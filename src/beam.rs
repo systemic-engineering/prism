@@ -1,8 +1,8 @@
-use crate::oid::Oid;
 use crate::loss::ShannonLoss;
+use crate::oid::Oid;
 use crate::precision::Precision;
 
-/// How a beam was recovered after a miss or degraded state.
+/// How a beam was recovered after a degraded projection.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Recovery {
     Coarsened { from: Precision, to: Precision },
@@ -10,10 +10,14 @@ pub enum Recovery {
     Failed { reason: String },
 }
 
-/// A focused result carrying its provenance: path through Oids, loss, precision, and recovery.
+/// The trace of a projection through a Prism.
+///
+/// Always lands. The result is always present. Loss tells you
+/// what didn't survive. The beam carries the story of how the
+/// result came to be: path, loss, precision, recovery.
 #[derive(Clone, Debug)]
 pub struct Beam<T> {
-    pub result: Option<T>,
+    pub result: T,
     pub path: Vec<Oid>,
     pub loss: ShannonLoss,
     pub precision: Precision,
@@ -21,9 +25,10 @@ pub struct Beam<T> {
 }
 
 impl<T> Beam<T> {
-    pub fn hit(value: T) -> Self {
+    /// Create a beam with a result and no loss.
+    pub fn new(result: T) -> Self {
         Beam {
-            result: Some(value),
+            result,
             path: Vec::new(),
             loss: ShannonLoss::zero(),
             precision: Precision::new(0.0),
@@ -31,35 +36,25 @@ impl<T> Beam<T> {
         }
     }
 
-    pub fn miss() -> Self {
-        Beam {
-            result: None,
-            path: Vec::new(),
-            loss: ShannonLoss::zero(),
-            precision: Precision::new(0.0),
-            recovered: None,
-        }
-    }
-
-    pub fn is_hit(&self) -> bool {
-        self.result.is_some()
-    }
-
-    pub fn is_miss(&self) -> bool {
-        self.result.is_none()
-    }
-
+    /// Whether the projection was lossless.
     pub fn is_lossless(&self) -> bool {
         self.loss.is_zero()
     }
 
+    /// Whether the projection lost information.
+    pub fn has_loss(&self) -> bool {
+        !self.loss.is_zero()
+    }
+
+    /// Whether recovery was attempted.
     pub fn was_recovered(&self) -> bool {
         self.recovered.is_some()
     }
 
+    /// Map the result, preserving the trace.
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Beam<U> {
         Beam {
-            result: self.result.map(f),
+            result: f(self.result),
             path: self.path,
             loss: self.loss,
             precision: self.precision,
@@ -67,21 +62,25 @@ impl<T> Beam<T> {
         }
     }
 
+    /// Add a step to the path.
     pub fn with_step(mut self, oid: Oid) -> Self {
         self.path.push(oid);
         self
     }
 
+    /// Set the precision.
     pub fn with_precision(mut self, precision: Precision) -> Self {
         self.precision = precision;
         self
     }
 
+    /// Set the loss.
     pub fn with_loss(mut self, loss: ShannonLoss) -> Self {
         self.loss = loss;
         self
     }
 
+    /// Set recovery.
     pub fn with_recovery(mut self, recovery: Recovery) -> Self {
         self.recovered = Some(recovery);
         self
@@ -93,64 +92,55 @@ mod tests {
     use super::*;
 
     #[test]
-    fn beam_hit() {
-        let b: Beam<i32> = Beam::hit(42);
-        assert!(b.is_hit());
-        assert!(!b.is_miss());
-        assert_eq!(b.result, Some(42));
+    fn beam_new() {
+        let b = Beam::new(42);
+        assert_eq!(b.result, 42);
+        assert!(b.is_lossless());
+        assert!(!b.has_loss());
     }
 
     #[test]
-    fn beam_miss() {
-        let b: Beam<i32> = Beam::miss();
-        assert!(b.is_miss());
-        assert!(!b.is_hit());
-        assert_eq!(b.result, None);
+    fn beam_has_loss() {
+        let b = Beam::new(0).with_loss(ShannonLoss::new(1.0));
+        assert!(b.has_loss());
+        assert!(!b.is_lossless());
     }
 
     #[test]
     fn beam_map() {
-        let b: Beam<i32> = Beam::hit(10);
-        let mapped = b.map(|x| x * 2);
-        assert_eq!(mapped.result, Some(20));
-    }
-
-    #[test]
-    fn beam_map_miss() {
-        let b: Beam<i32> = Beam::miss();
-        let mapped = b.map(|x| x * 2);
-        assert_eq!(mapped.result, None);
+        let b = Beam::new(10).map(|x| x * 2);
+        assert_eq!(b.result, 20);
     }
 
     #[test]
     fn beam_with_step() {
-        let b: Beam<i32> = Beam::hit(1).with_step(Oid::new("step-1"));
+        let b = Beam::new(1).with_step(Oid::new("step-1"));
         assert_eq!(b.path.len(), 1);
         assert_eq!(b.path[0].as_str(), "step-1");
     }
 
     #[test]
     fn beam_with_precision() {
-        let b: Beam<i32> = Beam::hit(1).with_precision(Precision::new(0.05));
+        let b = Beam::new(1).with_precision(Precision::new(0.05));
         assert_eq!(b.precision.as_f64(), 0.05);
     }
 
     #[test]
     fn beam_with_loss() {
-        let b: Beam<i32> = Beam::hit(1).with_loss(ShannonLoss::new(1.5));
+        let b = Beam::new(1).with_loss(ShannonLoss::new(1.5));
         assert_eq!(b.loss.as_f64(), 1.5);
         assert!(!b.is_lossless());
     }
 
     #[test]
     fn beam_was_recovered_false() {
-        let b: Beam<i32> = Beam::hit(1);
+        let b = Beam::new(1);
         assert!(!b.was_recovered());
     }
 
     #[test]
     fn beam_recovery_coarsened() {
-        let b: Beam<i32> = Beam::hit(1).with_recovery(Recovery::Coarsened {
+        let b = Beam::new(1).with_recovery(Recovery::Coarsened {
             from: Precision::new(0.01),
             to: Precision::new(0.1),
         });
@@ -166,7 +156,7 @@ mod tests {
 
     #[test]
     fn beam_recovery_replayed() {
-        let b: Beam<i32> = Beam::hit(1).with_recovery(Recovery::Replayed { from_step: 3 });
+        let b = Beam::new(1).with_recovery(Recovery::Replayed { from_step: 3 });
         assert!(b.was_recovered());
         match b.recovered.unwrap() {
             Recovery::Replayed { from_step } => assert_eq!(from_step, 3),
@@ -176,7 +166,7 @@ mod tests {
 
     #[test]
     fn beam_recovery_failed() {
-        let b: Beam<i32> = Beam::miss().with_recovery(Recovery::Failed {
+        let b = Beam::new(0).with_recovery(Recovery::Failed {
             reason: "no data".to_owned(),
         });
         assert!(b.was_recovered());
@@ -188,7 +178,7 @@ mod tests {
 
     #[test]
     fn beam_chained_builders() {
-        let b: Beam<&str> = Beam::hit("ok")
+        let b = Beam::new("ok")
             .with_step(Oid::new("a"))
             .with_step(Oid::new("b"))
             .with_precision(Precision::new(0.001))
@@ -200,9 +190,9 @@ mod tests {
 
     #[test]
     fn beam_clone() {
-        let a: Beam<i32> = Beam::hit(99).with_step(Oid::new("x"));
+        let a = Beam::new(99).with_step(Oid::new("x"));
         let b = a.clone();
-        assert_eq!(b.result, Some(99));
+        assert_eq!(b.result, 99);
         assert_eq!(b.path.len(), 1);
     }
 }
