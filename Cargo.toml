@@ -1,0 +1,8 @@
+[package]
+name = "prism"
+version = "0.1.0"
+edition = "2021"
+description = "Beam<T>, Oid, ShannonLoss, Precision, Pressure. The DATA DIVISION."
+
+[dependencies]
+# None. Depends on nothing.
