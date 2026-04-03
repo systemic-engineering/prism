@@ -1,4 +1,6 @@
-/// Content address. Newtype over String.
+/// Content address. The identity of a thing is its content.
+/// Two values with the same bytes have the same Oid.
+/// Oids are the nodes in every graph this system builds.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Oid(String);
 

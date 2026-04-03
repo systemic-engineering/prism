@@ -25,7 +25,10 @@ pub use precision::{Precision, Pressure};
 // The Prism trait — the five optic operations
 // ---------------------------------------------------------------------------
 
-/// The five optic operations.
+/// The five optic operations. The shared grammar of computation.
+///
+/// Any system that decomposes, projects, walks, transforms, and settles
+/// implements Prism. The parser. The compiler. The runtime. The database.
 ///
 /// Implementors provide concrete types for each stage.
 /// The Beam flows through, accumulating path, loss, precision.
@@ -74,8 +77,13 @@ pub trait Prism {
 
 /// Apply a Prism: fold → prism → lens.
 ///
-/// The Beam flows through each step.
-/// Loss accumulates. Precision narrows.
+/// The composition of the first three operations.
+/// Decompose the input, project at the given precision,
+/// transform the projection. The Beam carries the result
+/// through each step. Loss accumulates. Precision narrows.
+///
+/// Traversal and iso are not included — they are called
+/// separately when the caller needs to walk or settle.
 pub fn apply<P: Prism>(
     optic: &P,
     input: &P::Input,

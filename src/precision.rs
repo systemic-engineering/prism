@@ -1,4 +1,6 @@
-/// Measurement precision. Newtype over f64.
+/// The zoom level of a computation. Eigenvalues below this are zero.
+/// Higher precision = more detail = more compute.
+/// The prism operation uses precision to decide what survives the cut.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Precision(f64);
 
@@ -24,7 +26,9 @@ impl From<f64> for Precision {
     }
 }
 
-/// Load factor, clamped to [0.0, 1.0].
+/// Memory pressure. Precision applied to storage.
+/// How much room is left determines the resolution of what can be held.
+/// Clamped to [0.0, 1.0]. 0.0 = empty. 1.0 = full.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Pressure(f64);
 

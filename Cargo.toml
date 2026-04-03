@@ -2,7 +2,7 @@
 name = "prism"
 version = "0.1.0"
 edition = "2021"
-description = "Beam<T>, Oid, ShannonLoss, Precision, Pressure. The DATA DIVISION."
+description = "fold | prism | traversal | lens | iso. The five optic operations. Zero dependencies."
 
 [dependencies]
-# None. Depends on nothing.
+# None. Depends on nothing. The types outlive everything around them.

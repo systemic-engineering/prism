@@ -1,4 +1,6 @@
-/// Shannon loss in bits. Newtype over f64.
+/// What didn't survive the projection. Measured in bits.
+/// Every prism operation may lose information. The loss records how much.
+/// Zero loss = lossless projection = iso.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ShannonLoss(f64);
 
