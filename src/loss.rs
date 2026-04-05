@@ -22,6 +22,19 @@ impl ShannonLoss {
     }
 }
 
+impl std::ops::Add for ShannonLoss {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        ShannonLoss(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::AddAssign for ShannonLoss {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
 impl std::fmt::Display for ShannonLoss {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.6} bits", self.0)

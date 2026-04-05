@@ -85,6 +85,12 @@ impl<T> Beam<T> {
         self.recovered = Some(recovery);
         self
     }
+
+    /// Add to the existing loss (for boundary crossings).
+    pub fn accumulate_loss(mut self, additional: ShannonLoss) -> Self {
+        self.loss += additional;
+        self
+    }
 }
 
 #[cfg(test)]
