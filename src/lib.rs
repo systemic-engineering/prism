@@ -39,7 +39,7 @@ pub trait Prism {
     type Eigenvalues;
     /// What survives the precision cut.
     type Projection;
-    /// A node visited during traversal.
+    /// A node visited during split.
     type Node;
     /// Evidence that the system has settled.
     type Convergence;

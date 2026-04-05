@@ -1,6 +1,6 @@
 /// What didn't survive the projection. Measured in bits.
 /// Every prism operation may lose information. The loss records how much.
-/// Zero loss = lossless projection = iso.
+/// Zero loss = lossless projection = refract.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ShannonLoss(f64);
 

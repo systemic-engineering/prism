@@ -1,6 +1,6 @@
 /// The zoom level of a computation. Eigenvalues below this are zero.
 /// Higher precision = more detail = more compute.
-/// The prism operation uses precision to decide what survives the cut.
+/// The project operation uses precision to decide what survives the cut.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Precision(f64);
 
