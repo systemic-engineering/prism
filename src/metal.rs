@@ -35,23 +35,33 @@ pub struct Tape {
 
 impl Tape {
     pub fn new() -> Self {
-        todo!("Tape::new not implemented")
+        Tape {
+            cells: [0u8; 256],
+            dp: 0,
+        }
     }
 
-    pub fn read(&self, _offset: usize) -> u8 {
-        todo!("Tape::read not implemented")
+    /// Read a cell at dp + offset, bounds-checked.
+    pub fn read(&self, offset: usize) -> u8 {
+        let idx = (self.dp + offset).min(255);
+        self.cells[idx]
     }
 
-    pub fn write(&mut self, _offset: usize, _value: u8) {
-        todo!("Tape::write not implemented")
+    /// Write a cell at dp + offset, bounds-checked.
+    pub fn write(&mut self, offset: usize, value: u8) {
+        let idx = (self.dp + offset).min(255);
+        self.cells[idx] = value;
     }
 
-    pub fn add(&mut self, _offset: usize, _value: u8) {
-        todo!("Tape::add not implemented")
+    /// Add to a cell at dp + offset, wrapping.
+    pub fn add(&mut self, offset: usize, value: u8) {
+        let idx = (self.dp + offset).min(255);
+        self.cells[idx] = self.cells[idx].wrapping_add(value);
     }
 
-    pub fn advance(&mut self, _n: usize) {
-        todo!("Tape::advance not implemented")
+    /// Advance dp by n, clamped.
+    pub fn advance(&mut self, n: usize) {
+        self.dp = (self.dp + n).min(255);
     }
 }
 
@@ -63,8 +73,49 @@ impl Default for Tape {
 
 /// Execute a Metal program on a tape with input.
 /// Returns the output bytes.
-pub fn execute(_program: &[Instruction], _input: &[u8]) -> Vec<u8> {
-    todo!("execute not implemented")
+pub fn execute(program: &[Instruction], input: &[u8]) -> Vec<u8> {
+    let mut tape = Tape::new();
+    let mut inp = 0usize;
+    let mut output = Vec::new();
+
+    for instruction in program {
+        match instruction {
+            Instruction::Focus(n) => {
+                for _ in 0..*n {
+                    let byte = if inp < input.len() { input[inp] } else { 0 };
+                    tape.cells[tape.dp] = byte;
+                    tape.dp = (tape.dp + 1).min(255);
+                    inp += 1;
+                }
+            }
+            Instruction::Project(threshold) => {
+                for cell in tape.cells.iter_mut() {
+                    if *cell < *threshold {
+                        *cell = 0;
+                    }
+                }
+            }
+            Instruction::Split(n) => {
+                // Scan n cells from dp, find last nonzero, set dp there
+                let mut last_nonzero = tape.dp;
+                for i in 0..*n {
+                    let idx = (tape.dp + i).min(255);
+                    if tape.cells[idx] != 0 {
+                        last_nonzero = idx;
+                    }
+                }
+                tape.dp = last_nonzero;
+            }
+            Instruction::Zoom(offset, value) => {
+                tape.add(*offset, *value);
+            }
+            Instruction::Refract => {
+                output.push(tape.cells[tape.dp]);
+            }
+        }
+    }
+
+    output
 }
 
 #[cfg(test)]
@@ -93,10 +144,14 @@ mod tests {
 
     #[test]
     fn focus_zoom_refract_pipeline() {
+        // Read 2 inputs, add a weight, output the result
+        // Focus(2): cells[0]=5, cells[1]=7, dp=2
+        // Zoom(0, 10): cells[2] += 10 → cells[2]=10
+        // Refract: output cells[dp=2] = 10
         let program = vec![
-            Instruction::Focus(2),
-            Instruction::Zoom(0, 10),
-            Instruction::Refract,
+            Instruction::Focus(2),    // read 2 bytes → cells 0,1; dp=2
+            Instruction::Zoom(0, 10), // add 10 to cell at dp+0 = cell 2
+            Instruction::Refract,     // output cell at dp (cell 2) = 10
         ];
         let output = execute(&program, &[5, 7]);
         assert_eq!(output, vec![10]);
@@ -104,61 +159,66 @@ mod tests {
 
     #[test]
     fn split_finds_last_nonzero() {
+        // dp starts at 5 after Focus(5), cells 5+ are zero
         let program = vec![
-            Instruction::Focus(5),
-            Instruction::Split(5),
-            Instruction::Refract,
+            Instruction::Focus(5),  // read 5 bytes, dp=5
+            Instruction::Split(5),  // scan 5 cells from dp=5, all zero, dp stays at 5
+            Instruction::Refract,   // output cell at dp
         ];
+        // Input: cells 0-4 have values, cells 5+ are zero
         let output = execute(&program, &[0, 0, 10, 0, 20]);
+        // dp was 5, split scans 5 cells from 5 (all zero), dp stays at 5
         assert_eq!(output, vec![0]);
     }
 
     #[test]
     fn fate_selector_no_refract_produces_no_output() {
         let mut input = vec![0u8; 16];
-        input.push(0);
-        input.extend_from_slice(&[0, 10, 0, 0, 0]);
+        input.push(0); // context
+        input.extend_from_slice(&[0, 10, 0, 0, 0]); // biases: Pathfinder wins
+
         let program = vec![Instruction::Focus(22)];
         let output = execute(&program, &input);
-        assert!(output.is_empty());
+        assert!(output.is_empty()); // no Refract yet
     }
 
     #[test]
     fn project_zeroes_below_threshold() {
         let program = vec![
-            Instruction::Focus(3),
-            Instruction::Project(5),
+            Instruction::Focus(3),   // cells[0]=1, cells[1]=5, cells[2]=10; dp=3
+            Instruction::Project(5), // zero cells < 5 → cells[0]=0
         ];
         let output = execute(&program, &[1, 5, 10]);
-        assert!(output.is_empty());
+        assert!(output.is_empty()); // no Refract
     }
 
     #[test]
     fn instruction_count_for_fate() {
+        // The full Fate selector in Metal (without BF overhead):
         let program = vec![
-            Instruction::Focus(22),
-            Instruction::Zoom(0, 0),
-            Instruction::Split(5),
-            Instruction::Refract,
+            Instruction::Focus(22),  // 1 instruction
+            Instruction::Zoom(0, 0), // feature contribution (placeholder)
+            Instruction::Split(5),   // argmax
+            Instruction::Refract,    // output
         ];
-        assert_eq!(program.len(), 4);
+        assert_eq!(program.len(), 4); // The entire decision in 4 instructions
     }
 
     #[test]
     fn refract_outputs_current_cell() {
         let program = vec![
-            Instruction::Focus(1),
-            Instruction::Refract,
+            Instruction::Focus(1), // read 1 byte into cell 0, dp=1
+            Instruction::Refract,  // output cell at dp=1 (which is 0)
         ];
         let output = execute(&program, &[42]);
-        assert_eq!(output, vec![0]);
+        assert_eq!(output, vec![0]); // dp=1 after focus, cell 1 is 0
     }
 
     #[test]
     fn zoom_wraps_on_overflow() {
         let program = vec![
             Instruction::Zoom(0, 255),
-            Instruction::Zoom(0, 2),
+            Instruction::Zoom(0, 2), // 255 + 2 = 1 (wrapping)
             Instruction::Refract,
         ];
         let output = execute(&program, &[]);
@@ -185,7 +245,7 @@ mod tests {
     #[test]
     fn tape_advance_clamped() {
         let mut tape = Tape::new();
-        tape.advance(300);
+        tape.advance(300); // clamped to 255
         assert_eq!(tape.dp, 255);
     }
 }
