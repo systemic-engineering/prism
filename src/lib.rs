@@ -12,6 +12,7 @@
 pub mod beam;
 pub mod content;
 pub mod loss;
+pub mod metal;
 pub mod oid;
 pub mod precision;
 pub mod spectral_oid;
