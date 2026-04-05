@@ -195,4 +195,18 @@ mod tests {
         assert_eq!(b.result, 99);
         assert_eq!(b.path.len(), 1);
     }
+
+    #[test]
+    fn beam_accumulate_loss() {
+        let b = Beam::new(1)
+            .with_loss(ShannonLoss::new(1.0))
+            .accumulate_loss(ShannonLoss::new(0.5));
+        assert_eq!(b.loss.as_f64(), 1.5);
+    }
+
+    #[test]
+    fn beam_accumulate_loss_from_zero() {
+        let b = Beam::new(1).accumulate_loss(ShannonLoss::new(2.0));
+        assert_eq!(b.loss.as_f64(), 2.0);
+    }
 }

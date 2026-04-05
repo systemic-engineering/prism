@@ -78,4 +78,26 @@ mod tests {
         let b = ShannonLoss::new(1.0);
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn add() {
+        let a = ShannonLoss::new(1.0);
+        let b = ShannonLoss::new(2.5);
+        let c = a + b;
+        assert_eq!(c.as_f64(), 3.5);
+    }
+
+    #[test]
+    fn add_assign() {
+        let mut a = ShannonLoss::new(1.0);
+        a += ShannonLoss::new(0.5);
+        assert_eq!(a.as_f64(), 1.5);
+    }
+
+    #[test]
+    fn add_zero_is_identity() {
+        let a = ShannonLoss::new(3.0);
+        let b = a.clone() + ShannonLoss::zero();
+        assert_eq!(a, b);
+    }
 }
