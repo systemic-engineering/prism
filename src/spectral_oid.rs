@@ -3,15 +3,18 @@ use crate::precision::Precision;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-/// A content address paired with a Precision.
+/// A content address at a specific precision.
 ///
-/// Two SpectralOids are equal if their truncated eigenvalue representations
-/// match. The precision determines truncation depth: higher precision keeps
-/// more characters, lower precision keeps fewer. At coarse precision, strings
-/// that share a common prefix collapse to the same identity.
+/// Two SpectralOids are equal if their truncated eigenvalue
+/// representations match. The precision determines the truncation
+/// depth: fewer significant digits = coarser = more things are "equal".
 ///
-/// This is the cache key. The HashMap entry. The dedup boundary.
-/// The precision IS part of the identity.
+/// Equality is on the truncated form only. Two SpectralOids at
+/// different precisions may be equal if they happen to truncate
+/// identically.
+///
+/// Implements PartialEq, Eq, Hash — standard Rust equality semantics
+/// where equality IS spectral closeness.
 #[derive(Clone, Debug)]
 pub struct SpectralOid {
     raw: String,
@@ -56,7 +59,13 @@ fn truncation_len(total: usize, precision: &Precision) -> usize {
     if total == 0 {
         return 0;
     }
-    let keep = (total as f64 * precision.as_f64()).ceil() as usize;
+    let p = precision.as_f64();
+    debug_assert!(
+        p.is_finite() && p >= 0.0,
+        "precision must be finite and non-negative, got {p}"
+    );
+    let p_clamped = p.clamp(0.0, 1.0);
+    let keep = (total as f64 * p_clamped).ceil() as usize;
     keep.clamp(1, total)
 }
 
@@ -175,7 +184,7 @@ mod tests {
     fn minimum_one_char_kept() {
         // precision 0.0 → ceil(total * 0.0) = 0, clamped to 1
         let soid = SpectralOid::new("hello", Precision::new(0.0));
-        assert_eq!(soid.as_str().len(), 1);
+        assert_eq!(soid.as_str().chars().count(), 1);
     }
 
     #[test]
@@ -183,6 +192,23 @@ mod tests {
         let input = "hello world";
         let soid = SpectralOid::new(input, Precision::new(1.0));
         assert_eq!(soid.as_str(), input);
+    }
+
+    #[test]
+    fn unicode_truncation_by_chars_not_bytes() {
+        // 4 CJK characters, each 3 bytes in UTF-8
+        let input = "\u{4e00}\u{4e8c}\u{4e09}\u{56db}"; // 一二三四
+        let soid = SpectralOid::new(input, Precision::new(0.5));
+        assert_eq!(soid.as_str().chars().count(), 2);
+        assert_eq!(soid.as_str(), "\u{4e00}\u{4e8c}"); // 一二
+    }
+
+    #[test]
+    fn empty_string_produces_valid_oid() {
+        let soid = SpectralOid::new("", Precision::new(0.5));
+        assert_eq!(soid.as_str(), "");
+        assert_eq!(soid.raw(), "");
+        assert_eq!(soid.to_oid(), Oid::new(""));
     }
 
     #[test]
