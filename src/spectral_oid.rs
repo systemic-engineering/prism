@@ -3,6 +3,15 @@ use crate::precision::Precision;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
+/// A content address paired with a Precision.
+///
+/// Two SpectralOids are equal if their truncated eigenvalue representations
+/// match. The precision determines truncation depth: higher precision keeps
+/// more characters, lower precision keeps fewer. At coarse precision, strings
+/// that share a common prefix collapse to the same identity.
+///
+/// This is the cache key. The HashMap entry. The dedup boundary.
+/// The precision IS part of the identity.
 #[derive(Clone, Debug)]
 pub struct SpectralOid {
     raw: String,
@@ -11,50 +20,73 @@ pub struct SpectralOid {
 }
 
 impl SpectralOid {
-    pub fn new(_raw: impl Into<String>, _precision: Precision) -> Self {
-        todo!()
+    pub fn new(raw: impl Into<String>, precision: Precision) -> Self {
+        let raw = raw.into();
+        let len = truncation_len(raw.chars().count(), &precision);
+        let truncated: String = raw.chars().take(len).collect();
+        SpectralOid {
+            raw,
+            precision,
+            truncated,
+        }
     }
 
     pub fn raw(&self) -> &str {
-        todo!()
+        &self.raw
     }
 
     pub fn precision(&self) -> &Precision {
-        todo!()
+        &self.precision
     }
 
+    /// Returns the truncated form — the identity at this precision.
     pub fn as_str(&self) -> &str {
-        todo!()
+        &self.truncated
     }
 
+    /// Wraps the truncated form in an Oid.
     pub fn to_oid(&self) -> Oid {
-        todo!()
+        Oid::new(self.truncated.clone())
     }
 }
 
-fn truncation_len(_total: usize, _precision: &Precision) -> usize {
-    todo!()
+/// Maps a precision to the number of characters to keep from a string of
+/// `total` characters. Always keeps at least 1 character when total > 0.
+fn truncation_len(total: usize, precision: &Precision) -> usize {
+    if total == 0 {
+        return 0;
+    }
+    let keep = (total as f64 * precision.as_f64()).ceil() as usize;
+    keep.clamp(1, total)
 }
+
+// ---------------------------------------------------------------------------
+// Equality is on the truncated form
+// ---------------------------------------------------------------------------
 
 impl PartialEq for SpectralOid {
-    fn eq(&self, _other: &Self) -> bool {
-        todo!()
+    fn eq(&self, other: &Self) -> bool {
+        self.truncated == other.truncated
     }
 }
 
 impl Eq for SpectralOid {}
 
 impl Hash for SpectralOid {
-    fn hash<H: Hasher>(&self, _state: &mut H) {
-        todo!()
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.truncated.hash(state);
     }
 }
 
 impl fmt::Display for SpectralOid {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{}", self.truncated, self.precision)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -77,6 +109,7 @@ mod tests {
 
     #[test]
     fn coarse_precision_makes_similar_strings_equal() {
+        // 16 chars, precision 0.25 → ceil(16 * 0.25) = 4 chars kept
         let a = SpectralOid::new("abcd000000000000", Precision::new(0.25));
         let b = SpectralOid::new("abcd999999999999", Precision::new(0.25));
         assert_eq!(a.as_str(), "abcd");
@@ -119,6 +152,7 @@ mod tests {
 
     #[test]
     fn to_oid_uses_truncated() {
+        // 8 chars, precision 0.5 → ceil(8 * 0.5) = 4 chars kept
         let soid = SpectralOid::new("abcdefgh", Precision::new(0.5));
         let oid = soid.to_oid();
         assert_eq!(oid.as_str(), "abcd");
@@ -139,6 +173,7 @@ mod tests {
 
     #[test]
     fn minimum_one_char_kept() {
+        // precision 0.0 → ceil(total * 0.0) = 0, clamped to 1
         let soid = SpectralOid::new("hello", Precision::new(0.0));
         assert_eq!(soid.as_str().len(), 1);
     }
@@ -152,9 +187,13 @@ mod tests {
 
     #[test]
     fn truncation_len_edge_cases() {
+        // 0 → 0
         assert_eq!(truncation_len(0, &Precision::new(0.5)), 0);
+        // 10 at 0.0 → ceil(0) = 0, clamped to 1
         assert_eq!(truncation_len(10, &Precision::new(0.0)), 1);
+        // 10 at 1.0 → ceil(10) = 10
         assert_eq!(truncation_len(10, &Precision::new(1.0)), 10);
+        // 10 at 0.5 → ceil(5.0) = 5
         assert_eq!(truncation_len(10, &Precision::new(0.5)), 5);
     }
 }
