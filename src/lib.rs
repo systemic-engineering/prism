@@ -1,4 +1,4 @@
-//! Prism — fold | prism | traversal | lens | iso.
+//! Prism — focus | project | split | zoom | refract.
 //!
 //! Five operations. The optic hierarchy as a trait.
 //! The parser's vocabulary. The runtime's interface.
@@ -46,43 +46,43 @@ pub trait Prism {
     /// The immutable fixed point. The Fortran vector.
     type Crystal;
 
-    /// Fold: structure → eigenvalues. Read-only. Accumulate.
+    /// Focus: structure → eigenvalues. Read-only. Accumulate.
     /// The decomposition. Observe without modifying.
-    fn fold(&self, input: &Self::Input) -> Beam<Self::Eigenvalues>;
+    fn focus(&self, input: &Self::Input) -> Beam<Self::Eigenvalues>;
 
-    /// Prism: eigenvalues → projection. Partial. Precision-bounded.
+    /// Project: eigenvalues → projection. Partial. Precision-bounded.
     /// The boundary test. Returns what survives the cut.
-    fn prism(
+    fn project(
         &self,
         eigenvalues: &Self::Eigenvalues,
         precision: Precision,
     ) -> Beam<Self::Projection>;
 
-    /// Traversal: walk the projection. Multiple targets. Accumulate Beams.
+    /// Split: walk the projection. Multiple targets. Accumulate Beams.
     /// The multi-site observation.
-    fn traversal(&self, projection: &Self::Projection) -> Vec<Beam<Self::Node>>;
+    fn split(&self, projection: &Self::Projection) -> Vec<Beam<Self::Node>>;
 
-    /// Lens: focus, transform, put back. The recursive step.
+    /// Zoom: focus, transform, put back. The recursive step.
     /// Apply a function to the projection. Return the modified Beam.
-    fn lens(
+    fn zoom(
         &self,
         beam: Beam<Self::Projection>,
         f: &dyn Fn(Self::Projection) -> Self::Projection,
     ) -> Beam<Self::Projection>;
 
-    /// Iso: the fixed point. Lossless. Invertible. Immutable.
+    /// Refract: the fixed point. Lossless. Invertible. Immutable.
     /// The crystal. Only callable when convergence is proven.
-    fn iso(&self, beam: Beam<Self::Convergence>) -> Self::Crystal;
+    fn refract(&self, beam: Beam<Self::Convergence>) -> Self::Crystal;
 }
 
-/// Apply a Prism: fold → prism → lens.
+/// Apply a Prism: focus → project → zoom.
 ///
 /// The composition of the first three operations.
 /// Decompose the input, project at the given precision,
 /// transform the projection. The Beam carries the result
 /// through each step. Loss accumulates. Precision narrows.
 ///
-/// Traversal and iso are not included — they are called
+/// Split and refract are not included — they are called
 /// separately when the caller needs to walk or settle.
 pub fn apply<P: Prism>(
     optic: &P,
@@ -90,9 +90,9 @@ pub fn apply<P: Prism>(
     precision: Precision,
     transform: &dyn Fn(P::Projection) -> P::Projection,
 ) -> Beam<P::Projection> {
-    let eigenvalues = optic.fold(input);
-    let projection = optic.prism(&eigenvalues.result, precision);
-    optic.lens(projection, transform)
+    let eigenvalues = optic.focus(input);
+    let projection = optic.project(&eigenvalues.result, precision);
+    optic.zoom(projection, transform)
 }
 
 // ---------------------------------------------------------------------------
@@ -113,11 +113,11 @@ mod tests {
         type Convergence = String;
         type Crystal = String;
 
-        fn fold(&self, input: &String) -> Beam<Vec<char>> {
+        fn focus(&self, input: &String) -> Beam<Vec<char>> {
             Beam::new(input.chars().collect())
         }
 
-        fn prism(&self, eigenvalues: &Vec<char>, precision: Precision) -> Beam<String> {
+        fn project(&self, eigenvalues: &Vec<char>, precision: Precision) -> Beam<String> {
             let cutoff = (eigenvalues.len() as f64 * precision.as_f64()) as usize;
             let kept: String = eigenvalues[..cutoff.min(eigenvalues.len())]
                 .iter()
@@ -128,7 +128,7 @@ mod tests {
                 .with_precision(precision)
         }
 
-        fn traversal(&self, projection: &String) -> Vec<Beam<char>> {
+        fn split(&self, projection: &String) -> Vec<Beam<char>> {
             projection
                 .chars()
                 .enumerate()
@@ -136,7 +136,7 @@ mod tests {
                 .collect()
         }
 
-        fn lens(
+        fn zoom(
             &self,
             beam: Beam<String>,
             f: &dyn Fn(String) -> String,
@@ -144,70 +144,70 @@ mod tests {
             beam.map(f)
         }
 
-        fn iso(&self, beam: Beam<String>) -> String {
+        fn refract(&self, beam: Beam<String>) -> String {
             beam.result
         }
     }
 
     #[test]
-    fn fold_decomposes() {
+    fn focus_decomposes() {
         let p = StringPrism;
-        let beam = p.fold(&"hello".to_string());
+        let beam = p.focus(&"hello".to_string());
         assert_eq!(beam.result, vec!['h', 'e', 'l', 'l', 'o']);
         assert!(beam.is_lossless());
     }
 
     #[test]
-    fn prism_projects_with_precision() {
+    fn project_with_precision() {
         let p = StringPrism;
         let eigenvalues = vec!['h', 'e', 'l', 'l', 'o'];
-        let beam = p.prism(&eigenvalues, Precision::new(0.6));
+        let beam = p.project(&eigenvalues, Precision::new(0.6));
         assert_eq!(beam.result, "hel");
         assert!(beam.has_loss());
     }
 
     #[test]
-    fn prism_full_precision_is_lossless() {
+    fn project_full_precision_is_lossless() {
         let p = StringPrism;
         let eigenvalues = vec!['h', 'i'];
-        let beam = p.prism(&eigenvalues, Precision::new(1.0));
+        let beam = p.project(&eigenvalues, Precision::new(1.0));
         assert_eq!(beam.result, "hi");
         assert!(beam.is_lossless());
     }
 
     #[test]
-    fn traversal_walks_nodes() {
+    fn split_walks_nodes() {
         let p = StringPrism;
-        let beams = p.traversal(&"abc".to_string());
+        let beams = p.split(&"abc".to_string());
         assert_eq!(beams.len(), 3);
         assert_eq!(beams[0].result, 'a');
         assert_eq!(beams[0].path[0].as_str(), "0");
     }
 
     #[test]
-    fn lens_transforms() {
+    fn zoom_transforms() {
         let p = StringPrism;
         let beam = Beam::new("hello".to_string());
-        let transformed = p.lens(beam, &|s| s.to_uppercase());
+        let transformed = p.zoom(beam, &|s| s.to_uppercase());
         assert_eq!(transformed.result, "HELLO");
     }
 
     #[test]
-    fn lens_preserves_trace() {
+    fn zoom_preserves_trace() {
         let p = StringPrism;
         let beam = Beam::new("x".to_string())
             .with_step(Oid::new("origin"))
             .with_loss(ShannonLoss::new(0.5));
-        let transformed = p.lens(beam, &|s| s.to_uppercase());
+        let transformed = p.zoom(beam, &|s| s.to_uppercase());
         assert_eq!(transformed.result, "X");
         assert_eq!(transformed.path[0].as_str(), "origin");
         assert!(transformed.has_loss());
     }
 
     #[test]
-    fn iso_crystallizes() {
+    fn refract_crystallizes() {
         let p = StringPrism;
-        let crystal = p.iso(Beam::new("settled".to_string()));
+        let crystal = p.refract(Beam::new("settled".to_string()));
         assert_eq!(crystal, "settled");
     }
 
