@@ -47,6 +47,10 @@ pub trait Prism {
     type Convergence;
     /// The immutable fixed point. The Fortran vector.
     type Crystal;
+    /// The precision type used to bound the project operation.
+    /// Implementors set this to the concrete type they accept
+    /// (e.g. `type Precision = prism::Precision`).
+    type Precision;
 
     /// Focus: structure → eigenvalues. Read-only. Accumulate.
     /// The decomposition. Observe without modifying.
@@ -57,7 +61,7 @@ pub trait Prism {
     fn project(
         &self,
         eigenvalues: &Self::Eigenvalues,
-        precision: Precision,
+        precision: Self::Precision,
     ) -> Beam<Self::Projection>;
 
     /// Split: walk the projection. Multiple targets. Accumulate Beams.
@@ -89,7 +93,7 @@ pub trait Prism {
 pub fn apply<P: Prism>(
     optic: &P,
     input: &P::Input,
-    precision: Precision,
+    precision: P::Precision,
     transform: &dyn Fn(P::Projection) -> P::Projection,
 ) -> Beam<P::Projection> {
     let eigenvalues = optic.focus(input);
@@ -114,6 +118,7 @@ mod tests {
         type Node = char;
         type Convergence = String;
         type Crystal = String;
+        type Precision = Precision;
 
         fn focus(&self, input: &String) -> Beam<Vec<char>> {
             Beam::new(input.chars().collect())
