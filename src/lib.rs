@@ -14,12 +14,14 @@ pub mod content;
 pub mod loss;
 pub mod oid;
 pub mod precision;
+pub mod spectral_oid;
 
 pub use beam::{Beam, Recovery};
 pub use content::ContentAddressed;
 pub use loss::ShannonLoss;
 pub use oid::Oid;
 pub use precision::{Precision, Pressure};
+pub use spectral_oid::SpectralOid;
 
 // ---------------------------------------------------------------------------
 // The Prism trait — the five optic operations
