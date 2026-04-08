@@ -174,6 +174,105 @@ impl<T: Clone + 'static> PrismMonoid for IdPrism<T> {
     }
 }
 
+/// Test helper: a prism carrying a `count` field. Composing two
+/// CountPrisms sums their counts, giving a non-trivial monoid. Used
+/// to exercise identity and associativity laws.
+///
+/// The count has no semantic role beyond testing — it's the monoid
+/// element witness.
+#[cfg(test)]
+#[derive(Debug, Clone)]
+pub struct CountPrism {
+    count: u64,
+}
+
+#[cfg(test)]
+impl CountPrism {
+    pub fn new(count: u64) -> Self {
+        CountPrism { count }
+    }
+    pub fn count(&self) -> u64 {
+        self.count
+    }
+}
+
+#[cfg(test)]
+impl Prism for CountPrism {
+    type Input = String;
+    type Focused = String;
+    type Projected = String;
+    type Part = char;
+    type Crystal = CountPrism;
+
+    fn focus(&self, beam: Beam<String>) -> Beam<String> {
+        Beam {
+            result: beam.result,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
+    }
+
+    fn project(&self, beam: Beam<String>) -> Beam<String> {
+        Beam {
+            result: beam.result,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Projected,
+        }
+    }
+
+    fn split(&self, beam: Beam<String>) -> Vec<Beam<char>> {
+        beam.result
+            .chars()
+            .map(|c| Beam {
+                result: c,
+                path: beam.path.clone(),
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Split,
+            })
+            .collect()
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<String>,
+        f: &dyn Fn(Beam<String>) -> Beam<String>,
+    ) -> Beam<String> {
+        f(beam)
+    }
+
+    fn refract(&self, beam: Beam<String>) -> Beam<CountPrism> {
+        Beam {
+            result: CountPrism { count: self.count },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
+
+#[cfg(test)]
+impl PrismMonoid for CountPrism {
+    fn identity_prism() -> Self {
+        CountPrism { count: 0 }
+    }
+
+    fn compose(self, other: Self) -> Self {
+        CountPrism {
+            count: self.count + other.count,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
