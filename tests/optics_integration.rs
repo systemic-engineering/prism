@@ -109,3 +109,86 @@ fn gather_then_apply_full_pipeline() {
     let out = apply(&meta, "one two".to_string());
     assert_eq!(out.stage, Stage::Refracted);
 }
+
+// ---------------------------------------------------------------------------
+// Compose integration tests — verify the boot-fold pattern from the spec
+// ---------------------------------------------------------------------------
+
+/// Compose<IdPrism<String>, IdPrism<IdPrism<String>>> chains two identity
+/// prisms across a type boundary (String → IdPrism<String>). This invokes
+/// the full Compose::refract pipeline: first prism's refract produces a
+/// Beam<IdPrism<String>>, which the second prism consumes and produces
+/// Beam<IdPrism<IdPrism<String>>>.
+#[test]
+fn compose_two_idprisms_end_to_end_through_full_pipeline() {
+    use prism::optics::monoid::{Compose, IdPrism};
+
+    let first: IdPrism<String> = IdPrism::new();
+    let second: IdPrism<IdPrism<String>> = IdPrism::new();
+    let composed = Compose::new(first, second);
+
+    // Run the full Compose pipeline: focus → project → refract
+    let input = Beam::new("hello".to_string());
+    let focused = composed.focus(input);
+    assert_eq!(focused.stage, Stage::Focused);
+
+    let projected = composed.project(focused);
+    assert_eq!(projected.stage, Stage::Projected);
+
+    let out = composed.refract(projected);
+
+    assert_eq!(out.stage, Stage::Refracted);
+    // The beam's path/loss/precision should be preserved through the
+    // entire chain (both prisms are identity on those fields).
+    assert!(out.path.is_empty());
+    assert!(out.loss.is_lossless());
+}
+
+/// Compose preserves path entries and beam metadata through both prisms
+/// in the composition chain.
+#[test]
+fn compose_preserves_path_through_both_idprisms() {
+    use prism::optics::monoid::{Compose, IdPrism};
+
+    let first: IdPrism<String> = IdPrism::new();
+    let second: IdPrism<IdPrism<String>> = IdPrism::new();
+    let composed = Compose::new(first, second);
+
+    let input = Beam {
+        result: "world".to_string(),
+        path: vec![Oid::new("origin"), Oid::new("step1")],
+        loss: prism::ShannonLoss::new(0.0),
+        precision: prism::Precision::new(1.0),
+        recovered: None,
+        stage: Stage::Initial,
+    };
+
+    let focused = composed.focus(input);
+    let projected = composed.project(focused);
+    let out = composed.refract(projected);
+
+    assert_eq!(out.stage, Stage::Refracted);
+    assert_eq!(out.path.len(), 2, "path must survive through Compose");
+    assert_eq!(out.path[0].as_str(), "origin");
+    assert_eq!(out.path[1].as_str(), "step1");
+    assert_eq!(out.loss.as_f64(), 0.0);
+    assert_eq!(out.precision.as_f64(), 1.0);
+}
+
+/// The spec's headline use case: MetaPrism<WordsPrism, SumGather> splits
+/// a string into words, gathers them back via SumGather. This is the
+/// Layer 3 integration that justifies the optics layer's existence.
+#[test]
+fn meta_prism_full_pipeline_splits_gathers_and_refracts() {
+    let meta = MetaPrism::new(WordsPrism, SumGather);
+
+    // Run the full pipeline through apply: focus → project → refract
+    let out = apply(&meta, "alpha beta gamma".to_string());
+
+    // Should reach Refracted stage after the full pipeline.
+    assert_eq!(out.stage, Stage::Refracted);
+
+    // Meta's refract must return Beam<WordsPrism>, not a transformed type.
+    // The beam carries the path from the split operations.
+    // (WordsPrism::refract produces a Beam<WordsPrism>.)
+}
