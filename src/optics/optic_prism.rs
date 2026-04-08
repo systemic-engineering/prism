@@ -126,63 +126,85 @@ impl<S: Clone + Default + 'static, A: Clone + Default + 'static> Prism for Optic
 mod tests {
     use super::*;
 
-    #[derive(Clone, Default, Debug, PartialEq)]
+    // Shape has NO Default derive — verifying A: Default is not required.
+    #[derive(Clone, Debug, PartialEq)]
     enum Shape {
         Circle(i32),
         Square(i32),
-        #[default]
         Empty,
     }
 
-    #[test]
-    fn optic_prism_preview_succeeds_for_matching_case() {
-        let circle_prism: OpticPrism<Shape, i32> = OpticPrism::new(
-            |s: &Shape| if let Shape::Circle(r) = s { Some(*r) } else { None },
-            |r: i32| Shape::Circle(r),
-        );
+    fn circle_prism() -> OpticPrism<Shape, i32> {
+        OpticPrism::new(
+            |s: &Shape| matches!(s, Shape::Circle(_)),            // match_fn
+            |s: &Shape| if let Shape::Circle(r) = s { *r } else { -1 }, // extract_fn: sentinel -1 on no-match
+            |r: i32| Shape::Circle(r),                            // review_fn
+        )
+    }
 
-        assert_eq!(circle_prism.preview(&Shape::Circle(5)), Some(5));
-        assert_eq!(circle_prism.preview(&Shape::Square(3)), None);
+    #[test]
+    fn optic_prism_matches_reports_true_for_circle() {
+        let p = circle_prism();
+        assert!(p.matches(&Shape::Circle(5)));
+        assert!(!p.matches(&Shape::Square(3)));
+        assert!(!p.matches(&Shape::Empty));
+    }
+
+    #[test]
+    fn optic_prism_extract_returns_some_on_match_none_on_mismatch() {
+        let p = circle_prism();
+        assert_eq!(p.extract(&Shape::Circle(5)), Some(5));
+        assert_eq!(p.extract(&Shape::Square(3)), None);
     }
 
     #[test]
     fn optic_prism_review_reconstructs() {
-        let circle_prism: OpticPrism<Shape, i32> = OpticPrism::new(
-            |s: &Shape| if let Shape::Circle(r) = s { Some(*r) } else { None },
-            |r: i32| Shape::Circle(r),
-        );
-
-        assert_eq!(circle_prism.review(7), Shape::Circle(7));
+        let p = circle_prism();
+        assert_eq!(p.review(7), Shape::Circle(7));
     }
 
+    // Prism trait: focus on a MATCHING input → lossless Beam<A> (no Option in type).
     #[test]
-    fn optic_prism_project_encodes_refutation_as_infinite_loss() {
-        let circle_prism: OpticPrism<Shape, i32> = OpticPrism::new(
-            |s: &Shape| if let Shape::Circle(r) = s { Some(*r) } else { None },
-            |r: i32| Shape::Circle(r),
-        );
-
-        // Focus a Square — preview yields None.
-        let beam = Beam::new(Shape::Square(3));
-        let focused = circle_prism.focus(beam);
-        assert_eq!(focused.result, None);
-
-        // Project the None — loss becomes infinite.
-        let projected = circle_prism.project(focused);
-        assert!(projected.loss.as_f64().is_infinite());
+    fn optic_prism_focus_matching_case_is_lossless() {
+        let p = circle_prism();
+        let beam: Beam<i32> = p.focus(Beam::new(Shape::Circle(42)));
+        assert_eq!(beam.result, 42);
+        assert!(beam.loss.is_zero());
+        assert_eq!(beam.stage, Stage::Focused);
     }
 
+    // Prism trait: focus on a NON-MATCHING input → infinite-loss Beam<A>,
+    // result is the sentinel the closure author chose (not A::default()).
+    #[test]
+    fn optic_prism_focus_nonmatch_produces_infinite_loss_without_default() {
+        let p = circle_prism();
+        let beam: Beam<i32> = p.focus(Beam::new(Shape::Square(3)));
+        assert!(beam.loss.as_f64().is_infinite(), "loss must be infinite on refutation");
+        // The sentinel is -1, which proves we did NOT call A::default().
+        // (i32::default() would be 0, not -1.)
+        assert_eq!(beam.result, -1, "extract_fn sentinel must be -1, not A::default()");
+        assert_eq!(beam.stage, Stage::Focused);
+    }
+
+    // Prism trait: project on a matched beam is a simple stage transition.
     #[test]
     fn optic_prism_project_matching_case_is_lossless() {
-        let circle_prism: OpticPrism<Shape, i32> = OpticPrism::new(
-            |s: &Shape| if let Shape::Circle(r) = s { Some(*r) } else { None },
-            |r: i32| Shape::Circle(r),
-        );
-
-        let beam = Beam::new(Shape::Circle(42));
-        let focused = circle_prism.focus(beam);
-        let projected = circle_prism.project(focused);
+        let p = circle_prism();
+        let focused = p.focus(Beam::new(Shape::Circle(42)));
+        let projected = p.project(focused);
         assert_eq!(projected.result, 42);
         assert!(projected.loss.is_zero());
+        assert_eq!(projected.stage, Stage::Projected);
+    }
+
+    // Prism trait: project on a refuted beam preserves infinite loss.
+    #[test]
+    fn optic_prism_project_preserves_infinite_loss() {
+        let p = circle_prism();
+        let focused = p.focus(Beam::new(Shape::Square(3)));
+        assert!(focused.loss.as_f64().is_infinite());
+        let projected = p.project(focused);
+        assert!(projected.loss.as_f64().is_infinite());
+        assert_eq!(projected.stage, Stage::Projected);
     }
 }
