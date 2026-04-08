@@ -22,3 +22,4 @@ pub mod iso;
 pub mod lens;
 pub mod traversal;
 pub mod optic_prism;
+pub mod setter;

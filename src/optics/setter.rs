@@ -1,0 +1,95 @@
+//! Setter — the write-only optic.
+//!
+//! A Setter<S, A> provides a way to modify A within S by applying a
+//! function, without giving observational access. It's the weakest of
+//! the optic kinds — Fold + Setter with the read side removed.
+
+use crate::{Beam, Prism, Stage};
+use std::marker::PhantomData;
+
+pub struct Setter<S, A> {
+    modify_fn: Box<dyn Fn(S, &dyn Fn(A) -> A) -> S>,
+    _phantom: PhantomData<(S, A)>,
+}
+
+impl<S: 'static, A: 'static> Setter<S, A> {
+    pub fn new<M>(modify: M) -> Self
+    where
+        M: Fn(S, &dyn Fn(A) -> A) -> S + 'static,
+    {
+        Setter {
+            modify_fn: Box::new(modify),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn modify<F>(&self, s: S, f: F) -> S
+    where
+        F: Fn(A) -> A + 'static,
+    {
+        (self.modify_fn)(s, &f)
+    }
+}
+
+impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
+    type Input = S;
+    type Focused = S;
+    type Projected = S;
+    type Part = S;
+    type Crystal = SetterCrystal<S, A>;
+
+    fn focus(&self, beam: Beam<S>) -> Beam<S> { todo!() }
+    fn project(&self, beam: Beam<S>) -> Beam<S> { todo!() }
+    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { todo!() }
+    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { todo!() }
+    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> { todo!() }
+}
+
+pub struct SetterCrystal<S, A> { _phantom: PhantomData<(S, A)> }
+
+impl<S: Clone + 'static, A: Clone + 'static> Prism for SetterCrystal<S, A> {
+    type Input = S;
+    type Focused = S;
+    type Projected = S;
+    type Part = S;
+    type Crystal = SetterCrystal<S, A>;
+
+    fn focus(&self, beam: Beam<S>) -> Beam<S> { todo!() }
+    fn project(&self, beam: Beam<S>) -> Beam<S> { todo!() }
+    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { todo!() }
+    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { todo!() }
+    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> { todo!() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct Box2 { label: String, count: i32 }
+
+    #[test]
+    fn setter_modifies_field_via_function() {
+        let count_setter: Setter<Box2, i32> = Setter::new(
+            |b: Box2, f: &dyn Fn(i32) -> i32| Box2 { count: f(b.count), ..b },
+        );
+
+        let b = Box2 { label: "test".to_string(), count: 5 };
+        let b2 = count_setter.modify(b, |c| c + 10);
+        assert_eq!(b2.count, 15);
+        assert_eq!(b2.label, "test");
+    }
+
+    #[test]
+    fn setter_refract_crystallizes() {
+        let count_setter: Setter<Box2, i32> = Setter::new(
+            |b: Box2, f: &dyn Fn(i32) -> i32| Box2 { count: f(b.count), ..b },
+        );
+
+        let beam = Beam::new(Box2 { label: "x".to_string(), count: 0 });
+        let focused = count_setter.focus(beam);
+        let projected = count_setter.project(focused);
+        let refracted = count_setter.refract(projected);
+        assert_eq!(refracted.stage, Stage::Refracted);
+    }
+}
