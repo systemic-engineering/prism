@@ -55,9 +55,14 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
     fn split(&self, beam: Beam<Vec<B>>) -> Vec<Beam<B>> {
         beam.result
             .into_iter()
-            .map(|b| Beam {
+            .enumerate()
+            .map(|(i, b)| Beam {
                 result: b,
-                path: beam.path.clone(),
+                path: {
+                    let mut p = beam.path.clone();
+                    p.push(crate::Oid::new(format!("{}", i)));
+                    p
+                },
                 loss: beam.loss.clone(),
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
@@ -102,9 +107,14 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for TraversalCrystal<A, B> {
     fn split(&self, beam: Beam<Vec<B>>) -> Vec<Beam<B>> {
         beam.result
             .into_iter()
-            .map(|b| Beam {
+            .enumerate()
+            .map(|(i, b)| Beam {
                 result: b,
-                path: beam.path.clone(),
+                path: {
+                    let mut p = beam.path.clone();
+                    p.push(crate::Oid::new(format!("{}", i)));
+                    p
+                },
                 loss: beam.loss.clone(),
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),

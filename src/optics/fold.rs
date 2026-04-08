@@ -53,9 +53,14 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
     fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> {
         beam.result
             .into_iter()
-            .map(|a| Beam {
+            .enumerate()
+            .map(|(i, a)| Beam {
                 result: a,
-                path: beam.path.clone(),
+                path: {
+                    let mut p = beam.path.clone();
+                    p.push(crate::Oid::new(format!("{}", i)));
+                    p
+                },
                 loss: beam.loss.clone(),
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
@@ -94,9 +99,14 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for FoldCrystal<S, A> {
     fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> {
         beam.result
             .into_iter()
-            .map(|a| Beam {
+            .enumerate()
+            .map(|(i, a)| Beam {
                 result: a,
-                path: beam.path.clone(),
+                path: {
+                    let mut p = beam.path.clone();
+                    p.push(crate::Oid::new(format!("{}", i)));
+                    p
+                },
                 loss: beam.loss.clone(),
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
