@@ -273,10 +273,99 @@ impl PrismMonoid for CountPrism {
     }
 }
 
+/// Test helper: a prism that embeds its own `marker` string into the
+/// crystal it refracts. Two `MarkerPrism`s with different markers
+/// produce observably different crystals, letting us verify that
+/// `Compose<P1, P2>::refract` runs **both** prisms in order.
+///
+/// `Crystal = MarkerPrism`, so a second prism whose `Input = MarkerPrism`
+/// can be chained via `Compose` — satisfying `P2::Input = P1::Crystal`.
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct MarkerPrism {
+    pub marker: String,
+}
+
+#[cfg(test)]
+impl MarkerPrism {
+    pub fn new(marker: impl Into<String>) -> Self {
+        MarkerPrism { marker: marker.into() }
+    }
+}
+
+#[cfg(test)]
+impl Prism for MarkerPrism {
+    type Input = String;
+    type Focused = String;
+    type Projected = String;
+    type Part = char;
+    type Crystal = MarkerPrism;
+
+    fn focus(&self, beam: Beam<String>) -> Beam<String> {
+        Beam {
+            result: beam.result,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
+    }
+
+    fn project(&self, beam: Beam<String>) -> Beam<String> {
+        Beam {
+            result: beam.result,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Projected,
+        }
+    }
+
+    fn split(&self, beam: Beam<String>) -> Vec<Beam<char>> {
+        beam.result
+            .chars()
+            .map(|c| Beam {
+                result: c,
+                path: beam.path.clone(),
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Split,
+            })
+            .collect()
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<String>,
+        f: &dyn Fn(Beam<String>) -> Beam<String>,
+    ) -> Beam<String> {
+        f(beam)
+    }
+
+    /// Embeds `self.marker` and the incoming beam's result into the
+    /// crystal's marker field.  After `Compose`, inspection of the
+    /// outermost crystal's marker tells us which prism ran last.
+    fn refract(&self, beam: Beam<String>) -> Beam<MarkerPrism> {
+        Beam {
+            result: MarkerPrism {
+                marker: format!("{}:{}", self.marker, beam.result),
+            },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Stage;
+    use crate::{Oid, ShannonLoss, Stage};
 
     #[test]
     fn id_prism_refracts_beam_unchanged() {
@@ -364,5 +453,136 @@ mod tests {
         }
         // Just check it compiles.
         let _ = _require_compose_exists(IdPrism::<String>::new(), IdPrism::<String>::new());
+    }
+
+    // ── Real Compose<P1, P2>::refract tests ──────────────────────────────────
+    //
+    // The three tests below exercise `Compose::refract` with *distinct* prism
+    // types across a genuine type boundary:
+    //
+    //   P1 = MarkerPrism          (Input=String,       Crystal=MarkerPrism)
+    //   P2 = IdPrism<MarkerPrism> (Input=MarkerPrism,  Crystal=IdPrism<MarkerPrism>)
+    //
+    // Because P1::Crystal = MarkerPrism = P2::Input, the Compose constraint is
+    // satisfied.  This is the first test that actually calls
+    // `Compose::refract` end-to-end.
+
+    /// Compose<MarkerPrism, IdPrism<MarkerPrism>> must reach Stage::Refracted
+    /// and the resulting crystal must be an IdPrism wrapping a MarkerPrism that
+    /// carries the marker text.  This verifies the full pipeline ran through
+    /// both prisms.
+    #[test]
+    fn compose_runs_first_then_second_refract() {
+        let first = MarkerPrism::new("alpha");
+        let second: IdPrism<MarkerPrism> = IdPrism::new();
+        let composed = Compose::new(first, second);
+
+        let input = Beam::new("hello".to_string());
+
+        // Full pipeline through the composed prism.
+        let focused = composed.focus(input);
+        assert_eq!(focused.stage, Stage::Focused);
+
+        let projected = composed.project(focused);
+        assert_eq!(projected.stage, Stage::Projected);
+
+        // `refract` must run MarkerPrism's refract, then pipe the resulting
+        // Beam<MarkerPrism> through IdPrism<MarkerPrism>'s focus→project→refract.
+        let out = composed.refract(projected);
+
+        assert_eq!(out.stage, Stage::Refracted);
+        // IdPrism's refract drops the result value and replaces it with a new
+        // IdPrism — but the stage survives.
+        assert_eq!(out.result.marker(), "id");
+    }
+
+    /// Path, loss, and precision must survive through both prisms in the chain.
+    #[test]
+    fn compose_path_survives_through_both_prisms() {
+        let first = MarkerPrism::new("first");
+        let second: IdPrism<MarkerPrism> = IdPrism::new();
+        let composed = Compose::new(first, second);
+
+        let input = Beam {
+            result: "x".to_string(),
+            path: vec![Oid::new("origin")],
+            loss: ShannonLoss::new(0.5),
+            precision: crate::Precision::new(0.9),
+            recovered: None,
+            stage: Stage::Initial,
+        };
+
+        let focused = composed.focus(input);
+        let projected = composed.project(focused);
+        let out = composed.refract(projected);
+
+        assert_eq!(out.stage, Stage::Refracted);
+        assert_eq!(out.path.len(), 1, "path must survive through Compose");
+        assert_eq!(out.path[0].as_str(), "origin");
+        // Loss and precision must be preserved by the passthrough prisms.
+        assert_eq!(out.loss.as_f64(), 0.5);
+        assert_eq!(out.precision.as_f64(), 0.9);
+    }
+
+    /// Associativity via a 3-prism chain: `(a . b) . c ≡ a . (b . c)`.
+    ///
+    /// Both groupings must produce the same observable output (stage, path,
+    /// loss, precision) on identical input beams.
+    ///
+    /// Chain:
+    ///   a = MarkerPrism
+    ///   b = IdPrism<MarkerPrism>
+    ///   c = IdPrism<IdPrism<MarkerPrism>>
+    ///
+    /// left_assoc  = Compose<Compose<MarkerPrism, IdPrism<MarkerPrism>>,
+    ///                        IdPrism<IdPrism<MarkerPrism>>>
+    /// right_assoc = Compose<MarkerPrism,
+    ///                        Compose<IdPrism<MarkerPrism>, IdPrism<IdPrism<MarkerPrism>>>>
+    #[test]
+    fn compose_associativity_via_distinct_prism_chain() {
+        let a = MarkerPrism::new("a");
+        let b: IdPrism<MarkerPrism> = IdPrism::new();
+        let c: IdPrism<IdPrism<MarkerPrism>> = IdPrism::new();
+
+        let left_assoc = Compose::new(Compose::new(a.clone(), b.clone()), c.clone());
+        let right_assoc = Compose::new(a, Compose::new(b, c));
+
+        let make_beam = || Beam {
+            result: "test".to_string(),
+            path: vec![Oid::new("root")],
+            loss: ShannonLoss::new(1.0),
+            precision: crate::Precision::new(0.75),
+            recovered: None,
+            stage: Stage::Initial,
+        };
+
+        // Run each side inline — the two concrete Compose types are distinct
+        // and can't be unified behind a single dyn Fn.
+        let left_out = {
+            let f = left_assoc.focus(make_beam());
+            let p = left_assoc.project(f);
+            left_assoc.refract(p)
+        };
+        let right_out = {
+            let f = right_assoc.focus(make_beam());
+            let p = right_assoc.project(f);
+            right_assoc.refract(p)
+        };
+
+        // Both groupings must reach Refracted.
+        assert_eq!(left_out.stage, Stage::Refracted);
+        assert_eq!(right_out.stage, Stage::Refracted);
+
+        // Observable beam fields must be identical.
+        assert_eq!(left_out.path, right_out.path,
+            "path must be the same regardless of associativity grouping");
+        assert_eq!(left_out.loss.as_f64(), right_out.loss.as_f64(),
+            "loss must be the same regardless of associativity grouping");
+        assert_eq!(left_out.precision.as_f64(), right_out.precision.as_f64(),
+            "precision must be the same regardless of associativity grouping");
+
+        // The crystal type is IdPrism<IdPrism<MarkerPrism>> — marker is "id".
+        assert_eq!(left_out.result.marker(), "id");
+        assert_eq!(right_out.result.marker(), "id");
     }
 }
