@@ -8,6 +8,9 @@
 //! Zero dependencies. The types that outlive everything around them.
 //!
 //! A prism splits light into beams. A crystal is the lossless fixed point.
+//!
+//! For the composition layer — monoid structure, meta-prisms, and
+//! classical functional optics — enable the `optics` cargo feature.
 
 pub mod beam;
 pub mod content;
@@ -16,6 +19,9 @@ pub mod metal;
 pub mod oid;
 pub mod precision;
 pub mod spectral_oid;
+
+#[cfg(feature = "optics")]
+pub mod optics;
 
 pub use beam::{Beam, Recovery, Stage};
 pub use content::ContentAddressed;
