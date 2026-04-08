@@ -38,11 +38,20 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     type Part = S;
     type Crystal = SetterCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<S> { todo!() }
-    fn project(&self, beam: Beam<S>) -> Beam<S> { todo!() }
-    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { todo!() }
-    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { todo!() }
-    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> { todo!() }
+    fn focus(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Focused, ..beam } }
+    fn project(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Projected, ..beam } }
+    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
+    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
+    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
+        Beam {
+            result: SetterCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
 }
 
 pub struct SetterCrystal<S, A> { _phantom: PhantomData<(S, A)> }
@@ -54,11 +63,20 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for SetterCrystal<S, A> {
     type Part = S;
     type Crystal = SetterCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<S> { todo!() }
-    fn project(&self, beam: Beam<S>) -> Beam<S> { todo!() }
-    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { todo!() }
-    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { todo!() }
-    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> { todo!() }
+    fn focus(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Focused, ..beam } }
+    fn project(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Projected, ..beam } }
+    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
+    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
+    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
+        Beam {
+            result: SetterCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
 }
 
 #[cfg(test)]
