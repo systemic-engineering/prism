@@ -8,7 +8,155 @@
 use crate::{Beam, Prism, Stage};
 use std::marker::PhantomData;
 
-// Types go here.
+/// A total invertible pair (A → B, B → A).
+///
+/// Laws:
+/// - `backward(forward(a)) ≡ a` (left inverse)
+/// - `forward(backward(b)) ≡ b` (right inverse)
+///
+/// As a Prism: focus applies forward, refract crystallizes the resulting
+/// value in a fresh Iso carrying the same functions.
+pub struct Iso<A, B> {
+    forward_fn: Box<dyn Fn(A) -> B>,
+    backward_fn: Box<dyn Fn(B) -> A>,
+    _phantom: PhantomData<(A, B)>,
+}
+
+impl<A: 'static, B: 'static> Iso<A, B> {
+    pub fn new<F, G>(forward: F, backward: G) -> Self
+    where
+        F: Fn(A) -> B + 'static,
+        G: Fn(B) -> A + 'static,
+    {
+        Iso {
+            forward_fn: Box::new(forward),
+            backward_fn: Box::new(backward),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn forward(&self, a: A) -> B {
+        (self.forward_fn)(a)
+    }
+
+    pub fn backward(&self, b: B) -> A {
+        (self.backward_fn)(b)
+    }
+}
+
+impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
+    type Input = A;
+    type Focused = B;
+    type Projected = B;
+    type Part = B;
+    type Crystal = IsoCrystal<A, B>;
+
+    fn focus(&self, beam: Beam<A>) -> Beam<B> {
+        let forward = (self.forward_fn)(beam.result);
+        Beam {
+            result: forward,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
+    }
+
+    fn project(&self, beam: Beam<B>) -> Beam<B> {
+        // Iso's project is lossless pass-through — no precision cut.
+        Beam {
+            stage: Stage::Projected,
+            ..beam
+        }
+    }
+
+    fn split(&self, beam: Beam<B>) -> Vec<Beam<B>> {
+        vec![Beam {
+            stage: Stage::Split,
+            ..beam
+        }]
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<B>,
+        f: &dyn Fn(Beam<B>) -> Beam<B>,
+    ) -> Beam<B> {
+        f(beam)
+    }
+
+    fn refract(&self, beam: Beam<B>) -> Beam<IsoCrystal<A, B>> {
+        // Iso crystallizes into a marker struct — we can't clone the
+        // Fn trait objects, so the crystal just asserts "I was an Iso."
+        Beam {
+            result: IsoCrystal {
+                _phantom: PhantomData,
+            },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
+
+/// The crystal type for Iso<A, B>. A marker carrying no state — iso
+/// crystallization is acknowledged by the type, not by runtime data.
+pub struct IsoCrystal<A, B> {
+    _phantom: PhantomData<(A, B)>,
+}
+
+impl<A: Clone + 'static, B: Clone + 'static> Prism for IsoCrystal<A, B> {
+    type Input = B;
+    type Focused = B;
+    type Projected = B;
+    type Part = B;
+    type Crystal = IsoCrystal<A, B>;
+
+    fn focus(&self, beam: Beam<B>) -> Beam<B> {
+        Beam {
+            stage: Stage::Focused,
+            ..beam
+        }
+    }
+
+    fn project(&self, beam: Beam<B>) -> Beam<B> {
+        Beam {
+            stage: Stage::Projected,
+            ..beam
+        }
+    }
+
+    fn split(&self, beam: Beam<B>) -> Vec<Beam<B>> {
+        vec![Beam {
+            stage: Stage::Split,
+            ..beam
+        }]
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<B>,
+        f: &dyn Fn(Beam<B>) -> Beam<B>,
+    ) -> Beam<B> {
+        f(beam)
+    }
+
+    fn refract(&self, beam: Beam<B>) -> Beam<IsoCrystal<A, B>> {
+        Beam {
+            result: IsoCrystal {
+                _phantom: PhantomData,
+            },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
