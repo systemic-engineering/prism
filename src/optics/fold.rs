@@ -35,23 +35,48 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
     type Crystal = FoldCrystal<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<Vec<A>> {
-        todo!()
+        let list = (self.fold_fn)(&beam.result);
+        Beam {
+            result: list,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
     }
 
     fn project(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> {
-        todo!()
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> {
-        todo!()
+        beam.result
+            .into_iter()
+            .map(|a| Beam {
+                result: a,
+                path: beam.path.clone(),
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Split,
+            })
+            .collect()
     }
 
     fn zoom(&self, beam: Beam<Vec<A>>, f: &dyn Fn(Beam<Vec<A>>) -> Beam<Vec<A>>) -> Beam<Vec<A>> {
-        todo!()
+        f(beam)
     }
 
     fn refract(&self, beam: Beam<Vec<A>>) -> Beam<FoldCrystal<S, A>> {
-        todo!()
+        Beam {
+            result: FoldCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
     }
 }
 
@@ -64,11 +89,32 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for FoldCrystal<S, A> {
     type Part = A;
     type Crystal = FoldCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { todo!() }
-    fn project(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { todo!() }
-    fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> { todo!() }
-    fn zoom(&self, beam: Beam<Vec<A>>, f: &dyn Fn(Beam<Vec<A>>) -> Beam<Vec<A>>) -> Beam<Vec<A>> { todo!() }
-    fn refract(&self, beam: Beam<Vec<A>>) -> Beam<FoldCrystal<S, A>> { todo!() }
+    fn focus(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { Beam { stage: Stage::Focused, ..beam } }
+    fn project(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { Beam { stage: Stage::Projected, ..beam } }
+    fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> {
+        beam.result
+            .into_iter()
+            .map(|a| Beam {
+                result: a,
+                path: beam.path.clone(),
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Split,
+            })
+            .collect()
+    }
+    fn zoom(&self, beam: Beam<Vec<A>>, f: &dyn Fn(Beam<Vec<A>>) -> Beam<Vec<A>>) -> Beam<Vec<A>> { f(beam) }
+    fn refract(&self, beam: Beam<Vec<A>>) -> Beam<FoldCrystal<S, A>> {
+        Beam {
+            result: FoldCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
 }
 
 #[cfg(test)]
