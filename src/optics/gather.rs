@@ -84,6 +84,35 @@ mod tests {
     }
 
     #[test]
+    fn max_gather_picks_highest_precision_beam() {
+        let beams = vec![
+            Beam::new("low".to_string())
+                .with_precision(Precision::new(0.3))
+                .with_loss(ShannonLoss::new(5.0)),
+            Beam::new("high".to_string())
+                .with_precision(Precision::new(0.9))
+                .with_loss(ShannonLoss::new(0.1)),
+            Beam::new("mid".to_string())
+                .with_precision(Precision::new(0.6))
+                .with_loss(ShannonLoss::new(1.0)),
+        ];
+        let gather = MaxGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, "high");
+        assert_eq!(out.precision.as_f64(), 0.9);
+        assert_eq!(out.loss.as_f64(), 0.1);
+        assert_eq!(out.stage, Stage::Joined);
+    }
+
+    #[test]
+    fn max_gather_empty_vec_yields_empty_beam() {
+        let beams: Vec<Beam<String>> = vec![];
+        let gather = MaxGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, "");
+    }
+
+    #[test]
     fn sum_gather_empty_vec_yields_empty_beam() {
         let beams: Vec<Beam<String>> = vec![];
         let gather = SumGather;
