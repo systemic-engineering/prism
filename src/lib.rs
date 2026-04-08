@@ -1,8 +1,8 @@
-//! Prism — focus | project | split | join | zoom | refract.
+//! Prism — focus | project | split | zoom | refract.
 //!
-//! Six operations. The optic hierarchy as a trait.
+//! Five operations. The optic hierarchy as a trait.
 //! The parser's vocabulary. The runtime's interface.
-//! Everything else is a composition of these six.
+//! Everything else is a composition of these five.
 //!
 //! Beam<T>, Oid, ShannonLoss, Precision, Pressure, Recovery, ContentAddressed.
 //! Zero dependencies. The types that outlive everything around them.
@@ -25,14 +25,14 @@ pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;
 
 // ---------------------------------------------------------------------------
-// The Prism trait — six optic operations over Beam<T>
+// The Prism trait — five optic operations over Beam<T>
 // ---------------------------------------------------------------------------
 
-/// The six optic operations. The shared grammar of computation.
+/// The five optic operations. The shared grammar of computation.
 ///
-/// Any system that decomposes, projects, walks, joins, transforms,
-/// and settles implements Prism. The parser. The compiler. The
-/// runtime. The database.
+/// Any system that decomposes, projects, walks, transforms, and
+/// settles implements Prism. The parser. The compiler. The runtime.
+/// The database.
 ///
 /// Loss accumulates. Precision narrows. The Stage field tracks where
 /// in the pipeline a beam currently lives. Each operation's output
@@ -42,9 +42,14 @@ pub use spectral_oid::SpectralOid;
 ///   focus: Beam<Input> → Beam<Focused>
 ///   project: Beam<Focused> → Beam<Projected>
 ///   split: Beam<Projected> → Vec<Beam<Part>>
-///   join: Vec<Beam<Part>> → Beam<Projected>
 ///   zoom: (Beam<Projected>, f) → Beam<Projected>
 ///   refract: Beam<Projected> → Beam<Crystal>
+///
+/// `split` is the only operation that leaves the single-beam monoid:
+/// it produces a population of beams at a "level above." Gathering
+/// those beams back into one is the job of a meta-prism, which lives
+/// in the optics layer — not a method on the base trait. A single
+/// prism physically disperses; it cannot recombine its own output.
 ///
 /// The Crystal associated type is bounded by `Prism<Crystal =
 /// Self::Crystal>`, the fixed-point property: after one `refract`
@@ -80,11 +85,6 @@ pub trait Prism {
     /// Each child beam inherits the parent's path (with an added step)
     /// and its loss/precision. Transitions stage to Split.
     fn split(&self, beam: Beam<Self::Projected>) -> Vec<Beam<Self::Part>>;
-
-    /// Join: the inverse of split. Vec<Beam<Part>> → Beam<Projected>.
-    /// How loss aggregates is impl-specific (sum, max, Shannon-add).
-    /// Transitions stage to Joined.
-    fn join(&self, parts: Vec<Beam<Self::Part>>) -> Beam<Self::Projected>;
 
     /// Zoom: apply a Beam → Beam transformation in projected context.
     /// Stays in Projected-space (it's a self-map on Beam<Projected>).
@@ -218,21 +218,6 @@ mod tests {
                 .collect()
         }
 
-        fn join(&self, parts: Vec<Beam<char>>) -> Beam<String> {
-            let result: String = parts.iter().map(|b| b.result).collect();
-            let total_loss: f64 = parts.iter().map(|b| b.loss.as_f64()).sum();
-            let precision = parts.first().map(|b| b.precision.clone()).unwrap_or(Precision::new(1.0));
-            let path = parts.first().map(|b| b.path.clone()).unwrap_or_default();
-            Beam {
-                result,
-                path,
-                loss: ShannonLoss::new(total_loss),
-                precision,
-                recovered: None,
-                stage: Stage::Joined,
-            }
-        }
-
         fn zoom(
             &self,
             beam: Beam<String>,
@@ -353,14 +338,4 @@ mod tests {
         assert!(beam.is_lossless());
     }
 
-    #[test]
-    fn join_reverses_split() {
-        let p = StringPrism;
-        // split takes Beam<Projected> = Beam<String>
-        let projected = p.project(p.focus(Beam::new("hi".to_string())));
-        let parts = p.split(projected);
-        let rejoined = p.join(parts);
-        assert_eq!(rejoined.result, "hi");
-        assert_eq!(rejoined.stage, Stage::Joined);
-    }
 }
