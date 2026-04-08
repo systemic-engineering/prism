@@ -10,11 +10,26 @@ pub enum Recovery {
     Failed { reason: String },
 }
 
+/// The pipeline stage a beam has reached.
+///
+/// Tracks where in the focus → project → split → join → refract
+/// pipeline a beam currently lives. Initialized to `Initial` on
+/// `Beam::new`. Transitions are set explicitly via `with_stage`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    Initial,
+    Focused,
+    Projected,
+    Split,
+    Joined,
+    Refracted,
+}
+
 /// The trace of a projection through a Prism.
 ///
 /// Always lands. The result is always present. Loss tells you
 /// what didn't survive. The beam carries the story of how the
-/// result came to be: path, loss, precision, recovery.
+/// result came to be: path, loss, precision, recovery, stage.
 #[derive(Clone, Debug)]
 pub struct Beam<T> {
     pub result: T,
@@ -22,6 +37,7 @@ pub struct Beam<T> {
     pub loss: ShannonLoss,
     pub precision: Precision,
     pub recovered: Option<Recovery>,
+    pub stage: Stage,
 }
 
 impl<T> Beam<T> {
@@ -33,6 +49,7 @@ impl<T> Beam<T> {
             loss: ShannonLoss::zero(),
             precision: Precision::new(0.0),
             recovered: None,
+            stage: Stage::Initial,
         }
     }
 
@@ -51,6 +68,12 @@ impl<T> Beam<T> {
         self.recovered.is_some()
     }
 
+    /// Set the pipeline stage.
+    pub fn with_stage(mut self, stage: Stage) -> Self {
+        self.stage = stage;
+        self
+    }
+
     /// Map the result, preserving the trace.
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Beam<U> {
         Beam {
@@ -59,6 +82,7 @@ impl<T> Beam<T> {
             loss: self.loss,
             precision: self.precision,
             recovered: self.recovered,
+            stage: self.stage,
         }
     }
 
