@@ -207,4 +207,41 @@ mod tests {
         assert_eq!(out.result, "");
         assert!(out.loss.is_zero());
     }
+
+    #[test]
+    fn sum_gather_sums_i32_beams() {
+        let beams = vec![
+            Beam::new(10i32).with_loss(ShannonLoss::new(0.5)),
+            Beam::new(20i32).with_loss(ShannonLoss::new(0.3)),
+            Beam::new(30i32).with_loss(ShannonLoss::new(0.2)),
+        ];
+        let gather = SumGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, 60);
+        assert_eq!(out.loss.as_f64(), 1.0);
+    }
+
+    #[test]
+    fn max_gather_picks_highest_precision_for_i32() {
+        let beams = vec![
+            Beam::new(1i32).with_precision(Precision::new(0.3)),
+            Beam::new(2i32).with_precision(Precision::new(0.9)),
+            Beam::new(3i32).with_precision(Precision::new(0.6)),
+        ];
+        let gather = MaxGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, 2);
+        assert_eq!(out.precision.as_f64(), 0.9);
+    }
+
+    #[test]
+    fn first_gather_takes_first_i32_beam() {
+        let beams = vec![
+            Beam::new(42i32),
+            Beam::new(99i32),
+        ];
+        let gather = FirstGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, 42);
+    }
 }
