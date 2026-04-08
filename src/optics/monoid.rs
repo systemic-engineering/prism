@@ -213,6 +213,46 @@ mod tests {
     }
 
     #[test]
+    fn count_prism_identity_law_left() {
+        // identity . p ≡ p
+        let p = CountPrism::new(3);
+        let id = CountPrism::identity_prism();
+        let composed = id.compose(p.clone());
+        assert_eq!(composed.count(), p.count());
+    }
+
+    #[test]
+    fn count_prism_identity_law_right() {
+        // p . identity ≡ p
+        let p = CountPrism::new(3);
+        let id = CountPrism::identity_prism();
+        let composed = p.clone().compose(id);
+        assert_eq!(composed.count(), p.count());
+    }
+
+    #[test]
+    fn count_prism_associativity() {
+        // (a . b) . c ≡ a . (b . c)
+        let a = CountPrism::new(1);
+        let b = CountPrism::new(2);
+        let c = CountPrism::new(3);
+        let left = a.clone().compose(b.clone()).compose(c.clone());
+        let right = a.compose(b.compose(c));
+        assert_eq!(left.count(), right.count());
+        assert_eq!(left.count(), 6);
+    }
+
+    #[test]
+    fn count_prism_refract_increments_nothing_since_refract_is_lossless() {
+        // CountPrism.refract does not modify the beam content, only state.
+        // This is what makes it a valid member of the monoid.
+        let p = CountPrism::new(5);
+        let input = Beam::new("test".to_string());
+        let out = p.refract(input);
+        assert_eq!(out.stage, Stage::Refracted);
+    }
+
+    #[test]
     fn compose_type_chains_crystal_to_input() {
         // Compile-time check: Compose<A, B> requires B: Prism<Input = A::Crystal>.
         // This test verifies that the constraint itself type-checks with a
