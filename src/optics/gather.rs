@@ -17,17 +17,62 @@ pub trait Gather<T> {
     fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T>;
 }
 
-/// Gather strings by concatenation. Losses sum. Precision is the
-/// minimum of all precisions (the weakest link). Paths are taken from
-/// the first beam and extended with a synthetic marker.
+/// Private sealed helper: accumulate an owned `T` into an accumulator.
+///
+/// This exists because `std::ops::Add` for `String` is `Add<&str>`,
+/// not `Add<String>` — so we cannot write a single blanket
+/// `impl<T: Add<Output=T>> Gather<T> for SumGather` that also covers
+/// `String`. The sealed trait lets `SumGather` be generic without
+/// leaking implementation detail.
+mod sealed {
+    pub trait Accumulate: Clone + Default {
+        fn accumulate(acc: Self, item: Self) -> Self;
+    }
+
+    impl Accumulate for String {
+        fn accumulate(mut acc: Self, item: Self) -> Self {
+            acc.push_str(&item);
+            acc
+        }
+    }
+
+    impl<T> Accumulate for T
+    where
+        T: Clone + Default + std::ops::Add<Output = T>,
+        T: NotString,
+    {
+        fn accumulate(acc: Self, item: Self) -> Self {
+            acc + item
+        }
+    }
+
+    /// Marker trait to exclude String from the blanket Add impl so
+    /// Rust's coherence checker doesn't see a conflict.
+    pub trait NotString {}
+    impl NotString for i32 {}
+    impl NotString for i64 {}
+    impl NotString for u32 {}
+    impl NotString for u64 {}
+    impl NotString for f32 {}
+    impl NotString for f64 {}
+    impl NotString for usize {}
+    impl NotString for isize {}
+}
+
+/// Gather by summing. Works for `String` (via concatenation) and for
+/// standard numeric types (`i32`, `i64`, `f32`, `f64`, `u32`, `u64`,
+/// `usize`, `isize`) via arithmetic addition.
+///
+/// Losses sum. Precision is the minimum across beams. Path and
+/// recovered are taken from the first beam.
 #[derive(Clone)]
 pub struct SumGather;
 
-impl Gather<String> for SumGather {
-    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+impl<T: sealed::Accumulate> Gather<T> for SumGather {
+    fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T> {
         if beams.is_empty() {
             return Beam {
-                result: String::new(),
+                result: T::default(),
                 path: Vec::new(),
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
@@ -36,17 +81,18 @@ impl Gather<String> for SumGather {
             };
         }
 
-        let mut result = String::new();
-        let mut total_loss = 0.0f64;
-        let mut min_precision = Precision::new(1.0);
         let first_path = beams[0].path.clone();
         let first_recovered = beams[0].recovered.clone();
 
-        for beam in &beams {
-            result.push_str(&beam.result);
+        let mut result = T::default();
+        let mut total_loss = 0.0f64;
+        let mut min_precision = Precision::new(1.0);
+
+        for beam in beams {
+            result = T::accumulate(result, beam.result);
             total_loss += beam.loss.as_f64();
             if beam.precision.as_f64() < min_precision.as_f64() {
-                min_precision = beam.precision.clone();
+                min_precision = beam.precision;
             }
         }
 
@@ -61,16 +107,17 @@ impl Gather<String> for SumGather {
     }
 }
 
-/// Gather by picking the beam with the highest precision. Discards
-/// the others. Use when you only care about the single best outcome.
+/// Gather by picking the beam with the highest precision. Generic
+/// over any T: Clone + Default — no arithmetic needed, just comparison
+/// on precision.
 #[derive(Clone)]
 pub struct MaxGather;
 
-impl Gather<String> for MaxGather {
-    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+impl<T: Clone + Default> Gather<T> for MaxGather {
+    fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T> {
         if beams.is_empty() {
             return Beam {
-                result: String::new(),
+                result: T::default(),
                 path: Vec::new(),
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
@@ -100,13 +147,14 @@ impl Gather<String> for MaxGather {
     }
 }
 
-/// Gather by taking the first beam and discarding the rest. Simplest
-/// possible gather; mostly useful as a baseline and for testing.
+/// Gather by taking the first beam and discarding the rest. Generic
+/// over any T: Clone + Default. Simplest possible gather; mostly
+/// useful as a baseline and for testing.
 #[derive(Clone)]
 pub struct FirstGather;
 
-impl Gather<String> for FirstGather {
-    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+impl<T: Clone + Default> Gather<T> for FirstGather {
+    fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T> {
         let mut iter = beams.into_iter();
         match iter.next() {
             Some(first) => Beam {
@@ -114,7 +162,7 @@ impl Gather<String> for FirstGather {
                 ..first
             },
             None => Beam {
-                result: String::new(),
+                result: T::default(),
                 path: Vec::new(),
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
