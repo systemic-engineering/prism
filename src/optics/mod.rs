@@ -14,3 +14,5 @@
 //! (produces a `Vec<Beam<T>>`); meta-prisms gather it back.
 //!
 //! Enabled via `features = ["optics"]` on the `prism` dependency.
+
+pub mod monoid;
