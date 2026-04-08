@@ -14,6 +14,20 @@ pub struct Traversal<A, B> {
 }
 
 impl<A: 'static, B: 'static> Traversal<A, B> {
+    /// Construct a Traversal from a per-element mapping function.
+    ///
+    /// # Laws
+    ///
+    /// Traversal is the multi-focus optic. The caller is responsible for
+    /// ensuring the per-element mapping is:
+    ///
+    /// - Pure: `map(a)` returns the same `B` for the same `a`
+    /// - Total: `map(a)` does not panic for any well-typed `a`
+    ///
+    /// Traversal does not have set/get laws because it is shape-preserving:
+    /// it transforms elements but not their position in the container.
+    /// Recombination via a Gather strategy will preserve the original order
+    /// (assuming the iterator order was preserved).
     pub fn new<F>(map: F) -> Self
     where
         F: Fn(A) -> B + 'static,

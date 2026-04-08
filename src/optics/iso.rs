@@ -23,6 +23,23 @@ pub struct Iso<A, B> {
 }
 
 impl<A: 'static, B: 'static> Iso<A, B> {
+    /// Construct an Iso from a forward and backward function.
+    ///
+    /// # Laws
+    ///
+    /// The caller is responsible for ensuring the round-trip laws hold:
+    ///
+    /// - `backward(forward(a)) ≡ a` for all `a: A` (left inverse)
+    /// - `forward(backward(b)) ≡ b` for all `b: B` (right inverse)
+    ///
+    /// These cannot be enforced by the type system. An Iso constructed from
+    /// non-inverse functions will compile and run, but will produce results
+    /// that are meaningless under the Iso laws — downstream consumers that
+    /// depend on round-trip equality will see silent corruption.
+    ///
+    /// If you cannot prove the laws hold for arbitrary inputs, prefer one of
+    /// the more permissive optics (`Lens` for partial inverses, `Setter` for
+    /// write-only, `Fold` for read-only).
     pub fn new<F, G>(forward: F, backward: G) -> Self
     where
         F: Fn(A) -> B + 'static,

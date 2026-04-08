@@ -17,6 +17,19 @@ pub struct Lens<S, A> {
 }
 
 impl<S: 'static, A: 'static> Lens<S, A> {
+    /// Construct a Lens from a view and set function.
+    ///
+    /// # Laws
+    ///
+    /// The caller is responsible for ensuring the lens laws hold:
+    ///
+    /// - `view(set(s, a)) ≡ a` (set-view: setting then viewing returns what was set)
+    /// - `set(s, view(s)) ≡ s` (view-set: viewing then setting returns the original)
+    /// - `set(set(s, a1), a2) ≡ set(s, a2)` (set-set: setting twice equals setting once)
+    ///
+    /// These cannot be enforced by the type system. A Lens constructed from
+    /// functions that violate any of these laws will compile and run but will
+    /// produce results that are meaningless under the Lens laws.
     pub fn new<V, U>(view: V, set: U) -> Self
     where
         V: Fn(&S) -> A + 'static,

@@ -13,6 +13,18 @@ pub struct Setter<S, A> {
 }
 
 impl<S: 'static, A: 'static> Setter<S, A> {
+    /// Construct a Setter from a modify function.
+    ///
+    /// # Laws
+    ///
+    /// Setter is the weakest classical optic — it has only a write side, no
+    /// read side. The caller is responsible for ensuring:
+    ///
+    /// - `modify(s, |a| a) ≡ s` (the identity inner function does not change s)
+    /// - `modify(modify(s, f), g) ≡ modify(s, g ∘ f)` (modify composes)
+    ///
+    /// These are the standard Setter laws from functional optics. They cannot
+    /// be enforced by the type system.
     pub fn new<M>(modify: M) -> Self
     where
         M: Fn(S, &dyn Fn(A) -> A) -> S + 'static,

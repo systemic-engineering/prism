@@ -12,6 +12,20 @@ pub struct Fold<S, A> {
 }
 
 impl<S: 'static, A: 'static> Fold<S, A> {
+    /// Construct a Fold from a function that extracts zero or more `A`s from `S`.
+    ///
+    /// # Laws
+    ///
+    /// Fold has no bidirectional law (it has no `set` or `review` side), so
+    /// the caller is only responsible for ensuring the extraction is consistent
+    /// and side-effect-free:
+    ///
+    /// - `fold(s)` returns the same `Vec<A>` for the same `s` (purity)
+    /// - `fold(s)` does not panic for any well-typed `s`
+    ///
+    /// A Fold whose extraction function is impure or partial will produce
+    /// non-reproducible results in any pipeline that depends on content
+    /// addressing.
     pub fn new<F>(fold: F) -> Self
     where
         F: Fn(&S) -> Vec<A> + 'static,

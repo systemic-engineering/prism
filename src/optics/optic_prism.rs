@@ -15,18 +15,23 @@ pub struct OpticPrism<S, A> {
 }
 
 impl<S: 'static, A: 'static> OpticPrism<S, A> {
-    /// Construct a Prism from three closures:
+    /// Construct an OpticPrism (the semidet bidirectional optic) from a
+    /// match function, extract function, and review function.
     ///
-    /// - `matches`: returns `true` when `S` is the variant this prism targets.
-    /// - `extract`: given any `&S`, returns an `A`. Called regardless of whether
-    ///   `matches` returned true — the closure author is responsible for returning
-    ///   a safe sentinel value on non-matching inputs. The sentinel is the author's
-    ///   choice; the framework does not impose `A::default()`.
-    /// - `review`: reconstructs an `S` from an `A` (always succeeds).
+    /// # Laws
     ///
-    /// Refutation (non-matching input) is encoded as `ShannonLoss::INFINITY` in the
-    /// resulting `Beam<A>`. The `Beam::result` field is the sentinel from `extract`;
-    /// downstream consumers MUST check `beam.loss` before reading `beam.result`.
+    /// The caller is responsible for ensuring the prism laws hold:
+    ///
+    /// - When `matches(s)` is true: `review(extract(s)) ≡ s` (review undoes extract)
+    /// - For any `a: A`: `matches(review(a))` is true (review produces a valid case)
+    /// - When `matches(s)` is true: `extract(s)` returns the embedded `A` (not a sentinel)
+    /// - When `matches(s)` is false: `extract(s)` may return any sentinel `A` of
+    ///   the closure author's choice. The framework will mark the resulting beam
+    ///   with `ShannonLoss::infinite()`. Downstream consumers MUST check `loss`
+    ///   before reading `result`. The sentinel value is undefined behavior at
+    ///   the value level on infinite-loss beams.
+    ///
+    /// These cannot be enforced by the type system.
     pub fn new<M, E, R>(matches: M, extract: E, review: R) -> Self
     where
         M: Fn(&S) -> bool + 'static,
