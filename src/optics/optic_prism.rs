@@ -8,26 +8,52 @@ use crate::{Beam, Prism, ShannonLoss, Stage};
 use std::marker::PhantomData;
 
 pub struct OpticPrism<S, A> {
-    preview_fn: Box<dyn Fn(&S) -> Option<A>>,
+    match_fn: Box<dyn Fn(&S) -> bool>,
+    extract_fn: Box<dyn Fn(&S) -> A>,
     review_fn: Box<dyn Fn(A) -> S>,
     _phantom: PhantomData<(S, A)>,
 }
 
 impl<S: 'static, A: 'static> OpticPrism<S, A> {
-    pub fn new<P, R>(preview: P, review: R) -> Self
+    /// Construct a Prism from three closures:
+    ///
+    /// - `matches`: returns `true` when `S` is the variant this prism targets.
+    /// - `extract`: given any `&S`, returns an `A`. Called regardless of whether
+    ///   `matches` returned true — the closure author is responsible for returning
+    ///   a safe sentinel value on non-matching inputs. The sentinel is the author's
+    ///   choice; the framework does not impose `A::default()`.
+    /// - `review`: reconstructs an `S` from an `A` (always succeeds).
+    ///
+    /// Refutation (non-matching input) is encoded as `ShannonLoss::INFINITY` in the
+    /// resulting `Beam<A>`. The `Beam::result` field is the sentinel from `extract`;
+    /// downstream consumers MUST check `beam.loss` before reading `beam.result`.
+    pub fn new<M, E, R>(matches: M, extract: E, review: R) -> Self
     where
-        P: Fn(&S) -> Option<A> + 'static,
+        M: Fn(&S) -> bool + 'static,
+        E: Fn(&S) -> A + 'static,
         R: Fn(A) -> S + 'static,
     {
         OpticPrism {
-            preview_fn: Box::new(preview),
+            match_fn: Box::new(matches),
+            extract_fn: Box::new(extract),
             review_fn: Box::new(review),
             _phantom: PhantomData,
         }
     }
 
-    pub fn preview(&self, s: &S) -> Option<A> {
-        (self.preview_fn)(s)
+    /// Returns `true` if `s` is the variant this prism targets.
+    pub fn matches(&self, s: &S) -> bool {
+        (self.match_fn)(s)
+    }
+
+    /// Returns `Some(A)` on a matching `s`, `None` otherwise.
+    /// Inherent convenience method — `Option` is internal API, not on the trait surface.
+    pub fn extract(&self, s: &S) -> Option<A> {
+        if (self.match_fn)(s) {
+            Some((self.extract_fn)(s))
+        } else {
+            None
+        }
     }
 
     pub fn review(&self, a: A) -> S {
@@ -35,44 +61,35 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 }
 
-impl<S: Clone + Default + 'static, A: Clone + Default + 'static> Prism for OpticPrism<S, A> {
+impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
     type Input = S;
-    type Focused = Option<A>;
+    type Focused = A;      // refutation lives in ShannonLoss, never in Option
     type Projected = A;
     type Part = A;
     type Crystal = OpticPrismCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<Option<A>> {
-        let preview = (self.preview_fn)(&beam.result);
+    fn focus(&self, beam: Beam<S>) -> Beam<A> {
+        // Always call extract_fn. When the input doesn't match, the closure
+        // author's sentinel is used as the result value and loss is set to
+        // infinity. Downstream consumers must check loss before using result.
+        let a = (self.extract_fn)(&beam.result);
+        let loss = if (self.match_fn)(&beam.result) {
+            beam.loss
+        } else {
+            ShannonLoss::new(f64::INFINITY)
+        };
         Beam {
-            result: preview,
+            result: a,
             path: beam.path,
-            loss: beam.loss,
+            loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Focused,
         }
     }
 
-    fn project(&self, beam: Beam<Option<A>>) -> Beam<A> {
-        match beam.result {
-            Some(a) => Beam {
-                result: a,
-                path: beam.path,
-                loss: beam.loss,
-                precision: beam.precision,
-                recovered: beam.recovered,
-                stage: Stage::Projected,
-            },
-            None => Beam {
-                result: A::default(),
-                path: beam.path,
-                loss: ShannonLoss::new(f64::INFINITY),
-                precision: beam.precision,
-                recovered: beam.recovered,
-                stage: Stage::Projected,
-            },
-        }
+    fn project(&self, beam: Beam<A>) -> Beam<A> {
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> {
@@ -99,7 +116,7 @@ pub struct OpticPrismCrystal<S, A> {
     _phantom: PhantomData<(S, A)>,
 }
 
-impl<S: Clone + Default + 'static, A: Clone + Default + 'static> Prism for OpticPrismCrystal<S, A> {
+impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrismCrystal<S, A> {
     type Input = A;
     type Focused = A;
     type Projected = A;
