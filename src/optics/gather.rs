@@ -106,6 +106,29 @@ mod tests {
     use crate::{Precision, ShannonLoss, Stage};
 
     #[test]
+    fn first_gather_returns_first_beam() {
+        let beams = vec![
+            Beam::new("first".to_string())
+                .with_loss(ShannonLoss::new(1.0)),
+            Beam::new("second".to_string())
+                .with_loss(ShannonLoss::new(99.0)),
+        ];
+        let gather = FirstGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, "first");
+        assert_eq!(out.loss.as_f64(), 1.0);
+        assert_eq!(out.stage, Stage::Joined);
+    }
+
+    #[test]
+    fn first_gather_empty_vec() {
+        let beams: Vec<Beam<String>> = vec![];
+        let gather = FirstGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, "");
+    }
+
+    #[test]
     fn sum_gather_concatenates_strings_and_sums_losses() {
         let beams = vec![
             Beam::new("hello".to_string())
