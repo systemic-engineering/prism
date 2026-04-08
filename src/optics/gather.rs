@@ -100,6 +100,31 @@ impl Gather<String> for MaxGather {
     }
 }
 
+/// Gather by taking the first beam and discarding the rest. Simplest
+/// possible gather; mostly useful as a baseline and for testing.
+#[derive(Clone)]
+pub struct FirstGather;
+
+impl Gather<String> for FirstGather {
+    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+        let mut iter = beams.into_iter();
+        match iter.next() {
+            Some(first) => Beam {
+                stage: Stage::Joined,
+                ..first
+            },
+            None => Beam {
+                result: String::new(),
+                path: Vec::new(),
+                loss: ShannonLoss::new(0.0),
+                precision: Precision::new(1.0),
+                recovered: None,
+                stage: Stage::Joined,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
