@@ -17,58 +17,67 @@ pub trait Gather<T> {
     fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T>;
 }
 
-/// Private sealed helper: accumulate an owned `T` into an accumulator.
+/// Gather by concatenating string results. Losses sum. Precision is
+/// the minimum across beams. Path and recovered are taken from the
+/// first beam.
 ///
-/// This exists because `std::ops::Add` for `String` is `Add<&str>`,
-/// not `Add<String>` — so we cannot write a single blanket
-/// `impl<T: Add<Output=T>> Gather<T> for SumGather` that also covers
-/// `String`. The sealed trait lets `SumGather` be generic without
-/// leaking implementation detail.
-mod sealed {
-    pub trait Accumulate: Clone + Default {
-        fn accumulate(acc: Self, item: Self) -> Self;
-    }
+/// For a string-shaped gather. For numeric types, use `AddGather`.
+#[derive(Clone)]
+pub struct ConcatGather;
 
-    impl Accumulate for String {
-        fn accumulate(mut acc: Self, item: Self) -> Self {
-            acc.push_str(&item);
-            acc
+impl Gather<String> for ConcatGather {
+    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+        if beams.is_empty() {
+            return Beam {
+                result: String::new(),
+                path: Vec::new(),
+                loss: ShannonLoss::new(0.0),
+                precision: Precision::new(1.0),
+                recovered: None,
+                stage: Stage::Projected,
+            };
+        }
+
+        let first_path = beams[0].path.clone();
+        let first_recovered = beams[0].recovered.clone();
+
+        let mut result = String::new();
+        let mut total_loss = 0.0f64;
+        let mut min_precision = Precision::new(1.0);
+
+        for beam in beams {
+            result.push_str(&beam.result);
+            total_loss += beam.loss.as_f64();
+            if beam.precision.as_f64() < min_precision.as_f64() {
+                min_precision = beam.precision;
+            }
+        }
+
+        Beam {
+            result,
+            path: first_path,
+            loss: ShannonLoss::new(total_loss),
+            precision: min_precision,
+            recovered: first_recovered,
+            stage: Stage::Projected,
         }
     }
-
-    impl<T> Accumulate for T
-    where
-        T: Clone + Default + std::ops::Add<Output = T>,
-        T: NotString,
-    {
-        fn accumulate(acc: Self, item: Self) -> Self {
-            acc + item
-        }
-    }
-
-    /// Marker trait to exclude String from the blanket Add impl so
-    /// Rust's coherence checker doesn't see a conflict.
-    pub trait NotString {}
-    impl NotString for i32 {}
-    impl NotString for i64 {}
-    impl NotString for u32 {}
-    impl NotString for u64 {}
-    impl NotString for f32 {}
-    impl NotString for f64 {}
-    impl NotString for usize {}
-    impl NotString for isize {}
 }
 
-/// Gather by summing. Works for `String` (via concatenation) and for
-/// standard numeric types (`i32`, `i64`, `f32`, `f64`, `u32`, `u64`,
-/// `usize`, `isize`) via arithmetic addition.
+/// Gather by summing via `std::ops::Add`. Generic over any type that
+/// has a zero element (Default) and addition. Works for numeric types
+/// (i32, f64, etc.) and any user type implementing
+/// `Add<Output = Self> + Clone + Default`.
 ///
 /// Losses sum. Precision is the minimum across beams. Path and
 /// recovered are taken from the first beam.
 #[derive(Clone)]
-pub struct SumGather;
+pub struct AddGather;
 
-impl<T: sealed::Accumulate> Gather<T> for SumGather {
+impl<T> Gather<T> for AddGather
+where
+    T: Clone + Default + std::ops::Add<Output = T>,
+{
     fn gather(&self, beams: Vec<Beam<T>>) -> Beam<T> {
         if beams.is_empty() {
             return Beam {
@@ -89,7 +98,7 @@ impl<T: sealed::Accumulate> Gather<T> for SumGather {
         let mut min_precision = Precision::new(1.0);
 
         for beam in beams {
-            result = T::accumulate(result, beam.result);
+            result = result + beam.result;
             total_loss += beam.loss.as_f64();
             if beam.precision.as_f64() < min_precision.as_f64() {
                 min_precision = beam.precision;
@@ -202,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn sum_gather_concatenates_strings_and_sums_losses() {
+    fn concat_gather_concatenates_strings_and_sums_losses() {
         let beams = vec![
             Beam::new("hello".to_string())
                 .with_loss(ShannonLoss::new(1.0)),
@@ -211,7 +220,7 @@ mod tests {
             Beam::new("world".to_string())
                 .with_loss(ShannonLoss::new(2.0)),
         ];
-        let gather = SumGather;
+        let gather = ConcatGather;
         let out = gather.gather(beams);
         assert_eq!(out.result, "hello world");
         assert_eq!(out.loss.as_f64(), 3.0);
@@ -248,22 +257,22 @@ mod tests {
     }
 
     #[test]
-    fn sum_gather_empty_vec_yields_empty_beam() {
+    fn concat_gather_empty_vec_yields_empty_beam() {
         let beams: Vec<Beam<String>> = vec![];
-        let gather = SumGather;
+        let gather = ConcatGather;
         let out = gather.gather(beams);
         assert_eq!(out.result, "");
         assert!(out.loss.is_zero());
     }
 
     #[test]
-    fn sum_gather_sums_i32_beams() {
+    fn add_gather_sums_i32_beams() {
         let beams = vec![
             Beam::new(10i32).with_loss(ShannonLoss::new(0.5)),
             Beam::new(20i32).with_loss(ShannonLoss::new(0.3)),
             Beam::new(30i32).with_loss(ShannonLoss::new(0.2)),
         ];
-        let gather = SumGather;
+        let gather = AddGather;
         let out = gather.gather(beams);
         assert_eq!(out.result, 60);
         assert_eq!(out.loss.as_f64(), 1.0);
@@ -291,5 +300,27 @@ mod tests {
         let gather = FirstGather;
         let out = gather.gather(beams);
         assert_eq!(out.result, 42);
+    }
+
+    #[test]
+    fn add_gather_extensible_to_user_types() {
+        #[derive(Clone, Debug, PartialEq, Default)]
+        struct Points(i32);
+
+        impl std::ops::Add for Points {
+            type Output = Self;
+            fn add(self, other: Self) -> Self {
+                Points(self.0 + other.0)
+            }
+        }
+
+        let beams = vec![
+            Beam::new(Points(10)),
+            Beam::new(Points(20)),
+            Beam::new(Points(30)),
+        ];
+        let gather = AddGather;
+        let out = gather.gather(beams);
+        assert_eq!(out.result, Points(60));
     }
 }

@@ -159,7 +159,7 @@ where
 mod tests {
     use super::*;
     use crate::{Oid, Precision, ShannonLoss};
-    use super::super::gather::SumGather;
+    use super::super::gather::ConcatGather;
 
     // -------------------------------------------------------------------------
     // WordsPrism — a test prism that splits a String into individual words.
@@ -234,7 +234,7 @@ mod tests {
     /// population has the correct count, content, and stage.
     #[test]
     fn meta_prism_uses_inner_split_and_gathers() {
-        let meta = MetaPrism::new(WordsPrism, SumGather);
+        let meta = MetaPrism::new(WordsPrism, ConcatGather);
 
         let input = Beam::new("hello world test".to_string());
         let focused = meta.focus(input);
@@ -254,7 +254,7 @@ mod tests {
     /// Full pipeline test: apply() chains focus → project → refract.
     #[test]
     fn meta_prism_full_pipeline_via_apply() {
-        let meta = MetaPrism::new(WordsPrism, SumGather);
+        let meta = MetaPrism::new(WordsPrism, ConcatGather);
         let out = crate::apply(&meta, "alpha beta gamma".to_string());
         assert_eq!(out.stage, Stage::Refracted);
     }
@@ -267,7 +267,7 @@ mod tests {
     /// the parent beam's envelope.
     #[test]
     fn meta_prism_split_carries_parent_provenance() {
-        let meta = MetaPrism::new(WordsPrism, SumGather);
+        let meta = MetaPrism::new(WordsPrism, ConcatGather);
 
         let parent_beam = Beam {
             result: "x".to_string(),
@@ -304,13 +304,13 @@ mod tests {
     #[test]
     fn meta_prism_crystal_is_self() {
         fn require_prism<P: Prism>() {}
-        require_prism::<MetaPrism<WordsPrism, SumGather>>();
+        require_prism::<MetaPrism<WordsPrism, ConcatGather>>();
     }
 
     /// Verify that focus preserves the outer beam's path/loss/precision.
     #[test]
     fn meta_prism_focus_preserves_outer_envelope() {
-        let meta = MetaPrism::new(WordsPrism, SumGather);
+        let meta = MetaPrism::new(WordsPrism, ConcatGather);
 
         let input = Beam {
             result: "one two".to_string(),
@@ -331,7 +331,7 @@ mod tests {
     /// Verify that project carries outer envelope forward (M2 fix for project).
     #[test]
     fn meta_prism_project_carries_outer_envelope() {
-        let meta = MetaPrism::new(WordsPrism, SumGather);
+        let meta = MetaPrism::new(WordsPrism, ConcatGather);
 
         let input = Beam {
             result: "one two".to_string(),

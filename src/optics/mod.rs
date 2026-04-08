@@ -14,7 +14,8 @@
 //!    proving the monoid laws on a non-trivial element.
 //!
 //! 2. **Gather** (`gather`): strategies for collapsing `Vec<Beam<T>>`
-//!    into `Beam<T>`. `SumGather` concatenates, `MaxGather` picks the
+//!    into `Beam<T>`. `ConcatGather` concatenates strings, `AddGather`
+//!    sums numeric or user-defined types, `MaxGather` picks the
 //!    highest-precision beam, `FirstGather` takes the first.
 //!
 //! 3. **Meta-prism** (`meta`): `MetaPrism<T, G>` operates on populations

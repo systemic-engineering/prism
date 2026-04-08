@@ -1,12 +1,12 @@
 //! Integration test: compose multiple optics end-to-end.
 //!
 //! Builds a small "words pipeline" using Traversal + MetaPrism +
-//! SumGather, verifying the optic layers compose as expected.
+//! ConcatGather, verifying the optic layers compose as expected.
 
 #![cfg(feature = "optics")]
 
 use prism::{apply, Beam, Oid, Prism, Stage};
-use prism::optics::gather::SumGather;
+use prism::optics::gather::ConcatGather;
 use prism::optics::meta::MetaPrism;
 use prism::optics::traversal::Traversal;
 
@@ -93,7 +93,7 @@ fn traversal_lifts_string_transform_over_vec() {
 /// focus delegates to inner.split; project gathers the population.
 #[test]
 fn meta_prism_over_sum_gather_collapses_population() {
-    let meta = MetaPrism::new(WordsPrism, SumGather);
+    let meta = MetaPrism::new(WordsPrism, ConcatGather);
     let input = Beam::new("alpha beta gamma".to_string());
     let focused = meta.focus(input);
     assert_eq!(focused.result.len(), 3);
@@ -105,7 +105,7 @@ fn meta_prism_over_sum_gather_collapses_population() {
 /// Full pipeline: apply chains focus → project → refract.
 #[test]
 fn gather_then_apply_full_pipeline() {
-    let meta = MetaPrism::new(WordsPrism, SumGather);
+    let meta = MetaPrism::new(WordsPrism, ConcatGather);
     let out = apply(&meta, "one two".to_string());
     assert_eq!(out.stage, Stage::Refracted);
 }
@@ -175,12 +175,12 @@ fn compose_preserves_path_through_both_idprisms() {
     assert_eq!(out.precision.as_f64(), 1.0);
 }
 
-/// The spec's headline use case: MetaPrism<WordsPrism, SumGather> splits
-/// a string into words, gathers them back via SumGather. This is the
+/// The spec's headline use case: MetaPrism<WordsPrism, ConcatGather> splits
+/// a string into words, gathers them back via ConcatGather. This is the
 /// Layer 3 integration that justifies the optics layer's existence.
 #[test]
 fn meta_prism_full_pipeline_splits_gathers_and_refracts() {
-    let meta = MetaPrism::new(WordsPrism, SumGather);
+    let meta = MetaPrism::new(WordsPrism, ConcatGather);
 
     // Run the full pipeline through apply: focus → project → refract
     let out = apply(&meta, "alpha beta gamma".to_string());
