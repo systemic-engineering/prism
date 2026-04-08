@@ -97,7 +97,9 @@ where
     /// (M2 fix: the gather strategy doesn't know about the outer envelope).
     fn project(&self, beam: Beam<Vec<Beam<P::Part>>>) -> Beam<P::Part> {
         let mut gathered = self.gather.gather(beam.result);
-        // Override stage to Projected — the gather strategy sets Joined.
+        // Gather strategies emit Projected (M4 fix: Stage::Joined was removed).
+        // We re-set it explicitly here as defense-in-depth and to mark this
+        // as the meta-prism's project step.
         gathered.stage = Stage::Projected;
         // M2 fix: carry outer envelope's accumulated state forward so
         // provenance is not silently reset by the gather strategy.

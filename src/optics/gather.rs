@@ -32,7 +32,7 @@ impl Gather<String> for SumGather {
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
                 recovered: None,
-                stage: Stage::Joined,
+                stage: Stage::Projected,
             };
         }
 
@@ -56,7 +56,7 @@ impl Gather<String> for SumGather {
             loss: ShannonLoss::new(total_loss),
             precision: min_precision,
             recovered: first_recovered,
-            stage: Stage::Joined,
+            stage: Stage::Projected,
         }
     }
 }
@@ -75,7 +75,7 @@ impl Gather<String> for MaxGather {
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
                 recovered: None,
-                stage: Stage::Joined,
+                stage: Stage::Projected,
             };
         }
 
@@ -94,7 +94,7 @@ impl Gather<String> for MaxGather {
         let mut beams = beams;
         let best = beams.swap_remove(best_idx);
         Beam {
-            stage: Stage::Joined,
+            stage: Stage::Projected,
             ..best
         }
     }
@@ -110,7 +110,7 @@ impl Gather<String> for FirstGather {
         let mut iter = beams.into_iter();
         match iter.next() {
             Some(first) => Beam {
-                stage: Stage::Joined,
+                stage: Stage::Projected,
                 ..first
             },
             None => Beam {
@@ -119,7 +119,7 @@ impl Gather<String> for FirstGather {
                 loss: ShannonLoss::new(0.0),
                 precision: Precision::new(1.0),
                 recovered: None,
-                stage: Stage::Joined,
+                stage: Stage::Projected,
             },
         }
     }
@@ -142,7 +142,7 @@ mod tests {
         let out = gather.gather(beams);
         assert_eq!(out.result, "first");
         assert_eq!(out.loss.as_f64(), 1.0);
-        assert_eq!(out.stage, Stage::Joined);
+        assert_eq!(out.stage, Stage::Projected);
     }
 
     #[test]
@@ -167,7 +167,7 @@ mod tests {
         let out = gather.gather(beams);
         assert_eq!(out.result, "hello world");
         assert_eq!(out.loss.as_f64(), 3.0);
-        assert_eq!(out.stage, Stage::Joined);
+        assert_eq!(out.stage, Stage::Projected);
     }
 
     #[test]
@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(out.result, "high");
         assert_eq!(out.precision.as_f64(), 0.9);
         assert_eq!(out.loss.as_f64(), 0.1);
-        assert_eq!(out.stage, Stage::Joined);
+        assert_eq!(out.stage, Stage::Projected);
     }
 
     #[test]

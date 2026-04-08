@@ -12,16 +12,21 @@ pub enum Recovery {
 
 /// The pipeline stage a beam has reached.
 ///
-/// Tracks where in the focus → project → split → join → refract
+/// Tracks where in the focus → project → split → zoom → refract
 /// pipeline a beam currently lives. Initialized to `Initial` on
 /// `Beam::new`. Transitions are set explicitly via `with_stage`.
+///
+/// Note: there is no `Joined` variant. The base trait does not have
+/// a `join` operation — gathering populations of beams back into a
+/// single beam is the job of meta-prisms in the optics layer, and
+/// gather strategies emit `Projected` (the stage of the beam after
+/// the gathering project step completes).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stage {
     Initial,
     Focused,
     Projected,
     Split,
-    Joined,
     Refracted,
 }
 

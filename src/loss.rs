@@ -20,6 +20,13 @@ impl ShannonLoss {
     pub fn is_zero(&self) -> bool {
         self.0 == 0.0
     }
+
+    /// Semantic alias for `is_zero` — true when the projection is lossless.
+    /// `is_lossless` reads more naturally in optic-pipeline contexts where
+    /// "zero" could be confused with numerical zero.
+    pub fn is_lossless(&self) -> bool {
+        self.is_zero()
+    }
 }
 
 impl std::ops::Add for ShannonLoss {
