@@ -54,15 +54,23 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
     type Crystal = LensCrystal<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<A> {
-        todo!()
+        let a = (self.view_fn)(&beam.result);
+        Beam {
+            result: a,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
     }
 
     fn project(&self, beam: Beam<A>) -> Beam<A> {
-        todo!()
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> {
-        todo!()
+        vec![Beam { stage: Stage::Split, ..beam }]
     }
 
     fn zoom(
@@ -70,11 +78,18 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
         beam: Beam<A>,
         f: &dyn Fn(Beam<A>) -> Beam<A>,
     ) -> Beam<A> {
-        todo!()
+        f(beam)
     }
 
     fn refract(&self, beam: Beam<A>) -> Beam<LensCrystal<S, A>> {
-        todo!()
+        Beam {
+            result: LensCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
     }
 }
 
@@ -89,11 +104,20 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for LensCrystal<S, A> {
     type Part = A;
     type Crystal = LensCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<A>) -> Beam<A> { todo!() }
-    fn project(&self, beam: Beam<A>) -> Beam<A> { todo!() }
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { todo!() }
-    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { todo!() }
-    fn refract(&self, beam: Beam<A>) -> Beam<LensCrystal<S, A>> { todo!() }
+    fn focus(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Focused, ..beam } }
+    fn project(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Projected, ..beam } }
+    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { vec![Beam { stage: Stage::Split, ..beam }] }
+    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { f(beam) }
+    fn refract(&self, beam: Beam<A>) -> Beam<LensCrystal<S, A>> {
+        Beam {
+            result: LensCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
 }
 
 #[cfg(test)]
