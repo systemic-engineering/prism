@@ -162,4 +162,21 @@ mod tests {
             assert_eq!(p.stage, Stage::Split);
         }
     }
+
+    #[test]
+    fn traversal_split_indexes_children() {
+        use crate::Oid;
+
+        let id: Traversal<i32, i32> = Traversal::new(|x: i32| x);
+        let beam = Beam::new(vec![10, 20, 30]);
+        let focused = id.focus(beam);
+        let projected = id.project(focused);
+        let parts = id.split(projected);
+
+        assert_eq!(parts.len(), 3);
+        // Each child should have a path entry with its index
+        assert_eq!(parts[0].path.last(), Some(&Oid::new("0")));
+        assert_eq!(parts[1].path.last(), Some(&Oid::new("1")));
+        assert_eq!(parts[2].path.last(), Some(&Oid::new("2")));
+    }
 }

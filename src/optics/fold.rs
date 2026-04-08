@@ -154,4 +154,21 @@ mod tests {
         assert_eq!(parts[1].result, 6);
         assert_eq!(parts[2].result, 7);
     }
+
+    #[test]
+    fn fold_split_indexes_children() {
+        use crate::Oid;
+
+        let leaves_fold: Fold<Tree, i32> = Fold::new(|t: &Tree| t.leaves.clone());
+        let beam = Beam::new(Tree { leaves: vec![5, 6, 7] });
+        let focused = leaves_fold.focus(beam);
+        let projected = leaves_fold.project(focused);
+        let parts = leaves_fold.split(projected);
+
+        assert_eq!(parts.len(), 3);
+        // Each child should have a path entry with its index
+        assert_eq!(parts[0].path.last(), Some(&Oid::new("0")));
+        assert_eq!(parts[1].path.last(), Some(&Oid::new("1")));
+        assert_eq!(parts[2].path.last(), Some(&Oid::new("2")));
+    }
 }
