@@ -5,10 +5,76 @@
 
 #![cfg(feature = "optics")]
 
-use prism::{apply, Beam, Prism, Stage};
+use prism::{apply, Beam, Oid, Prism, Stage};
 use prism::optics::gather::SumGather;
 use prism::optics::meta::MetaPrism;
 use prism::optics::traversal::Traversal;
+
+// ---------------------------------------------------------------------------
+// WordsPrism — a test inner prism that splits a String into individual words.
+// Needed here because MetaPrism<P, G> now requires a real inner prism P.
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct WordsPrism;
+
+impl Prism for WordsPrism {
+    type Input = String;
+    type Focused = String;
+    type Projected = String;
+    type Part = String;
+    type Crystal = WordsPrism;
+
+    fn focus(&self, beam: Beam<String>) -> Beam<String> {
+        Beam { stage: Stage::Focused, ..beam }
+    }
+
+    fn project(&self, beam: Beam<String>) -> Beam<String> {
+        Beam { stage: Stage::Projected, ..beam }
+    }
+
+    fn split(&self, beam: Beam<String>) -> Vec<Beam<String>> {
+        beam.result
+            .split_whitespace()
+            .enumerate()
+            .map(|(i, w)| Beam {
+                result: w.to_string(),
+                path: {
+                    let mut p = beam.path.clone();
+                    p.push(Oid::new(format!("word/{}", i)));
+                    p
+                },
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Split,
+            })
+            .collect()
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<String>,
+        f: &dyn Fn(Beam<String>) -> Beam<String>,
+    ) -> Beam<String> {
+        f(beam)
+    }
+
+    fn refract(&self, beam: Beam<String>) -> Beam<WordsPrism> {
+        Beam {
+            result: WordsPrism,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[test]
 fn traversal_lifts_string_transform_over_vec() {
@@ -23,28 +89,23 @@ fn traversal_lifts_string_transform_over_vec() {
     assert_eq!(focused.stage, Stage::Focused);
 }
 
+/// MetaPrism now takes an inner prism (WordsPrism) plus a gather strategy.
+/// focus delegates to inner.split; project gathers the population.
 #[test]
 fn meta_prism_over_sum_gather_collapses_population() {
-    let meta: MetaPrism<String, SumGather> = MetaPrism::new(SumGather);
-    let population = vec![
-        Beam::new("alpha ".to_string()),
-        Beam::new("beta ".to_string()),
-        Beam::new("gamma".to_string()),
-    ];
-    let input = Beam::new(population);
+    let meta = MetaPrism::new(WordsPrism, SumGather);
+    let input = Beam::new("alpha beta gamma".to_string());
     let focused = meta.focus(input);
+    assert_eq!(focused.result.len(), 3);
     let projected = meta.project(focused);
-    assert_eq!(projected.result, "alpha beta gamma");
+    assert_eq!(projected.result, "alphabetagamma");
     assert_eq!(projected.stage, Stage::Projected);
 }
 
+/// Full pipeline: apply chains focus → project → refract.
 #[test]
 fn gather_then_apply_full_pipeline() {
-    let meta: MetaPrism<String, SumGather> = MetaPrism::new(SumGather);
-    let population = vec![
-        Beam::new("one".to_string()),
-        Beam::new("two".to_string()),
-    ];
-    let out = apply(&meta, population);
+    let meta = MetaPrism::new(WordsPrism, SumGather);
+    let out = apply(&meta, "one two".to_string());
     assert_eq!(out.stage, Stage::Refracted);
 }
