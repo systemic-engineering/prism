@@ -19,3 +19,4 @@ pub mod monoid;
 pub mod gather;
 pub mod meta;
 pub mod iso;
+pub mod lens;
