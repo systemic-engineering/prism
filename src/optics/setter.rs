@@ -43,8 +43,13 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
     fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
     fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
+        // Call modify_fn with the identity inner function. This exercises the
+        // closure and proves it's reachable from the Prism trait surface.
+        // With identity, the result is semantically equal to the input S, but
+        // the closure has run. The crystal records the witnessed S.
+        let modified = (self.modify_fn)(beam.result, &|a| a);
         Beam {
-            result: SetterCrystal { _phantom: PhantomData },
+            result: SetterCrystal { witnessed: modified, _phantom: PhantomData },
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
@@ -54,7 +59,10 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     }
 }
 
-pub struct SetterCrystal<S, A> { _phantom: PhantomData<(S, A)> }
+pub struct SetterCrystal<S, A> {
+    pub witnessed: S,
+    _phantom: PhantomData<A>,
+}
 
 impl<S: Clone + 'static, A: Clone + 'static> Prism for SetterCrystal<S, A> {
     type Input = S;
@@ -69,7 +77,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for SetterCrystal<S, A> {
     fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
     fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
         Beam {
-            result: SetterCrystal { _phantom: PhantomData },
+            result: SetterCrystal { witnessed: beam.result.clone(), _phantom: PhantomData },
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
