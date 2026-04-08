@@ -8,10 +8,88 @@
 //! This is where the inter-level movement happens: base prisms live at
 //! level 0 (`Beam<T>`), meta prisms live at level 1 (`Vec<Beam<T>>`).
 
+use std::marker::PhantomData;
 use crate::{Beam, Prism, Stage};
 use super::gather::{Gather, SumGather};
 
-// Types go here.
+/// MetaPrism lifts a Gather strategy into a full Prism that operates
+/// on populations of beams. Its Input is `Vec<Beam<T>>`; its refract
+/// collapses the population to a `Beam<T>` via the Gather strategy.
+///
+/// Type parameters:
+/// - `T`: the element type inside each child beam
+/// - `G`: the gather strategy (implements `Gather<T>`)
+pub struct MetaPrism<T, G: Gather<T>> {
+    gather: G,
+    _phantom: PhantomData<T>,
+}
+
+impl<T, G: Gather<T>> MetaPrism<T, G> {
+    pub fn new(gather: G) -> Self {
+        MetaPrism {
+            gather,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: Clone + 'static, G: Gather<T> + Clone + 'static> Prism for MetaPrism<T, G> {
+    type Input = Vec<Beam<T>>;
+    type Focused = Vec<Beam<T>>;
+    type Projected = T;
+    type Part = Beam<T>;
+    type Crystal = MetaPrism<T, G>;
+
+    fn focus(&self, beam: Beam<Vec<Beam<T>>>) -> Beam<Vec<Beam<T>>> {
+        Beam {
+            result: beam.result,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
+    }
+
+    fn project(&self, beam: Beam<Vec<Beam<T>>>) -> Beam<T> {
+        let mut gathered = self.gather.gather(beam.result);
+        gathered.stage = Stage::Projected;
+        gathered
+    }
+
+    fn split(&self, beam: Beam<T>) -> Vec<Beam<Beam<T>>> {
+        vec![Beam {
+            result: beam,
+            path: Vec::new(),
+            loss: crate::ShannonLoss::new(0.0),
+            precision: crate::Precision::new(1.0),
+            recovered: None,
+            stage: Stage::Split,
+        }]
+    }
+
+    fn zoom(
+        &self,
+        beam: Beam<T>,
+        f: &dyn Fn(Beam<T>) -> Beam<T>,
+    ) -> Beam<T> {
+        f(beam)
+    }
+
+    fn refract(&self, beam: Beam<T>) -> Beam<MetaPrism<T, G>> {
+        Beam {
+            result: MetaPrism {
+                gather: self.gather.clone(),
+                _phantom: PhantomData,
+            },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
