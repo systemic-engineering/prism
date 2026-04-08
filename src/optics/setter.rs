@@ -99,15 +99,22 @@ mod tests {
     }
 
     #[test]
-    fn setter_refract_crystallizes() {
+    fn setter_refract_runs_modify_with_identity_and_witnesses_value() {
+        // refract must call modify_fn with the identity inner function.
+        // Because the inner fn is identity, the witnessed S equals the input.
+        // This proves the closure is reachable from the Prism trait surface.
         let count_setter: Setter<Box2, i32> = Setter::new(
             |b: Box2, f: &dyn Fn(i32) -> i32| Box2 { count: f(b.count), ..b },
         );
 
-        let beam = Beam::new(Box2 { label: "x".to_string(), count: 0 });
+        let input = Box2 { label: "x".to_string(), count: 5 };
+        let beam = Beam::new(input.clone());
         let focused = count_setter.focus(beam);
         let projected = count_setter.project(focused);
         let refracted = count_setter.refract(projected);
+
         assert_eq!(refracted.stage, Stage::Refracted);
+        // Identity modify is a no-op at the A level, so witnessed == input.
+        assert_eq!(refracted.result.witnessed, input);
     }
 }
