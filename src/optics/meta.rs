@@ -1,86 +1,148 @@
-//! MetaPrism — operates on populations of beams.
+//! MetaPrism — lifts an inner prism's split into a first-class Prism.
 //!
-//! A base prism's `split` produces `Vec<Beam<Part>>`. To work with that
-//! population as a unit, you wrap it in a MetaPrism parameterized by a
-//! Gather strategy. The MetaPrism's refract collapses the population
-//! back into a single Beam using the strategy.
+//! A `MetaPrism<P, G>` takes a beam whose content is the inner prism `P`'s
+//! projected type. Its `focus` calls `inner.split(beam)` to produce a
+//! population of child beams. Its `project` gathers that population back into
+//! a single beam via the `G: Gather` strategy. Its `refract` closes the loop
+//! by emitting a fresh MetaPrism as the crystal.
 //!
-//! This is where the inter-level movement happens: base prisms live at
-//! level 0 (`Beam<T>`), meta prisms live at level 1 (`Vec<Beam<T>>`).
+//! This is where cross-level movement is made explicit: the inner prism lives
+//! at Level 0 (`Beam<T>`). The meta-prism operates at Level 1 by wrapping the
+//! inner's split output (`Vec<Beam<T>>`) and gathering it back via strategy G.
+//!
+//! # Type parameters
+//! - `P`: the inner prism that supplies `focus`, `project`, and `split`
+//! - `G`: the gather strategy for collapsing the split population
 
-use std::marker::PhantomData;
 use crate::{Beam, Prism, Stage};
-use super::gather::{Gather, SumGather};
+use super::gather::Gather;
 
-/// MetaPrism lifts a Gather strategy into a full Prism that operates
-/// on populations of beams. Its Input is `Vec<Beam<T>>`; its refract
-/// collapses the population to a `Beam<T>` via the Gather strategy.
+/// A meta-prism parameterized by an inner prism `P` and a gather strategy `G`.
 ///
-/// Type parameters:
-/// - `T`: the element type inside each child beam
-/// - `G`: the gather strategy (implements `Gather<T>`)
-pub struct MetaPrism<T, G: Gather<T>> {
-    gather: G,
-    _phantom: PhantomData<T>,
+/// The headline use case: lift `P::split` into a full Prism whose `focus`
+/// delegates to `inner.split`, whose `project` collapses via `gather.gather`,
+/// and whose `refract` produces a crystal of the same meta-prism type.
+///
+/// Type flow through the pipeline:
+/// ```text
+/// focus:   Beam<P::Projected>       → Beam<Vec<Beam<P::Part>>>
+/// project: Beam<Vec<Beam<P::Part>>> → Beam<P::Part>
+/// split:   Beam<P::Part>            → Vec<Beam<Beam<P::Part>>>
+/// zoom:    Beam<P::Part>            → Beam<P::Part>
+/// refract: Beam<P::Part>            → Beam<MetaPrism<P, G>>
+/// ```
+pub struct MetaPrism<P: Prism, G: Gather<P::Part>> {
+    pub inner: P,
+    pub gather: G,
 }
 
-impl<T, G: Gather<T>> MetaPrism<T, G> {
-    pub fn new(gather: G) -> Self {
-        MetaPrism {
-            gather,
-            _phantom: PhantomData,
-        }
+impl<P: Prism, G: Gather<P::Part>> MetaPrism<P, G> {
+    pub fn new(inner: P, gather: G) -> Self {
+        MetaPrism { inner, gather }
     }
 }
 
-impl<T: Clone + 'static, G: Gather<T> + Clone + 'static> Prism for MetaPrism<T, G> {
-    type Input = Vec<Beam<T>>;
-    type Focused = Vec<Beam<T>>;
-    type Projected = T;
-    type Part = Beam<T>;
-    type Crystal = MetaPrism<T, G>;
+impl<P, G> Prism for MetaPrism<P, G>
+where
+    P: Prism + Clone + 'static,
+    G: Gather<P::Part> + Clone + 'static,
+    P::Projected: Clone + 'static,
+    P::Part: Clone + 'static,
+{
+    /// The input is whatever the inner prism's `split` expects: `P::Projected`.
+    type Input = P::Projected;
+    /// Focus produces the inner prism's population: `Vec<Beam<P::Part>>`.
+    type Focused = Vec<Beam<P::Part>>;
+    /// Project collapses the population to a single part: `P::Part`.
+    type Projected = P::Part;
+    /// Each part is a child beam from the population.
+    type Part = Beam<P::Part>;
+    /// Crystal is itself — the meta-prism is its own fixed point.
+    type Crystal = MetaPrism<P, G>;
 
-    fn focus(&self, beam: Beam<Vec<Beam<T>>>) -> Beam<Vec<Beam<T>>> {
-        Beam {
+    /// Focus: call `inner.split` on the incoming beam to produce the population.
+    ///
+    /// The outer beam's path/loss/precision/recovered are carried into the
+    /// returned `Beam<Vec<...>>` so provenance is not silently dropped.
+    fn focus(&self, beam: Beam<P::Projected>) -> Beam<Vec<Beam<P::Part>>> {
+        let path = beam.path.clone();
+        let loss = beam.loss.clone();
+        let precision = beam.precision.clone();
+        let recovered = beam.recovered.clone();
+
+        // Hand a "projected" beam to the inner prism's split.
+        let inner_beam = Beam {
             result: beam.result,
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
+            stage: Stage::Projected,
+        };
+        let parts = self.inner.split(inner_beam);
+
+        Beam {
+            result: parts,
+            path,
+            loss,
+            precision,
+            recovered,
             stage: Stage::Focused,
         }
     }
 
-    fn project(&self, beam: Beam<Vec<Beam<T>>>) -> Beam<T> {
+    /// Project: gather the population back to a single `Beam<P::Part>`.
+    ///
+    /// The outer envelope's path/loss/precision/recovered are carried forward
+    /// (M2 fix: the gather strategy doesn't know about the outer envelope).
+    fn project(&self, beam: Beam<Vec<Beam<P::Part>>>) -> Beam<P::Part> {
         let mut gathered = self.gather.gather(beam.result);
+        // Override stage to Projected — the gather strategy sets Joined.
         gathered.stage = Stage::Projected;
+        // M2 fix: carry outer envelope's accumulated state forward so
+        // provenance is not silently reset by the gather strategy.
+        gathered.path = beam.path;
+        gathered.loss = beam.loss;
+        gathered.precision = beam.precision;
+        gathered.recovered = beam.recovered;
         gathered
     }
 
-    fn split(&self, beam: Beam<T>) -> Vec<Beam<Beam<T>>> {
+    /// Split: re-emit a singleton population from a `Beam<P::Part>`.
+    ///
+    /// M2 fix: the outer wrapper beam carries the parent's path/loss/
+    /// precision/recovered so provenance is not reset to fresh values.
+    fn split(&self, beam: Beam<P::Part>) -> Vec<Beam<Beam<P::Part>>> {
         vec![Beam {
-            result: beam,
-            path: Vec::new(),
-            loss: crate::ShannonLoss::new(0.0),
-            precision: crate::Precision::new(1.0),
-            recovered: None,
+            result: Beam {
+                result: beam.result,
+                path: beam.path.clone(),
+                loss: beam.loss.clone(),
+                precision: beam.precision.clone(),
+                recovered: beam.recovered.clone(),
+                stage: Stage::Projected,
+            },
+            path: beam.path,           // M2: carry parent path
+            loss: beam.loss,           // M2: carry parent loss
+            precision: beam.precision, // M2: carry parent precision
+            recovered: beam.recovered, // M2: carry parent recovered
             stage: Stage::Split,
         }]
     }
 
     fn zoom(
         &self,
-        beam: Beam<T>,
-        f: &dyn Fn(Beam<T>) -> Beam<T>,
-    ) -> Beam<T> {
+        beam: Beam<P::Part>,
+        f: &dyn Fn(Beam<P::Part>) -> Beam<P::Part>,
+    ) -> Beam<P::Part> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<T>) -> Beam<MetaPrism<T, G>> {
+    fn refract(&self, beam: Beam<P::Part>) -> Beam<MetaPrism<P, G>> {
         Beam {
             result: MetaPrism {
+                inner: self.inner.clone(),
                 gather: self.gather.clone(),
-                _phantom: PhantomData,
             },
             path: beam.path,
             loss: beam.loss,
@@ -95,11 +157,12 @@ impl<T: Clone + 'static, G: Gather<T> + Clone + 'static> Prism for MetaPrism<T, 
 mod tests {
     use super::*;
     use crate::{Oid, Precision, ShannonLoss};
+    use super::super::gather::SumGather;
 
     // -------------------------------------------------------------------------
     // WordsPrism — a test prism that splits a String into individual words.
-    // Tests the spec-correct MetaPrism<P, G> shape where P is an inner prism
-    // that supplies the split. MetaPrism::focus must call inner.split.
+    // This exercises the inner-prism path: a non-trivial split with multiple
+    // parts, making it possible to verify MetaPrism delegates to inner.split.
     // -------------------------------------------------------------------------
 
     #[derive(Clone)]
@@ -160,23 +223,22 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
-    // Spec-correct tests against MetaPrism<P: Prism, G: Gather<P::Part>>.
-    // These tests define the required shape. They fail to compile against the
-    // current MetaPrism<T, G> because MetaPrism::new takes only a gather
-    // strategy, not an inner prism.
+    // Tests
     // -------------------------------------------------------------------------
 
-    /// C1 regression: MetaPrism must delegate to inner.split.
+    /// The core C1 regression: MetaPrism must delegate to inner.split.
+    ///
+    /// Verifies that `focus` calls `inner.split` and that the resulting
+    /// population has the correct count, content, and stage.
     #[test]
     fn meta_prism_uses_inner_split_and_gathers() {
-        // This requires MetaPrism::new(inner, gather) — two arguments.
-        // The current impl only takes one argument (the gather strategy).
         let meta = MetaPrism::new(WordsPrism, SumGather);
 
         let input = Beam::new("hello world test".to_string());
         let focused = meta.focus(input);
 
-        assert_eq!(focused.result.len(), 3);
+        // inner.split should have produced three word beams
+        assert_eq!(focused.result.len(), 3, "focus should produce 3 word beams");
         assert_eq!(focused.result[0].result, "hello");
         assert_eq!(focused.result[1].result, "world");
         assert_eq!(focused.result[2].result, "test");
@@ -187,7 +249,7 @@ mod tests {
         assert_eq!(projected.stage, Stage::Projected);
     }
 
-    /// Full pipeline test.
+    /// Full pipeline test: apply() chains focus → project → refract.
     #[test]
     fn meta_prism_full_pipeline_via_apply() {
         let meta = MetaPrism::new(WordsPrism, SumGather);
@@ -196,6 +258,11 @@ mod tests {
     }
 
     /// M2 regression: split must carry parent path/loss/precision/recovered.
+    ///
+    /// The old implementation used FRESH values (`Vec::new()`, `ShannonLoss::new(0.0)`,
+    /// `Precision::new(1.0)`), silently dropping parent provenance. This test
+    /// asserts the fix: the outer wrapper beam in the split result inherits
+    /// the parent beam's envelope.
     #[test]
     fn meta_prism_split_carries_parent_provenance() {
         let meta = MetaPrism::new(WordsPrism, SumGather);
@@ -218,19 +285,27 @@ mod tests {
             vec![Oid::new("parent")],
             "outer path must be inherited from parent (M2 fix)"
         );
-        assert_eq!(outer.loss.as_f64(), 2.5, "outer loss must be inherited");
-        assert_eq!(outer.precision.as_f64(), 0.7, "outer precision must be inherited");
+        assert_eq!(
+            outer.loss.as_f64(),
+            2.5,
+            "outer loss must be inherited from parent (M2 fix)"
+        );
+        assert_eq!(
+            outer.precision.as_f64(),
+            0.7,
+            "outer precision must be inherited from parent (M2 fix)"
+        );
         assert_eq!(outer.stage, Stage::Split);
     }
 
-    /// Crystal type closure.
+    /// Verify the crystal type is itself — the fixed-point closure property.
     #[test]
     fn meta_prism_crystal_is_self() {
         fn require_prism<P: Prism>() {}
         require_prism::<MetaPrism<WordsPrism, SumGather>>();
     }
 
-    /// focus preserves the outer beam's path/loss/precision.
+    /// Verify that focus preserves the outer beam's path/loss/precision.
     #[test]
     fn meta_prism_focus_preserves_outer_envelope() {
         let meta = MetaPrism::new(WordsPrism, SumGather);
@@ -251,7 +326,7 @@ mod tests {
         assert_eq!(focused.stage, Stage::Focused);
     }
 
-    /// project carries outer envelope forward (M2 fix for project).
+    /// Verify that project carries outer envelope forward (M2 fix for project).
     #[test]
     fn meta_prism_project_carries_outer_envelope() {
         let meta = MetaPrism::new(WordsPrism, SumGather);
@@ -268,6 +343,8 @@ mod tests {
         let focused = meta.focus(input);
         let projected = meta.project(focused);
 
+        // The outer path/loss/precision should be carried forward, not
+        // overwritten by the gather strategy's output.
         assert_eq!(projected.path, vec![Oid::new("root")]);
         assert_eq!(projected.loss.as_f64(), 1.0);
         assert_eq!(projected.precision.as_f64(), 0.8);
