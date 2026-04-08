@@ -61,6 +61,45 @@ impl Gather<String> for SumGather {
     }
 }
 
+/// Gather by picking the beam with the highest precision. Discards
+/// the others. Use when you only care about the single best outcome.
+#[derive(Clone)]
+pub struct MaxGather;
+
+impl Gather<String> for MaxGather {
+    fn gather(&self, beams: Vec<Beam<String>>) -> Beam<String> {
+        if beams.is_empty() {
+            return Beam {
+                result: String::new(),
+                path: Vec::new(),
+                loss: ShannonLoss::new(0.0),
+                precision: Precision::new(1.0),
+                recovered: None,
+                stage: Stage::Joined,
+            };
+        }
+
+        let best_idx = beams
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| {
+                a.precision
+                    .as_f64()
+                    .partial_cmp(&b.precision.as_f64())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        let mut beams = beams;
+        let best = beams.swap_remove(best_idx);
+        Beam {
+            stage: Stage::Joined,
+            ..best
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
