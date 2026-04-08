@@ -43,23 +43,55 @@ impl<S: Clone + Default + 'static, A: Clone + Default + 'static> Prism for Optic
     type Crystal = OpticPrismCrystal<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<Option<A>> {
-        todo!()
+        let preview = (self.preview_fn)(&beam.result);
+        Beam {
+            result: preview,
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Focused,
+        }
     }
 
     fn project(&self, beam: Beam<Option<A>>) -> Beam<A> {
-        todo!()
+        match beam.result {
+            Some(a) => Beam {
+                result: a,
+                path: beam.path,
+                loss: beam.loss,
+                precision: beam.precision,
+                recovered: beam.recovered,
+                stage: Stage::Projected,
+            },
+            None => Beam {
+                result: A::default(),
+                path: beam.path,
+                loss: ShannonLoss::new(f64::INFINITY),
+                precision: beam.precision,
+                recovered: beam.recovered,
+                stage: Stage::Projected,
+            },
+        }
     }
 
     fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> {
-        todo!()
+        vec![Beam { stage: Stage::Split, ..beam }]
     }
 
     fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> {
-        todo!()
+        f(beam)
     }
 
     fn refract(&self, beam: Beam<A>) -> Beam<OpticPrismCrystal<S, A>> {
-        todo!()
+        Beam {
+            result: OpticPrismCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
     }
 }
 
@@ -74,11 +106,20 @@ impl<S: Clone + Default + 'static, A: Clone + Default + 'static> Prism for Optic
     type Part = A;
     type Crystal = OpticPrismCrystal<S, A>;
 
-    fn focus(&self, beam: Beam<A>) -> Beam<A> { todo!() }
-    fn project(&self, beam: Beam<A>) -> Beam<A> { todo!() }
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { todo!() }
-    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { todo!() }
-    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrismCrystal<S, A>> { todo!() }
+    fn focus(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Focused, ..beam } }
+    fn project(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Projected, ..beam } }
+    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { vec![Beam { stage: Stage::Split, ..beam }] }
+    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { f(beam) }
+    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrismCrystal<S, A>> {
+        Beam {
+            result: OpticPrismCrystal { _phantom: PhantomData },
+            path: beam.path,
+            loss: beam.loss,
+            precision: beam.precision,
+            recovered: beam.recovered,
+            stage: Stage::Refracted,
+        }
+    }
 }
 
 #[cfg(test)]
