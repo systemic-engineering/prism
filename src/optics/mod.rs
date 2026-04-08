@@ -16,3 +16,4 @@
 //! Enabled via `features = ["optics"]` on the `prism` dependency.
 
 pub mod monoid;
+pub mod gather;
