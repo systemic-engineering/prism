@@ -59,7 +59,18 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 
     /// Returns `Some(A)` on a matching `s`, `None` otherwise.
-    /// Inherent convenience method — `Option` is internal API, not on the trait surface.
+    ///
+    /// This is an INHERENT CONVENIENCE method and returns `Option<A>` by
+    /// design — it is NOT part of the `Prism` trait surface and does NOT
+    /// participate in the spectral framework's loss-based refutation channel.
+    /// The `Option` here is the standard Rust idiom for "did the case match,"
+    /// unrelated to the Prism pipeline's encoding of refutation.
+    ///
+    /// For the Prism pipeline, use `focus` → `project` → `refract` via the
+    /// `apply` free function or explicit calls. The trait surface encodes
+    /// refutation as `ShannonLoss::infinite()` on the returned Beam, never
+    /// as `Option` or `Result`. See N1 in
+    /// `docs/seam-taut-rereview-2026-04-08.md`.
     pub fn extract(&self, s: &S) -> Option<A> {
         if (self.match_fn)(s) {
             Some((self.extract_fn)(s))

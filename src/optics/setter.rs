@@ -71,6 +71,27 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     }
 }
 
+/// The crystal produced by refracting a `Setter<S, A>`.
+///
+/// Unlike the phantom crystals used by Iso/Lens/Traversal/OpticPrism/Fold,
+/// `SetterCrystal` carries a real `witnessed: S` field — the value of `S`
+/// after `modify_fn` was invoked with the identity inner function during
+/// refract. This is intentional and is the fix for C4 in the Seam+Taut
+/// review: a Setter whose Prism impl did nothing with `modify_fn` was
+/// flagged as a silently-disconnected closure. Carrying the modified `S`
+/// proves, at the value level, that the closure ran.
+///
+/// **Design note (N2):** this *does* leak `S` through the Prism trait
+/// surface, which is unusual — the other classical optic crystals are
+/// phantom markers. The leak is deliberate and the only way to witness
+/// the closure's reachability without performing an observable side effect.
+/// Downstream consumers that care only about stage transitions can ignore
+/// the `witnessed` field; consumers that want to verify the closure ran
+/// can inspect it.
+///
+/// Callers should treat `witnessed` as diagnostic, not as the primary
+/// output of the Setter — the primary output is the inherent `modify`
+/// method, which applies a caller-supplied A→A function.
 pub struct SetterCrystal<S, A> {
     pub witnessed: S,
     _phantom: PhantomData<A>,
