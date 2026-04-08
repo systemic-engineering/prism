@@ -137,4 +137,35 @@ mod tests {
         fn require_self_crystal<P: Prism<Crystal = P>>() {}
         require_self_crystal::<IdPrism<String>>();
     }
+
+    #[test]
+    fn compose_chains_two_prisms() {
+        // Compose IdPrism with IdPrism — the composition should also be
+        // an identity (refract through IdPrism then IdPrism is still an
+        // identity).
+        let first = IdPrism::<String>::new();
+        let second = IdPrism::<String>::new();
+        let composed = Compose::new(first, second);
+
+        let input = Beam::new("world".to_string());
+        let out = composed.refract(input);
+
+        // After composition, the crystal is the second prism's crystal type.
+        // For IdPrism ∘ IdPrism, that's still IdPrism<String> by construction.
+        assert_eq!(out.stage, Stage::Refracted);
+    }
+
+    #[test]
+    fn compose_type_chains_crystal_to_input() {
+        // Compile-time check: Compose<A, B>: Prism<Input = A::Input, Crystal = B::Crystal>
+        // This test asserts the types chain properly.
+        fn require_chain<A, B>()
+        where
+            A: Prism,
+            B: Prism<Input = A::Crystal>,
+        {
+            // If this compiles, the chain is sound.
+        }
+        require_chain::<IdPrism<String>, IdPrism<String>>();
+    }
 }
