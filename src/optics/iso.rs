@@ -6,6 +6,7 @@
 //! round-trip holds as a law.
 
 use crate::{Beam, Prism, Stage};
+use crate::optics::phantom_crystal::PhantomCrystal;
 use std::marker::PhantomData;
 
 /// A total invertible pair (A → B, B → A).
@@ -15,10 +16,16 @@ use std::marker::PhantomData;
 /// - `forward(backward(b)) ≡ b` (right inverse)
 ///
 /// As a Prism: focus applies forward, refract crystallizes the resulting
-/// value in a fresh Iso carrying the same functions.
+/// value in a fresh PhantomCrystal carrying the IsoMarker type fingerprint.
 pub struct Iso<A, B> {
     forward_fn: Box<dyn Fn(A) -> B>,
     backward_fn: Box<dyn Fn(B) -> A>,
+    _phantom: PhantomData<(A, B)>,
+}
+
+/// Type-level marker for Iso<A, B> crystals.
+#[derive(Clone)]
+pub struct IsoMarker<A, B> {
     _phantom: PhantomData<(A, B)>,
 }
 
@@ -66,7 +73,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
     type Focused = B;
     type Projected = B;
     type Part = B;
-    type Crystal = IsoCrystal<A, B>;
+    type Crystal = PhantomCrystal<IsoMarker<A, B>>;
 
     fn focus(&self, beam: Beam<A>) -> Beam<B> {
         let forward = (self.forward_fn)(beam.result);
@@ -103,69 +110,11 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<B>) -> Beam<IsoCrystal<A, B>> {
-        // Iso crystallizes into a marker struct — we can't clone the
+    fn refract(&self, beam: Beam<B>) -> Beam<PhantomCrystal<IsoMarker<A, B>>> {
+        // Iso crystallizes into a PhantomCrystal marker — we can't clone the
         // Fn trait objects, so the crystal just asserts "I was an Iso."
         Beam {
-            result: IsoCrystal {
-                _phantom: PhantomData,
-            },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-        }
-    }
-}
-
-/// The crystal type for Iso<A, B>. A marker carrying no state — iso
-/// crystallization is acknowledged by the type, not by runtime data.
-pub struct IsoCrystal<A, B> {
-    _phantom: PhantomData<(A, B)>,
-}
-
-impl<A: Clone + 'static, B: Clone + 'static> Prism for IsoCrystal<A, B> {
-    type Input = B;
-    type Focused = B;
-    type Projected = B;
-    type Part = B;
-    type Crystal = IsoCrystal<A, B>;
-
-    fn focus(&self, beam: Beam<B>) -> Beam<B> {
-        Beam {
-            stage: Stage::Focused,
-            ..beam
-        }
-    }
-
-    fn project(&self, beam: Beam<B>) -> Beam<B> {
-        Beam {
-            stage: Stage::Projected,
-            ..beam
-        }
-    }
-
-    fn split(&self, beam: Beam<B>) -> Vec<Beam<B>> {
-        vec![Beam {
-            stage: Stage::Split,
-            ..beam
-        }]
-    }
-
-    fn zoom(
-        &self,
-        beam: Beam<B>,
-        f: &dyn Fn(Beam<B>) -> Beam<B>,
-    ) -> Beam<B> {
-        f(beam)
-    }
-
-    fn refract(&self, beam: Beam<B>) -> Beam<IsoCrystal<A, B>> {
-        Beam {
-            result: IsoCrystal {
-                _phantom: PhantomData,
-            },
+            result: PhantomCrystal::new(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,

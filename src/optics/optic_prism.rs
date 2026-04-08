@@ -5,12 +5,19 @@
 //! (the case doesn't match), but review always reconstructs the whole.
 
 use crate::{Beam, Prism, ShannonLoss, Stage};
+use crate::optics::phantom_crystal::PhantomCrystal;
 use std::marker::PhantomData;
 
 pub struct OpticPrism<S, A> {
     match_fn: Box<dyn Fn(&S) -> bool>,
     extract_fn: Box<dyn Fn(&S) -> A>,
     review_fn: Box<dyn Fn(A) -> S>,
+    _phantom: PhantomData<(S, A)>,
+}
+
+/// Type-level marker for OpticPrism<S, A> crystals.
+#[derive(Clone)]
+pub struct OpticPrismMarker<S, A> {
     _phantom: PhantomData<(S, A)>,
 }
 
@@ -71,7 +78,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
     type Focused = A;      // refutation lives in ShannonLoss, never in Option
     type Projected = A;
     type Part = A;
-    type Crystal = OpticPrismCrystal<S, A>;
+    type Crystal = PhantomCrystal<OpticPrismMarker<S, A>>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<A> {
         // Always call extract_fn. When the input doesn't match, the closure
@@ -105,36 +112,9 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrismCrystal<S, A>> {
+    fn refract(&self, beam: Beam<A>) -> Beam<PhantomCrystal<OpticPrismMarker<S, A>>> {
         Beam {
-            result: OpticPrismCrystal { _phantom: PhantomData },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-        }
-    }
-}
-
-pub struct OpticPrismCrystal<S, A> {
-    _phantom: PhantomData<(S, A)>,
-}
-
-impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrismCrystal<S, A> {
-    type Input = A;
-    type Focused = A;
-    type Projected = A;
-    type Part = A;
-    type Crystal = OpticPrismCrystal<S, A>;
-
-    fn focus(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { vec![Beam { stage: Stage::Split, ..beam }] }
-    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { f(beam) }
-    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrismCrystal<S, A>> {
-        Beam {
-            result: OpticPrismCrystal { _phantom: PhantomData },
+            result: PhantomCrystal::new(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,

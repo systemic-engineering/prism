@@ -6,10 +6,17 @@
 //! specialized to Vec for simplicity.
 
 use crate::{Beam, Prism, Stage};
+use crate::optics::phantom_crystal::PhantomCrystal;
 use std::marker::PhantomData;
 
 pub struct Traversal<A, B> {
     map_fn: Box<dyn Fn(A) -> B>,
+    _phantom: PhantomData<(A, B)>,
+}
+
+/// Type-level marker for Traversal<A, B> crystals.
+#[derive(Clone)]
+pub struct TraversalMarker<A, B> {
     _phantom: PhantomData<(A, B)>,
 }
 
@@ -48,7 +55,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
     type Focused = Vec<B>;
     type Projected = Vec<B>;
     type Part = B;
-    type Crystal = TraversalCrystal<A, B>;
+    type Crystal = PhantomCrystal<TraversalMarker<A, B>>;
 
     fn focus(&self, beam: Beam<Vec<A>>) -> Beam<Vec<B>> {
         let mapped: Vec<B> = beam.result.into_iter().map(|a| (self.map_fn)(a)).collect();
@@ -93,55 +100,9 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<Vec<B>>) -> Beam<TraversalCrystal<A, B>> {
+    fn refract(&self, beam: Beam<Vec<B>>) -> Beam<PhantomCrystal<TraversalMarker<A, B>>> {
         Beam {
-            result: TraversalCrystal { _phantom: PhantomData },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-        }
-    }
-}
-
-pub struct TraversalCrystal<A, B> {
-    _phantom: PhantomData<(A, B)>,
-}
-
-impl<A: Clone + 'static, B: Clone + 'static> Prism for TraversalCrystal<A, B> {
-    type Input = Vec<B>;
-    type Focused = Vec<B>;
-    type Projected = Vec<B>;
-    type Part = B;
-    type Crystal = TraversalCrystal<A, B>;
-
-    fn focus(&self, beam: Beam<Vec<B>>) -> Beam<Vec<B>> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<Vec<B>>) -> Beam<Vec<B>> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<Vec<B>>) -> Vec<Beam<B>> {
-        beam.result
-            .into_iter()
-            .enumerate()
-            .map(|(i, b)| Beam {
-                result: b,
-                path: {
-                    let mut p = beam.path.clone();
-                    p.push(crate::Oid::new(format!("{}", i)));
-                    p
-                },
-                loss: beam.loss.clone(),
-                precision: beam.precision.clone(),
-                recovered: beam.recovered.clone(),
-                stage: Stage::Split,
-            })
-            .collect()
-    }
-    fn zoom(&self, beam: Beam<Vec<B>>, f: &dyn Fn(Beam<Vec<B>>) -> Beam<Vec<B>>) -> Beam<Vec<B>> {
-        f(beam)
-    }
-    fn refract(&self, beam: Beam<Vec<B>>) -> Beam<TraversalCrystal<A, B>> {
-        Beam {
-            result: TraversalCrystal { _phantom: PhantomData },
+            result: PhantomCrystal::new(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,

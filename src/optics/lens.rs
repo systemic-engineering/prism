@@ -8,11 +8,18 @@
 //! - `set(set(s, a1), a2) = set(s, a2)`  (set-set)
 
 use crate::{Beam, Prism, Stage};
+use crate::optics::phantom_crystal::PhantomCrystal;
 use std::marker::PhantomData;
 
 pub struct Lens<S, A> {
     view_fn: Box<dyn Fn(&S) -> A>,
     set_fn: Box<dyn Fn(S, A) -> S>,
+    _phantom: PhantomData<(S, A)>,
+}
+
+/// Type-level marker for Lens<S, A> crystals.
+#[derive(Clone)]
+pub struct LensMarker<S, A> {
     _phantom: PhantomData<(S, A)>,
 }
 
@@ -64,7 +71,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
     type Focused = A;
     type Projected = A;
     type Part = A;
-    type Crystal = LensCrystal<S, A>;
+    type Crystal = PhantomCrystal<LensMarker<S, A>>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<A> {
         let a = (self.view_fn)(&beam.result);
@@ -94,36 +101,9 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<A>) -> Beam<LensCrystal<S, A>> {
+    fn refract(&self, beam: Beam<A>) -> Beam<PhantomCrystal<LensMarker<S, A>>> {
         Beam {
-            result: LensCrystal { _phantom: PhantomData },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-        }
-    }
-}
-
-pub struct LensCrystal<S, A> {
-    _phantom: PhantomData<(S, A)>,
-}
-
-impl<S: Clone + 'static, A: Clone + 'static> Prism for LensCrystal<S, A> {
-    type Input = A;
-    type Focused = A;
-    type Projected = A;
-    type Part = A;
-    type Crystal = LensCrystal<S, A>;
-
-    fn focus(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<A>) -> Beam<A> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> { vec![Beam { stage: Stage::Split, ..beam }] }
-    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> { f(beam) }
-    fn refract(&self, beam: Beam<A>) -> Beam<LensCrystal<S, A>> {
-        Beam {
-            result: LensCrystal { _phantom: PhantomData },
+            result: PhantomCrystal::new(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,

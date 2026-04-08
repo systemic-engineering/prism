@@ -4,10 +4,17 @@
 //! side. Think of it as a Traversal with the put-back direction removed.
 
 use crate::{Beam, Prism, Stage};
+use crate::optics::phantom_crystal::PhantomCrystal;
 use std::marker::PhantomData;
 
 pub struct Fold<S, A> {
     fold_fn: Box<dyn Fn(&S) -> Vec<A>>,
+    _phantom: PhantomData<(S, A)>,
+}
+
+/// Type-level marker for Fold<S, A> crystals.
+#[derive(Clone)]
+pub struct FoldMarker<S, A> {
     _phantom: PhantomData<(S, A)>,
 }
 
@@ -46,7 +53,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
     type Focused = Vec<A>;
     type Projected = Vec<A>;
     type Part = A;
-    type Crystal = FoldCrystal<S, A>;
+    type Crystal = PhantomCrystal<FoldMarker<S, A>>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<Vec<A>> {
         let list = (self.fold_fn)(&beam.result);
@@ -87,51 +94,9 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<Vec<A>>) -> Beam<FoldCrystal<S, A>> {
+    fn refract(&self, beam: Beam<Vec<A>>) -> Beam<PhantomCrystal<FoldMarker<S, A>>> {
         Beam {
-            result: FoldCrystal { _phantom: PhantomData },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-        }
-    }
-}
-
-pub struct FoldCrystal<S, A> { _phantom: PhantomData<(S, A)> }
-
-impl<S: Clone + 'static, A: Clone + 'static> Prism for FoldCrystal<S, A> {
-    type Input = Vec<A>;
-    type Focused = Vec<A>;
-    type Projected = Vec<A>;
-    type Part = A;
-    type Crystal = FoldCrystal<S, A>;
-
-    fn focus(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<Vec<A>>) -> Beam<Vec<A>> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<Vec<A>>) -> Vec<Beam<A>> {
-        beam.result
-            .into_iter()
-            .enumerate()
-            .map(|(i, a)| Beam {
-                result: a,
-                path: {
-                    let mut p = beam.path.clone();
-                    p.push(crate::Oid::new(format!("{}", i)));
-                    p
-                },
-                loss: beam.loss.clone(),
-                precision: beam.precision.clone(),
-                recovered: beam.recovered.clone(),
-                stage: Stage::Split,
-            })
-            .collect()
-    }
-    fn zoom(&self, beam: Beam<Vec<A>>, f: &dyn Fn(Beam<Vec<A>>) -> Beam<Vec<A>>) -> Beam<Vec<A>> { f(beam) }
-    fn refract(&self, beam: Beam<Vec<A>>) -> Beam<FoldCrystal<S, A>> {
-        Beam {
-            result: FoldCrystal { _phantom: PhantomData },
+            result: PhantomCrystal::new(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,

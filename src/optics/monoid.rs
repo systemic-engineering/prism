@@ -111,36 +111,15 @@ impl<T: Clone + 'static> Prism for IdPrism<T> {
     type Crystal = IdPrism<T>;
 
     fn focus(&self, beam: Beam<T>) -> Beam<T> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Focused,
-        }
+        Beam { stage: Stage::Focused, ..beam }
     }
 
     fn project(&self, beam: Beam<T>) -> Beam<T> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Projected,
-        }
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<T>) -> Vec<Beam<T>> {
-        vec![Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Split,
-        }]
+        vec![Beam { stage: Stage::Split, ..beam }]
     }
 
     fn zoom(
@@ -205,25 +184,11 @@ impl Prism for CountPrism {
     type Crystal = CountPrism;
 
     fn focus(&self, beam: Beam<String>) -> Beam<String> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Focused,
-        }
+        Beam { stage: Stage::Focused, ..beam }
     }
 
     fn project(&self, beam: Beam<String>) -> Beam<String> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Projected,
-        }
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<String>) -> Vec<Beam<char>> {
@@ -302,25 +267,11 @@ impl Prism for MarkerPrism {
     type Crystal = MarkerPrism;
 
     fn focus(&self, beam: Beam<String>) -> Beam<String> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Focused,
-        }
+        Beam { stage: Stage::Focused, ..beam }
     }
 
     fn project(&self, beam: Beam<String>) -> Beam<String> {
-        Beam {
-            result: beam.result,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Projected,
-        }
+        Beam { stage: Stage::Projected, ..beam }
     }
 
     fn split(&self, beam: Beam<String>) -> Vec<Beam<char>> {
