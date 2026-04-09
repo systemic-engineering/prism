@@ -1,3 +1,4 @@
+use crate::connection::{Connection, ScalarConnection};
 use crate::loss::ShannonLoss;
 use crate::oid::Oid;
 use crate::precision::Precision;
@@ -36,13 +37,22 @@ pub enum Stage {
 /// what didn't survive. The beam carries the story of how the
 /// result came to be: path, loss, precision, recovery, stage.
 #[derive(Clone, Debug)]
-pub struct Beam<T> {
+pub struct Beam<T, C: Connection = ScalarConnection> {
     pub result: T,
     pub path: Vec<Oid>,
     pub loss: ShannonLoss,
     pub precision: Precision,
     pub recovered: Option<Recovery>,
     pub stage: Stage,
+    pub connection: C,
+}
+
+impl<T, C: Connection> Beam<T, C> {
+    /// Add a `connection` value to this beam (builder-style).
+    pub fn with_connection(mut self, c: C) -> Self {
+        self.connection = c;
+        self
+    }
 }
 
 impl<T> Beam<T> {
@@ -55,9 +65,12 @@ impl<T> Beam<T> {
             precision: Precision::new(0.0),
             recovered: None,
             stage: Stage::Initial,
+            connection: ScalarConnection::default(),
         }
     }
+}
 
+impl<T, C: Connection> Beam<T, C> {
     /// Whether the projection was lossless.
     pub fn is_lossless(&self) -> bool {
         self.loss.is_zero()
@@ -80,7 +93,7 @@ impl<T> Beam<T> {
     }
 
     /// Map the result, preserving the trace.
-    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Beam<U> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Beam<U, C> {
         Beam {
             result: f(self.result),
             path: self.path,
@@ -88,6 +101,7 @@ impl<T> Beam<T> {
             precision: self.precision,
             recovered: self.recovered,
             stage: self.stage,
+            connection: self.connection,
         }
     }
 

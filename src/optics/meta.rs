@@ -69,6 +69,7 @@ where
         let loss = beam.loss.clone();
         let precision = beam.precision.clone();
         let recovered = beam.recovered.clone();
+        let connection = beam.connection.clone();
 
         // Hand a "projected" beam to the inner prism's split.
         let inner_beam = Beam {
@@ -78,6 +79,7 @@ where
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Projected,
+            connection: beam.connection,
         };
         let parts = self.inner.split(inner_beam);
 
@@ -88,6 +90,7 @@ where
             precision,
             recovered,
             stage: Stage::Focused,
+            connection,
         }
     }
 
@@ -123,12 +126,14 @@ where
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
                 stage: Stage::Projected,
+                connection: beam.connection.clone(),
             },
             path: beam.path,           // M2: carry parent path
             loss: beam.loss,           // M2: carry parent loss
             precision: beam.precision, // M2: carry parent precision
             recovered: beam.recovered, // M2: carry parent recovered
             stage: Stage::Split,
+            connection: beam.connection,
         }]
     }
 
@@ -151,6 +156,7 @@ where
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -200,6 +206,7 @@ mod tests {
                     precision: beam.precision.clone(),
                     recovered: beam.recovered.clone(),
                     stage: Stage::Split,
+                    connection: beam.connection.clone(),
                 })
                 .collect()
         }
@@ -220,6 +227,7 @@ mod tests {
                 precision: beam.precision,
                 recovered: beam.recovered,
                 stage: Stage::Refracted,
+                connection: beam.connection,
             }
         }
     }
@@ -276,6 +284,7 @@ mod tests {
             precision: Precision::new(0.7),
             recovered: None,
             stage: Stage::Projected,
+            connection: Default::default(),
         };
 
         let parts = meta.split(parent_beam);
@@ -319,6 +328,7 @@ mod tests {
             precision: Precision::new(0.8),
             recovered: None,
             stage: Stage::Initial,
+            connection: Default::default(),
         };
 
         let focused = meta.focus(input);
@@ -340,6 +350,7 @@ mod tests {
             precision: Precision::new(0.8),
             recovered: None,
             stage: Stage::Initial,
+            connection: Default::default(),
         };
 
         let focused = meta.focus(input);

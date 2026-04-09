@@ -13,6 +13,7 @@
 //! classical functional optics — enable the `optics` cargo feature.
 
 pub mod beam;
+pub mod connection;
 pub mod content;
 pub mod loss;
 pub mod metal;
@@ -24,6 +25,7 @@ pub mod spectral_oid;
 pub mod optics;
 
 pub use beam::{Beam, Recovery, Stage};
+pub use connection::{Connection, ScalarConnection};
 pub use content::ContentAddressed;
 pub use loss::ShannonLoss;
 pub use oid::Oid;
@@ -172,6 +174,7 @@ mod tests {
                 precision: beam.precision,
                 recovered: beam.recovered,
                 stage: Stage::Focused,
+                connection: beam.connection,
             }
         }
 
@@ -187,6 +190,7 @@ mod tests {
                     precision: beam.precision,
                     recovered: beam.recovered,
                     stage: Stage::Projected,
+                    connection: beam.connection,
                 };
             }
             let cutoff = (beam.result.len() as f64 * precision) as usize;
@@ -200,6 +204,7 @@ mod tests {
                 precision: beam.precision,
                 recovered: beam.recovered,
                 stage: Stage::Projected,
+                connection: beam.connection,
             }
         }
 
@@ -219,6 +224,7 @@ mod tests {
                         precision: parent_precision.clone(),
                         recovered: None,
                         stage: Stage::Split,
+                        connection: Default::default(),
                     }
                 })
                 .collect()
@@ -242,6 +248,7 @@ mod tests {
                 precision: beam.precision,
                 recovered: beam.recovered,
                 stage: Stage::Refracted,
+                connection: beam.connection,
             }
         }
     }

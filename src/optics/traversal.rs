@@ -6,22 +6,14 @@
 //! specialized to Vec for simplicity.
 
 use crate::{Beam, Prism, Stage};
-use crate::optics::phantom_crystal::PhantomCrystal;
-use std::marker::PhantomData;
 
+#[derive(Clone, Copy)]
 pub struct Traversal<A, B> {
-    map_fn: Box<dyn Fn(A) -> B>,
-    _phantom: PhantomData<(A, B)>,
-}
-
-/// Type-level marker for Traversal<A, B> crystals.
-#[derive(Clone)]
-pub struct TraversalMarker<A, B> {
-    _phantom: PhantomData<(A, B)>,
+    map_fn: fn(A) -> B,
 }
 
 impl<A: 'static, B: 'static> Traversal<A, B> {
-    /// Construct a Traversal from a per-element mapping function.
+    /// Construct a Traversal from a per-element mapping fn pointer.
     ///
     /// # Laws
     ///
@@ -35,14 +27,8 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
     /// it transforms elements but not their position in the container.
     /// Recombination via a Gather strategy will preserve the original order
     /// (assuming the iterator order was preserved).
-    pub fn new<F>(map: F) -> Self
-    where
-        F: Fn(A) -> B + 'static,
-    {
-        Traversal {
-            map_fn: Box::new(map),
-            _phantom: PhantomData,
-        }
+    pub fn new(map: fn(A) -> B) -> Self {
+        Traversal { map_fn: map }
     }
 
     pub fn traverse(&self, input: Vec<A>) -> Vec<B> {
@@ -55,7 +41,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
     type Focused = Vec<B>;
     type Projected = Vec<B>;
     type Part = B;
-    type Crystal = PhantomCrystal<TraversalMarker<A, B>>;
+    type Crystal = Traversal<A, B>;
 
     fn focus(&self, beam: Beam<Vec<A>>) -> Beam<Vec<B>> {
         let mapped: Vec<B> = beam.result.into_iter().map(|a| (self.map_fn)(a)).collect();
@@ -66,6 +52,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Focused,
+            connection: beam.connection,
         }
     }
 
@@ -88,6 +75,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
                 stage: Stage::Split,
+                connection: beam.connection.clone(),
             })
             .collect()
     }
@@ -100,14 +88,16 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<Vec<B>>) -> Beam<PhantomCrystal<TraversalMarker<A, B>>> {
+    fn refract(&self, beam: Beam<Vec<B>>) -> Beam<Traversal<A, B>> {
+        // fn pointers are Copy — the optic itself IS the lossless fixed point.
         Beam {
-            result: PhantomCrystal::new(),
+            result: self.clone(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -118,23 +108,26 @@ mod tests {
 
     #[test]
     fn traversal_maps_over_vec() {
-        let double: Traversal<i32, i32> = Traversal::new(|x| x * 2);
-        let result = double.traverse(vec![1, 2, 3]);
+        fn double(x: i32) -> i32 { x * 2 }
+        let double_t: Traversal<i32, i32> = Traversal::new(double);
+        let result = double_t.traverse(vec![1, 2, 3]);
         assert_eq!(result, vec![2, 4, 6]);
     }
 
     #[test]
     fn traversal_as_prism_focus_maps() {
-        let to_upper: Traversal<String, String> = Traversal::new(|s: String| s.to_uppercase());
+        fn to_upper(s: String) -> String { s.to_uppercase() }
+        let to_upper_t: Traversal<String, String> = Traversal::new(to_upper);
         let beam = Beam::new(vec!["hello".to_string(), "world".to_string()]);
-        let focused = to_upper.focus(beam);
+        let focused = to_upper_t.focus(beam);
         assert_eq!(focused.result, vec!["HELLO", "WORLD"]);
         assert_eq!(focused.stage, Stage::Focused);
     }
 
     #[test]
     fn traversal_split_yields_individual_beams_with_shared_path() {
-        let id: Traversal<i32, i32> = Traversal::new(|x: i32| x);
+        fn identity(x: i32) -> i32 { x }
+        let id: Traversal<i32, i32> = Traversal::new(identity);
         let beam = Beam::new(vec![10, 20, 30]);
         let focused = id.focus(beam);
         let projected = id.project(focused);
@@ -151,8 +144,8 @@ mod tests {
     #[test]
     fn traversal_split_indexes_children() {
         use crate::Oid;
-
-        let id: Traversal<i32, i32> = Traversal::new(|x: i32| x);
+        fn identity(x: i32) -> i32 { x }
+        let id: Traversal<i32, i32> = Traversal::new(identity);
         let beam = Beam::new(vec![10, 20, 30]);
         let focused = id.focus(beam);
         let projected = id.project(focused);
@@ -163,5 +156,14 @@ mod tests {
         assert_eq!(parts[0].path.last(), Some(&Oid::new("0")));
         assert_eq!(parts[1].path.last(), Some(&Oid::new("1")));
         assert_eq!(parts[2].path.last(), Some(&Oid::new("2")));
+    }
+
+    #[test]
+    fn traversal_is_clone_and_copy() {
+        fn double(x: i32) -> i32 { x * 2 }
+        let t: Traversal<i32, i32> = Traversal::new(double);
+        let t2 = t; // Copy
+        let t3 = t2.clone(); // Clone
+        assert_eq!(t3.traverse(vec![1]), vec![2]);
     }
 }

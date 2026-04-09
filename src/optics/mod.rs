@@ -42,7 +42,6 @@
 pub mod monoid;
 pub mod gather;
 pub mod meta;
-pub mod phantom_crystal;
 pub mod iso;
 pub mod lens;
 pub mod traversal;

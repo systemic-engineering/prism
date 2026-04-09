@@ -5,7 +5,7 @@
 
 #![cfg(feature = "optics")]
 
-use prism::{apply, Beam, Oid, Prism, Stage};
+use prism::{apply, Beam, Oid, Prism, ScalarConnection, Stage};
 use prism::optics::gather::ConcatGather;
 use prism::optics::meta::MetaPrism;
 use prism::optics::traversal::Traversal;
@@ -48,6 +48,7 @@ impl Prism for WordsPrism {
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
                 stage: Stage::Split,
+                connection: beam.connection.clone(),
             })
             .collect()
     }
@@ -68,6 +69,7 @@ impl Prism for WordsPrism {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -161,6 +163,7 @@ fn compose_preserves_path_through_both_idprisms() {
         precision: prism::Precision::new(1.0),
         recovered: None,
         stage: Stage::Initial,
+        connection: Default::default(),
     };
 
     let focused = composed.focus(input);

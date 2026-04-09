@@ -8,23 +8,15 @@
 //! - `set(set(s, a1), a2) = set(s, a2)`  (set-set)
 
 use crate::{Beam, Prism, Stage};
-use crate::optics::phantom_crystal::PhantomCrystal;
-use std::marker::PhantomData;
 
+#[derive(Clone, Copy)]
 pub struct Lens<S, A> {
-    view_fn: Box<dyn Fn(&S) -> A>,
-    set_fn: Box<dyn Fn(S, A) -> S>,
-    _phantom: PhantomData<(S, A)>,
-}
-
-/// Type-level marker for Lens<S, A> crystals.
-#[derive(Clone)]
-pub struct LensMarker<S, A> {
-    _phantom: PhantomData<(S, A)>,
+    view_fn: fn(&S) -> A,
+    set_fn: fn(S, A) -> S,
 }
 
 impl<S: 'static, A: 'static> Lens<S, A> {
-    /// Construct a Lens from a view and set function.
+    /// Construct a Lens from a view and set fn pointer.
     ///
     /// # Laws
     ///
@@ -37,16 +29,8 @@ impl<S: 'static, A: 'static> Lens<S, A> {
     /// These cannot be enforced by the type system. A Lens constructed from
     /// functions that violate any of these laws will compile and run but will
     /// produce results that are meaningless under the Lens laws.
-    pub fn new<V, U>(view: V, set: U) -> Self
-    where
-        V: Fn(&S) -> A + 'static,
-        U: Fn(S, A) -> S + 'static,
-    {
-        Lens {
-            view_fn: Box::new(view),
-            set_fn: Box::new(set),
-            _phantom: PhantomData,
-        }
+    pub fn new(view: fn(&S) -> A, set: fn(S, A) -> S) -> Self {
+        Lens { view_fn: view, set_fn: set }
     }
 
     pub fn view(&self, s: &S) -> A {
@@ -71,7 +55,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
     type Focused = A;
     type Projected = A;
     type Part = A;
-    type Crystal = PhantomCrystal<LensMarker<S, A>>;
+    type Crystal = Lens<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<A> {
         let a = (self.view_fn)(&beam.result);
@@ -82,6 +66,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Focused,
+            connection: beam.connection,
         }
     }
 
@@ -101,14 +86,16 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<A>) -> Beam<PhantomCrystal<LensMarker<S, A>>> {
+    fn refract(&self, beam: Beam<A>) -> Beam<Lens<S, A>> {
+        // fn pointers are Copy — the optic itself IS the lossless fixed point.
         Beam {
-            result: PhantomCrystal::new(),
+            result: self.clone(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -120,12 +107,12 @@ mod tests {
     #[derive(Clone, Debug, PartialEq)]
     struct Point { x: i32, y: i32 }
 
+    fn point_view_x(p: &Point) -> i32 { p.x }
+    fn point_set_x(p: Point, new_x: i32) -> Point { Point { x: new_x, ..p } }
+
     #[test]
     fn lens_views_and_sets_field() {
-        let x_lens: Lens<Point, i32> = Lens::new(
-            |p: &Point| p.x,
-            |p: Point, new_x: i32| Point { x: new_x, ..p },
-        );
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
 
         let p = Point { x: 3, y: 5 };
         assert_eq!(x_lens.view(&p), 3);
@@ -136,10 +123,7 @@ mod tests {
 
     #[test]
     fn lens_view_set_law() {
-        let x_lens: Lens<Point, i32> = Lens::new(
-            |p: &Point| p.x,
-            |p: Point, new_x: i32| Point { x: new_x, ..p },
-        );
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
         let p = Point { x: 3, y: 5 };
         let viewed = x_lens.view(&p);
         let restored = x_lens.set(p.clone(), viewed);
@@ -148,10 +132,7 @@ mod tests {
 
     #[test]
     fn lens_set_view_law() {
-        let x_lens: Lens<Point, i32> = Lens::new(
-            |p: &Point| p.x,
-            |p: Point, new_x: i32| Point { x: new_x, ..p },
-        );
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
         let p = Point { x: 3, y: 5 };
         let set_p = x_lens.set(p, 99);
         assert_eq!(x_lens.view(&set_p), 99);
@@ -159,13 +140,18 @@ mod tests {
 
     #[test]
     fn lens_refract_as_prism() {
-        let x_lens: Lens<Point, i32> = Lens::new(
-            |p: &Point| p.x,
-            |p: Point, new_x: i32| Point { x: new_x, ..p },
-        );
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
         let beam = Beam::new(Point { x: 3, y: 5 });
         let focused = x_lens.focus(beam);
         assert_eq!(focused.result, 3);
         assert_eq!(focused.stage, Stage::Focused);
+    }
+
+    #[test]
+    fn lens_is_clone_and_copy() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let x_lens2 = x_lens; // Copy
+        let x_lens3 = x_lens2.clone(); // Clone
+        assert_eq!(x_lens3.view(&Point { x: 7, y: 0 }), 7);
     }
 }

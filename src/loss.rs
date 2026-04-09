@@ -4,6 +4,12 @@
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ShannonLoss(f64);
 
+impl Default for ShannonLoss {
+    fn default() -> Self {
+        ShannonLoss::zero()
+    }
+}
+
 impl ShannonLoss {
     pub fn new(bits: f64) -> Self {
         ShannonLoss(bits)

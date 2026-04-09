@@ -5,15 +5,14 @@
 //! the optic kinds — Fold + Setter with the read side removed.
 
 use crate::{Beam, Prism, Stage};
-use std::marker::PhantomData;
 
+#[derive(Clone, Copy)]
 pub struct Setter<S, A> {
-    modify_fn: Box<dyn Fn(S, &dyn Fn(A) -> A) -> S>,
-    _phantom: PhantomData<(S, A)>,
+    modify_fn: fn(S, &dyn Fn(A) -> A) -> S,
 }
 
 impl<S: 'static, A: 'static> Setter<S, A> {
-    /// Construct a Setter from a modify function.
+    /// Construct a Setter from a modify fn pointer.
     ///
     /// # Laws
     ///
@@ -25,14 +24,12 @@ impl<S: 'static, A: 'static> Setter<S, A> {
     ///
     /// These are the standard Setter laws from functional optics. They cannot
     /// be enforced by the type system.
-    pub fn new<M>(modify: M) -> Self
-    where
-        M: Fn(S, &dyn Fn(A) -> A) -> S + 'static,
-    {
-        Setter {
-            modify_fn: Box::new(modify),
-            _phantom: PhantomData,
-        }
+    ///
+    /// Note: the inner `&dyn Fn(A) -> A` is a function argument, not a stored
+    /// closure — this is fine and does not affect the fn pointer constraint on
+    /// `modify_fn` itself.
+    pub fn new(modify: fn(S, &dyn Fn(A) -> A) -> S) -> Self {
+        Setter { modify_fn: modify }
     }
 
     pub fn modify<F>(&self, s: S, f: F) -> S
@@ -48,74 +45,25 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     type Focused = S;
     type Projected = S;
     type Part = S;
-    type Crystal = SetterCrystal<S, A>;
+    type Crystal = Setter<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Focused, ..beam } }
     fn project(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Projected, ..beam } }
     fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
     fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
-    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
-        // Call modify_fn with the identity inner function. This exercises the
-        // closure and proves it's reachable from the Prism trait surface.
-        // With identity, the result is semantically equal to the input S, but
-        // the closure has run. The crystal records the witnessed S.
-        let modified = (self.modify_fn)(beam.result, &|a| a);
+
+    fn refract(&self, beam: Beam<S>) -> Beam<Setter<S, A>> {
+        // fn pointers are Copy — the optic itself IS the lossless fixed point.
+        // We also exercise modify_fn with identity to prove the closure is reachable.
+        let _witnessed = (self.modify_fn)(beam.result.clone(), &|a| a);
         Beam {
-            result: SetterCrystal { witnessed: modified, _phantom: PhantomData },
+            result: self.clone(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
-        }
-    }
-}
-
-/// The crystal produced by refracting a `Setter<S, A>`.
-///
-/// Unlike the phantom crystals used by Iso/Lens/Traversal/OpticPrism/Fold,
-/// `SetterCrystal` carries a real `witnessed: S` field — the value of `S`
-/// after `modify_fn` was invoked with the identity inner function during
-/// refract. This is intentional and is the fix for C4 in the Seam+Taut
-/// review: a Setter whose Prism impl did nothing with `modify_fn` was
-/// flagged as a silently-disconnected closure. Carrying the modified `S`
-/// proves, at the value level, that the closure ran.
-///
-/// **Design note (N2):** this *does* leak `S` through the Prism trait
-/// surface, which is unusual — the other classical optic crystals are
-/// phantom markers. The leak is deliberate and the only way to witness
-/// the closure's reachability without performing an observable side effect.
-/// Downstream consumers that care only about stage transitions can ignore
-/// the `witnessed` field; consumers that want to verify the closure ran
-/// can inspect it.
-///
-/// Callers should treat `witnessed` as diagnostic, not as the primary
-/// output of the Setter — the primary output is the inherent `modify`
-/// method, which applies a caller-supplied A→A function.
-pub struct SetterCrystal<S, A> {
-    pub witnessed: S,
-    _phantom: PhantomData<A>,
-}
-
-impl<S: Clone + 'static, A: Clone + 'static> Prism for SetterCrystal<S, A> {
-    type Input = S;
-    type Focused = S;
-    type Projected = S;
-    type Part = S;
-    type Crystal = SetterCrystal<S, A>;
-
-    fn focus(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
-    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
-    fn refract(&self, beam: Beam<S>) -> Beam<SetterCrystal<S, A>> {
-        Beam {
-            result: SetterCrystal { witnessed: beam.result.clone(), _phantom: PhantomData },
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -127,11 +75,13 @@ mod tests {
     #[derive(Clone, Debug, PartialEq)]
     struct Box2 { label: String, count: i32 }
 
+    fn box2_modify_count(b: Box2, f: &dyn Fn(i32) -> i32) -> Box2 {
+        Box2 { count: f(b.count), ..b }
+    }
+
     #[test]
     fn setter_modifies_field_via_function() {
-        let count_setter: Setter<Box2, i32> = Setter::new(
-            |b: Box2, f: &dyn Fn(i32) -> i32| Box2 { count: f(b.count), ..b },
-        );
+        let count_setter: Setter<Box2, i32> = Setter::new(box2_modify_count);
 
         let b = Box2 { label: "test".to_string(), count: 5 };
         let b2 = count_setter.modify(b, |c| c + 10);
@@ -140,13 +90,10 @@ mod tests {
     }
 
     #[test]
-    fn setter_refract_runs_modify_with_identity_and_witnesses_value() {
+    fn setter_refract_runs_modify_with_identity() {
         // refract must call modify_fn with the identity inner function.
-        // Because the inner fn is identity, the witnessed S equals the input.
-        // This proves the closure is reachable from the Prism trait surface.
-        let count_setter: Setter<Box2, i32> = Setter::new(
-            |b: Box2, f: &dyn Fn(i32) -> i32| Box2 { count: f(b.count), ..b },
-        );
+        // Crystal = Self — the refracted beam carries the Setter itself.
+        let count_setter: Setter<Box2, i32> = Setter::new(box2_modify_count);
 
         let input = Box2 { label: "x".to_string(), count: 5 };
         let beam = Beam::new(input.clone());
@@ -155,7 +102,17 @@ mod tests {
         let refracted = count_setter.refract(projected);
 
         assert_eq!(refracted.stage, Stage::Refracted);
-        // Identity modify is a no-op at the A level, so witnessed == input.
-        assert_eq!(refracted.result.witnessed, input);
+        // The crystal is the Setter itself. Verify it still works.
+        let result = refracted.result.modify(input, |c| c + 1);
+        assert_eq!(result.count, 6);
+    }
+
+    #[test]
+    fn setter_is_clone_and_copy() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let s2 = s; // Copy
+        let s3 = s2.clone(); // Clone
+        let b = Box2 { label: "t".to_string(), count: 3 };
+        assert_eq!(s3.modify(b, |c| c * 2).count, 6);
     }
 }

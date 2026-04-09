@@ -35,6 +35,7 @@ impl Gather<String> for ConcatGather {
                 precision: Precision::new(1.0),
                 recovered: None,
                 stage: Stage::Projected,
+                connection: Default::default(),
             };
         }
 
@@ -60,6 +61,7 @@ impl Gather<String> for ConcatGather {
             precision: min_precision,
             recovered: first_recovered,
             stage: Stage::Projected,
+            connection: Default::default(),
         }
     }
 }
@@ -87,6 +89,7 @@ where
                 precision: Precision::new(1.0),
                 recovered: None,
                 stage: Stage::Projected,
+                connection: Default::default(),
             };
         }
 
@@ -112,6 +115,7 @@ where
             precision: min_precision,
             recovered: first_recovered,
             stage: Stage::Projected,
+            connection: Default::default(),
         }
     }
 }
@@ -132,6 +136,7 @@ impl<T: Clone + Default> Gather<T> for MaxGather {
                 precision: Precision::new(1.0),
                 recovered: None,
                 stage: Stage::Projected,
+                connection: Default::default(),
             };
         }
 
@@ -177,6 +182,7 @@ impl<T: Clone + Default> Gather<T> for FirstGather {
                 precision: Precision::new(1.0),
                 recovered: None,
                 stage: Stage::Projected,
+                connection: Default::default(),
             },
         }
     }

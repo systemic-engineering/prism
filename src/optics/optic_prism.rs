@@ -5,20 +5,12 @@
 //! (the case doesn't match), but review always reconstructs the whole.
 
 use crate::{Beam, Prism, ShannonLoss, Stage};
-use crate::optics::phantom_crystal::PhantomCrystal;
-use std::marker::PhantomData;
 
+#[derive(Clone, Copy)]
 pub struct OpticPrism<S, A> {
-    match_fn: Box<dyn Fn(&S) -> bool>,
-    extract_fn: Box<dyn Fn(&S) -> A>,
-    review_fn: Box<dyn Fn(A) -> S>,
-    _phantom: PhantomData<(S, A)>,
-}
-
-/// Type-level marker for OpticPrism<S, A> crystals.
-#[derive(Clone)]
-pub struct OpticPrismMarker<S, A> {
-    _phantom: PhantomData<(S, A)>,
+    match_fn: fn(&S) -> bool,
+    extract_fn: fn(&S) -> A,
+    review_fn: fn(A) -> S,
 }
 
 impl<S: 'static, A: 'static> OpticPrism<S, A> {
@@ -39,17 +31,11 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     ///   the value level on infinite-loss beams.
     ///
     /// These cannot be enforced by the type system.
-    pub fn new<M, E, R>(matches: M, extract: E, review: R) -> Self
-    where
-        M: Fn(&S) -> bool + 'static,
-        E: Fn(&S) -> A + 'static,
-        R: Fn(A) -> S + 'static,
-    {
+    pub fn new(matches: fn(&S) -> bool, extract: fn(&S) -> A, review: fn(A) -> S) -> Self {
         OpticPrism {
-            match_fn: Box::new(matches),
-            extract_fn: Box::new(extract),
-            review_fn: Box::new(review),
-            _phantom: PhantomData,
+            match_fn: matches,
+            extract_fn: extract,
+            review_fn: review,
         }
     }
 
@@ -89,7 +75,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
     type Focused = A;      // refutation lives in ShannonLoss, never in Option
     type Projected = A;
     type Part = A;
-    type Crystal = PhantomCrystal<OpticPrismMarker<S, A>>;
+    type Crystal = OpticPrism<S, A>;
 
     fn focus(&self, beam: Beam<S>) -> Beam<A> {
         // Always call extract_fn. When the input doesn't match, the closure
@@ -108,6 +94,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Focused,
+            connection: beam.connection,
         }
     }
 
@@ -123,14 +110,16 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<A>) -> Beam<PhantomCrystal<OpticPrismMarker<S, A>>> {
+    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrism<S, A>> {
+        // fn pointers are Copy — the optic itself IS the lossless fixed point.
         Beam {
-            result: PhantomCrystal::new(),
+            result: self.clone(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -147,12 +136,20 @@ mod tests {
         Empty,
     }
 
+    fn shape_is_circle(s: &Shape) -> bool {
+        matches!(s, Shape::Circle(_))
+    }
+
+    fn shape_extract_circle(s: &Shape) -> i32 {
+        if let Shape::Circle(r) = s { *r } else { -1 }
+    }
+
+    fn shape_review_circle(r: i32) -> Shape {
+        Shape::Circle(r)
+    }
+
     fn circle_prism() -> OpticPrism<Shape, i32> {
-        OpticPrism::new(
-            |s: &Shape| matches!(s, Shape::Circle(_)),            // match_fn
-            |s: &Shape| if let Shape::Circle(r) = s { *r } else { -1 }, // extract_fn: sentinel -1 on no-match
-            |r: i32| Shape::Circle(r),                            // review_fn
-        )
+        OpticPrism::new(shape_is_circle, shape_extract_circle, shape_review_circle)
     }
 
     #[test]
@@ -219,5 +216,13 @@ mod tests {
         let projected = p.project(focused);
         assert!(projected.loss.as_f64().is_infinite());
         assert_eq!(projected.stage, Stage::Projected);
+    }
+
+    #[test]
+    fn optic_prism_is_clone_and_copy() {
+        let p = circle_prism();
+        let p2 = p; // Copy
+        let p3 = p2.clone(); // Clone
+        assert!(p3.matches(&Shape::Circle(1)));
     }
 }

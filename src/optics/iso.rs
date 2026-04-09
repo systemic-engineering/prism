@@ -6,8 +6,6 @@
 //! round-trip holds as a law.
 
 use crate::{Beam, Prism, Stage};
-use crate::optics::phantom_crystal::PhantomCrystal;
-use std::marker::PhantomData;
 
 /// A total invertible pair (A → B, B → A).
 ///
@@ -15,22 +13,16 @@ use std::marker::PhantomData;
 /// - `backward(forward(a)) ≡ a` (left inverse)
 /// - `forward(backward(b)) ≡ b` (right inverse)
 ///
-/// As a Prism: focus applies forward, refract crystallizes the resulting
-/// value in a fresh PhantomCrystal carrying the IsoMarker type fingerprint.
+/// As a Prism: focus applies forward, refract crystallizes the Iso itself
+/// since fn pointers are Copy and the optic IS the lossless fixed point.
+#[derive(Clone, Copy)]
 pub struct Iso<A, B> {
-    forward_fn: Box<dyn Fn(A) -> B>,
-    backward_fn: Box<dyn Fn(B) -> A>,
-    _phantom: PhantomData<(A, B)>,
-}
-
-/// Type-level marker for Iso<A, B> crystals.
-#[derive(Clone)]
-pub struct IsoMarker<A, B> {
-    _phantom: PhantomData<(A, B)>,
+    forward_fn: fn(A) -> B,
+    backward_fn: fn(B) -> A,
 }
 
 impl<A: 'static, B: 'static> Iso<A, B> {
-    /// Construct an Iso from a forward and backward function.
+    /// Construct an Iso from a forward and backward fn pointer.
     ///
     /// # Laws
     ///
@@ -47,16 +39,8 @@ impl<A: 'static, B: 'static> Iso<A, B> {
     /// If you cannot prove the laws hold for arbitrary inputs, prefer one of
     /// the more permissive optics (`Lens` for partial inverses, `Setter` for
     /// write-only, `Fold` for read-only).
-    pub fn new<F, G>(forward: F, backward: G) -> Self
-    where
-        F: Fn(A) -> B + 'static,
-        G: Fn(B) -> A + 'static,
-    {
-        Iso {
-            forward_fn: Box::new(forward),
-            backward_fn: Box::new(backward),
-            _phantom: PhantomData,
-        }
+    pub fn new(forward: fn(A) -> B, backward: fn(B) -> A) -> Self {
+        Iso { forward_fn: forward, backward_fn: backward }
     }
 
     pub fn forward(&self, a: A) -> B {
@@ -73,7 +57,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
     type Focused = B;
     type Projected = B;
     type Part = B;
-    type Crystal = PhantomCrystal<IsoMarker<A, B>>;
+    type Crystal = Iso<A, B>;
 
     fn focus(&self, beam: Beam<A>) -> Beam<B> {
         let forward = (self.forward_fn)(beam.result);
@@ -84,6 +68,7 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Focused,
+            connection: beam.connection,
         }
     }
 
@@ -110,16 +95,16 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
         f(beam)
     }
 
-    fn refract(&self, beam: Beam<B>) -> Beam<PhantomCrystal<IsoMarker<A, B>>> {
-        // Iso crystallizes into a PhantomCrystal marker — we can't clone the
-        // Fn trait objects, so the crystal just asserts "I was an Iso."
+    fn refract(&self, beam: Beam<B>) -> Beam<Iso<A, B>> {
+        // fn pointers are Copy — the optic itself IS the lossless fixed point.
         Beam {
-            result: PhantomCrystal::new(),
+            result: self.clone(),
             path: beam.path,
             loss: beam.loss,
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -128,16 +113,18 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
 mod tests {
     use super::*;
 
+    fn str_to_chars(s: String) -> Vec<char> {
+        s.chars().collect()
+    }
+
+    fn chars_to_str(v: Vec<char>) -> String {
+        v.into_iter().collect()
+    }
+
     #[test]
     fn iso_round_trip() {
-        // An iso between String and Vec<char>.
-        let iso: Iso<String, Vec<char>> = Iso::new(
-            |s: String| s.chars().collect::<Vec<char>>(),
-            |v: Vec<char>| v.into_iter().collect::<String>(),
-        );
+        let iso: Iso<String, Vec<char>> = Iso::new(str_to_chars, chars_to_str);
 
-        let input = "hello".to_string();
-        // Apply forward then backward — should get the original back.
         let forward = iso.forward("hello".to_string());
         assert_eq!(forward, vec!['h', 'e', 'l', 'l', 'o']);
         let backward = iso.backward(forward);
@@ -146,10 +133,7 @@ mod tests {
 
     #[test]
     fn iso_refract_is_lossless() {
-        let iso: Iso<String, Vec<char>> = Iso::new(
-            |s: String| s.chars().collect::<Vec<char>>(),
-            |v: Vec<char>| v.into_iter().collect::<String>(),
-        );
+        let iso: Iso<String, Vec<char>> = Iso::new(str_to_chars, chars_to_str);
 
         let beam = Beam::new("test".to_string());
         let projected = iso.project(iso.focus(beam));
@@ -158,5 +142,13 @@ mod tests {
 
         let refracted = iso.refract(projected);
         assert_eq!(refracted.stage, Stage::Refracted);
+    }
+
+    #[test]
+    fn iso_is_clone_and_copy() {
+        let iso: Iso<String, Vec<char>> = Iso::new(str_to_chars, chars_to_str);
+        let iso2 = iso; // Copy
+        let iso3 = iso2.clone(); // Clone
+        let _ = iso3.forward("ok".to_string());
     }
 }

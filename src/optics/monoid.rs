@@ -138,6 +138,7 @@ impl<T: Clone + 'static> Prism for IdPrism<T> {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -201,6 +202,7 @@ impl Prism for CountPrism {
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
                 stage: Stage::Split,
+                connection: beam.connection.clone(),
             })
             .collect()
     }
@@ -221,6 +223,7 @@ impl Prism for CountPrism {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -284,6 +287,7 @@ impl Prism for MarkerPrism {
                 precision: beam.precision.clone(),
                 recovered: beam.recovered.clone(),
                 stage: Stage::Split,
+                connection: beam.connection.clone(),
             })
             .collect()
     }
@@ -309,6 +313,7 @@ impl Prism for MarkerPrism {
             precision: beam.precision,
             recovered: beam.recovered,
             stage: Stage::Refracted,
+            connection: beam.connection,
         }
     }
 }
@@ -461,6 +466,7 @@ mod tests {
             precision: crate::Precision::new(0.9),
             recovered: None,
             stage: Stage::Initial,
+            connection: Default::default(),
         };
 
         let focused = composed.focus(input);
@@ -505,6 +511,7 @@ mod tests {
             precision: crate::Precision::new(0.75),
             recovered: None,
             stage: Stage::Initial,
+            connection: Default::default(),
         };
 
         // Run each side inline — the two concrete Compose types are distinct
