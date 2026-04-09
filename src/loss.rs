@@ -19,6 +19,10 @@ impl ShannonLoss {
         ShannonLoss(0.0)
     }
 
+    pub fn total() -> Self {
+        ShannonLoss(f64::INFINITY)
+    }
+
     pub fn as_f64(&self) -> f64 {
         self.0
     }

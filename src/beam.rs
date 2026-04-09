@@ -5,23 +5,107 @@
 //! - `PureBeam<In, Out, E>` — prod. Input + output. No trace overhead.
 //! - `TraceBeam<In, Out, E>` — debug. Same fields + full `Trace`. (forthcoming)
 //!
-//! Three states in both:
+//! Three luminosity states:
 //!
 //! - `Radiant` — full-strength value, zero loss.
 //! - `Dimmed`  — value present, information was lost getting here.
-//! - `Dark`    — the step failed. Input stored. Output phantom.
+//! - `Dark`    — the step failed.
+//!
+//! `Luminosity<V, E>` is the extracted state machine. PureBeam is a flat
+//! struct: `{ input: In, luminosity: Luminosity<Out, E> }`.
+//!
+//! Two transition methods:
+//! - `next(value)` — lossless, same error type. The common case.
+//! - `advance(luminosity)` — full control: change error type, carry loss, or fail.
 //!
 //! The type chain is enforced by the compiler:
 //!
 //!   `type Next<T>: Beam<In = Self::Out, Out = T, Error = Self::Error>`
-//!
-//! Each prism step's output type becomes the next step's input type.
-//! You cannot wire prisms together incorrectly at compile time.
 
 use std::convert::Infallible;
-use std::marker::PhantomData;
 
 use crate::loss::ShannonLoss;
+use crate::trace::Op;
+
+// ---------------------------------------------------------------------------
+// Operation trait
+// ---------------------------------------------------------------------------
+
+/// A self-contained pipeline operation. Wraps a prism (and closure for
+/// split/zoom). The beam is NOT stored here — it arrives via `apply`.
+///
+/// `op()` identifies which pipeline stage this is. Used by `TraceBeam`
+/// to record the step without any caller cooperation.
+pub trait Operation<B: Beam> {
+    type Output: Beam;
+    fn op(&self) -> Op;
+    fn apply(self, beam: B) -> Self::Output;
+}
+
+// ---------------------------------------------------------------------------
+// Luminosity — the extracted state machine
+// ---------------------------------------------------------------------------
+
+/// The luminosity of a beam: how much signal is present, and how was it lost.
+///
+/// `combine` propagates accumulated loss from a prior step into the next.
+/// Callers must not combine from a Dark luminosity — that is a programming error.
+#[derive(Clone, Debug)]
+pub enum Luminosity<V, E> {
+    Radiant(V),
+    Dimmed(V, ShannonLoss),
+    Dark(E),
+}
+
+impl<V, E> Luminosity<V, E> {
+    /// Owned result: Ok if Radiant/Dimmed, Err if Dark.
+    pub fn result(self) -> Result<V, E> {
+        match self {
+            Self::Radiant(v) | Self::Dimmed(v, _) => Ok(v),
+            Self::Dark(e) => Err(e),
+        }
+    }
+
+    /// Borrowed result.
+    pub fn result_ref(&self) -> Result<&V, &E> {
+        match self {
+            Self::Radiant(v) | Self::Dimmed(v, _) => Ok(v),
+            Self::Dark(e) => Err(e),
+        }
+    }
+
+    /// Extract the value if light, or None if Dark.
+    pub fn value(self) -> Option<V> {
+        self.result().ok()
+    }
+
+    /// Loss at this step.
+    pub fn loss(&self) -> ShannonLoss {
+        match self {
+            Self::Radiant(..)       => ShannonLoss::zero(),
+            Self::Dimmed(_, loss)   => loss.clone(),
+            Self::Dark(..)          => ShannonLoss::total(),
+        }
+    }
+
+    /// Propagate accumulated loss from `self` through `next`.
+    ///
+    /// Rules:
+    /// - Radiant self: pass `next` through unchanged.
+    /// - Dimmed self:  carry loss into `next` (Dark `next` passes through).
+    /// - Dark self:    programming error — panics.
+    pub fn combine<V2, E2>(self, next: Luminosity<V2, E2>) -> Luminosity<V2, E2> {
+        match self {
+            Self::Dark(_) => panic!("combine called on Dark luminosity — check is_light() first"),
+            Self::Radiant(_) => next,
+            Self::Dimmed(_, loss) => match next {
+                Luminosity::Radiant(v)       => Luminosity::Dimmed(v, loss),
+                Luminosity::Dimmed(v, loss2) => Luminosity::Dimmed(v, loss + loss2),
+                Luminosity::Dark(e)          => Luminosity::Dark(e),
+            },
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Beam trait
@@ -35,15 +119,12 @@ use crate::loss::ShannonLoss;
 /// `Next<T>` and `NextWithError<T, E>` enforce that each step's `Out`
 /// becomes the next step's `In`. The compiler rejects invalid pipelines.
 ///
-/// # Factory methods
+/// # Transition methods
 ///
-/// Prisms construct the next beam using `advance`, `advance_lossy`, `fail`,
-/// and their `_err` variants. These consume `self` and return `Self::Next<T>`
-/// or `Self::NextWithError<T, E>`.
+/// - `next(value)` — lossless, same error type. The common case in prism methods.
+/// - `advance(luminosity)` — full control: new error type, carry loss, or fail.
 ///
-/// **Contract:** `advance*` and `fail_err` must only be called on non-Dark beams.
-/// They panic in debug mode if called on Dark. Prisms should call `is_ok()`
-/// before advancing.
+/// **Contract:** Both panic if called on a Dark beam. Call `is_light()` first.
 pub trait Beam: Sized {
     type In;
     type Out;
@@ -58,7 +139,6 @@ pub trait Beam: Sized {
     type NextWithError<T, E>: Beam<In = Self::Out, Out = T, Error = E>;
 
     /// The input that entered this step.
-    /// For Dark beams: the input at the time of failure.
     fn input(&self) -> &Self::In;
 
     /// Information loss at this step.
@@ -69,7 +149,7 @@ pub trait Beam: Sized {
     fn result(&self) -> Result<&Self::Out, &Self::Error>;
 
     /// Whether this beam is carrying a value (Radiant or Dimmed).
-    fn is_ok(&self) -> bool {
+    fn is_light(&self) -> bool {
         self.result().is_ok()
     }
 
@@ -78,156 +158,101 @@ pub trait Beam: Sized {
         self.result().is_err()
     }
 
-    // --- Factory: same error type ---
-
-    /// Advance to a new output value.
+    /// Lossless transition to a new output, preserving error type.
     /// The current `Out` becomes the new `In`. Loss state preserved.
-    fn advance<T>(self, output: T) -> Self::Next<T>;
+    /// Panics if called on a Dark beam.
+    fn next<T>(self, value: T) -> Self::Next<T>;
 
-    /// Advance with additional information loss.
-    /// Radiant → Dimmed. Dimmed loss accumulates.
-    fn advance_lossy<T>(self, output: T, loss: ShannonLoss) -> Self::Next<T>;
+    /// Full transition: new output and error type via `Luminosity`.
+    /// The current `Out` becomes the new `In`. Loss accumulates per `combine`.
+    /// Panics if called on a Dark beam.
+    fn advance<T, E>(self, luminosity: Luminosity<T, E>) -> Self::NextWithError<T, E>;
 
-    /// Fail: transition to Dark with an error.
-    /// Stores the current `In` in the Dark beam.
-    fn fail(self, error: Self::Error) -> Self;
-
-    // --- Factory: new error type ---
-
-    /// Advance to a new output and error type.
-    /// The current `Out` becomes the new `In`. Error type changes.
-    fn advance_err<T, E>(self, output: T) -> Self::NextWithError<T, E>;
-
-    /// Advance with loss and a new error type.
-    fn advance_lossy_err<T, E>(self, output: T, loss: ShannonLoss) -> Self::NextWithError<T, E>;
-
-    /// Fail with a new error type.
-    /// The current `Out` becomes the Dark beam's `In`
-    /// (the value we were trying to transform when failure occurred).
-    fn fail_err<T, E>(self, error: E) -> Self::NextWithError<T, E>;
+    /// Apply an operation to this beam. The pipeline DSL entry point.
+    ///
+    /// `beam.apply(Focus(&prism)).apply(Project(&prism)).apply(Refract(&prism))`
+    fn apply<O: Operation<Self>>(self, op: O) -> O::Output {
+        op.apply(self)
+    }
 }
 
 // ---------------------------------------------------------------------------
 // PureBeam
 // ---------------------------------------------------------------------------
 
-/// Production beam. Input + output, no trace overhead.
-///
-/// The `Out` type parameter is phantom in the `Dark` variant —
-/// there is no output value when a step fails. The type is still
-/// tracked for the type chain.
-pub enum PureBeam<In, Out, E = Infallible> {
-    Radiant { input: In, output: Out },
-    Dimmed  { input: In, output: Out, loss: ShannonLoss },
-    Dark    { input: In, error: E, _out: PhantomData<Out> },
+/// Production beam. Flat struct: input + luminosity. No trace overhead.
+pub struct PureBeam<In, Out, E = Infallible> {
+    input: In,
+    luminosity: Luminosity<Out, E>,
 }
 
 impl<In, Out, E> PureBeam<In, Out, E> {
     /// Construct a lossless Radiant beam.
     pub fn radiant(input: In, output: Out) -> Self {
-        Self::Radiant { input, output }
+        Self { input, luminosity: Luminosity::Radiant(output) }
     }
 
     /// Construct a Dimmed beam (value with information loss).
     pub fn dimmed(input: In, output: Out, loss: ShannonLoss) -> Self {
-        Self::Dimmed { input, output, loss }
+        Self { input, luminosity: Luminosity::Dimmed(output, loss) }
     }
 
     /// Construct a Dark beam (step failed).
     pub fn dark(input: In, error: E) -> Self {
-        Self::Dark { input, error, _out: PhantomData }
+        Self { input, luminosity: Luminosity::Dark(error) }
     }
 }
 
 impl<In, Out, E> Beam for PureBeam<In, Out, E> {
-    type In = In;
-    type Out = Out;
+    type In    = In;
+    type Out   = Out;
     type Error = E;
-    type Next<T> = PureBeam<Out, T, E>;
+    type Next<T>              = PureBeam<Out, T, E>;
     type NextWithError<T, NE> = PureBeam<Out, T, NE>;
 
     fn input(&self) -> &In {
-        match self {
-            Self::Radiant { input, .. }
-            | Self::Dimmed { input, .. }
-            | Self::Dark { input, .. } => input,
-        }
+        &self.input
     }
 
     fn loss(&self) -> ShannonLoss {
-        match self {
-            Self::Radiant { .. } => ShannonLoss::zero(),
-            Self::Dimmed { loss, .. } => loss.clone(),
-            Self::Dark { .. } => ShannonLoss::new(f64::INFINITY),
-        }
+        self.luminosity.loss()
     }
 
     fn result(&self) -> Result<&Out, &E> {
-        match self {
-            Self::Radiant { output, .. } | Self::Dimmed { output, .. } => Ok(output),
-            Self::Dark { error, .. } => Err(error),
+        self.luminosity.result_ref()
+    }
+
+    fn next<T>(self, value: T) -> PureBeam<Out, T, E> {
+        match self.luminosity {
+            Luminosity::Dark(_) =>
+                panic!("next called on Dark beam — check is_light() first"),
+            Luminosity::Radiant(old_out) => PureBeam {
+                input: old_out,
+                luminosity: Luminosity::Radiant(value),
+            },
+            Luminosity::Dimmed(old_out, loss) => PureBeam {
+                input: old_out,
+                luminosity: Luminosity::Dimmed(value, loss),
+            },
         }
     }
 
-    fn advance<T>(self, output: T) -> PureBeam<Out, T, E> {
-        match self {
-            Self::Radiant { output: old, .. } =>
-                PureBeam::Radiant { input: old, output },
-            Self::Dimmed { output: old, loss, .. } =>
-                PureBeam::Dimmed { input: old, output, loss },
-            Self::Dark { .. } =>
-                panic!("advance called on Dark beam — check is_ok() first"),
-        }
-    }
-
-    fn advance_lossy<T>(self, output: T, extra: ShannonLoss) -> PureBeam<Out, T, E> {
-        match self {
-            Self::Radiant { output: old, .. } =>
-                PureBeam::Dimmed { input: old, output, loss: extra },
-            Self::Dimmed { output: old, loss, .. } =>
-                PureBeam::Dimmed { input: old, output, loss: loss + extra },
-            Self::Dark { .. } =>
-                panic!("advance_lossy called on Dark beam — check is_ok() first"),
-        }
-    }
-
-    fn fail(self, error: E) -> Self {
-        match self {
-            Self::Radiant { input, .. } | Self::Dimmed { input, .. } =>
-                Self::Dark { input, error, _out: PhantomData },
-            Self::Dark { .. } =>
-                panic!("fail called on already-Dark beam"),
-        }
-    }
-
-    fn advance_err<T, NE>(self, output: T) -> PureBeam<Out, T, NE> {
-        match self {
-            Self::Radiant { output: old, .. } =>
-                PureBeam::Radiant { input: old, output },
-            Self::Dimmed { output: old, loss, .. } =>
-                PureBeam::Dimmed { input: old, output, loss },
-            Self::Dark { .. } =>
-                panic!("advance_err called on Dark beam — check is_ok() first"),
-        }
-    }
-
-    fn advance_lossy_err<T, NE>(self, output: T, extra: ShannonLoss) -> PureBeam<Out, T, NE> {
-        match self {
-            Self::Radiant { output: old, .. } =>
-                PureBeam::Dimmed { input: old, output, loss: extra },
-            Self::Dimmed { output: old, loss, .. } =>
-                PureBeam::Dimmed { input: old, output, loss: loss + extra },
-            Self::Dark { .. } =>
-                panic!("advance_lossy_err called on Dark beam — check is_ok() first"),
-        }
-    }
-
-    fn fail_err<T, NE>(self, error: NE) -> PureBeam<Out, T, NE> {
-        match self {
-            Self::Radiant { output, .. } | Self::Dimmed { output, .. } =>
-                PureBeam::Dark { input: output, error, _out: PhantomData },
-            Self::Dark { .. } =>
-                panic!("fail_err called on already-Dark beam"),
+    fn advance<T, NE>(self, next: Luminosity<T, NE>) -> PureBeam<Out, T, NE> {
+        match self.luminosity {
+            Luminosity::Dark(_) =>
+                panic!("advance called on Dark beam — check is_light() first"),
+            Luminosity::Radiant(old_out) => PureBeam {
+                input: old_out,
+                luminosity: next,
+            },
+            Luminosity::Dimmed(old_out, loss) => PureBeam {
+                input: old_out,
+                luminosity: match next {
+                    Luminosity::Radiant(v)       => Luminosity::Dimmed(v, loss),
+                    Luminosity::Dimmed(v, loss2) => Luminosity::Dimmed(v, loss + loss2),
+                    Luminosity::Dark(e)          => Luminosity::Dark(e),
+                },
+            },
         }
     }
 }
@@ -243,9 +268,9 @@ mod tests {
     type Pure<I, O> = PureBeam<I, O, String>;
 
     #[test]
-    fn radiant_is_ok() {
+    fn radiant_is_light() {
         let b: Pure<(), u32> = PureBeam::radiant((), 42);
-        assert!(b.is_ok());
+        assert!(b.is_light());
         assert!(!b.is_dark());
         assert_eq!(b.result(), Ok(&42));
         assert_eq!(b.input(), &());
@@ -253,9 +278,9 @@ mod tests {
     }
 
     #[test]
-    fn dimmed_is_ok_with_loss() {
+    fn dimmed_is_light_with_loss() {
         let b: Pure<(), u32> = PureBeam::dimmed((), 42, ShannonLoss::new(1.5));
-        assert!(b.is_ok());
+        assert!(b.is_light());
         assert_eq!(b.result(), Ok(&42));
         assert_eq!(b.loss().as_f64(), 1.5);
     }
@@ -264,93 +289,114 @@ mod tests {
     fn dark_is_err() {
         let b: Pure<(), u32> = PureBeam::dark((), "oops".to_string());
         assert!(b.is_dark());
-        assert!(!b.is_ok());
+        assert!(!b.is_light());
         assert_eq!(b.result(), Err(&"oops".to_string()));
         assert!(b.loss().as_f64().is_infinite());
     }
 
     #[test]
-    fn advance_radiant_preserves_state() {
+    fn next_preserves_radiant() {
         let b: PureBeam<(), u32, String> = PureBeam::radiant((), 10);
-        let next = b.advance("hello");
-        assert!(next.is_ok());
-        assert_eq!(next.result(), Ok(&"hello"));
-        assert_eq!(next.input(), &10u32);
-        assert!(next.loss().is_zero());
+        let n = b.next("hello");
+        assert!(n.is_light());
+        assert_eq!(n.result(), Ok(&"hello"));
+        assert_eq!(n.input(), &10u32);
+        assert!(n.loss().is_zero());
     }
 
     #[test]
-    fn advance_dimmed_preserves_loss() {
+    fn next_preserves_dimmed_loss() {
         let b: Pure<(), u32> = PureBeam::dimmed((), 10, ShannonLoss::new(2.0));
-        let next = b.advance(20u32);
-        assert_eq!(next.loss().as_f64(), 2.0);
-        assert_eq!(next.input(), &10u32);
+        let n = b.next(20u32);
+        assert_eq!(n.loss().as_f64(), 2.0);
+        assert_eq!(n.input(), &10u32);
     }
 
     #[test]
-    fn advance_lossy_radiant_becomes_dimmed() {
-        let b: PureBeam<(), u32, String> = PureBeam::radiant((), 5);
-        let next = b.advance_lossy("x", ShannonLoss::new(0.5));
-        assert!(next.is_ok());
-        assert_eq!(next.loss().as_f64(), 0.5);
+    fn advance_radiant_with_radiant_stays_radiant() {
+        let b: Pure<(), u32> = PureBeam::radiant((), 5);
+        let n = b.advance(Luminosity::<&str, String>::Radiant("hi"));
+        assert!(n.is_light());
+        assert!(n.loss().is_zero());
     }
 
     #[test]
-    fn advance_lossy_dimmed_accumulates() {
+    fn advance_radiant_with_dimmed_becomes_dimmed() {
+        let b: Pure<(), u32> = PureBeam::radiant((), 5);
+        let n = b.advance(Luminosity::<&str, String>::Dimmed("hi", ShannonLoss::new(1.0)));
+        assert!(n.is_light());
+        assert_eq!(n.loss().as_f64(), 1.0);
+    }
+
+    #[test]
+    fn advance_dimmed_with_radiant_carries_loss() {
         let b: Pure<(), u32> = PureBeam::dimmed((), 5, ShannonLoss::new(1.0));
-        let next = b.advance_lossy(10u32, ShannonLoss::new(0.5));
-        assert_eq!(next.loss().as_f64(), 1.5);
+        let n = b.advance(Luminosity::<u32, String>::Radiant(10));
+        assert_eq!(n.loss().as_f64(), 1.0);
     }
 
     #[test]
-    fn fail_transitions_to_dark() {
-        let b: Pure<(), u32> = PureBeam::radiant((), 99);
-        let dark = b.fail("bang".to_string());
-        assert!(dark.is_dark());
-        assert_eq!(dark.result(), Err(&"bang".to_string()));
-        assert_eq!(dark.input(), &());
+    fn advance_dimmed_with_dimmed_accumulates_loss() {
+        let b: Pure<(), u32> = PureBeam::dimmed((), 5, ShannonLoss::new(1.0));
+        let n = b.advance(Luminosity::<u32, String>::Dimmed(10, ShannonLoss::new(0.5)));
+        assert_eq!(n.loss().as_f64(), 1.5);
     }
 
     #[test]
-    fn fail_err_carries_output_as_new_input() {
-        let b: PureBeam<(), u32, String> = PureBeam::radiant((), 42);
-        let dark: PureBeam<u32, &str, i32> = b.fail_err::<&str, i32>(-1);
-        assert!(dark.is_dark());
-        // The Dark beam's input is the old output (42)
-        assert_eq!(dark.input(), &42u32);
-        assert_eq!(dark.result(), Err(&-1i32));
-    }
-
-    #[test]
-    fn advance_err_changes_error_type() {
-        let b: PureBeam<(), u32, String> = PureBeam::radiant((), 7);
-        let next: PureBeam<u32, &str, i32> = b.advance_err::<&str, i32>("hello");
-        assert!(next.is_ok());
-        assert_eq!(next.result(), Ok(&"hello"));
-        assert_eq!(next.input(), &7u32);
+    fn advance_with_dark_fails() {
+        let b: Pure<(), u32> = PureBeam::radiant((), 5);
+        let n: PureBeam<u32, u32, i32> = b.advance(Luminosity::Dark(-1i32));
+        assert!(n.is_dark());
+        assert_eq!(n.result(), Err(&-1i32));
     }
 
     #[test]
     fn type_chain_three_steps() {
-        // () → u32 → String → Vec<char>
         let b0: PureBeam<(), u32> = PureBeam::radiant((), 42u32);
-        let b1: PureBeam<u32, String> = b0.advance("hello".to_string());
-        let b2: PureBeam<String, Vec<char>> = b1.advance(vec!['a', 'b']);
+        let b1: PureBeam<u32, String> = b0.next("hello".to_string());
+        let b2: PureBeam<String, Vec<char>> = b1.next(vec!['a', 'b']);
         assert_eq!(b2.input(), &"hello".to_string());
         assert_eq!(b2.result(), Ok(&vec!['a', 'b']));
+    }
+
+    #[test]
+    #[should_panic(expected = "next called on Dark beam")]
+    fn next_on_dark_panics() {
+        let b: Pure<(), u32> = PureBeam::dark((), "err".to_string());
+        let _ = b.next(0u32);
     }
 
     #[test]
     #[should_panic(expected = "advance called on Dark beam")]
     fn advance_on_dark_panics() {
         let b: Pure<(), u32> = PureBeam::dark((), "err".to_string());
-        let _ = b.advance(0u32);
+        let _ = b.advance(Luminosity::<u32, String>::Radiant(0));
+    }
+
+    // --- Luminosity::combine ---
+
+    #[test]
+    fn combine_radiant_passes_through() {
+        let a = Luminosity::<u32, String>::Radiant(1);
+        let b = Luminosity::<&str, String>::Dimmed("x", ShannonLoss::new(2.0));
+        let c = a.combine(b);
+        assert_eq!(c.loss().as_f64(), 2.0);
     }
 
     #[test]
-    #[should_panic(expected = "fail called on already-Dark beam")]
-    fn double_fail_panics() {
-        let b: Pure<(), u32> = PureBeam::dark((), "first".to_string());
-        let _ = b.fail("second".to_string());
+    fn combine_dimmed_accumulates() {
+        let a = Luminosity::<u32, String>::Dimmed(1, ShannonLoss::new(1.0));
+        let b = Luminosity::<u32, String>::Radiant(2);
+        let c = a.combine(b);
+        assert_eq!(c.loss().as_f64(), 1.0);
+        assert_eq!(c.result_ref(), Ok(&2));
+    }
+
+    #[test]
+    #[should_panic(expected = "combine called on Dark luminosity")]
+    fn combine_dark_panics() {
+        let a = Luminosity::<u32, &str>::Dark("boom");
+        let b = Luminosity::<u32, &str>::Radiant(1);
+        let _ = a.combine(b);
     }
 }
