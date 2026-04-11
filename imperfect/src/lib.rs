@@ -6,6 +6,82 @@
 //! `Loss` is a trait. `ShannonLoss` (information loss in bits) is the
 //! default implementation.
 
+/// A measure of what didn't survive a transformation.
+pub trait Loss: Clone + Default {
+    fn zero() -> Self;
+    fn total() -> Self;
+    fn is_zero(&self) -> bool;
+    fn combine(self, other: Self) -> Self;
+}
+
+/// Information loss measured in bits. The default `Loss` implementation.
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ShannonLoss(f64);
+
+impl ShannonLoss {
+    pub fn new(bits: f64) -> Self {
+        ShannonLoss(bits)
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        self.0
+    }
+
+    pub fn is_lossless(&self) -> bool {
+        self.is_zero()
+    }
+}
+
+impl Default for ShannonLoss {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+impl Loss for ShannonLoss {
+    fn zero() -> Self {
+        ShannonLoss(0.0)
+    }
+
+    fn total() -> Self {
+        ShannonLoss(f64::INFINITY)
+    }
+
+    fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+
+    fn combine(self, other: Self) -> Self {
+        ShannonLoss(self.0 + other.0)
+    }
+}
+
+impl std::ops::Add for ShannonLoss {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        ShannonLoss(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::AddAssign for ShannonLoss {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl std::fmt::Display for ShannonLoss {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.6} bits", self.0)
+    }
+}
+
+impl From<f64> for ShannonLoss {
+    fn from(v: f64) -> Self {
+        ShannonLoss(v)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
