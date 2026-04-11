@@ -367,4 +367,68 @@ mod tests {
         let m = i.map_err(|e| e.len());
         assert_eq!(m.err(), Some(4));
     }
+
+    // --- compose ---
+
+    #[test]
+    fn compose_ok_ok() {
+        let a: Imperfect<u32, String> = Imperfect::Ok(1);
+        let b: Imperfect<&str, String> = Imperfect::Ok("hi");
+        let c = a.compose(b);
+        assert!(matches!(c, Imperfect::Ok("hi")));
+    }
+
+    #[test]
+    fn compose_ok_partial() {
+        let a: Imperfect<u32, String> = Imperfect::Ok(1);
+        let b: Imperfect<u32, String> = Imperfect::Partial(2, ShannonLoss::new(1.0));
+        let c = a.compose(b);
+        assert!(c.is_partial());
+        assert_eq!(c.loss().as_f64(), 1.0);
+        assert_eq!(c.ok(), Some(2));
+    }
+
+    #[test]
+    fn compose_ok_err() {
+        let a: Imperfect<u32, String> = Imperfect::Ok(1);
+        let b: Imperfect<u32, String> = Imperfect::Err("fail".into());
+        let c = a.compose(b);
+        assert!(c.is_err());
+    }
+
+    #[test]
+    fn compose_partial_ok_carries_loss() {
+        let a: Imperfect<u32, String> = Imperfect::Partial(1, ShannonLoss::new(1.0));
+        let b: Imperfect<u32, String> = Imperfect::Ok(2);
+        let c = a.compose(b);
+        assert!(c.is_partial());
+        assert_eq!(c.loss().as_f64(), 1.0);
+        assert_eq!(c.ok(), Some(2));
+    }
+
+    #[test]
+    fn compose_partial_partial_accumulates() {
+        let a: Imperfect<u32, String> = Imperfect::Partial(1, ShannonLoss::new(1.0));
+        let b: Imperfect<u32, String> = Imperfect::Partial(2, ShannonLoss::new(0.5));
+        let c = a.compose(b);
+        assert!(c.is_partial());
+        assert_eq!(c.loss().as_f64(), 1.5);
+        assert_eq!(c.ok(), Some(2));
+    }
+
+    #[test]
+    fn compose_partial_err() {
+        let a: Imperfect<u32, String> = Imperfect::Partial(1, ShannonLoss::new(1.0));
+        let b: Imperfect<u32, String> = Imperfect::Err("fail".into());
+        let c = a.compose(b);
+        assert!(c.is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "compose called on Err")]
+    fn compose_err_panics() {
+        let a: Imperfect<u32, String> = Imperfect::Err("fail".into());
+        let b: Imperfect<u32, String> = Imperfect::Ok(2);
+        let _ = a.compose(b);
+    }
 }
