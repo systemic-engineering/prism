@@ -8,6 +8,19 @@
 
 use imperfect::{Imperfect, Loss};
 
+/// Level 0: the observed state. The section of the bundle.
+/// Abyss. The fiber.
+pub trait Fiber {
+    type State;
+}
+
+/// Level 1: the optic that determines how information transports.
+/// Introject. The connection on the principal bundle.
+pub trait Connection: Fiber {
+    type Optic;
+    fn connection(&self) -> &Self::Optic;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
