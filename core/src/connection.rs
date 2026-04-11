@@ -1,11 +1,11 @@
-//! Connection — the relational substrate flowing through a Beam.
+//! Carrier — the relational substrate flowing through a Beam.
 //!
 //! ShannonLoss captures scalar information loss.
-//! Connection captures the relational/geometric structure of how
+//! Carrier captures the relational/geometric structure of how
 //! pipeline stages are connected.
 //!
 //! For most pipelines ScalarConnection is sufficient.
-//! Non-abelian connections are for geometric contexts where
+//! Non-abelian carriers are for geometric contexts where
 //! order matters and parallel transport is non-trivial.
 
 use imperfect::{Loss, ShannonLoss};
@@ -16,7 +16,7 @@ use imperfect::{Loss, ShannonLoss};
 /// - Identity: `C::identity().compose(c) == c` and `c.compose(C::identity()) == c`
 /// - Associativity: `(a.compose(b)).compose(c) == a.compose(b.compose(c))`
 /// - Norm: `identity().norm()` is zero loss
-pub trait Connection: Clone + Default {
+pub trait Carrier: Clone + Default {
     /// Compose: self followed by other. Non-abelian in general.
     fn compose(self, other: Self) -> Self;
     /// The scalar projection — how much information this connection consumed.
@@ -39,7 +39,7 @@ impl ScalarConnection {
     }
 }
 
-impl Connection for ScalarConnection {
+impl Carrier for ScalarConnection {
     fn compose(self, other: Self) -> Self {
         ScalarConnection { loss: ShannonLoss::new(self.loss.as_f64() + other.loss.as_f64()) }
     }

@@ -48,7 +48,7 @@ pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
-pub use connection::{Connection as PipelineConnection, ScalarConnection};
+pub use connection::{Carrier, ScalarConnection};
 pub use content::ContentAddressed;
 pub use oid::Oid;
 pub use precision::{Precision, Pressure};
