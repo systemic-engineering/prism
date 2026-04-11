@@ -82,6 +82,81 @@ impl From<f64> for ShannonLoss {
     }
 }
 
+/// Result extended with partial success.
+///
+/// Three states:
+/// - `Ok(T)` — perfect result, zero loss.
+/// - `Partial(T, L)` — value present, some information lost getting here.
+/// - `Err(E)` — failure, no value.
+///
+/// Follows `Result` conventions: `is_ok()` means "has a value" (Ok or Partial).
+#[derive(Clone, Debug)]
+pub enum Imperfect<T, E, L: Loss = ShannonLoss> {
+    Ok(T),
+    Partial(T, L),
+    Err(E),
+}
+
+impl<T, E, L: Loss> Imperfect<T, E, L> {
+    pub fn is_ok(&self) -> bool {
+        !self.is_err()
+    }
+
+    pub fn is_partial(&self) -> bool {
+        matches!(self, Imperfect::Partial(_, _))
+    }
+
+    pub fn is_err(&self) -> bool {
+        matches!(self, Imperfect::Err(_))
+    }
+
+    pub fn ok(self) -> Option<T> {
+        match self {
+            Imperfect::Ok(v) | Imperfect::Partial(v, _) => Some(v),
+            Imperfect::Err(_) => None,
+        }
+    }
+
+    pub fn err(self) -> Option<E> {
+        match self {
+            Imperfect::Err(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn loss(&self) -> L {
+        match self {
+            Imperfect::Ok(_) => L::zero(),
+            Imperfect::Partial(_, l) => l.clone(),
+            Imperfect::Err(_) => L::total(),
+        }
+    }
+
+    pub fn as_ref(&self) -> Imperfect<&T, &E, L> {
+        match self {
+            Imperfect::Ok(t) => Imperfect::Ok(t),
+            Imperfect::Partial(t, l) => Imperfect::Partial(t, l.clone()),
+            Imperfect::Err(e) => Imperfect::Err(e),
+        }
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Imperfect<U, E, L> {
+        match self {
+            Imperfect::Ok(t) => Imperfect::Ok(f(t)),
+            Imperfect::Partial(t, l) => Imperfect::Partial(f(t), l),
+            Imperfect::Err(e) => Imperfect::Err(e),
+        }
+    }
+
+    pub fn map_err<F>(self, f: impl FnOnce(E) -> F) -> Imperfect<T, F, L> {
+        match self {
+            Imperfect::Ok(t) => Imperfect::Ok(t),
+            Imperfect::Partial(t, l) => Imperfect::Partial(t, l),
+            Imperfect::Err(e) => Imperfect::Err(f(e)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,8 +328,8 @@ mod tests {
     fn as_ref_partial() {
         let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
         let r = i.as_ref();
-        assert_eq!(r.ok(), Some(&42));
         assert!(r.is_partial());
+        assert_eq!(r.ok(), Some(&42));
     }
 
     #[test]
@@ -275,8 +350,8 @@ mod tests {
     fn map_partial_preserves_loss() {
         let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
         let m = i.map(|v| v * 2);
-        assert_eq!(m.ok(), Some(84));
         assert!(m.is_partial());
+        assert_eq!(m.ok(), Some(84));
     }
 
     #[test]
