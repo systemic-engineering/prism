@@ -24,7 +24,7 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     /// # Laws
     /// - When `matches(s)`: `review(extract(s)) ≡ s`
     /// - For any `a`: `matches(review(a))` is true
-    /// - When `!matches(s)`: extract returns a sentinel; the beam will be Failure.
+    /// - When `!matches(s)`: extract returns a sentinel; the beam will be Partial with infinite loss.
     pub fn new(matches: fn(&S) -> bool, extract: fn(&S) -> A, review: fn(A) -> S) -> Self {
         OpticPrism {
             match_fn: matches,

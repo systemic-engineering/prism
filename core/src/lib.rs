@@ -126,7 +126,7 @@ impl<P: Prism> Operation<P::Projected> for Refract<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use imperfect::{Imperfect, ShannonLoss};
+    use imperfect::Imperfect;
 
     /// A prism that counts characters.
     /// focus: String → Vec<char>, project: Vec<char> → usize, refract: usize → String

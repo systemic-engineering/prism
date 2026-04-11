@@ -45,6 +45,7 @@ pub struct ShannonLoss(f64);
 
 impl ShannonLoss {
     pub fn new(bits: f64) -> Self {
+        debug_assert!(bits >= 0.0, "loss must be non-negative");
         ShannonLoss(bits)
     }
 
@@ -103,6 +104,7 @@ impl std::fmt::Display for ShannonLoss {
 
 impl From<f64> for ShannonLoss {
     fn from(v: f64) -> Self {
+        debug_assert!(v >= 0.0, "loss must be non-negative");
         ShannonLoss(v)
     }
 }
@@ -127,6 +129,17 @@ pub enum Imperfect<T, E, L: Loss = ShannonLoss> {
     Success(T),
     Partial(T, L),
     Failure(E),
+}
+
+impl<T: PartialEq, E: PartialEq, L: Loss + PartialEq> PartialEq for Imperfect<T, E, L> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Imperfect::Success(a), Imperfect::Success(b)) => a == b,
+            (Imperfect::Partial(a, la), Imperfect::Partial(b, lb)) => a == b && la == lb,
+            (Imperfect::Failure(a), Imperfect::Failure(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 impl<T, E, L: Loss> Imperfect<T, E, L> {
@@ -323,6 +336,21 @@ mod tests {
     fn shannon_is_lossless() {
         assert!(ShannonLoss::zero().is_lossless());
         assert!(!ShannonLoss::new(0.1).is_lossless());
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(debug_assertions)]
+    fn shannon_negative_panics_debug() {
+        ShannonLoss::new(-1.0);
+    }
+
+    #[test]
+    fn total_is_absorbing() {
+        let t = ShannonLoss::total();
+        let x = ShannonLoss::new(5.0);
+        assert!(t.clone().combine(x.clone()).as_f64().is_infinite());
+        assert!(x.combine(t).as_f64().is_infinite());
     }
 
     // --- Imperfect ---

@@ -4,9 +4,5 @@ version = "0.1.0"
 edition = "2021"
 description = "Result extended with partial success. Loss as a trait."
 
-[features]
-default = ["std"]
-std = []
-
 [dependencies]
 # None. Depends on nothing.

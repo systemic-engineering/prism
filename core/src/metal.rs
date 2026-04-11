@@ -11,6 +11,7 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
     /// Focus: read N bytes from input into tape starting at dp.
+    /// Reads past the end of input are padded with zeros.
     /// Advances dp by n.
     Focus(usize),
     /// Project: keep only cells where value >= threshold.
