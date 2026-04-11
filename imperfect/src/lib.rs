@@ -167,4 +167,129 @@ mod tests {
         assert!(ShannonLoss::zero().is_lossless());
         assert!(!ShannonLoss::new(0.1).is_lossless());
     }
+
+    // --- Imperfect ---
+
+    #[test]
+    fn ok_is_ok() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        assert!(i.is_ok());
+        assert!(!i.is_partial());
+        assert!(!i.is_err());
+    }
+
+    #[test]
+    fn partial_is_partial() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.5));
+        assert!(i.is_ok());
+        assert!(i.is_partial());
+        assert!(!i.is_err());
+    }
+
+    #[test]
+    fn err_is_err() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        assert!(!i.is_ok());
+        assert!(!i.is_partial());
+        assert!(i.is_err());
+    }
+
+    #[test]
+    fn ok_returns_value() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        assert_eq!(i.ok(), Some(42));
+    }
+
+    #[test]
+    fn partial_ok_returns_value() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
+        assert_eq!(i.ok(), Some(42));
+    }
+
+    #[test]
+    fn err_ok_returns_none() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        assert_eq!(i.ok(), None);
+    }
+
+    #[test]
+    fn err_returns_error() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        assert_eq!(i.err(), Some("oops".into()));
+    }
+
+    #[test]
+    fn ok_err_returns_none() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        assert_eq!(i.err(), None);
+    }
+
+    #[test]
+    fn loss_ok_is_zero() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        assert!(i.loss().is_zero());
+    }
+
+    #[test]
+    fn loss_partial() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.5));
+        assert_eq!(i.loss().as_f64(), 1.5);
+    }
+
+    #[test]
+    fn loss_err_is_total() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        assert!(i.loss().as_f64().is_infinite());
+    }
+
+    #[test]
+    fn as_ref_ok() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let r = i.as_ref();
+        assert_eq!(r.ok(), Some(&42));
+    }
+
+    #[test]
+    fn as_ref_partial() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
+        let r = i.as_ref();
+        assert_eq!(r.ok(), Some(&42));
+        assert!(r.is_partial());
+    }
+
+    #[test]
+    fn as_ref_err() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let r = i.as_ref();
+        assert_eq!(r.err(), Some(&"oops".to_string()));
+    }
+
+    #[test]
+    fn map_ok() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let m = i.map(|v| v * 2);
+        assert_eq!(m.ok(), Some(84));
+    }
+
+    #[test]
+    fn map_partial_preserves_loss() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
+        let m = i.map(|v| v * 2);
+        assert_eq!(m.ok(), Some(84));
+        assert!(m.is_partial());
+    }
+
+    #[test]
+    fn map_err_is_noop() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let m = i.map(|v| v * 2);
+        assert!(m.is_err());
+    }
+
+    #[test]
+    fn map_err_transforms_error() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let m = i.map_err(|e| e.len());
+        assert_eq!(m.err(), Some(4));
+    }
 }
