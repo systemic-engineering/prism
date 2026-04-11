@@ -10,6 +10,73 @@ pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
+// ---------------------------------------------------------------------------
+// Prism trait
+// ---------------------------------------------------------------------------
+
+/// Three optic operations. A prism is the monoid lifted into the Beam
+/// semifunctor. All beam types are associated types, not parameters.
+pub trait Prism {
+    type Input:     Beam;
+    type Focused:   Beam<In = <Self::Input     as Beam>::Out>;
+    type Projected: Beam<In = <Self::Focused   as Beam>::Out>;
+    type Refracted: Beam<In = <Self::Projected as Beam>::Out>;
+
+    fn focus(&self, beam: Self::Input) -> Self::Focused;
+    fn project(&self, beam: Self::Focused) -> Self::Projected;
+    fn refract(&self, beam: Self::Projected) -> Self::Refracted;
+}
+
+/// Blanket impl: `&P` is a Prism wherever `P` is.
+impl<P: Prism> Prism for &P {
+    type Input     = P::Input;
+    type Focused   = P::Focused;
+    type Projected = P::Projected;
+    type Refracted = P::Refracted;
+
+    fn focus(&self, beam: P::Input) -> P::Focused         { P::focus(self, beam) }
+    fn project(&self, beam: P::Focused) -> P::Projected   { P::project(self, beam) }
+    fn refract(&self, beam: P::Projected) -> P::Refracted { P::refract(self, beam) }
+}
+
+/// Run a prism end-to-end: focus → project → refract.
+pub fn apply<P: Prism>(prism: &P, beam: P::Input) -> P::Refracted {
+    beam.apply(Focus(prism))
+        .apply(Project(prism))
+        .apply(Refract(prism))
+}
+
+// ---------------------------------------------------------------------------
+// Operation structs — three pipeline stages
+// ---------------------------------------------------------------------------
+
+/// focus: Input → Focused.
+pub struct Focus<P>(pub P);
+
+/// project: Focused → Projected.
+pub struct Project<P>(pub P);
+
+/// refract: Projected → Refracted.
+pub struct Refract<P>(pub P);
+
+impl<P: Prism> Operation<P::Input> for Focus<P> {
+    type Output = P::Focused;
+    fn op(&self) -> Op { Op::Focus }
+    fn apply(self, beam: P::Input) -> P::Focused { self.0.focus(beam) }
+}
+
+impl<P: Prism> Operation<P::Focused> for Project<P> {
+    type Output = P::Projected;
+    fn op(&self) -> Op { Op::Project }
+    fn apply(self, beam: P::Focused) -> P::Projected { self.0.project(beam) }
+}
+
+impl<P: Prism> Operation<P::Projected> for Refract<P> {
+    type Output = P::Refracted;
+    fn op(&self) -> Op { Op::Refract }
+    fn apply(self, beam: P::Projected) -> P::Refracted { self.0.refract(beam) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
