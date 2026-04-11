@@ -450,4 +450,55 @@ mod tests {
         let b: Imperfect<u32, String> = Imperfect::Ok(2);
         let _ = a.compose(b);
     }
+
+    // --- std interop ---
+
+    #[test]
+    fn from_result_ok() {
+        let r: Result<u32, String> = Ok(42);
+        let i: Imperfect<u32, String> = r.into();
+        assert!(matches!(i, Imperfect::Ok(42)));
+    }
+
+    #[test]
+    fn from_result_err() {
+        let r: Result<u32, String> = Err("oops".into());
+        let i: Imperfect<u32, String> = r.into();
+        assert!(i.is_err());
+    }
+
+    #[test]
+    fn into_result_ok() {
+        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let r: Result<u32, String> = i.into();
+        assert_eq!(r, Ok(42));
+    }
+
+    #[test]
+    fn into_result_partial_keeps_value() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
+        let r: Result<u32, String> = i.into();
+        assert_eq!(r, Ok(42));
+    }
+
+    #[test]
+    fn into_result_err() {
+        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let r: Result<u32, String> = i.into();
+        assert_eq!(r, Err("oops".into()));
+    }
+
+    #[test]
+    fn from_option_some() {
+        let o: Option<u32> = Some(42);
+        let i: Imperfect<u32, ()> = o.into();
+        assert!(matches!(i, Imperfect::Ok(42)));
+    }
+
+    #[test]
+    fn from_option_none() {
+        let o: Option<u32> = None;
+        let i: Imperfect<u32, ()> = o.into();
+        assert!(i.is_err());
+    }
 }
