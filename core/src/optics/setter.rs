@@ -1,10 +1,14 @@
 //! Setter — the write-only optic.
 //!
-//! A Setter<S, A> provides a way to modify A within S by applying a
-//! function, without giving observational access. It's the weakest of
-//! the optic kinds — Fold + Setter with the read side removed.
+//! A Setter<S, A> provides a way to modify A within S by applying a function,
+//! without giving observational access to the part.
+//!
+//! As a Prism: all stages are identity on S. The modify operation is available
+//! as an inherent method. The pipeline preserves S through all stages.
 
-use crate::{Beam, Prism, Stage};
+use std::convert::Infallible;
+use crate::{Beam, Prism, PureBeam};
+use imperfect::ShannonLoss;
 
 #[derive(Clone, Copy)]
 pub struct Setter<S, A> {
@@ -15,19 +19,8 @@ impl<S: 'static, A: 'static> Setter<S, A> {
     /// Construct a Setter from a modify fn pointer.
     ///
     /// # Laws
-    ///
-    /// Setter is the weakest classical optic — it has only a write side, no
-    /// read side. The caller is responsible for ensuring:
-    ///
-    /// - `modify(s, |a| a) ≡ s` (the identity inner function does not change s)
-    /// - `modify(modify(s, f), g) ≡ modify(s, g ∘ f)` (modify composes)
-    ///
-    /// These are the standard Setter laws from functional optics. They cannot
-    /// be enforced by the type system.
-    ///
-    /// Note: the inner `&dyn Fn(A) -> A` is a function argument, not a stored
-    /// closure — this is fine and does not affect the fn pointer constraint on
-    /// `modify_fn` itself.
+    /// - `modify(s, |a| a) ≡ s` (identity law)
+    /// - `modify(modify(s, f), g) ≡ modify(s, g ∘ f)` (composition law)
     pub fn new(modify: fn(S, &dyn Fn(A) -> A) -> S) -> Self {
         Setter { modify_fn: modify }
     }
@@ -40,37 +33,40 @@ impl<S: 'static, A: 'static> Setter<S, A> {
     }
 }
 
+/// Setter implements Prism with PureBeam.
+///
+/// Pipeline flow:
+/// - focus: identity (S → S) — no read access
+/// - project: identity (S → S)
+/// - refract: applies modify with identity to witness the closure, returns S
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
-    type Input = S;
-    type Focused = S;
-    type Projected = S;
-    type Part = S;
-    type Crystal = Setter<S, A>;
+    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
+    type Focused   = PureBeam<S, S, Infallible, ShannonLoss>;
+    type Projected = PureBeam<S, S, Infallible, ShannonLoss>;
+    type Refracted = PureBeam<S, S, Infallible, ShannonLoss>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Focused, ..beam } }
-    fn project(&self, beam: Beam<S>) -> Beam<S> { Beam { stage: Stage::Projected, ..beam } }
-    fn split(&self, beam: Beam<S>) -> Vec<Beam<S>> { vec![Beam { stage: Stage::Split, ..beam }] }
-    fn zoom(&self, beam: Beam<S>, f: &dyn Fn(Beam<S>) -> Beam<S>) -> Beam<S> { f(beam) }
+    fn focus(&self, beam: Self::Input) -> Self::Focused {
+        let s = beam.result().ok().expect("focus: Err beam").clone();
+        beam.next(s)
+    }
 
-    fn refract(&self, beam: Beam<S>) -> Beam<Setter<S, A>> {
-        // fn pointers are Copy — the optic itself IS the lossless fixed point.
-        // We also exercise modify_fn with identity to prove the closure is reachable.
-        let _witnessed = (self.modify_fn)(beam.result.clone(), &|a| a);
-        Beam {
-            result: self.clone(),
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-            connection: beam.connection,
-        }
+    fn project(&self, beam: Self::Focused) -> Self::Projected {
+        let s = beam.result().ok().expect("project: Err beam").clone();
+        beam.next(s)
+    }
+
+    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
+        let s = beam.result().ok().expect("refract: Err beam").clone();
+        // Witness: run modify with identity to prove the closure is reachable
+        let witnessed = (self.modify_fn)(s, &|a| a);
+        beam.next(witnessed)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Beam as BeamTrait;
 
     #[derive(Clone, Debug, PartialEq)]
     struct Box2 { label: String, count: i32 }
@@ -79,32 +75,65 @@ mod tests {
         Box2 { count: f(b.count), ..b }
     }
 
-    #[test]
-    fn setter_modifies_field_via_function() {
-        let count_setter: Setter<Box2, i32> = Setter::new(box2_modify_count);
+    // --- Inherent method tests ---
 
+    #[test]
+    fn setter_modifies_field() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
         let b = Box2 { label: "test".to_string(), count: 5 };
-        let b2 = count_setter.modify(b, |c| c + 10);
+        let b2 = s.modify(b, |c| c + 10);
         assert_eq!(b2.count, 15);
         assert_eq!(b2.label, "test");
     }
 
     #[test]
-    fn setter_refract_runs_modify_with_identity() {
-        // refract must call modify_fn with the identity inner function.
-        // Crystal = Self — the refracted beam carries the Setter itself.
-        let count_setter: Setter<Box2, i32> = Setter::new(box2_modify_count);
+    fn setter_identity_law() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let b = Box2 { label: "x".to_string(), count: 7 };
+        let b2 = s.modify(b.clone(), |a| a);
+        assert_eq!(b2, b);
+    }
 
-        let input = Box2 { label: "x".to_string(), count: 5 };
-        let beam = Beam::new(input.clone());
-        let focused = count_setter.focus(beam);
-        let projected = count_setter.project(focused);
-        let refracted = count_setter.refract(projected);
+    // --- Prism trait tests ---
 
-        assert_eq!(refracted.stage, Stage::Refracted);
-        // The crystal is the Setter itself. Verify it still works.
-        let result = refracted.result.modify(input, |c| c + 1);
-        assert_eq!(result.count, 6);
+    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
+        PureBeam::ok((), v)
+    }
+
+    #[test]
+    fn setter_prism_focus_passes_through() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let b = Box2 { label: "x".to_string(), count: 5 };
+        let focused = s.focus(seed(b.clone()));
+        assert_eq!(focused.result().ok(), Some(&b));
+    }
+
+    #[test]
+    fn setter_prism_project_passes_through() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let b = Box2 { label: "x".to_string(), count: 5 };
+        let focused = s.focus(seed(b.clone()));
+        let projected = s.project(focused);
+        assert_eq!(projected.result().ok(), Some(&b));
+    }
+
+    #[test]
+    fn setter_prism_refract_witnesses_modify() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let b = Box2 { label: "x".to_string(), count: 5 };
+        let focused = s.focus(seed(b.clone()));
+        let projected = s.project(focused);
+        let refracted = s.refract(projected);
+        // refract applies identity modify, so value is unchanged
+        assert_eq!(refracted.result().ok(), Some(&b));
+    }
+
+    #[test]
+    fn setter_prism_is_lossless() {
+        let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
+        let b = Box2 { label: "t".to_string(), count: 3 };
+        let focused = s.focus(seed(b));
+        assert!(!focused.is_partial());
     }
 
     #[test]

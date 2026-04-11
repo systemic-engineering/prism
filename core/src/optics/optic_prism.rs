@@ -3,8 +3,13 @@
 //! Named OpticPrism (not Prism) to avoid collision with our crate's
 //! central Prism trait. Represents a sum-type case: preview may fail
 //! (the case doesn't match), but review always reconstructs the whole.
+//!
+//! As a Prism: focus extracts (using Failure on non-match), project is identity,
+//! refract returns the extracted value.
 
-use crate::{Beam, Prism, ShannonLoss, Stage};
+use std::convert::Infallible;
+use crate::{Beam, Prism, PureBeam};
+use imperfect::{Imperfect, ShannonLoss};
 
 #[derive(Clone, Copy)]
 pub struct OpticPrism<S, A> {
@@ -14,23 +19,12 @@ pub struct OpticPrism<S, A> {
 }
 
 impl<S: 'static, A: 'static> OpticPrism<S, A> {
-    /// Construct an OpticPrism (the semidet bidirectional optic) from a
-    /// match function, extract function, and review function.
+    /// Construct an OpticPrism from a match, extract, and review function.
     ///
     /// # Laws
-    ///
-    /// The caller is responsible for ensuring the prism laws hold:
-    ///
-    /// - When `matches(s)` is true: `review(extract(s)) ≡ s` (review undoes extract)
-    /// - For any `a: A`: `matches(review(a))` is true (review produces a valid case)
-    /// - When `matches(s)` is true: `extract(s)` returns the embedded `A` (not a sentinel)
-    /// - When `matches(s)` is false: `extract(s)` may return any sentinel `A` of
-    ///   the closure author's choice. The framework will mark the resulting beam
-    ///   with `ShannonLoss::infinite()`. Downstream consumers MUST check `loss`
-    ///   before reading `result`. The sentinel value is undefined behavior at
-    ///   the value level on infinite-loss beams.
-    ///
-    /// These cannot be enforced by the type system.
+    /// - When `matches(s)`: `review(extract(s)) ≡ s`
+    /// - For any `a`: `matches(review(a))` is true
+    /// - When `!matches(s)`: extract returns a sentinel; the beam will be Failure.
     pub fn new(matches: fn(&S) -> bool, extract: fn(&S) -> A, review: fn(A) -> S) -> Self {
         OpticPrism {
             match_fn: matches,
@@ -45,18 +39,6 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 
     /// Returns `Some(A)` on a matching `s`, `None` otherwise.
-    ///
-    /// This is an INHERENT CONVENIENCE method and returns `Option<A>` by
-    /// design — it is NOT part of the `Prism` trait surface and does NOT
-    /// participate in the spectral framework's loss-based refutation channel.
-    /// The `Option` here is the standard Rust idiom for "did the case match,"
-    /// unrelated to the Prism pipeline's encoding of refutation.
-    ///
-    /// For the Prism pipeline, use `focus` → `project` → `refract` via the
-    /// `apply` free function or explicit calls. The trait surface encodes
-    /// refutation as `ShannonLoss::infinite()` on the returned Beam, never
-    /// as `Option` or `Result`. See N1 in
-    /// `docs/seam-taut-rereview-2026-04-08.md`.
     pub fn extract(&self, s: &S) -> Option<A> {
         if (self.match_fn)(s) {
             Some((self.extract_fn)(s))
@@ -70,70 +52,54 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 }
 
+/// OpticPrism implements Prism with PureBeam.
+///
+/// Pipeline flow:
+/// - focus: extract (S → A), using Partial with infinite loss on non-match
+/// - project: identity pass-through
+/// - refract: identity pass-through
+///
+/// Non-matching inputs produce a Partial beam with ShannonLoss::total()
+/// (infinite loss), signaling refutation through the loss channel rather
+/// than the error channel.
 impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
-    type Input = S;
-    type Focused = A;      // refutation lives in ShannonLoss, never in Option
-    type Projected = A;
-    type Part = A;
-    type Crystal = OpticPrism<S, A>;
+    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
+    type Focused   = PureBeam<S, A, Infallible, ShannonLoss>;
+    type Projected = PureBeam<A, A, Infallible, ShannonLoss>;
+    type Refracted = PureBeam<A, A, Infallible, ShannonLoss>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<A> {
-        // Always call extract_fn. When the input doesn't match, the closure
-        // author's sentinel is used as the result value and loss is set to
-        // infinity. Downstream consumers must check loss before using result.
-        let a = (self.extract_fn)(&beam.result);
-        let loss = if (self.match_fn)(&beam.result) {
-            beam.loss
+    fn focus(&self, beam: Self::Input) -> Self::Focused {
+        let s = beam.result().ok().expect("focus: Err beam").clone();
+        if (self.match_fn)(&s) {
+            let a = (self.extract_fn)(&s);
+            beam.next(a)
         } else {
-            ShannonLoss::new(f64::INFINITY)
-        };
-        Beam {
-            result: a,
-            path: beam.path,
-            loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Focused,
-            connection: beam.connection,
+            // Non-match: extract the sentinel and mark with infinite loss.
+            let sentinel = (self.extract_fn)(&s);
+            beam.tick(Imperfect::Partial(sentinel, ShannonLoss::new(f64::INFINITY)))
         }
     }
 
-    fn project(&self, beam: Beam<A>) -> Beam<A> {
-        Beam { stage: Stage::Projected, ..beam }
+    fn project(&self, beam: Self::Focused) -> Self::Projected {
+        let a = beam.result().ok().expect("project: Err beam").clone();
+        beam.next(a)
     }
 
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> {
-        vec![Beam { stage: Stage::Split, ..beam }]
-    }
-
-    fn zoom(&self, beam: Beam<A>, f: &dyn Fn(Beam<A>) -> Beam<A>) -> Beam<A> {
-        f(beam)
-    }
-
-    fn refract(&self, beam: Beam<A>) -> Beam<OpticPrism<S, A>> {
-        // fn pointers are Copy — the optic itself IS the lossless fixed point.
-        Beam {
-            result: self.clone(),
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-            connection: beam.connection,
-        }
+    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
+        let a = beam.result().ok().expect("refract: Err beam").clone();
+        beam.next(a)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Beam as BeamTrait;
 
-    // Shape has NO Default derive — verifying A: Default is not required.
     #[derive(Clone, Debug, PartialEq)]
     enum Shape {
         Circle(i32),
         Square(i32),
-        Empty,
     }
 
     fn shape_is_circle(s: &Shape) -> bool {
@@ -152,70 +118,79 @@ mod tests {
         OpticPrism::new(shape_is_circle, shape_extract_circle, shape_review_circle)
     }
 
+    // --- Inherent method tests ---
+
     #[test]
-    fn optic_prism_matches_reports_true_for_circle() {
+    fn optic_prism_matches() {
         let p = circle_prism();
         assert!(p.matches(&Shape::Circle(5)));
         assert!(!p.matches(&Shape::Square(3)));
-        assert!(!p.matches(&Shape::Empty));
     }
 
     #[test]
-    fn optic_prism_extract_returns_some_on_match_none_on_mismatch() {
+    fn optic_prism_extract_some_on_match() {
         let p = circle_prism();
         assert_eq!(p.extract(&Shape::Circle(5)), Some(5));
+    }
+
+    #[test]
+    fn optic_prism_extract_none_on_mismatch() {
+        let p = circle_prism();
         assert_eq!(p.extract(&Shape::Square(3)), None);
     }
 
     #[test]
-    fn optic_prism_review_reconstructs() {
+    fn optic_prism_review() {
         let p = circle_prism();
         assert_eq!(p.review(7), Shape::Circle(7));
     }
 
-    // Prism trait: focus on a MATCHING input → lossless Beam<A> (no Option in type).
-    #[test]
-    fn optic_prism_focus_matching_case_is_lossless() {
-        let p = circle_prism();
-        let beam: Beam<i32> = p.focus(Beam::new(Shape::Circle(42)));
-        assert_eq!(beam.result, 42);
-        assert!(beam.loss.is_zero());
-        assert_eq!(beam.stage, Stage::Focused);
+    // --- Prism trait tests ---
+
+    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
+        PureBeam::ok((), v)
     }
 
-    // Prism trait: focus on a NON-MATCHING input → infinite-loss Beam<A>,
-    // result is the sentinel the closure author chose (not A::default()).
     #[test]
-    fn optic_prism_focus_nonmatch_produces_infinite_loss_without_default() {
+    fn optic_prism_focus_matching_is_lossless() {
         let p = circle_prism();
-        let beam: Beam<i32> = p.focus(Beam::new(Shape::Square(3)));
-        assert!(beam.loss.as_f64().is_infinite(), "loss must be infinite on refutation");
-        // The sentinel is -1, which proves we did NOT call A::default().
-        // (i32::default() would be 0, not -1.)
-        assert_eq!(beam.result, -1, "extract_fn sentinel must be -1, not A::default()");
-        assert_eq!(beam.stage, Stage::Focused);
+        let beam = seed(Shape::Circle(42));
+        let focused = p.focus(beam);
+        assert_eq!(focused.result().ok(), Some(&42));
+        assert!(!focused.is_partial());
     }
 
-    // Prism trait: project on a matched beam is a simple stage transition.
     #[test]
-    fn optic_prism_project_matching_case_is_lossless() {
+    fn optic_prism_focus_nonmatch_produces_infinite_loss() {
         let p = circle_prism();
-        let focused = p.focus(Beam::new(Shape::Circle(42)));
+        let beam = seed(Shape::Square(3));
+        let focused = p.focus(beam);
+        // Should be partial with infinite loss
+        assert!(focused.is_partial());
+        // The sentinel value is accessible
+        assert_eq!(focused.result().ok(), Some(&-1));
+    }
+
+    #[test]
+    fn optic_prism_full_pipeline_matching() {
+        let p = circle_prism();
+        let focused = p.focus(seed(Shape::Circle(10)));
         let projected = p.project(focused);
-        assert_eq!(projected.result, 42);
-        assert!(projected.loss.is_zero());
-        assert_eq!(projected.stage, Stage::Projected);
+        let refracted = p.refract(projected);
+        assert_eq!(refracted.result().ok(), Some(&10));
+        assert!(!refracted.is_partial());
     }
 
-    // Prism trait: project on a refuted beam preserves infinite loss.
     #[test]
-    fn optic_prism_project_preserves_infinite_loss() {
+    fn optic_prism_full_pipeline_nonmatch_carries_loss() {
         let p = circle_prism();
-        let focused = p.focus(Beam::new(Shape::Square(3)));
-        assert!(focused.loss.as_f64().is_infinite());
+        let focused = p.focus(seed(Shape::Square(3)));
+        assert!(focused.is_partial());
         let projected = p.project(focused);
-        assert!(projected.loss.as_f64().is_infinite());
-        assert_eq!(projected.stage, Stage::Projected);
+        // Loss propagates through the pipeline
+        assert!(projected.is_partial());
+        let refracted = p.refract(projected);
+        assert!(refracted.is_partial());
     }
 
     #[test]

@@ -1,13 +1,17 @@
 //! Lens — total bidirectional single-focus optic.
 //!
 //! A Lens<S, A> gives total access to a part A within a whole S.
-//! The view function extracts A; the modify function updates A
-//! within S. Laws:
+//! Laws:
 //! - `view(set(s, a)) = a`        (set-view)
 //! - `set(s, view(s)) = s`        (view-set)
 //! - `set(set(s, a1), a2) = set(s, a2)`  (set-set)
+//!
+//! As a Prism: focus views (S→A), project is identity, refract returns A.
+//! The original S is available as the beam's input chain for reconstruction.
 
-use crate::{Beam, Prism, Stage};
+use std::convert::Infallible;
+use crate::{Beam, Prism, PureBeam};
+use imperfect::ShannonLoss;
 
 #[derive(Clone, Copy)]
 pub struct Lens<S, A> {
@@ -19,16 +23,9 @@ impl<S: 'static, A: 'static> Lens<S, A> {
     /// Construct a Lens from a view and set fn pointer.
     ///
     /// # Laws
-    ///
-    /// The caller is responsible for ensuring the lens laws hold:
-    ///
-    /// - `view(set(s, a)) ≡ a` (set-view: setting then viewing returns what was set)
-    /// - `set(s, view(s)) ≡ s` (view-set: viewing then setting returns the original)
-    /// - `set(set(s, a1), a2) ≡ set(s, a2)` (set-set: setting twice equals setting once)
-    ///
-    /// These cannot be enforced by the type system. A Lens constructed from
-    /// functions that violate any of these laws will compile and run but will
-    /// produce results that are meaningless under the Lens laws.
+    /// - `view(set(s, a)) ≡ a` (set-view)
+    /// - `set(s, view(s)) ≡ s` (view-set)
+    /// - `set(set(s, a1), a2) ≡ set(s, a2)` (set-set)
     pub fn new(view: fn(&S) -> A, set: fn(S, A) -> S) -> Self {
         Lens { view_fn: view, set_fn: set }
     }
@@ -50,59 +47,39 @@ impl<S: 'static, A: 'static> Lens<S, A> {
     }
 }
 
+/// Lens implements Prism with PureBeam.
+///
+/// Pipeline flow:
+/// - focus: view (S → A)
+/// - project: identity (A → A)
+/// - refract: identity (A → A) — the focused value is the final output
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
-    type Input = S;
-    type Focused = A;
-    type Projected = A;
-    type Part = A;
-    type Crystal = Lens<S, A>;
+    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
+    type Focused   = PureBeam<S, A, Infallible, ShannonLoss>;
+    type Projected = PureBeam<A, A, Infallible, ShannonLoss>;
+    type Refracted = PureBeam<A, A, Infallible, ShannonLoss>;
 
-    fn focus(&self, beam: Beam<S>) -> Beam<A> {
-        let a = (self.view_fn)(&beam.result);
-        Beam {
-            result: a,
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Focused,
-            connection: beam.connection,
-        }
+    fn focus(&self, beam: Self::Input) -> Self::Focused {
+        let s = beam.result().ok().expect("focus: Err beam").clone();
+        let a = (self.view_fn)(&s);
+        beam.next(a)
     }
 
-    fn project(&self, beam: Beam<A>) -> Beam<A> {
-        Beam { stage: Stage::Projected, ..beam }
+    fn project(&self, beam: Self::Focused) -> Self::Projected {
+        let a = beam.result().ok().expect("project: Err beam").clone();
+        beam.next(a)
     }
 
-    fn split(&self, beam: Beam<A>) -> Vec<Beam<A>> {
-        vec![Beam { stage: Stage::Split, ..beam }]
-    }
-
-    fn zoom(
-        &self,
-        beam: Beam<A>,
-        f: &dyn Fn(Beam<A>) -> Beam<A>,
-    ) -> Beam<A> {
-        f(beam)
-    }
-
-    fn refract(&self, beam: Beam<A>) -> Beam<Lens<S, A>> {
-        // fn pointers are Copy — the optic itself IS the lossless fixed point.
-        Beam {
-            result: self.clone(),
-            path: beam.path,
-            loss: beam.loss,
-            precision: beam.precision,
-            recovered: beam.recovered,
-            stage: Stage::Refracted,
-            connection: beam.connection,
-        }
+    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
+        let a = beam.result().ok().expect("refract: Err beam").clone();
+        beam.next(a)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Beam as BeamTrait;
 
     #[derive(Clone, Debug, PartialEq)]
     struct Point { x: i32, y: i32 }
@@ -110,16 +87,34 @@ mod tests {
     fn point_view_x(p: &Point) -> i32 { p.x }
     fn point_set_x(p: Point, new_x: i32) -> Point { Point { x: new_x, ..p } }
 
-    #[test]
-    fn lens_views_and_sets_field() {
-        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+    // --- Inherent method tests ---
 
+    #[test]
+    fn lens_view() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
         let p = Point { x: 3, y: 5 };
         assert_eq!(x_lens.view(&p), 3);
+    }
+
+    #[test]
+    fn lens_set() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let p = Point { x: 3, y: 5 };
         let p2 = x_lens.set(p, 10);
         assert_eq!(p2.x, 10);
         assert_eq!(p2.y, 5);
     }
+
+    #[test]
+    fn lens_modify() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let p = Point { x: 3, y: 5 };
+        let p2 = x_lens.modify(p, |x| x * 2);
+        assert_eq!(p2.x, 6);
+        assert_eq!(p2.y, 5);
+    }
+
+    // --- Lens laws ---
 
     #[test]
     fn lens_view_set_law() {
@@ -139,12 +134,57 @@ mod tests {
     }
 
     #[test]
-    fn lens_refract_as_prism() {
+    fn lens_set_set_law() {
         let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
-        let beam = Beam::new(Point { x: 3, y: 5 });
+        let p = Point { x: 3, y: 5 };
+        let set_once = x_lens.set(p.clone(), 10);
+        let set_twice = x_lens.set(set_once, 20);
+        let set_direct = x_lens.set(p, 20);
+        assert_eq!(set_twice, set_direct);
+    }
+
+    // --- Prism trait tests ---
+
+    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
+        PureBeam::ok((), v)
+    }
+
+    #[test]
+    fn lens_prism_focus_views() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let beam = seed(Point { x: 42, y: 0 });
         let focused = x_lens.focus(beam);
-        assert_eq!(focused.result, 3);
-        assert_eq!(focused.stage, Stage::Focused);
+        assert_eq!(focused.result().ok(), Some(&42));
+        // The input of the focused beam is the original S
+        assert_eq!(focused.input(), &Point { x: 42, y: 0 });
+    }
+
+    #[test]
+    fn lens_prism_project_passes_through() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let focused = x_lens.focus(seed(Point { x: 7, y: 3 }));
+        let projected = x_lens.project(focused);
+        assert_eq!(projected.result().ok(), Some(&7));
+    }
+
+    #[test]
+    fn lens_prism_refract_returns_value() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let focused = x_lens.focus(seed(Point { x: 5, y: 2 }));
+        let projected = x_lens.project(focused);
+        let refracted = x_lens.refract(projected);
+        assert_eq!(refracted.result().ok(), Some(&5));
+    }
+
+    #[test]
+    fn lens_prism_is_lossless() {
+        let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+        let focused = x_lens.focus(seed(Point { x: 1, y: 2 }));
+        assert!(!focused.is_partial());
+        let projected = x_lens.project(focused);
+        assert!(!projected.is_partial());
+        let refracted = x_lens.refract(projected);
+        assert!(!refracted.is_partial());
     }
 
     #[test]
