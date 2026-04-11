@@ -6,9 +6,25 @@
 pub mod beam;
 pub mod trace;
 
+pub mod connection;
+pub mod content;
+pub mod metal;
+pub mod oid;
+pub mod precision;
+pub mod spectral_oid;
+
+#[cfg(feature = "optics")]
+pub mod optics;
+
 pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
+
+pub use connection::{Connection, ScalarConnection};
+pub use content::ContentAddressed;
+pub use oid::Oid;
+pub use precision::{Precision, Pressure};
+pub use spectral_oid::SpectralOid;
 
 // ---------------------------------------------------------------------------
 // Prism trait

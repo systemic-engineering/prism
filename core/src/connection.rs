@@ -8,7 +8,7 @@
 //! Non-abelian connections are for geometric contexts where
 //! order matters and parallel transport is non-trivial.
 
-use crate::loss::ShannonLoss;
+use imperfect::{Loss, ShannonLoss};
 
 /// The relational structure carried by a Beam through a pipeline.
 ///

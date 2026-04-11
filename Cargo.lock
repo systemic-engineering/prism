@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
-name = "prism"
+name = "imperfect"
 version = "0.1.0"
+
+[[package]]
+name = "prism-core"
+version = "0.1.0"
+dependencies = [
+ "imperfect",
+]
