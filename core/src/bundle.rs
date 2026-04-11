@@ -63,4 +63,102 @@ mod tests {
     fn connection_has_state_from_fiber() {
         let _: <TestConnection as Fiber>::State = [1.0, 2.0, 3.0, 4.0];
     }
+
+    struct TestBundle {
+        optic: String,
+        strategy: u8,
+        fixed: bool,
+    }
+
+    impl Fiber for TestBundle {
+        type State = [f64; 4];
+    }
+
+    impl Connection for TestBundle {
+        type Optic = String;
+        fn connection(&self) -> &String { &self.optic }
+    }
+
+    impl Gauge for TestBundle {
+        type Group = u8;
+        fn gauge(&self) -> &u8 { &self.strategy }
+    }
+
+    impl Transport for TestBundle {
+        type Holonomy = ShannonLoss;
+        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], ShannonLoss> {
+            let compressed = [state[0], state[1], 0.0, 0.0];
+            let loss = state[2].abs() + state[3].abs();
+            if loss == 0.0 {
+                Imperfect::Success(compressed)
+            } else {
+                Imperfect::Partial(compressed, ShannonLoss::new(loss))
+            }
+        }
+    }
+
+    impl Closure for TestBundle {
+        type Fixed = bool;
+        fn close(&self) -> &bool { &self.fixed }
+    }
+
+    #[test]
+    fn gauge_requires_connection() {
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        assert_eq!(*b.gauge(), 3);
+    }
+
+    #[test]
+    fn transport_returns_partial() {
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let state = [1.0, 2.0, 3.0, 4.0];
+        let result = b.transport(&state);
+        assert!(result.is_partial());
+    }
+
+    #[test]
+    fn transport_holonomy_measures_loss() {
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let state = [1.0, 2.0, 3.0, 4.0];
+        match b.transport(&state) {
+            Imperfect::Partial(compressed, loss) => {
+                assert_eq!(compressed, [1.0, 2.0, 0.0, 0.0]);
+                assert_eq!(loss.as_f64(), 7.0);
+            }
+            _ => panic!("expected Partial"),
+        }
+    }
+
+    #[test]
+    fn transport_zero_loss_returns_success() {
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let state = [1.0, 2.0, 0.0, 0.0];
+        let result = b.transport(&state);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn closure_is_fixed_point() {
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        assert_eq!(*b.close(), true);
+    }
+
+    #[test]
+    fn full_tower_is_bundle() {
+        fn accepts_bundle<B: Bundle>(_b: &B) {}
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        accepts_bundle(&b);
+    }
+
+    #[test]
+    fn bundle_associated_types_accessible() {
+        fn read_tower<B: Bundle>(b: &B) -> bool
+        where
+            B::Fixed: Copy,
+        {
+            *b.close()
+        }
+        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        assert!(read_tower(&b));
+    }
 }
