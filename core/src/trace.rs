@@ -1,4 +1,9 @@
 //! Trace — the execution record of a beam through a pipeline.
+//!
+//! Each [`Step`] records which prism and operation produced it, the input
+//! that entered, the output (or error) that left, and the loss incurred.
+//! A [`Trace`] collects steps in order, and [`reenter_at`](Trace::reenter_at)
+//! allows recovering a typed input at any step for replay or debugging.
 
 use std::any::Any;
 use std::fmt;

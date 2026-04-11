@@ -1,20 +1,45 @@
-//! Imperfect — Result extended with partial success.
+//! I wanna thank Brené Brown for her work.
 //!
-//! Three states: Success (perfect), Partial (value with loss), Failure (failure).
-//! Derived from partial successes in PbtA game design.
 //!
-//! `Loss` is a trait. `ShannonLoss` (information loss in bits) is the
-//! default implementation.
+//! Result extended with partial success. Three states:
+//!
+//! - **Success** — the transformation preserved everything. Zero loss.
+//! - **Partial** — a value came through, but something was lost getting here.
+//!   The loss is measured and carried forward.
+//! - **Failure** — no value survived.
+//!
+//! The middle state is the point. Most real transformations are not perfect
+//! and not failed. They are partial: a value exists, and it cost something.
+//! Collapsing that into `Ok` or `Err` destroys the information about what
+//! was lost.
+//!
+//! [`Loss`] is the trait that measures what didn't survive. [`ShannonLoss`]
+//! is the default implementation, measuring information loss in bits using
+//! Shannon's base-2 logarithmic measure.
 
 /// A measure of what didn't survive a transformation.
+///
+/// Loss forms a monoid: `zero()` is the identity element, `combine` is
+/// associative, and `total()` is the absorbing element (annihilator).
 pub trait Loss: Clone + Default {
+    /// The identity: no loss occurred. `combine(zero(), x) == x`.
     fn zero() -> Self;
+
+    /// Total loss: the transformation destroyed everything.
+    /// Acts as an absorbing element under `combine`.
     fn total() -> Self;
+
+    /// Whether this loss is zero (lossless).
     fn is_zero(&self) -> bool;
+
+    /// Accumulate two losses. Associative: `a.combine(b).combine(c) == a.combine(b.combine(c))`.
     fn combine(self, other: Self) -> Self;
 }
 
-/// Information loss measured in bits. The default `Loss` implementation.
+/// Information loss measured in bits (Shannon entropy, base-2 logarithm).
+///
+/// Bits are the natural unit because every transformation is a channel,
+/// and channels lose information in bits. The default [`Loss`] implementation.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct ShannonLoss(f64);
 
@@ -88,6 +113,12 @@ impl From<f64> for ShannonLoss {
 /// - `Success(T)` — perfect result, zero loss.
 /// - `Partial(T, L)` — value present, some information lost getting here.
 /// - `Failure(E)` — failure, no value.
+///
+/// The design descends from PbtA (Powered by the Apocalypse) tabletop games,
+/// which use three outcome tiers: 10+ is full success, 7-9 is success with
+/// complications, 6- is failure. The middle tier — success with cost — is the
+/// design innovation that PbtA contributed to game design. This crate encodes
+/// that structure in types.
 ///
 /// Follows `Result` conventions: `is_ok()` means "has a value" (Success or Partial).
 /// The `.ok()` and `.err()` extractor methods follow `Result` naming conventions.
@@ -197,6 +228,8 @@ impl<T, E, L: Loss> From<Imperfect<T, E, L>> for Result<T, E> {
     }
 }
 
+/// `None` maps to `Failure(())` because absence is total loss — there is no
+/// value and no meaningful error to report. `Some(v)` maps to `Success(v)`.
 impl<T, L: Loss> From<Option<T>> for Imperfect<T, (), L> {
     fn from(o: Option<T>) -> Self {
         match o {

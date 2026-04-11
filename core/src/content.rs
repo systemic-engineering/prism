@@ -1,3 +1,7 @@
+//! Content addressing. A value's identity is derived from its content,
+//! not from where it lives or when it was created. Types that implement
+//! [`ContentAddressed`] produce an [`Oid`] that is their content-derived identity.
+
 use crate::oid::Oid;
 
 /// A type that has a content address.

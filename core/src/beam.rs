@@ -16,12 +16,20 @@ pub trait Operation<B: Beam> {
     fn apply(self, beam: B) -> Self::Output;
 }
 
-/// The pipeline value carrier. A semifunctor over `Imperfect`.
+/// The pipeline value carrier. A semifunctor over [`Imperfect`].
+///
+/// A semifunctor is like a functor (you can map a function over the carried
+/// value via [`smap`](Beam::smap)), but the identity law may not hold:
+/// mapping the identity function over a Failure beam panics instead of
+/// returning the same beam. This is deliberate — Failure beams have no
+/// value to map over, so the type system forces you to check `is_ok()`
+/// before transforming.
 ///
 /// Three required methods: `input`, `result`, `tick`.
 /// Everything else is derived.
 ///
-/// **Contract:** `tick` and `next` panic on Err beams. Call `is_ok()` first.
+/// **Contract:** `tick`, `next`, and `smap` panic on Failure beams.
+/// Call `is_ok()` first.
 pub trait Beam: Sized {
     type In;
     type Out;
@@ -37,7 +45,11 @@ pub trait Beam: Sized {
     /// The output of this step, or the error if failed.
     fn result(&self) -> Imperfect<&Self::Out, &Self::Error, Self::Loss>;
 
-    /// The primitive. One tick forward. Panics on Err beam.
+    /// The primitive. One tick forward.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is a Failure beam. Check `is_ok()` first.
     fn tick<T, E>(self, imperfect: Imperfect<T, E, Self::Loss>) -> Self::Tick<T, E>;
 
     /// Whether this beam has a value (Ok or Partial).
@@ -56,7 +68,10 @@ pub trait Beam: Sized {
     }
 
     /// Lossless transition. Shorthand for `tick(Imperfect::Success(value))`.
-    /// Panics on Err beam.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is a Failure beam.
     fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
         self.tick(Imperfect::Success(value))
     }
@@ -67,7 +82,10 @@ pub trait Beam: Sized {
     }
 
     /// Semifunctor map. Derived from `tick`.
-    /// Panics on Err beam.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is a Failure beam.
     fn smap<T>(
         self,
         f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
@@ -80,7 +98,11 @@ pub trait Beam: Sized {
     }
 }
 
-/// Production beam. Flat struct: input + imperfect. No trace overhead.
+/// Production beam. Flat struct: input + imperfect result. No trace overhead.
+///
+/// This is the default `Beam` implementation for pipelines that do not need
+/// execution recording. A `TraceBeam` that records each step into a [`Trace`](crate::trace::Trace)
+/// is forthcoming.
 pub struct PureBeam<In, Out, E = Infallible, L: Loss = ShannonLoss> {
     input: In,
     imperfect: Imperfect<Out, E, L>,

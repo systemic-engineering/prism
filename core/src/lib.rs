@@ -1,7 +1,29 @@
 //! Prism — focus | project | refract.
 //!
-//! A Beam is a semifunctor. A Prism is the monoid lifted into it.
-//! Three operations. Three dimensions of space.
+//! A [`Beam`] carries three things through a pipeline: a value, the input
+//! that produced it, and the accumulated loss ([`Imperfect`]). A [`Prism`]
+//! defines three operations over beams:
+//!
+//! - **focus** — select what matters from the input.
+//! - **project** — transform the focused value (precision cut, eigenvalue
+//!   threshold, the lossy step where information may not survive).
+//! - **refract** — produce the output from what survived projection.
+//!
+//! ```ignore
+//! let result = seed("hello")
+//!     .apply(Focus(&my_prism))
+//!     .apply(Project(&my_prism))
+//!     .apply(Refract(&my_prism));
+//! ```
+//!
+//! Algebraically: a Beam is a **semifunctor** — you can map over the carried
+//! value (`smap`), but the identity law may not hold because Failure beams
+//! break it (mapping over a Failure panics rather than returning the same
+//! Failure). A Prism is a **monoid** lifted into that semifunctor: prisms
+//! compose associatively (`focus | project | refract` chains), and an identity
+//! prism exists (pass-through on all three stages). This means pipelines are
+//! type-safe by construction — the compiler enforces that each stage's output
+//! type matches the next stage's input type.
 
 pub mod beam;
 pub mod trace;
@@ -30,8 +52,13 @@ pub use spectral_oid::SpectralOid;
 // Prism trait
 // ---------------------------------------------------------------------------
 
-/// Three optic operations. A prism is the monoid lifted into the Beam
-/// semifunctor. All beam types are associated types, not parameters.
+/// Three optic operations over beams: focus, project, refract.
+///
+/// The associated types form a chain: `Input` feeds `focus`, whose output
+/// beam (`Focused`) feeds `project`, whose output beam (`Projected`) feeds
+/// `refract`, producing `Refracted`. The chain is enforced by the `Beam::In`
+/// constraints — each stage's `In` must equal the previous stage's `Out`.
+/// This makes type mismatches between pipeline stages a compile error.
 pub trait Prism {
     type Input:     Beam;
     type Focused:   Beam<In = <Self::Input     as Beam>::Out>;
@@ -55,7 +82,10 @@ impl<P: Prism> Prism for &P {
     fn refract(&self, beam: P::Projected) -> P::Refracted { P::refract(self, beam) }
 }
 
-/// Run a prism end-to-end: focus → project → refract.
+/// Run a prism end-to-end: focus, then project, then refract.
+///
+/// Equivalent to the DSL pattern `beam.apply(Focus(p)).apply(Project(p)).apply(Refract(p))`
+/// but without requiring the caller to spell out each stage.
 pub fn apply<P: Prism>(prism: &P, beam: P::Input) -> P::Refracted {
     beam.apply(Focus(prism))
         .apply(Project(prism))
