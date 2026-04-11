@@ -30,6 +30,7 @@ pub mod trace;
 
 pub mod connection;
 pub mod content;
+pub mod kernel;
 pub mod metal;
 pub mod oid;
 pub mod precision;
@@ -41,12 +42,19 @@ pub mod optics;
 #[cfg(feature = "bundle")]
 pub mod bundle;
 
+#[cfg(feature = "lapack")]
+pub mod ffi;
+
+#[cfg(feature = "bundle")]
+pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
+
 pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
-pub use connection::{Connection, ScalarConnection};
+pub use connection::{Carrier, ScalarConnection};
 pub use content::ContentAddressed;
+pub use kernel::{Decomposition, KernelSpec};
 pub use oid::Oid;
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;

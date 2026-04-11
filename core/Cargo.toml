@@ -8,6 +8,10 @@ description = "Beam (semifunctor) + Prism (monoid). Three dimensions: focus, pro
 default = []
 optics = []
 bundle = ["optics"]
+lapack = ["dep:cc"]
 
 [dependencies]
 imperfect = { path = "../imperfect" }
+
+[build-dependencies]
+cc = { version = "1", optional = true }

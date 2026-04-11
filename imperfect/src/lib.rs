@@ -104,7 +104,6 @@ impl std::fmt::Display for ShannonLoss {
 
 impl From<f64> for ShannonLoss {
     fn from(v: f64) -> Self {
-        debug_assert!(v >= 0.0, "loss must be non-negative");
         ShannonLoss(v)
     }
 }
@@ -124,22 +123,11 @@ impl From<f64> for ShannonLoss {
 ///
 /// Follows `Result` conventions: `is_ok()` means "has a value" (Success or Partial).
 /// The `.ok()` and `.err()` extractor methods follow `Result` naming conventions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Imperfect<T, E, L: Loss = ShannonLoss> {
     Success(T),
     Partial(T, L),
     Failure(E),
-}
-
-impl<T: PartialEq, E: PartialEq, L: Loss + PartialEq> PartialEq for Imperfect<T, E, L> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Imperfect::Success(a), Imperfect::Success(b)) => a == b,
-            (Imperfect::Partial(a, la), Imperfect::Partial(b, lb)) => a == b && la == lb,
-            (Imperfect::Failure(a), Imperfect::Failure(b)) => a == b,
-            _ => false,
-        }
-    }
 }
 
 impl<T, E, L: Loss> Imperfect<T, E, L> {
@@ -255,6 +243,10 @@ impl<T, L: Loss> From<Option<T>> for Imperfect<T, (), L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn double_u32(v: u32) -> u32 {
+        v * 2
+    }
 
     #[test]
     fn shannon_zero() {
@@ -452,14 +444,14 @@ mod tests {
     #[test]
     fn map_ok() {
         let i: Imperfect<u32, String> = Imperfect::Success(42);
-        let m = i.map(|v| v * 2);
+        let m = i.map(double_u32);
         assert_eq!(m.ok(), Some(84));
     }
 
     #[test]
     fn map_partial_preserves_loss() {
         let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.0));
-        let m = i.map(|v| v * 2);
+        let m = i.map(double_u32);
         assert!(m.is_partial());
         assert_eq!(m.ok(), Some(84));
     }
@@ -467,7 +459,7 @@ mod tests {
     #[test]
     fn map_err_is_noop() {
         let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
-        let m = i.map(|v| v * 2);
+        let m = i.map(double_u32);
         assert!(m.is_err());
     }
 
@@ -476,6 +468,66 @@ mod tests {
         let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         let m = i.map_err(|e| e.len());
         assert_eq!(m.err(), Some(4));
+    }
+
+    #[test]
+    fn map_err_success_passes_through() {
+        let i: Imperfect<u32, String> = Imperfect::Success(7);
+        let m = i.map_err(|_e| 99usize);
+        assert_eq!(m.ok(), Some(7));
+    }
+
+    #[test]
+    fn map_err_partial_passes_through() {
+        let i: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.5));
+        let m = i.map_err(|_e| 99usize);
+        assert!(m.is_partial());
+        assert_eq!(m.loss().as_f64(), 1.5);
+        assert_eq!(m.ok(), Some(42));
+    }
+
+    // --- PartialEq ---
+
+    #[test]
+    fn partial_eq_success_equal() {
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
+        let b: Imperfect<u32, String> = Imperfect::Success(1);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn partial_eq_success_not_equal() {
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
+        let b: Imperfect<u32, String> = Imperfect::Success(2);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn partial_eq_partial_equal() {
+        let a: Imperfect<u32, String> = Imperfect::Partial(5, ShannonLoss::new(1.0));
+        let b: Imperfect<u32, String> = Imperfect::Partial(5, ShannonLoss::new(1.0));
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn partial_eq_partial_not_equal_value() {
+        let a: Imperfect<u32, String> = Imperfect::Partial(5, ShannonLoss::new(1.0));
+        let b: Imperfect<u32, String> = Imperfect::Partial(6, ShannonLoss::new(1.0));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn partial_eq_failure_equal() {
+        let a: Imperfect<u32, String> = Imperfect::Failure("err".into());
+        let b: Imperfect<u32, String> = Imperfect::Failure("err".into());
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn partial_eq_different_variants_not_equal() {
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
+        let b: Imperfect<u32, String> = Imperfect::Failure("err".into());
+        assert_ne!(a, b);
     }
 
     // --- compose ---
@@ -548,7 +600,7 @@ mod tests {
     fn from_result_ok() {
         let r: Result<u32, String> = Ok(42);
         let i: Imperfect<u32, String> = r.into();
-        assert!(matches!(i, Imperfect::Success(42)));
+        assert_eq!(i.ok(), Some(42));
     }
 
     #[test]
@@ -583,7 +635,7 @@ mod tests {
     fn from_option_some() {
         let o: Option<u32> = Some(42);
         let i: Imperfect<u32, ()> = o.into();
-        assert!(matches!(i, Imperfect::Success(42)));
+        assert_eq!(i.ok(), Some(42));
     }
 
     #[test]

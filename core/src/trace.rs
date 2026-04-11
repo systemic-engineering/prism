@@ -142,4 +142,31 @@ mod tests {
         assert_ne!(Op::Project, Op::Refract);
         assert_ne!(Op::Focus, Op::Refract);
     }
+
+    #[test]
+    fn steps_returns_slice() {
+        let mut t = Trace::new();
+        t.push(Step {
+            prism: "p",
+            op: Op::Refract,
+            loss: ShannonLoss::zero(),
+            input: Box::new(1u32),
+            output: StepOutput::Value(Box::new(2u32)),
+        });
+        assert_eq!(t.steps().len(), 1);
+        assert_eq!(t.steps()[0].prism, "p");
+    }
+
+    #[test]
+    fn trace_reenter_string_input() {
+        let mut t = Trace::new();
+        t.push(Step {
+            prism: "test",
+            op: Op::Focus,
+            loss: ShannonLoss::zero(),
+            input: Box::new("hello".to_string()),
+            output: StepOutput::Value(Box::new(42u32)),
+        });
+        assert_eq!(t.reenter_at::<String>(0), Some(&"hello".to_string()));
+    }
 }

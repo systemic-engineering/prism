@@ -299,6 +299,14 @@ mod tests {
     }
 
     #[test]
+    fn tape_default_equals_new() {
+        let t1 = Tape::new();
+        let t2 = Tape::default();
+        assert_eq!(t1.dp, t2.dp);
+        assert_eq!(t1.cells, t2.cells);
+    }
+
+    #[test]
     fn empty_program_no_output() {
         let output = execute(&[], &[1, 2, 3]);
         assert!(output.is_empty());
