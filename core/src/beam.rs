@@ -7,7 +7,121 @@
 use imperfect::{Imperfect, Loss, ShannonLoss};
 use std::convert::Infallible;
 
-// Beam trait and PureBeam will go here
+/// The pipeline value carrier. A semifunctor over `Imperfect`.
+///
+/// Three required methods: `input`, `result`, `tick`.
+/// Everything else is derived.
+///
+/// **Contract:** `tick` and `next` panic on Err beams. Call `is_ok()` first.
+pub trait Beam: Sized {
+    type In;
+    type Out;
+    type Error;
+    type Loss: Loss;
+
+    /// Advance: new Out and Error types. Loss type preserved.
+    type Tick<T, E>: Beam<In = Self::Out, Out = T, Error = E, Loss = Self::Loss>;
+
+    /// The input that entered this step.
+    fn input(&self) -> &Self::In;
+
+    /// The output of this step, or the error if failed.
+    fn result(&self) -> Imperfect<&Self::Out, &Self::Error, Self::Loss>;
+
+    /// The primitive. One tick forward. Panics on Err beam.
+    fn tick<T, E>(self, imperfect: Imperfect<T, E, Self::Loss>) -> Self::Tick<T, E>;
+
+    /// Whether this beam has a value (Ok or Partial).
+    fn is_ok(&self) -> bool {
+        !self.is_err()
+    }
+
+    /// Whether this beam is in the Partial state.
+    fn is_partial(&self) -> bool {
+        self.result().is_partial()
+    }
+
+    /// Whether this beam failed (Err).
+    fn is_err(&self) -> bool {
+        self.result().is_err()
+    }
+
+    /// Lossless transition. Shorthand for `tick(Imperfect::Ok(value))`.
+    /// Panics on Err beam.
+    fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
+        self.tick(Imperfect::Ok(value))
+    }
+
+    /// Semifunctor map. Derived from `tick`.
+    /// Panics on Err beam.
+    fn smap<T>(
+        self,
+        f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
+    ) -> Self::Tick<T, Self::Error> {
+        let imp = match self.result() {
+            Imperfect::Ok(v) | Imperfect::Partial(v, _) => f(v),
+            Imperfect::Err(_) => panic!("smap on Err beam"),
+        };
+        self.tick(imp)
+    }
+}
+
+/// Production beam. Flat struct: input + imperfect. No trace overhead.
+pub struct PureBeam<In, Out, E = Infallible, L: Loss = ShannonLoss> {
+    input: In,
+    imperfect: Imperfect<Out, E, L>,
+}
+
+impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
+    /// Construct a perfect beam (zero loss).
+    pub fn ok(input: In, output: Out) -> Self {
+        Self { input, imperfect: Imperfect::Ok(output) }
+    }
+
+    /// Construct a partial beam (value with loss).
+    pub fn partial(input: In, output: Out, loss: L) -> Self {
+        Self { input, imperfect: Imperfect::Partial(output, loss) }
+    }
+
+    /// Construct a failed beam.
+    pub fn err(input: In, error: E) -> Self {
+        Self { input, imperfect: Imperfect::Err(error) }
+    }
+}
+
+impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
+    type In = In;
+    type Out = Out;
+    type Error = E;
+    type Loss = L;
+    type Tick<T, NE> = PureBeam<Out, T, NE, L>;
+
+    fn input(&self) -> &In {
+        &self.input
+    }
+
+    fn result(&self) -> Imperfect<&Out, &E, L> {
+        self.imperfect.as_ref()
+    }
+
+    fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> PureBeam<Out, T, NE, L> {
+        match self.imperfect {
+            Imperfect::Err(_) => panic!("tick on Err beam — check is_ok() first"),
+            Imperfect::Ok(old_out) => PureBeam {
+                input: old_out,
+                imperfect: next,
+            },
+            Imperfect::Partial(old_out, loss) => PureBeam {
+                input: old_out,
+                imperfect: match next {
+                    Imperfect::Ok(v) => Imperfect::Partial(v, loss),
+                    Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
+                    Imperfect::Err(e) => Imperfect::Err(e),
+                },
+            },
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -142,7 +256,7 @@ mod tests {
 
     #[test]
     fn smap_returns_err() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
+        let b: PureBeam<(), u32, String> = PureBeam::ok((), 5);
         let n = b.smap(|_| Imperfect::<u32, String>::Err("nope".into()));
         assert!(n.is_err());
     }
