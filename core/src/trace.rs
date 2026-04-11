@@ -47,28 +47,29 @@ pub struct Trace {
 
 impl Trace {
     pub fn new() -> Self {
-        todo!("implement Trace::new")
+        Trace { steps: Vec::new() }
     }
 
-    pub fn push(&mut self, _step: Step) {
-        todo!("implement Trace::push")
+    pub fn push(&mut self, step: Step) {
+        self.steps.push(step);
     }
 
     pub fn steps(&self) -> &[Step] {
-        todo!("implement Trace::steps")
+        &self.steps
     }
 
     pub fn len(&self) -> usize {
-        todo!("implement Trace::len")
+        self.steps.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        todo!("implement Trace::is_empty")
+        self.steps.is_empty()
     }
 
     /// Recover the input at step `i` as concrete type `T`.
-    pub fn reenter_at<T: 'static>(&self, _i: usize) -> Option<&T> {
-        todo!("implement Trace::reenter_at")
+    pub fn reenter_at<T: 'static>(&self, i: usize) -> Option<&T> {
+        let input: &dyn Traced = self.steps.get(i)?.input.as_ref();
+        input.as_any().downcast_ref::<T>()
     }
 }
 
