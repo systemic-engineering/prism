@@ -1,5 +1,8 @@
 # prism-core
 
+[![crates.io](https://img.shields.io/crates/v/prism-core.svg)](https://crates.io/crates/prism-core)
+[![docs.rs](https://docs.rs/prism-core/badge.svg)](https://docs.rs/prism-core)
+
 Beam (semifunctor) + Prism (monoid). Three operations: focus, project, refract.
 
 ## Beam

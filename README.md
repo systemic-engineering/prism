@@ -1,5 +1,10 @@
 # prism
 
+[![CI](https://github.com/systemic-engineering/prism/actions/workflows/ci.yml/badge.svg)](https://github.com/systemic-engineering/prism/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-99.89%25-brightgreen)](https://github.com/systemic-engineering/prism)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](https://github.com/systemic-engineering/prism)
+[![unsafe](https://img.shields.io/badge/unsafe-0-green)](https://github.com/systemic-engineering/prism)
+
 Focus | project | refract. A typed transformation pipeline in Rust.
 
 ## Crates

@@ -1,5 +1,9 @@
 # imperfect
 
+[![crates.io](https://img.shields.io/crates/v/imperfect.svg)](https://crates.io/crates/imperfect)
+[![docs.rs](https://docs.rs/imperfect/badge.svg)](https://docs.rs/imperfect)
+[![no_std](https://img.shields.io/badge/no__std-compatible-blue)](https://github.com/systemic-engineering/prism/tree/main/imperfect)
+
 I wanna thank Brene Brown for her work.
 
 
