@@ -176,6 +176,35 @@ impl<T, E, L: Loss> Imperfect<T, E, L> {
     }
 }
 
+// --- std interop ---
+
+impl<T, E, L: Loss> From<Result<T, E>> for Imperfect<T, E, L> {
+    fn from(r: Result<T, E>) -> Self {
+        match r {
+            Ok(v) => Imperfect::Ok(v),
+            Err(e) => Imperfect::Err(e),
+        }
+    }
+}
+
+impl<T, E, L: Loss> From<Imperfect<T, E, L>> for Result<T, E> {
+    fn from(i: Imperfect<T, E, L>) -> Self {
+        match i {
+            Imperfect::Ok(v) | Imperfect::Partial(v, _) => Ok(v),
+            Imperfect::Err(e) => Err(e),
+        }
+    }
+}
+
+impl<T, L: Loss> From<Option<T>> for Imperfect<T, (), L> {
+    fn from(o: Option<T>) -> Self {
+        match o {
+            Some(v) => Imperfect::Ok(v),
+            None => Imperfect::Err(()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
