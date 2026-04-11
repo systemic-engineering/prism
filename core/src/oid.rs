@@ -1,3 +1,7 @@
+//! Object identity. An [`Oid`] is the content address of a value — two values
+//! with the same bytes produce the same Oid. Oids are the nodes in every
+//! graph this system builds: content-addressed, comparable, hashable.
+
 /// Content address. The identity of a thing is its content.
 /// Two values with the same bytes have the same Oid.
 /// Oids are the nodes in every graph this system builds.

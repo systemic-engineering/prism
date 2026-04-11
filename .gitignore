@@ -1,3 +1,4 @@
 /target
 /.nix-cargo
+/.direnv
 beam/build/

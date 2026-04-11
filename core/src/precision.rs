@@ -1,3 +1,8 @@
+//! Precision and pressure. [`Precision`] controls how much detail survives
+//! projection — eigenvalues below the precision threshold are zeroed out.
+//! [`Pressure`] measures memory occupancy as a ratio, determining the
+//! resolution of what can be held in bounded storage.
+
 /// The zoom level of a computation. Eigenvalues below this are zero.
 /// Higher precision = more detail = more compute.
 /// The project operation uses precision to decide what survives the cut.

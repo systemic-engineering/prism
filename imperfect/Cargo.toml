@@ -1,0 +1,8 @@
+[package]
+name = "imperfect"
+version = "0.1.0"
+edition = "2021"
+description = "Result extended with partial success. Loss as a trait."
+
+[dependencies]
+# None. Depends on nothing.

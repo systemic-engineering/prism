@@ -1,0 +1,12 @@
+[package]
+name = "prism-core"
+version = "0.1.0"
+edition = "2021"
+description = "Beam (semifunctor) + Prism (monoid). Three dimensions: focus, project, refract."
+
+[features]
+default = []
+optics = []
+
+[dependencies]
+imperfect = { path = "../imperfect" }

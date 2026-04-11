@@ -1,12 +1,3 @@
-[package]
-name = "prism"
-version = "0.1.0"
-edition = "2021"
-description = "focus | project | split | zoom | refract. The five optic operations. Zero dependencies."
-
-[features]
-default = []
-optics = []
-
-[dependencies]
-# None. Depends on nothing. The types outlive everything around them.
+[workspace]
+members = ["imperfect", "core"]
+resolver = "2"

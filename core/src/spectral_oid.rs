@@ -1,3 +1,10 @@
+//! Spectral object identity. A [`SpectralOid`] is an [`Oid`](crate::oid::Oid)
+//! viewed at a specific [`Precision`](crate::precision::Precision). Truncating
+//! the raw content address to fewer characters makes coarser identities —
+//! distinct values become "equal" when their truncated representations match.
+//! This is how the project operation controls resolution: lower precision
+//! merges more things into the same identity.
+
 use crate::oid::Oid;
 use crate::precision::Precision;
 use std::fmt;
