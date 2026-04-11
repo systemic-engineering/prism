@@ -37,30 +37,41 @@ pub struct KernelSpec {
 
 impl KernelSpec {
     /// Create a kernel spec with explicit dimensions.
-    pub fn new(_dimensions: Vec<usize>, _decomposition: Decomposition, _precision: Precision) -> Self {
-        todo!("not yet implemented")
+    pub fn new(dimensions: Vec<usize>, decomposition: Decomposition, precision: Precision) -> Self {
+        KernelSpec { dimensions, decomposition, precision }
     }
 
     /// Construct from logits: dimensions where logit > threshold are preserved.
     /// The logits ARE the dimension selector.
     pub fn from_logits(
-        _logits: &[f64],
-        _threshold: f64,
-        _decomposition: Decomposition,
-        _precision: Precision,
+        logits: &[f64],
+        threshold: f64,
+        decomposition: Decomposition,
+        precision: Precision,
     ) -> Self {
-        todo!("not yet implemented")
+        let dimensions: Vec<usize> = logits.iter()
+            .enumerate()
+            .filter(|(_, &l)| l > threshold)
+            .map(|(i, _)| i)
+            .collect();
+        KernelSpec { dimensions, decomposition, precision }
     }
 
     /// Number of preserved dimensions.
     pub fn rank(&self) -> usize {
-        todo!("not yet implemented")
+        self.dimensions.len()
     }
 
     /// Build a diagonal projection matrix (n×n, row-major) that preserves
     /// only the specified dimensions. Everything else is zeroed.
-    pub fn projection_matrix(&self, _n: usize) -> Vec<f64> {
-        todo!("not yet implemented")
+    pub fn projection_matrix(&self, n: usize) -> Vec<f64> {
+        let mut matrix = vec![0.0f64; n * n];
+        for &d in &self.dimensions {
+            if d < n {
+                matrix[d * n + d] = 1.0;
+            }
+        }
+        matrix
     }
 }
 
