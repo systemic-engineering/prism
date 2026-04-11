@@ -38,6 +38,9 @@ pub mod spectral_oid;
 #[cfg(feature = "optics")]
 pub mod optics;
 
+#[cfg(feature = "bundle")]
+pub mod bundle;
+
 pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
