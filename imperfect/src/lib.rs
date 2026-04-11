@@ -1,6 +1,6 @@
 //! Imperfect — Result extended with partial success.
 //!
-//! Three states: Ok (perfect), Partial (value with loss), Err (failure).
+//! Three states: Success (perfect), Partial (value with loss), Failure (failure).
 //! Derived from partial successes in PbtA game design.
 //!
 //! `Loss` is a trait. `ShannonLoss` (information loss in bits) is the
@@ -85,16 +85,17 @@ impl From<f64> for ShannonLoss {
 /// Result extended with partial success.
 ///
 /// Three states:
-/// - `Ok(T)` — perfect result, zero loss.
+/// - `Success(T)` — perfect result, zero loss.
 /// - `Partial(T, L)` — value present, some information lost getting here.
-/// - `Err(E)` — failure, no value.
+/// - `Failure(E)` — failure, no value.
 ///
-/// Follows `Result` conventions: `is_ok()` means "has a value" (Ok or Partial).
+/// Follows `Result` conventions: `is_ok()` means "has a value" (Success or Partial).
+/// The `.ok()` and `.err()` extractor methods follow `Result` naming conventions.
 #[derive(Clone, Debug)]
 pub enum Imperfect<T, E, L: Loss = ShannonLoss> {
-    Ok(T),
+    Success(T),
     Partial(T, L),
-    Err(E),
+    Failure(E),
 }
 
 impl<T, E, L: Loss> Imperfect<T, E, L> {
@@ -107,70 +108,70 @@ impl<T, E, L: Loss> Imperfect<T, E, L> {
     }
 
     pub fn is_err(&self) -> bool {
-        matches!(self, Imperfect::Err(_))
+        matches!(self, Imperfect::Failure(_))
     }
 
     pub fn ok(self) -> Option<T> {
         match self {
-            Imperfect::Ok(v) | Imperfect::Partial(v, _) => Some(v),
-            Imperfect::Err(_) => None,
+            Imperfect::Success(v) | Imperfect::Partial(v, _) => Some(v),
+            Imperfect::Failure(_) => None,
         }
     }
 
     pub fn err(self) -> Option<E> {
         match self {
-            Imperfect::Err(e) => Some(e),
+            Imperfect::Failure(e) => Some(e),
             _ => None,
         }
     }
 
     pub fn loss(&self) -> L {
         match self {
-            Imperfect::Ok(_) => L::zero(),
+            Imperfect::Success(_) => L::zero(),
             Imperfect::Partial(_, l) => l.clone(),
-            Imperfect::Err(_) => L::total(),
+            Imperfect::Failure(_) => L::total(),
         }
     }
 
     pub fn as_ref(&self) -> Imperfect<&T, &E, L> {
         match self {
-            Imperfect::Ok(t) => Imperfect::Ok(t),
+            Imperfect::Success(t) => Imperfect::Success(t),
             Imperfect::Partial(t, l) => Imperfect::Partial(t, l.clone()),
-            Imperfect::Err(e) => Imperfect::Err(e),
+            Imperfect::Failure(e) => Imperfect::Failure(e),
         }
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Imperfect<U, E, L> {
         match self {
-            Imperfect::Ok(t) => Imperfect::Ok(f(t)),
+            Imperfect::Success(t) => Imperfect::Success(f(t)),
             Imperfect::Partial(t, l) => Imperfect::Partial(f(t), l),
-            Imperfect::Err(e) => Imperfect::Err(e),
+            Imperfect::Failure(e) => Imperfect::Failure(e),
         }
     }
 
     pub fn map_err<F>(self, f: impl FnOnce(E) -> F) -> Imperfect<T, F, L> {
         match self {
-            Imperfect::Ok(t) => Imperfect::Ok(t),
+            Imperfect::Success(t) => Imperfect::Success(t),
             Imperfect::Partial(t, l) => Imperfect::Partial(t, l),
-            Imperfect::Err(e) => Imperfect::Err(f(e)),
+            Imperfect::Failure(e) => Imperfect::Failure(f(e)),
         }
     }
 
     /// Propagate accumulated loss from `self` through `next`.
     ///
-    /// - Ok + next → next (no loss to propagate)
-    /// - Partial(_, loss) + Ok(v) → Partial(v, loss)
+    /// - Success + next → next (no loss to propagate)
+    /// - Partial(_, loss) + Success(v) → Partial(v, loss)
     /// - Partial(_, loss1) + Partial(v, loss2) → Partial(v, loss1.combine(loss2))
-    /// - Partial(_, _) + Err(e) → Err(e)
-    /// - Err + anything → panics (programming error)
+    /// - Partial(_, _) + Failure(e) → Failure(e)
+    /// - Failure + anything → panics (programming error)
     pub fn compose<T2, E2>(self, next: Imperfect<T2, E2, L>) -> Imperfect<T2, E2, L> {
         match self {
-            Imperfect::Err(_) => panic!("compose called on Err — check is_ok() first"),
-            Imperfect::Ok(_) => next,
+            Imperfect::Failure(_) => panic!("compose called on Failure — check is_ok() first"),
+            Imperfect::Success(_) => next,
             Imperfect::Partial(_, loss) => match next {
-                Imperfect::Ok(v) => Imperfect::Partial(v, loss),
+                Imperfect::Success(v) => Imperfect::Partial(v, loss),
                 Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
-                Imperfect::Err(e) => Imperfect::Err(e),
+                Imperfect::Failure(e) => Imperfect::Failure(e),
             },
         }
     }
@@ -181,8 +182,8 @@ impl<T, E, L: Loss> Imperfect<T, E, L> {
 impl<T, E, L: Loss> From<Result<T, E>> for Imperfect<T, E, L> {
     fn from(r: Result<T, E>) -> Self {
         match r {
-            Ok(v) => Imperfect::Ok(v),
-            Err(e) => Imperfect::Err(e),
+            Ok(v) => Imperfect::Success(v),
+            Err(e) => Imperfect::Failure(e),
         }
     }
 }
@@ -190,8 +191,8 @@ impl<T, E, L: Loss> From<Result<T, E>> for Imperfect<T, E, L> {
 impl<T, E, L: Loss> From<Imperfect<T, E, L>> for Result<T, E> {
     fn from(i: Imperfect<T, E, L>) -> Self {
         match i {
-            Imperfect::Ok(v) | Imperfect::Partial(v, _) => Ok(v),
-            Imperfect::Err(e) => Err(e),
+            Imperfect::Success(v) | Imperfect::Partial(v, _) => Ok(v),
+            Imperfect::Failure(e) => Err(e),
         }
     }
 }
@@ -199,8 +200,8 @@ impl<T, E, L: Loss> From<Imperfect<T, E, L>> for Result<T, E> {
 impl<T, L: Loss> From<Option<T>> for Imperfect<T, (), L> {
     fn from(o: Option<T>) -> Self {
         match o {
-            Some(v) => Imperfect::Ok(v),
-            None => Imperfect::Err(()),
+            Some(v) => Imperfect::Success(v),
+            None => Imperfect::Failure(()),
         }
     }
 }
@@ -295,7 +296,7 @@ mod tests {
 
     #[test]
     fn ok_is_ok() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         assert!(i.is_ok());
         assert!(!i.is_partial());
         assert!(!i.is_err());
@@ -311,7 +312,7 @@ mod tests {
 
     #[test]
     fn err_is_err() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         assert!(!i.is_ok());
         assert!(!i.is_partial());
         assert!(i.is_err());
@@ -319,7 +320,7 @@ mod tests {
 
     #[test]
     fn ok_returns_value() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         assert_eq!(i.ok(), Some(42));
     }
 
@@ -331,25 +332,25 @@ mod tests {
 
     #[test]
     fn err_ok_returns_none() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         assert_eq!(i.ok(), None);
     }
 
     #[test]
     fn err_returns_error() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         assert_eq!(i.err(), Some("oops".into()));
     }
 
     #[test]
     fn ok_err_returns_none() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         assert_eq!(i.err(), None);
     }
 
     #[test]
     fn loss_ok_is_zero() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         assert!(i.loss().is_zero());
     }
 
@@ -361,13 +362,13 @@ mod tests {
 
     #[test]
     fn loss_err_is_total() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         assert!(i.loss().as_f64().is_infinite());
     }
 
     #[test]
     fn as_ref_ok() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         let r = i.as_ref();
         assert_eq!(r.ok(), Some(&42));
     }
@@ -382,14 +383,14 @@ mod tests {
 
     #[test]
     fn as_ref_err() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         let r = i.as_ref();
         assert_eq!(r.err(), Some(&"oops".to_string()));
     }
 
     #[test]
     fn map_ok() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         let m = i.map(|v| v * 2);
         assert_eq!(m.ok(), Some(84));
     }
@@ -404,14 +405,14 @@ mod tests {
 
     #[test]
     fn map_err_is_noop() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         let m = i.map(|v| v * 2);
         assert!(m.is_err());
     }
 
     #[test]
     fn map_err_transforms_error() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         let m = i.map_err(|e| e.len());
         assert_eq!(m.err(), Some(4));
     }
@@ -420,15 +421,15 @@ mod tests {
 
     #[test]
     fn compose_ok_ok() {
-        let a: Imperfect<u32, String> = Imperfect::Ok(1);
-        let b: Imperfect<&str, String> = Imperfect::Ok("hi");
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
+        let b: Imperfect<&str, String> = Imperfect::Success("hi");
         let c = a.compose(b);
-        assert!(matches!(c, Imperfect::Ok("hi")));
+        assert!(matches!(c, Imperfect::Success("hi")));
     }
 
     #[test]
     fn compose_ok_partial() {
-        let a: Imperfect<u32, String> = Imperfect::Ok(1);
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
         let b: Imperfect<u32, String> = Imperfect::Partial(2, ShannonLoss::new(1.0));
         let c = a.compose(b);
         assert!(c.is_partial());
@@ -438,8 +439,8 @@ mod tests {
 
     #[test]
     fn compose_ok_err() {
-        let a: Imperfect<u32, String> = Imperfect::Ok(1);
-        let b: Imperfect<u32, String> = Imperfect::Err("fail".into());
+        let a: Imperfect<u32, String> = Imperfect::Success(1);
+        let b: Imperfect<u32, String> = Imperfect::Failure("fail".into());
         let c = a.compose(b);
         assert!(c.is_err());
     }
@@ -447,7 +448,7 @@ mod tests {
     #[test]
     fn compose_partial_ok_carries_loss() {
         let a: Imperfect<u32, String> = Imperfect::Partial(1, ShannonLoss::new(1.0));
-        let b: Imperfect<u32, String> = Imperfect::Ok(2);
+        let b: Imperfect<u32, String> = Imperfect::Success(2);
         let c = a.compose(b);
         assert!(c.is_partial());
         assert_eq!(c.loss().as_f64(), 1.0);
@@ -467,16 +468,16 @@ mod tests {
     #[test]
     fn compose_partial_err() {
         let a: Imperfect<u32, String> = Imperfect::Partial(1, ShannonLoss::new(1.0));
-        let b: Imperfect<u32, String> = Imperfect::Err("fail".into());
+        let b: Imperfect<u32, String> = Imperfect::Failure("fail".into());
         let c = a.compose(b);
         assert!(c.is_err());
     }
 
     #[test]
-    #[should_panic(expected = "compose called on Err")]
+    #[should_panic(expected = "compose called on Failure")]
     fn compose_err_panics() {
-        let a: Imperfect<u32, String> = Imperfect::Err("fail".into());
-        let b: Imperfect<u32, String> = Imperfect::Ok(2);
+        let a: Imperfect<u32, String> = Imperfect::Failure("fail".into());
+        let b: Imperfect<u32, String> = Imperfect::Success(2);
         let _ = a.compose(b);
     }
 
@@ -486,7 +487,7 @@ mod tests {
     fn from_result_ok() {
         let r: Result<u32, String> = Ok(42);
         let i: Imperfect<u32, String> = r.into();
-        assert!(matches!(i, Imperfect::Ok(42)));
+        assert!(matches!(i, Imperfect::Success(42)));
     }
 
     #[test]
@@ -498,7 +499,7 @@ mod tests {
 
     #[test]
     fn into_result_ok() {
-        let i: Imperfect<u32, String> = Imperfect::Ok(42);
+        let i: Imperfect<u32, String> = Imperfect::Success(42);
         let r: Result<u32, String> = i.into();
         assert_eq!(r, Ok(42));
     }
@@ -512,7 +513,7 @@ mod tests {
 
     #[test]
     fn into_result_err() {
-        let i: Imperfect<u32, String> = Imperfect::Err("oops".into());
+        let i: Imperfect<u32, String> = Imperfect::Failure("oops".into());
         let r: Result<u32, String> = i.into();
         assert_eq!(r, Err("oops".into()));
     }
@@ -521,7 +522,7 @@ mod tests {
     fn from_option_some() {
         let o: Option<u32> = Some(42);
         let i: Imperfect<u32, ()> = o.into();
-        assert!(matches!(i, Imperfect::Ok(42)));
+        assert!(matches!(i, Imperfect::Success(42)));
     }
 
     #[test]

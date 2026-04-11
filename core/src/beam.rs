@@ -55,10 +55,10 @@ pub trait Beam: Sized {
         self.result().is_err()
     }
 
-    /// Lossless transition. Shorthand for `tick(Imperfect::Ok(value))`.
+    /// Lossless transition. Shorthand for `tick(Imperfect::Success(value))`.
     /// Panics on Err beam.
     fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
-        self.tick(Imperfect::Ok(value))
+        self.tick(Imperfect::Success(value))
     }
 
     /// Apply an operation. The DSL entry point.
@@ -73,8 +73,8 @@ pub trait Beam: Sized {
         f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
     ) -> Self::Tick<T, Self::Error> {
         let imp = match self.result() {
-            Imperfect::Ok(v) | Imperfect::Partial(v, _) => f(v),
-            Imperfect::Err(_) => panic!("smap on Err beam"),
+            Imperfect::Success(v) | Imperfect::Partial(v, _) => f(v),
+            Imperfect::Failure(_) => panic!("smap on Err beam"),
         };
         self.tick(imp)
     }
@@ -89,7 +89,7 @@ pub struct PureBeam<In, Out, E = Infallible, L: Loss = ShannonLoss> {
 impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
     /// Construct a perfect beam (zero loss).
     pub fn ok(input: In, output: Out) -> Self {
-        Self { input, imperfect: Imperfect::Ok(output) }
+        Self { input, imperfect: Imperfect::Success(output) }
     }
 
     /// Construct a partial beam (value with loss).
@@ -99,7 +99,7 @@ impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
 
     /// Construct a failed beam.
     pub fn err(input: In, error: E) -> Self {
-        Self { input, imperfect: Imperfect::Err(error) }
+        Self { input, imperfect: Imperfect::Failure(error) }
     }
 }
 
@@ -120,17 +120,17 @@ impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
 
     fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> PureBeam<Out, T, NE, L> {
         match self.imperfect {
-            Imperfect::Err(_) => panic!("tick on Err beam — check is_ok() first"),
-            Imperfect::Ok(old_out) => PureBeam {
+            Imperfect::Failure(_) => panic!("tick on Err beam — check is_ok() first"),
+            Imperfect::Success(old_out) => PureBeam {
                 input: old_out,
                 imperfect: next,
             },
             Imperfect::Partial(old_out, loss) => PureBeam {
                 input: old_out,
                 imperfect: match next {
-                    Imperfect::Ok(v) => Imperfect::Partial(v, loss),
+                    Imperfect::Success(v) => Imperfect::Partial(v, loss),
                     Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
-                    Imperfect::Err(e) => Imperfect::Err(e),
+                    Imperfect::Failure(e) => Imperfect::Failure(e),
                 },
             },
         }
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn tick_ok_with_ok() {
         let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.tick(Imperfect::<&str, String>::Ok("hi"));
+        let n = b.tick(Imperfect::<&str, String>::Success("hi"));
         assert!(n.is_ok());
         assert!(!n.is_partial());
     }
@@ -229,14 +229,14 @@ mod tests {
     #[test]
     fn tick_ok_with_err() {
         let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n: PureBeam<u32, u32, i32> = b.tick(Imperfect::Err(-1));
+        let n: PureBeam<u32, u32, i32> = b.tick(Imperfect::Failure(-1));
         assert!(n.is_err());
     }
 
     #[test]
     fn tick_partial_with_ok_carries_loss() {
         let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.tick(Imperfect::<u32, String>::Ok(10));
+        let n = b.tick(Imperfect::<u32, String>::Success(10));
         assert!(n.is_partial());
     }
 
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn tick_partial_with_err() {
         let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.tick(Imperfect::<u32, String>::Err("fail".into()));
+        let n = b.tick(Imperfect::<u32, String>::Failure("fail".into()));
         assert!(n.is_err());
     }
 
@@ -258,7 +258,7 @@ mod tests {
     #[should_panic(expected = "tick on Err beam")]
     fn tick_on_err_panics() {
         let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
-        let _ = b.tick(Imperfect::<u32, String>::Ok(0));
+        let _ = b.tick(Imperfect::<u32, String>::Success(0));
     }
 
     #[test]
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn smap_ok() {
         let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.smap(|&v| Imperfect::Ok(v * 2));
+        let n = b.smap(|&v| Imperfect::Success(v * 2));
         assert_eq!(n.result().ok(), Some(&10));
         assert!(!n.is_partial());
     }
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn smap_returns_err() {
         let b: PureBeam<(), u32, String> = PureBeam::ok((), 5);
-        let n = b.smap(|_| Imperfect::<u32, String>::Err("nope".into()));
+        let n = b.smap(|_| Imperfect::<u32, String>::Failure("nope".into()));
         assert!(n.is_err());
     }
 
@@ -306,6 +306,6 @@ mod tests {
     #[should_panic(expected = "smap on Err beam")]
     fn smap_on_err_panics() {
         let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
-        let _ = b.smap(|&v| Imperfect::<u32, String>::Ok(v));
+        let _ = b.smap(|&v| Imperfect::<u32, String>::Success(v));
     }
 }

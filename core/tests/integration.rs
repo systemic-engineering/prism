@@ -57,7 +57,7 @@ fn smap_as_zoom_in_pipeline() {
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism));
 
-    let doubled = projected.smap(|&n| Imperfect::Ok(n * 2));
+    let doubled = projected.smap(|&n| Imperfect::Success(n * 2));
     assert_eq!(doubled.result().ok(), Some(&4));
 }
 
@@ -68,7 +68,7 @@ fn smap_as_split_in_pipeline() {
 
     let chars: PureBeam<Vec<String>, Vec<char>> = focused.smap(|tokens| {
         let all_chars: Vec<char> = tokens.iter().flat_map(|t| t.chars()).collect();
-        Imperfect::Ok(all_chars)
+        Imperfect::Success(all_chars)
     });
     assert_eq!(chars.result().ok(), Some(&vec!['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd']));
 }
