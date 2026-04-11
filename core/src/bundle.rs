@@ -21,6 +21,33 @@ pub trait Connection: Fiber {
     fn connection(&self) -> &Self::Optic;
 }
 
+/// Level 2: the structure group. Which decomposition strategy.
+/// Cartographer. The gauge transformation.
+pub trait Gauge: Connection {
+    type Group;
+    fn gauge(&self) -> &Self::Group;
+}
+
+/// Level 3: parallel transport with holonomy.
+/// Explorer. Comprehension always costs something.
+/// The holonomy IS the loss. Returns Partial by design.
+pub trait Transport: Gauge {
+    type Holonomy: Loss;
+    fn transport(&self, state: &Self::State) -> Imperfect<Self::State, Self::Holonomy>;
+}
+
+/// Level 4: autopoietic closure. The Lawvere fixed point.
+/// Fate. selectors[4] = self-reference.
+pub trait Closure: Transport {
+    type Fixed;
+    fn close(&self) -> &Self::Fixed;
+}
+
+/// A complete principal bundle tower.
+/// Blanket impl: any type that implements all five levels is a Bundle.
+pub trait Bundle: Closure {}
+impl<T: Closure> Bundle for T {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,9 +181,9 @@ mod tests {
     fn bundle_associated_types_accessible() {
         fn read_tower<B: Bundle>(b: &B) -> bool
         where
-            B::Fixed: Copy,
+            B::Fixed: Copy + Into<bool>,
         {
-            *b.close()
+            (*b.close()).into()
         }
         let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
         assert!(read_tower(&b));
