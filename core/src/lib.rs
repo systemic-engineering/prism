@@ -4,5 +4,7 @@
 //! Three operations. Three dimensions of space.
 
 pub mod beam;
+pub mod trace;
 
-pub use beam::{Beam, PureBeam};
+pub use beam::{Beam, Operation, PureBeam};
+pub use trace::{Op, Step, StepOutput, Trace, Traced};

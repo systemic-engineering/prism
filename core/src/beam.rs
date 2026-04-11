@@ -4,8 +4,17 @@
 //! `next` is the lossless shorthand.
 //! `smap` is the semifunctor map, derived from `tick`.
 
+use crate::trace::Op;
 use imperfect::{Imperfect, Loss, ShannonLoss};
 use std::convert::Infallible;
+
+/// A self-contained pipeline operation. Wraps a prism (and closure for
+/// user-space operations). The beam arrives via `apply`.
+pub trait Operation<B: Beam> {
+    type Output: Beam;
+    fn op(&self) -> Op;
+    fn apply(self, beam: B) -> Self::Output;
+}
 
 /// The pipeline value carrier. A semifunctor over `Imperfect`.
 ///
@@ -50,6 +59,11 @@ pub trait Beam: Sized {
     /// Panics on Err beam.
     fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
         self.tick(Imperfect::Ok(value))
+    }
+
+    /// Apply an operation. The DSL entry point.
+    fn apply<O: Operation<Self>>(self, op: O) -> O::Output {
+        op.apply(self)
     }
 
     /// Semifunctor map. Derived from `tick`.
@@ -126,6 +140,26 @@ impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trace::Op;
+
+    /// A trivial operation for testing: doubles the value.
+    struct DoubleOp;
+
+    impl Operation<PureBeam<(), u32>> for DoubleOp {
+        type Output = PureBeam<u32, u32>;
+        fn op(&self) -> Op { Op::Project }
+        fn apply(self, beam: PureBeam<(), u32>) -> PureBeam<u32, u32> {
+            let v = *beam.result().ok().unwrap();
+            beam.next(v * 2)
+        }
+    }
+
+    #[test]
+    fn apply_operation() {
+        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
+        let n = b.apply(DoubleOp);
+        assert_eq!(n.result().ok(), Some(&10));
+    }
 
     #[test]
     fn pure_beam_ok() {
