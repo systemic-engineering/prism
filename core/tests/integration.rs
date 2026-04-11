@@ -95,5 +95,3 @@ fn imperfect_result_interop() {
     assert_eq!(back, Ok(42));
 }
 
-// COMPILE FAILURE: nonexistent type — red phase marker
-fn _red_marker(_: prism_core::NonExistentTypeForRedPhase) {}
