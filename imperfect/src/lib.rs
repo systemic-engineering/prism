@@ -155,6 +155,25 @@ impl<T, E, L: Loss> Imperfect<T, E, L> {
             Imperfect::Err(e) => Imperfect::Err(f(e)),
         }
     }
+
+    /// Propagate accumulated loss from `self` through `next`.
+    ///
+    /// - Ok + next → next (no loss to propagate)
+    /// - Partial(_, loss) + Ok(v) → Partial(v, loss)
+    /// - Partial(_, loss1) + Partial(v, loss2) → Partial(v, loss1.combine(loss2))
+    /// - Partial(_, _) + Err(e) → Err(e)
+    /// - Err + anything → panics (programming error)
+    pub fn compose<T2, E2>(self, next: Imperfect<T2, E2, L>) -> Imperfect<T2, E2, L> {
+        match self {
+            Imperfect::Err(_) => panic!("compose called on Err — check is_ok() first"),
+            Imperfect::Ok(_) => next,
+            Imperfect::Partial(_, loss) => match next {
+                Imperfect::Ok(v) => Imperfect::Partial(v, loss),
+                Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
+                Imperfect::Err(e) => Imperfect::Err(e),
+            },
+        }
+    }
 }
 
 #[cfg(test)]
