@@ -41,11 +41,14 @@ pub mod optics;
 #[cfg(feature = "bundle")]
 pub mod bundle;
 
+#[cfg(feature = "bundle")]
+pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
+
 pub use beam::{Beam, Operation, PureBeam};
 pub use imperfect::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
-pub use connection::{Connection, ScalarConnection};
+pub use connection::{Connection as PipelineConnection, ScalarConnection};
 pub use content::ContentAddressed;
 pub use oid::Oid;
 pub use precision::{Precision, Pressure};
