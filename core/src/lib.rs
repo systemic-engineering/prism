@@ -30,6 +30,7 @@ pub mod trace;
 
 pub mod connection;
 pub mod content;
+pub mod kernel;
 pub mod metal;
 pub mod oid;
 pub mod precision;
@@ -50,6 +51,7 @@ pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};
 pub use content::ContentAddressed;
+pub use kernel::{Decomposition, KernelSpec};
 pub use oid::Oid;
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;
