@@ -42,6 +42,9 @@ pub mod optics;
 #[cfg(feature = "bundle")]
 pub mod bundle;
 
+#[cfg(feature = "lapack")]
+pub mod ffi;
+
 #[cfg(feature = "bundle")]
 pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
