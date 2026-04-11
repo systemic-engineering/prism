@@ -38,8 +38,10 @@ fn build_fortran() {
     }
 }
 
+#[cfg(feature = "lapack")]
 const C_FLAG_VARS: &[&str] = &["CFLAGS", "CXXFLAGS", "NIX_CFLAGS_COMPILE"];
 
+#[cfg(feature = "lapack")]
 fn save_and_clear_c_flags() -> Vec<(&'static str, Option<String>)> {
     C_FLAG_VARS
         .iter()
@@ -51,6 +53,7 @@ fn save_and_clear_c_flags() -> Vec<(&'static str, Option<String>)> {
         .collect()
 }
 
+#[cfg(feature = "lapack")]
 fn restore_c_flags(saved: Vec<(&'static str, Option<String>)>) {
     for (var, val) in saved {
         match val {
