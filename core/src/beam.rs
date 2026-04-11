@@ -125,6 +125,14 @@ impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
     }
 }
 
+fn propagate<T, E, L: Loss>(loss: L, next: Imperfect<T, E, L>) -> Imperfect<T, E, L> {
+    match next {
+        Imperfect::Success(v) => Imperfect::Partial(v, loss),
+        Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
+        Imperfect::Failure(e) => Imperfect::Failure(e),
+    }
+}
+
 impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
     type In = In;
     type Out = Out;
@@ -143,18 +151,8 @@ impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
     fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> PureBeam<Out, T, NE, L> {
         match self.imperfect {
             Imperfect::Failure(_) => panic!("tick on Err beam — check is_ok() first"),
-            Imperfect::Success(old_out) => PureBeam {
-                input: old_out,
-                imperfect: next,
-            },
-            Imperfect::Partial(old_out, loss) => PureBeam {
-                input: old_out,
-                imperfect: match next {
-                    Imperfect::Success(v) => Imperfect::Partial(v, loss),
-                    Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
-                    Imperfect::Failure(e) => Imperfect::Failure(e),
-                },
-            },
+            Imperfect::Success(old_out) => PureBeam { input: old_out, imperfect: next },
+            Imperfect::Partial(old_out, loss) => PureBeam { input: old_out, imperfect: propagate(loss, next) },
         }
     }
 }
@@ -324,10 +322,27 @@ mod tests {
         assert!(n.is_partial());
     }
 
+    fn wrap_success(v: &u32) -> Imperfect<u32, String> {
+        Imperfect::Success(*v)
+    }
+
     #[test]
     #[should_panic(expected = "smap on Err beam")]
     fn smap_on_err_panics() {
         let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
-        let _ = b.smap(|&v| Imperfect::<u32, String>::Success(v));
+        let _ = b.smap(wrap_success);
+    }
+
+    #[test]
+    fn smap_fn_pointer_executes_body() {
+        let b: PureBeam<(), u32, String> = PureBeam::ok((), 7);
+        let n = b.smap(wrap_success);
+        assert_eq!(n.result().ok(), Some(&7));
+    }
+
+    #[test]
+    fn double_op_reports_project_op() {
+        let op = DoubleOp;
+        assert_eq!(op.op(), Op::Project);
     }
 }

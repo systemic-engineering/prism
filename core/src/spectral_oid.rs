@@ -219,6 +219,13 @@ mod tests {
     }
 
     #[test]
+    fn precision_accessor_returns_stored_precision() {
+        let p = Precision::new(0.75);
+        let soid = SpectralOid::new("abcdefgh", p.clone());
+        assert_eq!(soid.precision(), &p);
+    }
+
+    #[test]
     fn truncation_len_edge_cases() {
         // 0 → 0
         assert_eq!(truncation_len(0, &Precision::new(0.5)), 0);

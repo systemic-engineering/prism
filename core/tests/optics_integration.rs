@@ -141,6 +141,88 @@ fn monoid_laws_hold() {
     assert_eq!(left.count(), right.count());
 }
 
+// --- Additional coverage: panic paths and partial propagation ---
+
+fn wrap_success_i32(v: &i32) -> imperfect::Imperfect<i32, String, ShannonLoss> {
+    imperfect::Imperfect::Success(*v)
+}
+
+#[test]
+#[should_panic(expected = "smap on Err beam")]
+fn smap_on_err_panics_in_integration() {
+    let b: PureBeam<(), i32, String, ShannonLoss> = PureBeam::err((), "fail".into());
+    let _ = b.smap(wrap_success_i32);
+}
+
+#[test]
+fn smap_fn_ptr_executes_in_integration() {
+    let b: PureBeam<(), i32, String, ShannonLoss> = PureBeam::ok((), 5);
+    let n = b.smap(wrap_success_i32);
+    assert_eq!(n.result().ok(), Some(&5));
+}
+
+#[test]
+#[should_panic(expected = "tick on Err beam")]
+fn tick_on_err_panics_in_integration() {
+    let b: PureBeam<(), i32, String, ShannonLoss> = PureBeam::err((), "fail".into());
+    let _ = b.next(99i32);
+}
+
+#[test]
+fn tick_partial_to_partial_accumulates_loss_in_integration() {
+    let b: PureBeam<(), i32, String, ShannonLoss> =
+        PureBeam::partial((), 1i32, ShannonLoss::new(1.0));
+    let n = b.tick(imperfect::Imperfect::<i32, String, ShannonLoss>::Partial(
+        2,
+        ShannonLoss::new(0.5),
+    ));
+    assert!(n.is_partial());
+    assert_eq!(n.result().loss().as_f64(), 1.5);
+}
+
+#[test]
+fn tick_partial_to_failure_in_integration() {
+    let b: PureBeam<(), i32, String, ShannonLoss> =
+        PureBeam::partial((), 1i32, ShannonLoss::new(1.0));
+    let n = b.tick(imperfect::Imperfect::<i32, String, ShannonLoss>::Failure("e".into()));
+    assert!(n.is_err());
+}
+
+#[test]
+fn optic_prism_review_covers_review_fn() {
+    let p: OpticPrism<Shape, i32> = OpticPrism::new(is_circle, extract_circle, review_circle);
+    // review_circle: i32 -> Shape
+    let s = p.review(7);
+    assert_eq!(s, Shape::Circle(7));
+}
+
+#[test]
+fn optic_prism_matching_focus_calls_next() {
+    // This test ensures PureBeam<(), Shape>::next::<i32> is called
+    // (which happens in OpticPrism::focus on a matching shape)
+    let p: OpticPrism<Shape, i32> = OpticPrism::new(is_circle, extract_circle, review_circle);
+    let focused = p.focus(seed(Shape::Circle(42)));
+    assert!(focused.is_ok());
+    assert_eq!(focused.result().ok(), Some(&42i32));
+}
+
+#[test]
+fn lens_set_covers_setter_fn() {
+    let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
+    let p = Point { x: 1, y: 2 };
+    let updated = x_lens.set(p, 99);
+    assert_eq!(updated.x, 99);
+    assert_eq!(updated.y, 2);
+}
+
+#[test]
+fn count_monoid_identity_in_integration() {
+    use prism_core::optics::monoid::{CountMonoid, PrismMonoid};
+    let id = CountMonoid::identity();
+    let a = CountMonoid::new(3);
+    assert_eq!(id.compose(a.clone()).count(), a.count());
+}
+
 // --- Loss propagation ---
 
 #[test]

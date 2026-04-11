@@ -95,3 +95,35 @@ fn imperfect_result_interop() {
     assert_eq!(back, Ok(42));
 }
 
+#[test]
+fn shannon_loss_methods_covered_in_integration() {
+    use imperfect::Loss;
+
+    // is_lossless: delegates to is_zero
+    let zero = ShannonLoss::zero();
+    assert!(zero.is_lossless());
+
+    // Loss::total via trait method
+    let total = ShannonLoss::total();
+    assert!(!total.is_zero());
+
+    // Add operator
+    let a = ShannonLoss::new(1.0);
+    let b = ShannonLoss::new(2.0);
+    let sum = a + b;
+    assert_eq!(sum.as_f64(), 3.0);
+
+    // AddAssign operator
+    let mut c = ShannonLoss::new(1.0);
+    c += ShannonLoss::new(0.5);
+    assert_eq!(c.as_f64(), 1.5);
+
+    // Display
+    let d = ShannonLoss::new(2.0);
+    assert_eq!(format!("{}", d), "2.000000 bits");
+
+    // From<f64>
+    let e: ShannonLoss = 3.14f64.into();
+    assert_eq!(e.as_f64(), 3.14);
+}
+
