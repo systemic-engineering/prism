@@ -55,6 +55,18 @@ impl KernelSpec {
             .map(|(i, _)| i)
             .collect();
 
+        // Guard: never produce empty dimensions. Keep the best one.
+        let dimensions = if dimensions.is_empty() && !logits.is_empty() {
+            let best = logits.iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(i, _)| i)
+                .unwrap();
+            vec![best]
+        } else {
+            dimensions
+        };
+
         KernelSpec { dimensions, decomposition, precision }
     }
 
