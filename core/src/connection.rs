@@ -8,7 +8,7 @@
 //! Non-abelian carriers are for geometric contexts where
 //! order matters and parallel transport is non-trivial.
 
-use imperfect::{Loss, ShannonLoss};
+use terni::{Loss, ShannonLoss};
 
 /// The relational structure carried by a Beam through a pipeline.
 ///
@@ -32,16 +32,22 @@ pub struct ScalarConnection {
 
 impl ScalarConnection {
     pub fn zero() -> Self {
-        ScalarConnection { loss: ShannonLoss::zero() }
+        ScalarConnection {
+            loss: ShannonLoss::zero(),
+        }
     }
     pub fn new(loss: f64) -> Self {
-        ScalarConnection { loss: ShannonLoss::new(loss) }
+        ScalarConnection {
+            loss: ShannonLoss::new(loss),
+        }
     }
 }
 
 impl Carrier for ScalarConnection {
     fn compose(self, other: Self) -> Self {
-        ScalarConnection { loss: ShannonLoss::new(self.loss.as_f64() + other.loss.as_f64()) }
+        ScalarConnection {
+            loss: ShannonLoss::new(self.loss.as_f64() + other.loss.as_f64()),
+        }
     }
     fn norm(&self) -> ShannonLoss {
         self.loss.clone()

@@ -9,9 +9,9 @@
 //! As a Prism: focus views (S→A), project is identity, refract returns A.
 //! The original S is available as the beam's input chain for reconstruction.
 
-use std::convert::Infallible;
 use crate::{Beam, Prism, PureBeam};
-use imperfect::ShannonLoss;
+use std::convert::Infallible;
+use terni::ShannonLoss;
 
 #[derive(Clone, Copy)]
 pub struct Lens<S, A> {
@@ -27,7 +27,10 @@ impl<S: 'static, A: 'static> Lens<S, A> {
     /// - `set(s, view(s)) ≡ s` (view-set)
     /// - `set(set(s, a1), a2) ≡ set(s, a2)` (set-set)
     pub fn new(view: fn(&S) -> A, set: fn(S, A) -> S) -> Self {
-        Lens { view_fn: view, set_fn: set }
+        Lens {
+            view_fn: view,
+            set_fn: set,
+        }
     }
 
     pub fn view(&self, s: &S) -> A {
@@ -54,8 +57,8 @@ impl<S: 'static, A: 'static> Lens<S, A> {
 /// - project: identity (A → A)
 /// - refract: identity (A → A) — the focused value is the final output
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
-    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
-    type Focused   = PureBeam<S, A, Infallible, ShannonLoss>;
+    type Input = PureBeam<(), S, Infallible, ShannonLoss>;
+    type Focused = PureBeam<S, A, Infallible, ShannonLoss>;
     type Projected = PureBeam<A, A, Infallible, ShannonLoss>;
     type Refracted = PureBeam<A, A, Infallible, ShannonLoss>;
 
@@ -82,10 +85,17 @@ mod tests {
     use crate::Beam as BeamTrait;
 
     #[derive(Clone, Debug, PartialEq)]
-    struct Point { x: i32, y: i32 }
+    struct Point {
+        x: i32,
+        y: i32,
+    }
 
-    fn point_view_x(p: &Point) -> i32 { p.x }
-    fn point_set_x(p: Point, new_x: i32) -> Point { Point { x: new_x, ..p } }
+    fn point_view_x(p: &Point) -> i32 {
+        p.x
+    }
+    fn point_set_x(p: Point, new_x: i32) -> Point {
+        Point { x: new_x, ..p }
+    }
 
     // --- Inherent method tests ---
 

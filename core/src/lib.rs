@@ -49,7 +49,7 @@ pub mod ffi;
 pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
 pub use beam::{Beam, Operation, PureBeam};
-pub use imperfect::{Imperfect, Loss, ShannonLoss};
+pub use terni::{Imperfect, Loss, ShannonLoss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};
@@ -71,9 +71,9 @@ pub use spectral_oid::SpectralOid;
 /// constraints — each stage's `In` must equal the previous stage's `Out`.
 /// This makes type mismatches between pipeline stages a compile error.
 pub trait Prism {
-    type Input:     Beam;
-    type Focused:   Beam<In = <Self::Input     as Beam>::Out>;
-    type Projected: Beam<In = <Self::Focused   as Beam>::Out>;
+    type Input: Beam;
+    type Focused: Beam<In = <Self::Input as Beam>::Out>;
+    type Projected: Beam<In = <Self::Focused as Beam>::Out>;
     type Refracted: Beam<In = <Self::Projected as Beam>::Out>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused;
@@ -83,14 +83,20 @@ pub trait Prism {
 
 /// Blanket impl: `&P` is a Prism wherever `P` is.
 impl<P: Prism> Prism for &P {
-    type Input     = P::Input;
-    type Focused   = P::Focused;
+    type Input = P::Input;
+    type Focused = P::Focused;
     type Projected = P::Projected;
     type Refracted = P::Refracted;
 
-    fn focus(&self, beam: P::Input) -> P::Focused         { P::focus(self, beam) }
-    fn project(&self, beam: P::Focused) -> P::Projected   { P::project(self, beam) }
-    fn refract(&self, beam: P::Projected) -> P::Refracted { P::refract(self, beam) }
+    fn focus(&self, beam: P::Input) -> P::Focused {
+        P::focus(self, beam)
+    }
+    fn project(&self, beam: P::Focused) -> P::Projected {
+        P::project(self, beam)
+    }
+    fn refract(&self, beam: P::Projected) -> P::Refracted {
+        P::refract(self, beam)
+    }
 }
 
 /// Run a prism end-to-end: focus, then project, then refract.
@@ -118,39 +124,52 @@ pub struct Refract<P>(pub P);
 
 impl<P: Prism> Operation<P::Input> for Focus<P> {
     type Output = P::Focused;
-    fn op(&self) -> Op { Op::Focus }
-    fn apply(self, beam: P::Input) -> P::Focused { self.0.focus(beam) }
+    fn op(&self) -> Op {
+        Op::Focus
+    }
+    fn apply(self, beam: P::Input) -> P::Focused {
+        self.0.focus(beam)
+    }
 }
 
 impl<P: Prism> Operation<P::Focused> for Project<P> {
     type Output = P::Projected;
-    fn op(&self) -> Op { Op::Project }
-    fn apply(self, beam: P::Focused) -> P::Projected { self.0.project(beam) }
+    fn op(&self) -> Op {
+        Op::Project
+    }
+    fn apply(self, beam: P::Focused) -> P::Projected {
+        self.0.project(beam)
+    }
 }
 
 impl<P: Prism> Operation<P::Projected> for Refract<P> {
     type Output = P::Refracted;
-    fn op(&self) -> Op { Op::Refract }
-    fn apply(self, beam: P::Projected) -> P::Refracted { self.0.refract(beam) }
+    fn op(&self) -> Op {
+        Op::Refract
+    }
+    fn apply(self, beam: P::Projected) -> P::Refracted {
+        self.0.refract(beam)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use imperfect::Imperfect;
+    use terni::Imperfect;
 
     /// A prism that counts characters.
     /// focus: String → Vec<char>, project: Vec<char> → usize, refract: usize → String
     struct CountPrism;
 
     impl Prism for CountPrism {
-        type Input     = PureBeam<(), String>;
-        type Focused   = PureBeam<String, Vec<char>>;
+        type Input = PureBeam<(), String>;
+        type Focused = PureBeam<String, Vec<char>>;
         type Projected = PureBeam<Vec<char>, usize>;
         type Refracted = PureBeam<usize, String>;
 
         fn focus(&self, beam: Self::Input) -> Self::Focused {
-            let chars: Vec<char> = beam.result()
+            let chars: Vec<char> = beam
+                .result()
                 .ok()
                 .expect("focus: Err beam")
                 .chars()

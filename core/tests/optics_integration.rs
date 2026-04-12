@@ -6,17 +6,17 @@
 
 #![cfg(feature = "optics")]
 
-use prism_core::{Beam, Prism, PureBeam};
+use prism_core::optics::fold::Fold;
+use prism_core::optics::gather::{AddGather, ConcatGather, Gather};
 use prism_core::optics::iso::Iso;
 use prism_core::optics::lens::Lens;
-use prism_core::optics::optic_prism::OpticPrism;
-use prism_core::optics::traversal::Traversal;
-use prism_core::optics::fold::Fold;
-use prism_core::optics::setter::Setter;
-use prism_core::optics::gather::{ConcatGather, AddGather, Gather};
 use prism_core::optics::monoid::PrismMonoid;
-use imperfect::ShannonLoss;
+use prism_core::optics::optic_prism::OpticPrism;
+use prism_core::optics::setter::Setter;
+use prism_core::optics::traversal::Traversal;
+use prism_core::{Beam, Prism, PureBeam};
 use std::convert::Infallible;
+use terni::ShannonLoss;
 
 fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
     PureBeam::ok((), v)
@@ -24,8 +24,12 @@ fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
 
 // --- Iso ---
 
-fn str_to_chars(s: String) -> Vec<char> { s.chars().collect() }
-fn chars_to_str(v: Vec<char>) -> String { v.into_iter().collect() }
+fn str_to_chars(s: String) -> Vec<char> {
+    s.chars().collect()
+}
+fn chars_to_str(v: Vec<char>) -> String {
+    v.into_iter().collect()
+}
 
 #[test]
 fn iso_full_pipeline_round_trips() {
@@ -40,10 +44,17 @@ fn iso_full_pipeline_round_trips() {
 // --- Lens ---
 
 #[derive(Clone, Debug, PartialEq)]
-struct Point { x: i32, y: i32 }
+struct Point {
+    x: i32,
+    y: i32,
+}
 
-fn point_view_x(p: &Point) -> i32 { p.x }
-fn point_set_x(p: Point, new_x: i32) -> Point { Point { x: new_x, ..p } }
+fn point_view_x(p: &Point) -> i32 {
+    p.x
+}
+fn point_set_x(p: Point, new_x: i32) -> Point {
+    Point { x: new_x, ..p }
+}
 
 #[test]
 fn lens_pipeline_extracts_field() {
@@ -57,11 +68,24 @@ fn lens_pipeline_extracts_field() {
 // --- OpticPrism ---
 
 #[derive(Clone, Debug, PartialEq)]
-enum Shape { Circle(i32), Square(i32) }
+enum Shape {
+    Circle(i32),
+    Square(i32),
+}
 
-fn is_circle(s: &Shape) -> bool { matches!(s, Shape::Circle(_)) }
-fn extract_circle(s: &Shape) -> i32 { if let Shape::Circle(r) = s { *r } else { -1 } }
-fn review_circle(r: i32) -> Shape { Shape::Circle(r) }
+fn is_circle(s: &Shape) -> bool {
+    matches!(s, Shape::Circle(_))
+}
+fn extract_circle(s: &Shape) -> i32 {
+    if let Shape::Circle(r) = s {
+        *r
+    } else {
+        -1
+    }
+}
+fn review_circle(r: i32) -> Shape {
+    Shape::Circle(r)
+}
 
 #[test]
 fn optic_prism_nonmatch_carries_infinite_loss() {
@@ -74,12 +98,14 @@ fn optic_prism_nonmatch_carries_infinite_loss() {
 
 #[test]
 fn traversal_with_gather_via_smap() {
-    fn double(x: i32) -> i32 { x * 2 }
+    fn double(x: i32) -> i32 {
+        x * 2
+    }
     let t: Traversal<i32, i32> = Traversal::new(double);
     let focused = t.focus(seed(vec![1, 2, 3]));
     let gathered = focused.smap(|v| {
         let result = AddGather.gather(v.clone());
-        imperfect::Imperfect::Success(result)
+        terni::Imperfect::Success(result)
     });
     assert_eq!(gathered.result().ok(), Some(&12));
 }
@@ -87,33 +113,46 @@ fn traversal_with_gather_via_smap() {
 // --- Fold ---
 
 #[derive(Clone)]
-struct Tree { leaves: Vec<i32> }
+struct Tree {
+    leaves: Vec<i32>,
+}
 
-fn tree_leaves(t: &Tree) -> Vec<i32> { t.leaves.clone() }
+fn tree_leaves(t: &Tree) -> Vec<i32> {
+    t.leaves.clone()
+}
 
 #[test]
 fn fold_extracts_and_gathers() {
     let f: Fold<Tree, i32> = Fold::new(tree_leaves);
-    let focused = f.focus(seed(Tree { leaves: vec![10, 20, 30] }));
-    let gathered = focused.smap(|v| {
-        imperfect::Imperfect::Success(AddGather.gather(v.clone()))
-    });
+    let focused = f.focus(seed(Tree {
+        leaves: vec![10, 20, 30],
+    }));
+    let gathered = focused.smap(|v| terni::Imperfect::Success(AddGather.gather(v.clone())));
     assert_eq!(gathered.result().ok(), Some(&60));
 }
 
 // --- Setter ---
 
 #[derive(Clone, Debug, PartialEq)]
-struct Box2 { label: String, count: i32 }
+struct Box2 {
+    label: String,
+    count: i32,
+}
 
 fn box2_modify_count(b: Box2, f: &dyn Fn(i32) -> i32) -> Box2 {
-    Box2 { count: f(b.count), ..b }
+    Box2 {
+        count: f(b.count),
+        ..b
+    }
 }
 
 #[test]
 fn setter_pipeline_preserves_value() {
     let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-    let b = Box2 { label: "test".to_string(), count: 5 };
+    let b = Box2 {
+        label: "test".to_string(),
+        count: 5,
+    };
     let focused = s.focus(seed(b.clone()));
     let projected = s.project(focused);
     let refracted = s.refract(projected);
@@ -124,7 +163,11 @@ fn setter_pipeline_preserves_value() {
 
 #[test]
 fn concat_gather_collapses_strings() {
-    let result = ConcatGather.gather(vec!["hello".to_string(), " ".to_string(), "world".to_string()]);
+    let result = ConcatGather.gather(vec![
+        "hello".to_string(),
+        " ".to_string(),
+        "world".to_string(),
+    ]);
     assert_eq!(result, "hello world");
 }
 
@@ -143,8 +186,8 @@ fn monoid_laws_hold() {
 
 // --- Additional coverage: panic paths and partial propagation ---
 
-fn wrap_success_i32(v: &i32) -> imperfect::Imperfect<i32, String, ShannonLoss> {
-    imperfect::Imperfect::Success(*v)
+fn wrap_success_i32(v: &i32) -> terni::Imperfect<i32, String, ShannonLoss> {
+    terni::Imperfect::Success(*v)
 }
 
 #[test]
@@ -172,7 +215,7 @@ fn tick_on_err_panics_in_integration() {
 fn tick_partial_to_partial_accumulates_loss_in_integration() {
     let b: PureBeam<(), i32, String, ShannonLoss> =
         PureBeam::partial((), 1i32, ShannonLoss::new(1.0));
-    let n = b.tick(imperfect::Imperfect::<i32, String, ShannonLoss>::Partial(
+    let n = b.tick(terni::Imperfect::<i32, String, ShannonLoss>::Partial(
         2,
         ShannonLoss::new(0.5),
     ));
@@ -184,7 +227,9 @@ fn tick_partial_to_partial_accumulates_loss_in_integration() {
 fn tick_partial_to_failure_in_integration() {
     let b: PureBeam<(), i32, String, ShannonLoss> =
         PureBeam::partial((), 1i32, ShannonLoss::new(1.0));
-    let n = b.tick(imperfect::Imperfect::<i32, String, ShannonLoss>::Failure("e".into()));
+    let n = b.tick(terni::Imperfect::<i32, String, ShannonLoss>::Failure(
+        "e".into(),
+    ));
     assert!(n.is_err());
 }
 
@@ -233,7 +278,13 @@ fn loss_propagation_through_optic_pipeline() {
     let focused = iso.focus(beam);
     assert!(focused.is_partial(), "loss must propagate through focus");
     let projected = iso.project(focused);
-    assert!(projected.is_partial(), "loss must propagate through project");
+    assert!(
+        projected.is_partial(),
+        "loss must propagate through project"
+    );
     let refracted = iso.refract(projected);
-    assert!(refracted.is_partial(), "loss must propagate through refract");
+    assert!(
+        refracted.is_partial(),
+        "loss must propagate through refract"
+    );
 }

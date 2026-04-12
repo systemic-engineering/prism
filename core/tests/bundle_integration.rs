@@ -2,8 +2,8 @@
 
 #![cfg(feature = "bundle")]
 
-use imperfect::{Imperfect, ShannonLoss};
 use prism_core::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
+use terni::{Imperfect, ShannonLoss};
 
 struct Spectral {
     optic: &'static str,
@@ -16,12 +16,16 @@ impl Fiber for Spectral {
 
 impl Connection for Spectral {
     type Optic = &'static str;
-    fn connection(&self) -> &&'static str { &self.optic }
+    fn connection(&self) -> &&'static str {
+        &self.optic
+    }
 }
 
 impl Gauge for Spectral {
     type Group = u32;
-    fn gauge(&self) -> &u32 { &self.strategy }
+    fn gauge(&self) -> &u32 {
+        &self.strategy
+    }
 }
 
 impl Transport for Spectral {
@@ -44,7 +48,9 @@ impl Transport for Spectral {
 
 impl Closure for Spectral {
     type Fixed = &'static str;
-    fn close(&self) -> &&'static str { &"fate" }
+    fn close(&self) -> &&'static str {
+        &"fate"
+    }
 }
 
 fn traverse_tower<B: Bundle>(b: &B) -> bool

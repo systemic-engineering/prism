@@ -1,86 +1,84 @@
-# imperfect
+# terni
 
-[![crates.io](https://img.shields.io/crates/v/imperfect.svg)](https://crates.io/crates/imperfect)
-[![docs.rs](https://docs.rs/imperfect/badge.svg)](https://docs.rs/imperfect)
-[![no_std](https://img.shields.io/badge/no__std-compatible-blue)](https://github.com/systemic-engineering/prism/tree/main/imperfect)
+> I wanna thank Brene Brown for her work.
 
-I wanna thank Brene Brown for her work.
+Ternary error handling for Rust. Because computation is not binary.
 
+[![crates.io](https://img.shields.io/crates/v/terni.svg)](https://crates.io/crates/terni)
+[![docs.rs](https://docs.rs/terni/badge.svg)](https://docs.rs/terni)
+[![license](https://img.shields.io/crates/l/terni.svg)](https://github.com/systemic-engineering/prism/blob/main/imperfect/LICENSE)
 
-`Result` extended with partial success. Three states:
+## `eh`
 
-- **Success(T)** -- the transformation preserved everything. Zero loss.
-- **Partial(T, L)** -- a value came through, but something was lost. The loss is measured and carried forward.
-- **Failure(E)** -- no value survived.
-
-Most real transformations are not perfect and not failed. They are partial: a value exists, and it cost something. Collapsing that into `Ok` or `Err` destroys the information about what was lost.
-
-## Usage
+The type. Three states instead of two.
 
 ```rust
-use imperfect::{Imperfect, ShannonLoss, Loss};
+use terni::{Imperfect, ConvergenceLoss};
 
-// Three states
-let perfect: Imperfect<u32, String> = Imperfect::Success(42);
-let lossy: Imperfect<u32, String> = Imperfect::Partial(42, ShannonLoss::new(1.5));
-let failed: Imperfect<u32, String> = Imperfect::Failure("gone".into());
+let perfect: Imperfect<u32, String, ConvergenceLoss> = Imperfect::Success(42);
+let lossy = Imperfect::Partial(42, ConvergenceLoss::new(3));
+let failed: Imperfect<u32, String, ConvergenceLoss> = Imperfect::Failure("gone".into());
 
-// Check state -- is_ok() returns true for Success and Partial
 assert!(perfect.is_ok());
-assert!(lossy.is_ok());
+assert!(lossy.is_partial());
 assert!(failed.is_err());
-
-// Extract
-assert_eq!(perfect.ok(), Some(42));
-assert_eq!(lossy.ok(), Some(42));   // value survives, loss is metadata
-assert_eq!(failed.ok(), None);
-
-// Measure loss
-assert!(perfect.loss().is_zero());
-assert_eq!(lossy.loss().as_f64(), 1.5);
-assert!(failed.loss().as_f64().is_infinite());  // total loss
 ```
 
-## Composition
+[`Loss`](https://docs.rs/terni/latest/terni/trait.Loss.html) measures what didn't survive. It's a monoid: `zero()` identity, `combine` associative, `total()` absorbing.
 
-`compose` propagates accumulated loss through a chain of results:
+Three loss types ship with the crate:
+- **`ConvergenceLoss`** — distance to crystal. Combine: max.
+- **`ApertureLoss`** — dark dimensions. Combine: union.
+- **`RoutingLoss`** — decision entropy. Combine: max entropy, min gap.
+
+[Loss types in depth →](docs/loss-types.md)
+
+## `eh!`
+
+The bind. Chain operations, accumulate loss.
 
 ```rust
-use imperfect::{Imperfect, ShannonLoss};
+use terni::{Imperfect, ConvergenceLoss};
 
-let step1: Imperfect<u32, String> = Imperfect::Partial(10, ShannonLoss::new(1.0));
-let step2: Imperfect<u32, String> = Imperfect::Partial(20, ShannonLoss::new(0.5));
+let result = Imperfect::<i32, String, ConvergenceLoss>::Success(1)
+    .eh(|x| Imperfect::Success(x * 2))
+    .eh(|x| Imperfect::Partial(x + 1, ConvergenceLoss::new(3)));
 
-let result = step1.compose(step2);
-assert_eq!(result.ok(), Some(20));
-assert_eq!(result.loss().as_f64(), 1.5);  // losses accumulate
+assert_eq!(result.ok(), Some(3));
+assert!(result.is_partial());
 ```
 
-## The Loss trait
-
-`Loss` is a monoid: `zero()` is the identity, `combine` is associative, `total()` is the absorbing element.
+For explicit context with loss accumulation:
 
 ```rust
-use imperfect::Loss;
+use terni::{Imperfect, Eh, ConvergenceLoss};
 
-pub trait Loss: Clone + Default {
-    fn zero() -> Self;       // no loss occurred
-    fn total() -> Self;      // everything was destroyed
-    fn is_zero(&self) -> bool;
-    fn combine(self, other: Self) -> Self;  // accumulate
-}
+let mut eh = Eh::new();
+let a = eh.eh(Imperfect::<i32, String, ConvergenceLoss>::Success(1)).unwrap();
+let b = eh.eh(Imperfect::<_, String, _>::Partial(a + 1, ConvergenceLoss::new(5))).unwrap();
+let result: Imperfect<i32, String, ConvergenceLoss> = eh.finish(b);
+
+assert!(result.is_partial());
 ```
 
-`ShannonLoss` is the default implementation. Information loss measured in bits (base-2 logarithm). Losses combine by addition -- this is Shannon's channel coding theorem: information lost through sequential channels sums.
+`.imp()` and `.tri()` are aliases for `.eh()` — same bind, different name. Use whichever reads best in your code.
 
-Implement `Loss` for domain-specific loss types. The `Imperfect` type is parameterized over any `L: Loss`.
+[Pipeline guide →](docs/pipeline.md) · [Context guide →](docs/context.md)
 
-## PbtA lineage
+## `eh?`
 
-The three-state design descends from Powered by the Apocalypse tabletop games: 10+ is full success, 7-9 is success with complications, 6- is failure. The middle tier -- success with cost -- is the design innovation that PbtA contributed to game design. This crate encodes that structure in types.
+The question. Coming in a future release.
 
-## Compatibility
+Block macro for implicit loss accumulation — `eh! { }` will do what `Eh` does without the boilerplate.
 
-- `no_std` compatible: core type + `Loss` trait require no allocator.
-- `std` interop (default feature): `From<Result<T, E>>`, `From<Option<T>>`, `Into<Result<T, E>>`.
-- Zero dependencies.
+## More
+
+- [Loss types](docs/loss-types.md) — the `Loss` trait, shipped types, custom implementations
+- [Pipeline](docs/pipeline.md) — `.eh()` bind in depth, loss accumulation rules
+- [Context](docs/context.md) — `Eh` struct, mixing `Imperfect` and `Result`
+- [Terni-functor](docs/terni-functor.md) — the math behind `.eh()`
+- [Migration](docs/migration.md) — moving from `Result<T, E>` to `Imperfect<T, E, L>`
+
+## License
+
+Apache-2.0

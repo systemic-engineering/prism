@@ -5,8 +5,8 @@
 //! `smap` is the semifunctor map, derived from `tick`.
 
 use crate::trace::Op;
-use imperfect::{Imperfect, Loss, ShannonLoss};
 use std::convert::Infallible;
+use terni::{Imperfect, Loss, ShannonLoss};
 
 /// A self-contained pipeline operation. Wraps a prism (and closure for
 /// user-space operations). The beam arrives via `apply`.
@@ -111,17 +111,26 @@ pub struct PureBeam<In, Out, E = Infallible, L: Loss = ShannonLoss> {
 impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
     /// Construct a perfect beam (zero loss).
     pub fn ok(input: In, output: Out) -> Self {
-        Self { input, imperfect: Imperfect::Success(output) }
+        Self {
+            input,
+            imperfect: Imperfect::Success(output),
+        }
     }
 
     /// Construct a partial beam (value with loss).
     pub fn partial(input: In, output: Out, loss: L) -> Self {
-        Self { input, imperfect: Imperfect::Partial(output, loss) }
+        Self {
+            input,
+            imperfect: Imperfect::Partial(output, loss),
+        }
     }
 
     /// Construct a failed beam.
     pub fn err(input: In, error: E) -> Self {
-        Self { input, imperfect: Imperfect::Failure(error) }
+        Self {
+            input,
+            imperfect: Imperfect::Failure(error),
+        }
     }
 }
 
@@ -151,8 +160,14 @@ impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
     fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> PureBeam<Out, T, NE, L> {
         match self.imperfect {
             Imperfect::Failure(_) => panic!("tick on Err beam — check is_ok() first"),
-            Imperfect::Success(old_out) => PureBeam { input: old_out, imperfect: next },
-            Imperfect::Partial(old_out, loss) => PureBeam { input: old_out, imperfect: propagate(loss, next) },
+            Imperfect::Success(old_out) => PureBeam {
+                input: old_out,
+                imperfect: next,
+            },
+            Imperfect::Partial(old_out, loss) => PureBeam {
+                input: old_out,
+                imperfect: propagate(loss, next),
+            },
         }
     }
 }
@@ -167,7 +182,9 @@ mod tests {
 
     impl Operation<PureBeam<(), u32>> for DoubleOp {
         type Output = PureBeam<u32, u32>;
-        fn op(&self) -> Op { Op::Project }
+        fn op(&self) -> Op {
+            Op::Project
+        }
         fn apply(self, beam: PureBeam<(), u32>) -> PureBeam<u32, u32> {
             let v = *beam.result().ok().unwrap();
             beam.next(v * 2)
@@ -241,7 +258,10 @@ mod tests {
     #[test]
     fn tick_ok_with_partial() {
         let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.tick(Imperfect::<&str, String>::Partial("hi", ShannonLoss::new(1.0)));
+        let n = b.tick(Imperfect::<&str, String>::Partial(
+            "hi",
+            ShannonLoss::new(1.0),
+        ));
         assert!(n.is_partial());
         assert_eq!(n.result().ok(), Some(&"hi"));
     }

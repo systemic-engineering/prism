@@ -84,4 +84,4 @@ Wrap in named `Operation` implementations for reuse. That's application code, no
 
 ## Dependencies
 
-Depends on `imperfect`. Zero external dependencies.
+Depends on `terni`. Zero external dependencies.

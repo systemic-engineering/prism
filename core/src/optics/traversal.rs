@@ -6,9 +6,9 @@
 //! As a Prism: focus maps elements (Vec<A> → Vec<B>), project is identity,
 //! refract returns the mapped collection.
 
-use std::convert::Infallible;
 use crate::{Beam, Prism, PureBeam};
-use imperfect::ShannonLoss;
+use std::convert::Infallible;
+use terni::ShannonLoss;
 
 #[derive(Clone, Copy)]
 pub struct Traversal<A, B> {
@@ -37,8 +37,8 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
 /// - project: identity (Vec<B> → Vec<B>)
 /// - refract: identity (Vec<B> → Vec<B>)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
-    type Input     = PureBeam<(), Vec<A>, Infallible, ShannonLoss>;
-    type Focused   = PureBeam<Vec<A>, Vec<B>, Infallible, ShannonLoss>;
+    type Input = PureBeam<(), Vec<A>, Infallible, ShannonLoss>;
+    type Focused = PureBeam<Vec<A>, Vec<B>, Infallible, ShannonLoss>;
     type Projected = PureBeam<Vec<B>, Vec<B>, Infallible, ShannonLoss>;
     type Refracted = PureBeam<Vec<B>, Vec<B>, Infallible, ShannonLoss>;
 
@@ -64,7 +64,9 @@ mod tests {
     use super::*;
     use crate::Beam as BeamTrait;
 
-    fn double(x: i32) -> i32 { x * 2 }
+    fn double(x: i32) -> i32 {
+        x * 2
+    }
 
     // --- Inherent method tests ---
 
@@ -124,10 +126,15 @@ mod tests {
 
     #[test]
     fn traversal_prism_with_type_change() {
-        fn to_string(x: i32) -> String { x.to_string() }
+        fn to_string(x: i32) -> String {
+            x.to_string()
+        }
         let t: Traversal<i32, String> = Traversal::new(to_string);
         let focused = t.focus(seed(vec![1, 2, 3]));
-        assert_eq!(focused.result().ok(), Some(&vec!["1".to_string(), "2".to_string(), "3".to_string()]));
+        assert_eq!(
+            focused.result().ok(),
+            Some(&vec!["1".to_string(), "2".to_string(), "3".to_string()])
+        );
     }
 
     #[test]
@@ -144,9 +151,8 @@ mod tests {
         let t: Traversal<i32, i32> = Traversal::new(double);
         let focused = t.focus(seed(vec![1, 2, 3]));
         // smap can decompose the Vec into individual processing
-        let first_element = focused.smap(|v| {
-            imperfect::Imperfect::Success(v.first().cloned().unwrap_or(0))
-        });
+        let first_element =
+            focused.smap(|v| terni::Imperfect::Success(v.first().cloned().unwrap_or(0)));
         assert_eq!(first_element.result().ok(), Some(&2));
     }
 }

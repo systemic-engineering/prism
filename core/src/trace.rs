@@ -8,7 +8,7 @@
 use std::any::Any;
 use std::fmt;
 
-use imperfect::ShannonLoss;
+use terni::ShannonLoss;
 
 /// Which pipeline operation produced a step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,7 +81,7 @@ impl Trace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use imperfect::Loss as _;
+    use terni::Loss as _;
 
     #[test]
     fn trace_starts_empty() {

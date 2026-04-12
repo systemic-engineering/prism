@@ -6,9 +6,9 @@
 //! As a Prism: focus applies forward, project is identity, refract applies backward.
 //! Round-trip is genuinely lossless — the only optic with this property.
 
-use std::convert::Infallible;
 use crate::{Beam, Prism, PureBeam};
-use imperfect::ShannonLoss;
+use std::convert::Infallible;
+use terni::ShannonLoss;
 
 /// A total invertible pair (A → B, B → A).
 ///
@@ -30,7 +30,10 @@ impl<A: 'static, B: 'static> Iso<A, B> {
     /// - `backward(forward(a)) ≡ a` for all `a: A`
     /// - `forward(backward(b)) ≡ b` for all `b: B`
     pub fn new(forward: fn(A) -> B, backward: fn(B) -> A) -> Self {
-        Iso { forward_fn: forward, backward_fn: backward }
+        Iso {
+            forward_fn: forward,
+            backward_fn: backward,
+        }
     }
 
     pub fn forward(&self, a: A) -> B {
@@ -40,7 +43,6 @@ impl<A: 'static, B: 'static> Iso<A, B> {
     pub fn backward(&self, b: B) -> A {
         (self.backward_fn)(b)
     }
-
 }
 
 /// Iso implements Prism with PureBeam.
@@ -50,8 +52,8 @@ impl<A: 'static, B: 'static> Iso<A, B> {
 /// - project: identity pass-through (B → B)
 /// - refract: applies backward (B → A)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
-    type Input     = PureBeam<(), A, Infallible, ShannonLoss>;
-    type Focused   = PureBeam<A, B, Infallible, ShannonLoss>;
+    type Input = PureBeam<(), A, Infallible, ShannonLoss>;
+    type Focused = PureBeam<A, B, Infallible, ShannonLoss>;
     type Projected = PureBeam<B, B, Infallible, ShannonLoss>;
     type Refracted = PureBeam<B, A, Infallible, ShannonLoss>;
 

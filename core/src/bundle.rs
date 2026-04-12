@@ -6,7 +6,7 @@
 //! The same mathematical object at every scale:
 //! Fate chip, BEAM runtime, Mirror compiler.
 
-use imperfect::{Imperfect, Loss};
+use terni::{Imperfect, Loss};
 
 /// Level 0: the observed state. The section of the bundle.
 /// Abyss. The fiber.
@@ -51,7 +51,7 @@ impl<T: Closure> Bundle for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use imperfect::ShannonLoss;
+    use terni::ShannonLoss;
 
     struct TestFiber;
 
@@ -82,7 +82,9 @@ mod tests {
 
     #[test]
     fn connection_requires_fiber() {
-        let c = TestConnection { optic: "lens".to_string() };
+        let c = TestConnection {
+            optic: "lens".to_string(),
+        };
         assert_eq!(c.connection(), "lens");
     }
 
@@ -103,12 +105,16 @@ mod tests {
 
     impl Connection for TestBundle {
         type Optic = String;
-        fn connection(&self) -> &String { &self.optic }
+        fn connection(&self) -> &String {
+            &self.optic
+        }
     }
 
     impl Gauge for TestBundle {
         type Group = u8;
-        fn gauge(&self) -> &u8 { &self.strategy }
+        fn gauge(&self) -> &u8 {
+            &self.strategy
+        }
     }
 
     impl Transport for TestBundle {
@@ -126,18 +132,28 @@ mod tests {
 
     impl Closure for TestBundle {
         type Fixed = bool;
-        fn close(&self) -> &bool { &self.fixed }
+        fn close(&self) -> &bool {
+            &self.fixed
+        }
     }
 
     #[test]
     fn gauge_requires_connection() {
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         assert_eq!(*b.gauge(), 3);
     }
 
     #[test]
     fn transport_returns_partial() {
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         let state = [1.0, 2.0, 3.0, 4.0];
         let result = b.transport(&state);
         assert!(result.is_partial());
@@ -145,7 +161,11 @@ mod tests {
 
     #[test]
     fn transport_holonomy_measures_loss() {
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         let state = [1.0, 2.0, 3.0, 4.0];
         match b.transport(&state) {
             Imperfect::Partial(compressed, loss) => {
@@ -158,7 +178,11 @@ mod tests {
 
     #[test]
     fn transport_zero_loss_returns_success() {
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         let state = [1.0, 2.0, 0.0, 0.0];
         let result = b.transport(&state);
         assert!(result.is_ok());
@@ -166,14 +190,22 @@ mod tests {
 
     #[test]
     fn closure_is_fixed_point() {
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         assert_eq!(*b.close(), true);
     }
 
     #[test]
     fn full_tower_is_bundle() {
         fn accepts_bundle<B: Bundle>(_b: &B) {}
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         accepts_bundle(&b);
     }
 
@@ -185,7 +217,11 @@ mod tests {
         {
             (*b.close()).into()
         }
-        let b = TestBundle { optic: "traversal".to_string(), strategy: 3, fixed: true };
+        let b = TestBundle {
+            optic: "traversal".to_string(),
+            strategy: 3,
+            fixed: true,
+        };
         assert!(read_tower(&b));
     }
 }

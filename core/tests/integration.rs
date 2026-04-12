@@ -1,20 +1,19 @@
-use imperfect::{Imperfect, ShannonLoss};
-use prism_core::{
-    Beam, Focus, Prism, Project, PureBeam, Refract,
-};
+use prism_core::{Beam, Focus, Prism, Project, PureBeam, Refract};
 use std::convert::Infallible;
+use terni::{Imperfect, ShannonLoss};
 
 /// A prism that tokenizes → counts → formats.
 struct TokenPrism;
 
 impl Prism for TokenPrism {
-    type Input     = PureBeam<(), String>;
-    type Focused   = PureBeam<String, Vec<String>>;
+    type Input = PureBeam<(), String>;
+    type Focused = PureBeam<String, Vec<String>>;
     type Projected = PureBeam<Vec<String>, usize>;
     type Refracted = PureBeam<usize, String>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
-        let tokens: Vec<String> = beam.result()
+        let tokens: Vec<String> = beam
+            .result()
             .ok()
             .expect("focus: Err beam")
             .split_whitespace()
@@ -63,14 +62,16 @@ fn smap_as_zoom_in_pipeline() {
 
 #[test]
 fn smap_as_split_in_pipeline() {
-    let focused = PureBeam::ok((), "hello world".to_string())
-        .apply(Focus(&TokenPrism));
+    let focused = PureBeam::ok((), "hello world".to_string()).apply(Focus(&TokenPrism));
 
     let chars: PureBeam<Vec<String>, Vec<char>> = focused.smap(|tokens| {
         let all_chars: Vec<char> = tokens.iter().flat_map(|t| t.chars()).collect();
         Imperfect::Success(all_chars)
     });
-    assert_eq!(chars.result().ok(), Some(&vec!['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd']));
+    assert_eq!(
+        chars.result().ok(),
+        Some(&vec!['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd'])
+    );
 }
 
 #[test]
@@ -97,7 +98,7 @@ fn imperfect_result_interop() {
 
 #[test]
 fn shannon_loss_methods_covered_in_integration() {
-    use imperfect::Loss;
+    use terni::Loss;
 
     // is_lossless: delegates to is_zero
     let zero = ShannonLoss::zero();
@@ -126,4 +127,3 @@ fn shannon_loss_methods_covered_in_integration() {
     let e: ShannonLoss = 3.14f64.into();
     assert_eq!(e.as_f64(), 3.14);
 }
-
