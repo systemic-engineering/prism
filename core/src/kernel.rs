@@ -54,6 +54,7 @@ impl KernelSpec {
             .filter(|(_, &l)| l > threshold)
             .map(|(i, _)| i)
             .collect();
+
         KernelSpec { dimensions, decomposition, precision }
     }
 
@@ -145,5 +146,13 @@ mod tests {
         let spec = KernelSpec::from_logits(&[], 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
         assert_eq!(spec.rank(), 0);
         assert!(spec.dimensions.is_empty());
+    }
+
+    #[test]
+    fn from_logits_never_empty() {
+        let logits = [-1.0, -2.0, -3.0, -4.0];
+        let spec = KernelSpec::from_logits(&logits, 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
+        assert_eq!(spec.rank(), 1); // keeps the best one (-1.0 at index 0)
+        assert_eq!(spec.dimensions, vec![0]);
     }
 }
