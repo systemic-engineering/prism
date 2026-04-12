@@ -10,11 +10,19 @@ jobs:
     uses: systemic-engineering/ci/.github/workflows/rust-nix-check.yml@main
     with:
       coverage_threshold: '99'
-      features: 'optics'
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: systemic-engineering/ci/actions/nix-setup@main
+      - name: Check formatting
+        run: nix develop -c cargo fmt --all -- --check
 
   notify-on-failure:
     if: failure()
-    needs: [check]
+    needs: [check, format]
     uses: systemic-engineering/ci/.github/workflows/notify-ntfy.yml@main
     with:
       repo: ${{ github.repository }}
