@@ -17,6 +17,83 @@
 //! is the default implementation, measuring information loss in bits using
 //! Shannon's base-2 logarithmic measure.
 
+// ---------------------------------------------------------------------------
+// ApertureLoss — which dimensions were dark at observation time
+// ---------------------------------------------------------------------------
+
+/// Loss that tracks which feature dimensions were dark (unobservable) at
+/// the time of observation.
+///
+/// `dark_dims` — indices of the dimensions that were not illuminated.
+/// `total_dims` — total number of dimensions in the space.
+///
+/// Zero loss means all dimensions were illuminated (no dark dims).
+/// Total loss means all dimensions were dark.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ApertureLoss {
+    dark_dims: Vec<usize>,
+    total_dims: usize,
+}
+
+impl ApertureLoss {
+    /// Create a new ApertureLoss.
+    ///
+    /// `dark_dims` — indices of dimensions that were dark at observation.
+    /// `total_dims` — total number of dimensions in the feature space.
+    pub fn new(dark_dims: Vec<usize>, total_dims: usize) -> Self {
+        ApertureLoss { dark_dims, total_dims }
+    }
+
+    /// The dark dimension indices.
+    pub fn dark_dims(&self) -> &[usize] {
+        &self.dark_dims
+    }
+
+    /// Total number of dimensions in the space.
+    pub fn total_dims(&self) -> usize {
+        self.total_dims
+    }
+
+    /// Number of illuminated (active) dimensions.
+    pub fn active_count(&self) -> usize {
+        self.total_dims.saturating_sub(self.dark_dims.len())
+    }
+}
+
+impl Default for ApertureLoss {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+impl Loss for ApertureLoss {
+    fn zero() -> Self {
+        ApertureLoss { dark_dims: Vec::new(), total_dims: 0 }
+    }
+
+    fn total() -> Self {
+        // Sentinel: total_dims = usize::MAX, dark_dims empty (all dims dark conceptually)
+        ApertureLoss { dark_dims: Vec::new(), total_dims: usize::MAX }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.dark_dims.is_empty() && self.total_dims != usize::MAX
+    }
+
+    fn combine(mut self, other: Self) -> Self {
+        // Union of dark dims; take the larger total_dims
+        for d in other.dark_dims {
+            if !self.dark_dims.contains(&d) {
+                self.dark_dims.push(d);
+            }
+        }
+        self.total_dims = self.total_dims.max(other.total_dims);
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 /// A measure of what didn't survive a transformation.
 ///
 /// Loss forms a monoid: `zero()` is the identity element, `combine` is
