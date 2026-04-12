@@ -211,10 +211,11 @@ pub fn compose(n: usize, p1: &[f64], p2: &[f64]) -> Vec<f64> {
 /// matrices the layout is invariant under transpose, but we convert for
 /// consistency with the rest of the API.
 ///
-/// Returns an empty `Vec` when `n == 0`.
-pub fn eigenvalues(n: usize, matrix: &[f64]) -> Vec<f64> {
+/// Returns `Ok(vec![])` when `n == 0`.
+/// Returns `Err(info)` if LAPACK convergence fails (info != 0).
+pub fn eigenvalues(n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
     if n == 0 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mat_cm = row_to_col_major(matrix, n, n);
     let mut evals = vec![0.0_f64; n];
@@ -229,8 +230,7 @@ pub fn eigenvalues(n: usize, matrix: &[f64]) -> Vec<f64> {
         );
     }
 
-    assert_eq!(info, 0, "spectral_eigenvalues: LAPACK dsyev returned info={info}");
-    evals
+    if info != 0 { Err(info) } else { Ok(evals) }
 }
 
 /// Compute eigenvalues and eigenvectors of a real symmetric `n×n` matrix.
@@ -241,9 +241,12 @@ pub fn eigenvalues(n: usize, matrix: &[f64]) -> Vec<f64> {
 ///
 /// Note: LAPACK stores eigenvectors as **columns**; the wrapper converts back
 /// to row-major so `evecs[i * n .. i * n + n]` is eigenvector `i`.
-pub fn eigensystem(n: usize, matrix: &[f64]) -> (Vec<f64>, Vec<f64>) {
+///
+/// Returns `Ok((vec![], vec![]))` when `n == 0`.
+/// Returns `Err(info)` if LAPACK convergence fails (info != 0).
+pub fn eigensystem(n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32> {
     if n == 0 {
-        return (Vec::new(), Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     }
     let mat_cm = row_to_col_major(matrix, n, n);
     let mut evals = vec![0.0_f64; n];
@@ -260,21 +263,26 @@ pub fn eigensystem(n: usize, matrix: &[f64]) -> (Vec<f64>, Vec<f64>) {
         );
     }
 
-    assert_eq!(info, 0, "spectral_eigensystem: LAPACK dsyev returned info={info}");
+    if info != 0 {
+        return Err(info);
+    }
 
     // LAPACK stores eigenvectors as columns of evecs_cm (col-major n×n).
     // col_to_row_major converts so that row i holds eigenvector i.
     let evecs = col_to_row_major(&evecs_cm, n, n);
-    (evals, evecs)
+    Ok((evals, evecs))
 }
 
 /// Compute singular values of an `m×n` matrix.
 ///
 /// Returns `min(m, n)` singular values in descending order.
-pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Vec<f64> {
+///
+/// Returns `Ok(vec![])` when `m == 0` or `n == 0`.
+/// Returns `Err(info)` if LAPACK convergence fails (info != 0).
+pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
     let k = m.min(n);
     if k == 0 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let mat_cm = row_to_col_major(matrix, m, n);
     let mut svs = vec![0.0_f64; k];
@@ -290,8 +298,7 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Vec<f64> {
         );
     }
 
-    assert_eq!(info, 0, "spectral_singular_values: LAPACK dgesvd returned info={info}");
-    svs
+    if info != 0 { Err(info) } else { Ok(svs) }
 }
 
 /// Compute the full SVD of an `m×n` matrix.
@@ -300,10 +307,13 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Vec<f64> {
 /// - `singular_values` has length `min(m, n)`, in descending order.
 /// - `u` is an `m×m` unitary matrix (row-major flat).
 /// - `vt` is an `n×n` unitary matrix — V transposed (row-major flat).
-pub fn svd(m: usize, n: usize, matrix: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+///
+/// Returns `Ok((vec![], vec![], vec![]))` when `m == 0` or `n == 0`.
+/// Returns `Err(info)` if LAPACK convergence fails (info != 0).
+pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>), i32> {
     let k = m.min(n);
     if k == 0 {
-        return (Vec::new(), Vec::new(), Vec::new());
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
     let mat_cm = row_to_col_major(matrix, m, n);
     let mut svs     = vec![0.0_f64; k];
@@ -323,11 +333,13 @@ pub fn svd(m: usize, n: usize, matrix: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
         );
     }
 
-    assert_eq!(info, 0, "spectral_svd: LAPACK dgesvd returned info={info}");
+    if info != 0 {
+        return Err(info);
+    }
 
     let u  = col_to_row_major(&u_cm,  m, m);
     let vt = col_to_row_major(&vt_cm, n, n);
-    (svs, u, vt)
+    Ok((svs, u, vt))
 }
 
 // ---------------------------------------------------------------------------
@@ -369,25 +381,25 @@ mod tests {
     #[test]
     fn eigenvalues_diagonal() {
         let matrix = vec![3.0, 0.0, 0.0, 5.0];
-        let evals = eigenvalues(2, &matrix);
+        let evals = eigenvalues(2, &matrix).unwrap();
         assert!((evals[0] - 3.0).abs() < 1e-10);
         assert!((evals[1] - 5.0).abs() < 1e-10);
     }
 
     #[test]
     fn eigenvalues_empty() {
-        assert!(eigenvalues(0, &[]).is_empty());
+        assert!(eigenvalues(0, &[]).unwrap().is_empty());
     }
 
     #[test]
     fn eigenvalues_1x1() {
-        assert_eq!(eigenvalues(1, &[7.0]), vec![7.0]);
+        assert_eq!(eigenvalues(1, &[7.0]).unwrap(), vec![7.0]);
     }
 
     #[test]
     fn singular_values_identity() {
         let identity = vec![1.0, 0.0, 0.0, 1.0];
-        let svs = singular_values(2, 2, &identity);
+        let svs = singular_values(2, 2, &identity).unwrap();
         for sv in &svs {
             assert!((sv - 1.0).abs() < 1e-10);
         }
