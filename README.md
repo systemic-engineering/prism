@@ -11,7 +11,7 @@ Focus | project | refract. A typed transformation pipeline in Rust.
 
 ### `imperfect`
 
-`Result` extended with partial success. Three states: Success, Partial (value + measured loss), Failure. The `Loss` trait measures what didn't survive a transformation; `ShannonLoss` is the default implementation, measuring information loss in bits. Standalone crate, no dependencies on prism.
+`Result` extended with partial success. Three states: Success, Partial (value + measured loss), Failure. The `Loss` trait measures what didn't survive a transformation. Standalone crate, no dependencies on prism.
 
 ### `prism-core`
 
@@ -29,11 +29,11 @@ prism-core         (depends on imperfect, zero external dependencies)
 ## Example
 
 ```rust
-use prism_core::{Beam, Prism, PureBeam, Focus, Project, Refract};
-use imperfect::Imperfect;
+use prism_core::{Beam, Prism, Optic, Focus, Project, Refract};
+use terni::Imperfect;
 
 // Seed a beam and run it through a prism
-let result = PureBeam::ok((), "hello".to_string())
+let result = Optic::ok((), "hello".to_string())
     .apply(Focus(&my_prism))
     .apply(Project(&my_prism))
     .apply(Refract(&my_prism));
@@ -45,10 +45,10 @@ Each `apply` step is type-checked: the output type of one stage must match the i
 
 ## Tests
 
-220 tests across the workspace:
+435 tests across the workspace:
 
 ```
-nix develop -c cargo test --workspace --features optics
+nix develop -c cargo test --workspace --features optics,bundle
 ```
 
 ## License
