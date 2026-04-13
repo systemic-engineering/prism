@@ -3,7 +3,9 @@
 #![cfg(feature = "bundle")]
 
 use prism_core::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
-use terni::{Imperfect, ShannonLoss};
+use prism_core::ScalarLoss;
+use std::convert::Infallible;
+use terni::Imperfect;
 
 struct Spectral {
     optic: &'static str,
@@ -29,8 +31,8 @@ impl Gauge for Spectral {
 }
 
 impl Transport for Spectral {
-    type Holonomy = ShannonLoss;
-    fn transport(&self, state: &[f64; 16]) -> Imperfect<[f64; 16], ShannonLoss> {
+    type Holonomy = ScalarLoss;
+    fn transport(&self, state: &[f64; 16]) -> Imperfect<[f64; 16], Infallible, ScalarLoss> {
         // Compress: keep first 8, zero last 8
         let mut compressed = *state;
         let mut loss = 0.0;
@@ -41,7 +43,7 @@ impl Transport for Spectral {
         if loss == 0.0 {
             Imperfect::Success(compressed)
         } else {
-            Imperfect::Partial(compressed, ShannonLoss::new(loss))
+            Imperfect::Partial(compressed, ScalarLoss::new(loss))
         }
     }
 }

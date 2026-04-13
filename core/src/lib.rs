@@ -26,6 +26,7 @@
 //! type matches the next stage's input type.
 
 pub mod beam;
+pub mod scalar_loss;
 pub mod trace;
 
 pub mod connection;
@@ -49,7 +50,8 @@ pub mod ffi;
 pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
 pub use beam::{Beam, Operation, PureBeam};
-pub use terni::{Imperfect, Loss, ShannonLoss};
+pub use scalar_loss::ScalarLoss;
+pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};

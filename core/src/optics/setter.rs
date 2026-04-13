@@ -8,7 +8,7 @@
 
 use crate::{Beam, Prism, PureBeam};
 use std::convert::Infallible;
-use terni::ShannonLoss;
+use crate::ScalarLoss;
 
 #[derive(Clone, Copy)]
 pub struct Setter<S, A> {
@@ -40,10 +40,10 @@ impl<S: 'static, A: 'static> Setter<S, A> {
 /// - project: identity (S → S)
 /// - refract: applies modify with identity to witness the closure, returns S
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
-    type Input = PureBeam<(), S, Infallible, ShannonLoss>;
-    type Focused = PureBeam<S, S, Infallible, ShannonLoss>;
-    type Projected = PureBeam<S, S, Infallible, ShannonLoss>;
-    type Refracted = PureBeam<S, S, Infallible, ShannonLoss>;
+    type Input = PureBeam<(), S, Infallible, ScalarLoss>;
+    type Focused = PureBeam<S, S, Infallible, ScalarLoss>;
+    type Projected = PureBeam<S, S, Infallible, ScalarLoss>;
+    type Refracted = PureBeam<S, S, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -108,7 +108,7 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
+    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
         PureBeam::ok((), v)
     }
 

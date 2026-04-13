@@ -6,6 +6,7 @@
 //! The same mathematical object at every scale:
 //! Fate chip, BEAM runtime, Mirror compiler.
 
+use std::convert::Infallible;
 use terni::{Imperfect, Loss};
 
 /// Level 0: the observed state. The section of the bundle.
@@ -33,7 +34,7 @@ pub trait Gauge: Connection {
 /// The holonomy IS the loss. Returns Partial by design.
 pub trait Transport: Gauge {
     type Holonomy: Loss;
-    fn transport(&self, state: &Self::State) -> Imperfect<Self::State, Self::Holonomy>;
+    fn transport(&self, state: &Self::State) -> Imperfect<Self::State, Infallible, Self::Holonomy>;
 }
 
 /// Level 4: autopoietic closure. The Lawvere fixed point.
@@ -51,7 +52,7 @@ impl<T: Closure> Bundle for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terni::ShannonLoss;
+    use crate::ScalarLoss;
 
     struct TestFiber;
 
@@ -118,14 +119,14 @@ mod tests {
     }
 
     impl Transport for TestBundle {
-        type Holonomy = ShannonLoss;
-        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], ShannonLoss> {
+        type Holonomy = ScalarLoss;
+        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], Infallible, ScalarLoss> {
             let compressed = [state[0], state[1], 0.0, 0.0];
             let loss = state[2].abs() + state[3].abs();
             if loss == 0.0 {
                 Imperfect::Success(compressed)
             } else {
-                Imperfect::Partial(compressed, ShannonLoss::new(loss))
+                Imperfect::Partial(compressed, ScalarLoss::new(loss))
             }
         }
     }

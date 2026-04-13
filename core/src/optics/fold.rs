@@ -7,7 +7,7 @@
 
 use crate::{Beam, Prism, PureBeam};
 use std::convert::Infallible;
-use terni::ShannonLoss;
+use crate::ScalarLoss;
 
 #[derive(Clone, Copy)]
 pub struct Fold<S, A> {
@@ -36,10 +36,10 @@ impl<S: 'static, A: 'static> Fold<S, A> {
 /// - project: identity (Vec<A> → Vec<A>)
 /// - refract: identity (Vec<A> → Vec<A>)
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
-    type Input = PureBeam<(), S, Infallible, ShannonLoss>;
-    type Focused = PureBeam<S, Vec<A>, Infallible, ShannonLoss>;
-    type Projected = PureBeam<Vec<A>, Vec<A>, Infallible, ShannonLoss>;
-    type Refracted = PureBeam<Vec<A>, Vec<A>, Infallible, ShannonLoss>;
+    type Input = PureBeam<(), S, Infallible, ScalarLoss>;
+    type Focused = PureBeam<S, Vec<A>, Infallible, ScalarLoss>;
+    type Projected = PureBeam<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
+    type Refracted = PureBeam<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -92,7 +92,7 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
+    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
         PureBeam::ok((), v)
     }
 

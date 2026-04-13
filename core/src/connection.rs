@@ -1,6 +1,6 @@
 //! Carrier — the relational substrate flowing through a Beam.
 //!
-//! ShannonLoss captures scalar information loss.
+//! ScalarLoss (from crate::scalar_loss) captures scalar information loss.
 //! Carrier captures the relational/geometric structure of how
 //! pipeline stages are connected.
 //!
@@ -8,7 +8,8 @@
 //! Non-abelian carriers are for geometric contexts where
 //! order matters and parallel transport is non-trivial.
 
-use terni::{Loss, ShannonLoss};
+use crate::ScalarLoss;
+use terni::Loss;
 
 /// The relational structure carried by a Beam through a pipeline.
 ///
@@ -20,25 +21,25 @@ pub trait Carrier: Clone + Default {
     /// Compose: self followed by other. Non-abelian in general.
     fn compose(self, other: Self) -> Self;
     /// The scalar projection — how much information this connection consumed.
-    fn norm(&self) -> ShannonLoss;
+    fn norm(&self) -> ScalarLoss;
 }
 
 /// The default connection: pure scalar, no relational structure.
 /// compose = add losses, norm = the loss itself.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct ScalarConnection {
-    pub loss: ShannonLoss,
+    pub loss: ScalarLoss,
 }
 
 impl ScalarConnection {
     pub fn zero() -> Self {
         ScalarConnection {
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
         }
     }
     pub fn new(loss: f64) -> Self {
         ScalarConnection {
-            loss: ShannonLoss::new(loss),
+            loss: ScalarLoss::new(loss),
         }
     }
 }
@@ -46,10 +47,10 @@ impl ScalarConnection {
 impl Carrier for ScalarConnection {
     fn compose(self, other: Self) -> Self {
         ScalarConnection {
-            loss: ShannonLoss::new(self.loss.as_f64() + other.loss.as_f64()),
+            loss: ScalarLoss::new(self.loss.as_f64() + other.loss.as_f64()),
         }
     }
-    fn norm(&self) -> ShannonLoss {
+    fn norm(&self) -> ScalarLoss {
         self.loss.clone()
     }
 }
