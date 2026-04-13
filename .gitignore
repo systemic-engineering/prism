@@ -3,11 +3,5 @@
 /.direnv
 beam/build/
 .worktrees/
-imperfect/Cargo.toml
-imperfect/README.md
-imperfect/src/lib.rs
-core/optics_prism.mod
-core/optics_spectral.mod
-librust_out.rlib
 *.mod
 *.rlib
