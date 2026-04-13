@@ -3,3 +3,8 @@
 /.direnv
 beam/build/
 .worktrees/
+core/optics_prism.mod
+core/optics_spectral.mod
+librust_out.rlib
+*.mod
+*.rlib
