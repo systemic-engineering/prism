@@ -5,8 +5,9 @@
 //! `smap` is the semifunctor map, derived from `tick`.
 
 use crate::trace::Op;
-use imperfect::{Imperfect, Loss, ShannonLoss};
+use crate::ScalarLoss;
 use std::convert::Infallible;
+use terni::{Imperfect, Loss};
 
 /// A self-contained pipeline operation. Wraps a prism (and closure for
 /// user-space operations). The beam arrives via `apply`.
@@ -67,13 +68,13 @@ pub trait Beam: Sized {
         self.result().is_err()
     }
 
-    /// Lossless transition. Shorthand for `tick(Imperfect::Success(value))`.
+    /// Lossless transition. Shorthand for `tick(Imperfect::success(value))`.
     ///
     /// # Panics
     ///
     /// Panics if `self` is a Failure beam.
     fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
-        self.tick(Imperfect::Success(value))
+        self.tick(Imperfect::success(value))
     }
 
     /// Apply an operation. The DSL entry point.
@@ -92,67 +93,83 @@ pub trait Beam: Sized {
     ) -> Self::Tick<T, Self::Error> {
         let imp = match self.result() {
             Imperfect::Success(v) | Imperfect::Partial(v, _) => f(v),
-            Imperfect::Failure(_) => panic!("smap on Err beam"),
+            Imperfect::Failure(_, _) => panic!("smap on Err beam"),
         };
         self.tick(imp)
     }
 }
 
-/// Production beam. Flat struct: input + imperfect result. No trace overhead.
+/// Bidirectional carrier for optics. Carries the source alongside the focus.
+/// For Lens get/put, Prism preview/review — operations that need to go back.
 ///
-/// This is the default `Beam` implementation for pipelines that do not need
-/// execution recording. A `TraceBeam` that records each step into a [`Trace`](crate::trace::Trace)
+/// Flat struct: source + imperfect focus. No trace overhead.
+/// A `TraceBeam` that records each step into a [`Trace`](crate::trace::Trace)
 /// is forthcoming.
-pub struct PureBeam<In, Out, E = Infallible, L: Loss = ShannonLoss> {
-    input: In,
-    imperfect: Imperfect<Out, E, L>,
+pub struct Optic<In, Out, E = Infallible, L: Loss = ScalarLoss> {
+    source: In,
+    focus: Imperfect<Out, E, L>,
 }
 
-impl<In, Out, E, L: Loss> PureBeam<In, Out, E, L> {
-    /// Construct a perfect beam (zero loss).
-    pub fn ok(input: In, output: Out) -> Self {
-        Self { input, imperfect: Imperfect::Success(output) }
+impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
+    /// Construct a perfect optic (zero loss).
+    pub fn ok(source: In, output: Out) -> Self {
+        Self {
+            source,
+            focus: Imperfect::success(output),
+        }
     }
 
-    /// Construct a partial beam (value with loss).
-    pub fn partial(input: In, output: Out, loss: L) -> Self {
-        Self { input, imperfect: Imperfect::Partial(output, loss) }
+    /// Construct a partial optic (value with loss).
+    pub fn partial(source: In, output: Out, loss: L) -> Self {
+        Self {
+            source,
+            focus: Imperfect::partial(output, loss),
+        }
     }
 
-    /// Construct a failed beam.
-    pub fn err(input: In, error: E) -> Self {
-        Self { input, imperfect: Imperfect::Failure(error) }
+    /// Construct a failed optic.
+    pub fn err(source: In, error: E) -> Self {
+        Self {
+            source,
+            focus: Imperfect::failure(error),
+        }
     }
 }
 
 fn propagate<T, E, L: Loss>(loss: L, next: Imperfect<T, E, L>) -> Imperfect<T, E, L> {
     match next {
-        Imperfect::Success(v) => Imperfect::Partial(v, loss),
-        Imperfect::Partial(v, loss2) => Imperfect::Partial(v, loss.combine(loss2)),
-        Imperfect::Failure(e) => Imperfect::Failure(e),
+        Imperfect::Success(v) => Imperfect::partial(v, loss),
+        Imperfect::Partial(v, loss2) => Imperfect::partial(v, loss.combine(loss2)),
+        Imperfect::Failure(e, loss2) => Imperfect::failure_with_loss(e, loss.combine(loss2)),
     }
 }
 
-impl<In, Out, E, L: Loss> Beam for PureBeam<In, Out, E, L> {
+impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
     type In = In;
     type Out = Out;
     type Error = E;
     type Loss = L;
-    type Tick<T, NE> = PureBeam<Out, T, NE, L>;
+    type Tick<T, NE> = Optic<Out, T, NE, L>;
 
     fn input(&self) -> &In {
-        &self.input
+        &self.source
     }
 
     fn result(&self) -> Imperfect<&Out, &E, L> {
-        self.imperfect.as_ref()
+        self.focus.as_ref()
     }
 
-    fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> PureBeam<Out, T, NE, L> {
-        match self.imperfect {
-            Imperfect::Failure(_) => panic!("tick on Err beam — check is_ok() first"),
-            Imperfect::Success(old_out) => PureBeam { input: old_out, imperfect: next },
-            Imperfect::Partial(old_out, loss) => PureBeam { input: old_out, imperfect: propagate(loss, next) },
+    fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> Optic<Out, T, NE, L> {
+        match self.focus {
+            Imperfect::Failure(_, _) => panic!("tick on Err beam — check is_ok() first"),
+            Imperfect::Success(old_out) => Optic {
+                source: old_out,
+                focus: next,
+            },
+            Imperfect::Partial(old_out, loss) => Optic {
+                source: old_out,
+                focus: propagate(loss, next),
+            },
         }
     }
 }
@@ -165,10 +182,12 @@ mod tests {
     /// A trivial operation for testing: doubles the value.
     struct DoubleOp;
 
-    impl Operation<PureBeam<(), u32>> for DoubleOp {
-        type Output = PureBeam<u32, u32>;
-        fn op(&self) -> Op { Op::Project }
-        fn apply(self, beam: PureBeam<(), u32>) -> PureBeam<u32, u32> {
+    impl Operation<Optic<(), u32>> for DoubleOp {
+        type Output = Optic<u32, u32>;
+        fn op(&self) -> Op {
+            Op::Project
+        }
+        fn apply(self, beam: Optic<(), u32>) -> Optic<u32, u32> {
             let v = *beam.result().ok().unwrap();
             beam.next(v * 2)
         }
@@ -176,14 +195,14 @@ mod tests {
 
     #[test]
     fn apply_operation() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
+        let b: Optic<(), u32> = Optic::ok((), 5);
         let n = b.apply(DoubleOp);
         assert_eq!(n.result().ok(), Some(&10));
     }
 
     #[test]
     fn pure_beam_ok() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 42);
+        let b: Optic<(), u32> = Optic::ok((), 42);
         assert!(b.is_ok());
         assert!(!b.is_err());
         assert_eq!(b.result().ok(), Some(&42));
@@ -192,7 +211,7 @@ mod tests {
 
     #[test]
     fn pure_beam_partial() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 42, ShannonLoss::new(1.5));
+        let b: Optic<(), u32> = Optic::partial((), 42, ScalarLoss::new(1.5));
         assert!(b.is_ok());
         assert!(b.is_partial());
         assert_eq!(b.result().ok(), Some(&42));
@@ -200,14 +219,14 @@ mod tests {
 
     #[test]
     fn pure_beam_err() {
-        let b: PureBeam<(), u32, String> = PureBeam::err((), "oops".into());
+        let b: Optic<(), u32, String> = Optic::err((), "oops".into());
         assert!(b.is_err());
         assert!(!b.is_ok());
     }
 
     #[test]
     fn next_ok_to_ok() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 10);
+        let b: Optic<(), u32> = Optic::ok((), 10);
         let n = b.next("hello");
         assert!(n.is_ok());
         assert!(!n.is_partial());
@@ -217,7 +236,7 @@ mod tests {
 
     #[test]
     fn next_partial_carries_loss() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 10, ShannonLoss::new(2.0));
+        let b: Optic<(), u32> = Optic::partial((), 10, ScalarLoss::new(2.0));
         let n = b.next(20u32);
         assert!(n.is_partial());
         assert_eq!(n.input(), &10u32);
@@ -226,66 +245,75 @@ mod tests {
     #[test]
     #[should_panic(expected = "tick on Err beam")]
     fn next_on_err_panics() {
-        let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
+        let b: Optic<(), u32, String> = Optic::err((), "err".into());
         let _ = b.next(0u32);
     }
 
     #[test]
     fn tick_ok_with_ok() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.tick(Imperfect::<&str, String>::Success("hi"));
+        let b: Optic<(), u32> = Optic::ok((), 5);
+        let n = b.tick(Imperfect::<&str, String, ScalarLoss>::success("hi"));
         assert!(n.is_ok());
         assert!(!n.is_partial());
     }
 
     #[test]
     fn tick_ok_with_partial() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.tick(Imperfect::<&str, String>::Partial("hi", ShannonLoss::new(1.0)));
+        let b: Optic<(), u32> = Optic::ok((), 5);
+        let n = b.tick(Imperfect::<&str, String, ScalarLoss>::partial(
+            "hi",
+            ScalarLoss::new(1.0),
+        ));
         assert!(n.is_partial());
         assert_eq!(n.result().ok(), Some(&"hi"));
     }
 
     #[test]
     fn tick_ok_with_err() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n: PureBeam<u32, u32, i32> = b.tick(Imperfect::Failure(-1));
+        let b: Optic<(), u32> = Optic::ok((), 5);
+        let n: Optic<u32, u32, i32> = b.tick(Imperfect::failure(-1));
         assert!(n.is_err());
     }
 
     #[test]
     fn tick_partial_with_ok_carries_loss() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.tick(Imperfect::<u32, String>::Success(10));
+        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let n = b.tick(Imperfect::<u32, String, ScalarLoss>::success(10));
         assert!(n.is_partial());
     }
 
     #[test]
     fn tick_partial_with_partial_accumulates() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.tick(Imperfect::<u32, String>::Partial(10, ShannonLoss::new(0.5)));
+        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let n = b.tick(Imperfect::<u32, String, ScalarLoss>::partial(
+            10,
+            ScalarLoss::new(0.5),
+        ));
         assert!(n.is_partial());
     }
 
     #[test]
     fn tick_partial_with_err() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.tick(Imperfect::<u32, String>::Failure("fail".into()));
+        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let n = b.tick(Imperfect::<u32, String, ScalarLoss>::failure_with_loss(
+            "fail".into(),
+            ScalarLoss::zero(),
+        ));
         assert!(n.is_err());
     }
 
     #[test]
     #[should_panic(expected = "tick on Err beam")]
     fn tick_on_err_panics() {
-        let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
-        let _ = b.tick(Imperfect::<u32, String>::Success(0));
+        let b: Optic<(), u32, String> = Optic::err((), "err".into());
+        let _ = b.tick(Imperfect::<u32, String, ScalarLoss>::success(0));
     }
 
     #[test]
     fn type_chain_three_steps() {
-        let b0: PureBeam<(), u32> = PureBeam::ok((), 42u32);
-        let b1: PureBeam<u32, String> = b0.next("hello".to_string());
-        let b2: PureBeam<String, Vec<char>> = b1.next(vec!['a', 'b']);
+        let b0: Optic<(), u32> = Optic::ok((), 42u32);
+        let b1: Optic<u32, String> = b0.next("hello".to_string());
+        let b2: Optic<String, Vec<char>> = b1.next(vec!['a', 'b']);
         assert_eq!(b2.input(), &"hello".to_string());
         assert_eq!(b2.result().ok(), Some(&vec!['a', 'b']));
     }
@@ -294,48 +322,48 @@ mod tests {
 
     #[test]
     fn smap_ok() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.smap(|&v| Imperfect::Success(v * 2));
+        let b: Optic<(), u32> = Optic::ok((), 5);
+        let n = b.smap(|&v| Imperfect::success(v * 2));
         assert_eq!(n.result().ok(), Some(&10));
         assert!(!n.is_partial());
     }
 
     #[test]
     fn smap_returns_partial() {
-        let b: PureBeam<(), u32> = PureBeam::ok((), 5);
-        let n = b.smap(|&v| Imperfect::Partial(v * 2, ShannonLoss::new(0.5)));
+        let b: Optic<(), u32> = Optic::ok((), 5);
+        let n = b.smap(|&v| Imperfect::partial(v * 2, ScalarLoss::new(0.5)));
         assert!(n.is_partial());
         assert_eq!(n.result().ok(), Some(&10));
     }
 
     #[test]
     fn smap_returns_err() {
-        let b: PureBeam<(), u32, String> = PureBeam::ok((), 5);
-        let n = b.smap(|_| Imperfect::<u32, String>::Failure("nope".into()));
+        let b: Optic<(), u32, String> = Optic::ok((), 5);
+        let n = b.smap(|_| Imperfect::<u32, String, ScalarLoss>::failure("nope".into()));
         assert!(n.is_err());
     }
 
     #[test]
     fn smap_on_partial_accumulates_loss() {
-        let b: PureBeam<(), u32> = PureBeam::partial((), 5, ShannonLoss::new(1.0));
-        let n = b.smap(|&v| Imperfect::Partial(v * 2, ShannonLoss::new(0.5)));
+        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let n = b.smap(|&v| Imperfect::partial(v * 2, ScalarLoss::new(0.5)));
         assert!(n.is_partial());
     }
 
-    fn wrap_success(v: &u32) -> Imperfect<u32, String> {
-        Imperfect::Success(*v)
+    fn wrap_success(v: &u32) -> Imperfect<u32, String, ScalarLoss> {
+        Imperfect::success(*v)
     }
 
     #[test]
     #[should_panic(expected = "smap on Err beam")]
     fn smap_on_err_panics() {
-        let b: PureBeam<(), u32, String> = PureBeam::err((), "err".into());
+        let b: Optic<(), u32, String> = Optic::err((), "err".into());
         let _ = b.smap(wrap_success);
     }
 
     #[test]
     fn smap_fn_pointer_executes_body() {
-        let b: PureBeam<(), u32, String> = PureBeam::ok((), 7);
+        let b: Optic<(), u32, String> = Optic::ok((), 7);
         let n = b.smap(wrap_success);
         assert_eq!(n.result().ok(), Some(&7));
     }

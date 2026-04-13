@@ -7,9 +7,10 @@
 //! As a Prism: focus extracts (using Failure on non-match), project is identity,
 //! refract returns the extracted value.
 
+use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
-use crate::{Beam, Prism, PureBeam};
-use imperfect::{Imperfect, ShannonLoss};
+use terni::Imperfect;
 
 #[derive(Clone, Copy)]
 pub struct OpticPrism<S, A> {
@@ -52,21 +53,21 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 }
 
-/// OpticPrism implements Prism with PureBeam.
+/// OpticPrism implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: extract (S → A), using Partial with infinite loss on non-match
 /// - project: identity pass-through
 /// - refract: identity pass-through
 ///
-/// Non-matching inputs produce a Partial beam with ShannonLoss::total()
+/// Non-matching inputs produce a Partial beam with ScalarLoss::total()
 /// (infinite loss), signaling refutation through the loss channel rather
 /// than the error channel.
 impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
-    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
-    type Focused   = PureBeam<S, A, Infallible, ShannonLoss>;
-    type Projected = PureBeam<A, A, Infallible, ShannonLoss>;
-    type Refracted = PureBeam<A, A, Infallible, ShannonLoss>;
+    type Input = Optic<(), S, Infallible, ScalarLoss>;
+    type Focused = Optic<S, A, Infallible, ScalarLoss>;
+    type Projected = Optic<A, A, Infallible, ScalarLoss>;
+    type Refracted = Optic<A, A, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -76,7 +77,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
         } else {
             // Non-match: extract the sentinel and mark with infinite loss.
             let sentinel = (self.extract_fn)(&s);
-            beam.tick(Imperfect::Partial(sentinel, ShannonLoss::new(f64::INFINITY)))
+            beam.tick(Imperfect::partial(sentinel, ScalarLoss::new(f64::INFINITY)))
         }
     }
 
@@ -107,7 +108,11 @@ mod tests {
     }
 
     fn shape_extract_circle(s: &Shape) -> i32 {
-        if let Shape::Circle(r) = s { *r } else { -1 }
+        if let Shape::Circle(r) = s {
+            *r
+        } else {
+            -1
+        }
     }
 
     fn shape_review_circle(r: i32) -> Shape {
@@ -147,8 +152,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]

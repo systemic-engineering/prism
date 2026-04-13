@@ -6,9 +6,9 @@
 //! As a Prism: all stages are identity on S. The modify operation is available
 //! as an inherent method. The pipeline preserves S through all stages.
 
+use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
-use crate::{Beam, Prism, PureBeam};
-use imperfect::ShannonLoss;
 
 #[derive(Clone, Copy)]
 pub struct Setter<S, A> {
@@ -33,17 +33,17 @@ impl<S: 'static, A: 'static> Setter<S, A> {
     }
 }
 
-/// Setter implements Prism with PureBeam.
+/// Setter implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: identity (S → S) — no read access
 /// - project: identity (S → S)
 /// - refract: applies modify with identity to witness the closure, returns S
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
-    type Input     = PureBeam<(), S, Infallible, ShannonLoss>;
-    type Focused   = PureBeam<S, S, Infallible, ShannonLoss>;
-    type Projected = PureBeam<S, S, Infallible, ShannonLoss>;
-    type Refracted = PureBeam<S, S, Infallible, ShannonLoss>;
+    type Input = Optic<(), S, Infallible, ScalarLoss>;
+    type Focused = Optic<S, S, Infallible, ScalarLoss>;
+    type Projected = Optic<S, S, Infallible, ScalarLoss>;
+    type Refracted = Optic<S, S, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -69,10 +69,16 @@ mod tests {
     use crate::Beam as BeamTrait;
 
     #[derive(Clone, Debug, PartialEq)]
-    struct Box2 { label: String, count: i32 }
+    struct Box2 {
+        label: String,
+        count: i32,
+    }
 
     fn box2_modify_count(b: Box2, f: &dyn Fn(i32) -> i32) -> Box2 {
-        Box2 { count: f(b.count), ..b }
+        Box2 {
+            count: f(b.count),
+            ..b
+        }
     }
 
     // --- Inherent method tests ---
@@ -80,7 +86,10 @@ mod tests {
     #[test]
     fn setter_modifies_field() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "test".to_string(), count: 5 };
+        let b = Box2 {
+            label: "test".to_string(),
+            count: 5,
+        };
         let b2 = s.modify(b, |c| c + 10);
         assert_eq!(b2.count, 15);
         assert_eq!(b2.label, "test");
@@ -89,21 +98,27 @@ mod tests {
     #[test]
     fn setter_identity_law() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "x".to_string(), count: 7 };
+        let b = Box2 {
+            label: "x".to_string(),
+            count: 7,
+        };
         let b2 = s.modify(b.clone(), |a| a);
         assert_eq!(b2, b);
     }
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ShannonLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]
     fn setter_prism_focus_passes_through() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "x".to_string(), count: 5 };
+        let b = Box2 {
+            label: "x".to_string(),
+            count: 5,
+        };
         let focused = s.focus(seed(b.clone()));
         assert_eq!(focused.result().ok(), Some(&b));
     }
@@ -111,7 +126,10 @@ mod tests {
     #[test]
     fn setter_prism_project_passes_through() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "x".to_string(), count: 5 };
+        let b = Box2 {
+            label: "x".to_string(),
+            count: 5,
+        };
         let focused = s.focus(seed(b.clone()));
         let projected = s.project(focused);
         assert_eq!(projected.result().ok(), Some(&b));
@@ -120,7 +138,10 @@ mod tests {
     #[test]
     fn setter_prism_refract_witnesses_modify() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "x".to_string(), count: 5 };
+        let b = Box2 {
+            label: "x".to_string(),
+            count: 5,
+        };
         let focused = s.focus(seed(b.clone()));
         let projected = s.project(focused);
         let refracted = s.refract(projected);
@@ -131,7 +152,10 @@ mod tests {
     #[test]
     fn setter_prism_is_lossless() {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
-        let b = Box2 { label: "t".to_string(), count: 3 };
+        let b = Box2 {
+            label: "t".to_string(),
+            count: 3,
+        };
         let focused = s.focus(seed(b));
         assert!(!focused.is_partial());
     }
@@ -141,7 +165,10 @@ mod tests {
         let s: Setter<Box2, i32> = Setter::new(box2_modify_count);
         let s2 = s; // Copy
         let s3 = s2.clone(); // Clone
-        let b = Box2 { label: "t".to_string(), count: 3 };
+        let b = Box2 {
+            label: "t".to_string(),
+            count: 3,
+        };
         assert_eq!(s3.modify(b, |c| c * 2).count, 6);
     }
 }

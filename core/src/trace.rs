@@ -8,7 +8,7 @@
 use std::any::Any;
 use std::fmt;
 
-use imperfect::ShannonLoss;
+use crate::ScalarLoss;
 
 /// Which pipeline operation produced a step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +39,7 @@ pub enum StepOutput {
 pub struct Step {
     pub prism: &'static str,
     pub op: Op,
-    pub loss: ShannonLoss,
+    pub loss: ScalarLoss,
     pub input: Box<dyn Traced>,
     pub output: StepOutput,
 }
@@ -81,7 +81,7 @@ impl Trace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use imperfect::Loss as _;
+    use terni::Loss as _;
 
     #[test]
     fn trace_starts_empty() {
@@ -96,7 +96,7 @@ mod tests {
         t.push(Step {
             prism: "test",
             op: Op::Focus,
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
             input: Box::new(42u32),
             output: StepOutput::Value(Box::new("focused".to_string())),
         });
@@ -110,7 +110,7 @@ mod tests {
         t.push(Step {
             prism: "test",
             op: Op::Focus,
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
             input: Box::new(99u32),
             output: StepOutput::Value(Box::new("out".to_string())),
         });
@@ -123,7 +123,7 @@ mod tests {
         t.push(Step {
             prism: "test",
             op: Op::Focus,
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
             input: Box::new(99u32),
             output: StepOutput::Value(Box::new("out".to_string())),
         });
@@ -149,7 +149,7 @@ mod tests {
         t.push(Step {
             prism: "p",
             op: Op::Refract,
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
             input: Box::new(1u32),
             output: StepOutput::Value(Box::new(2u32)),
         });
@@ -163,7 +163,7 @@ mod tests {
         t.push(Step {
             prism: "test",
             op: Op::Focus,
-            loss: ShannonLoss::zero(),
+            loss: ScalarLoss::zero(),
             input: Box::new("hello".to_string()),
             output: StepOutput::Value(Box::new(42u32)),
         });

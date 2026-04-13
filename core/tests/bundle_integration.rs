@@ -2,8 +2,10 @@
 
 #![cfg(feature = "bundle")]
 
-use imperfect::{Imperfect, ShannonLoss};
+use prism_core::ScalarLoss;
 use prism_core::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
+use std::convert::Infallible;
+use terni::Imperfect;
 
 struct Spectral {
     optic: &'static str,
@@ -16,17 +18,21 @@ impl Fiber for Spectral {
 
 impl Connection for Spectral {
     type Optic = &'static str;
-    fn connection(&self) -> &&'static str { &self.optic }
+    fn connection(&self) -> &&'static str {
+        &self.optic
+    }
 }
 
 impl Gauge for Spectral {
     type Group = u32;
-    fn gauge(&self) -> &u32 { &self.strategy }
+    fn gauge(&self) -> &u32 {
+        &self.strategy
+    }
 }
 
 impl Transport for Spectral {
-    type Holonomy = ShannonLoss;
-    fn transport(&self, state: &[f64; 16]) -> Imperfect<[f64; 16], ShannonLoss> {
+    type Holonomy = ScalarLoss;
+    fn transport(&self, state: &[f64; 16]) -> Imperfect<[f64; 16], Infallible, ScalarLoss> {
         // Compress: keep first 8, zero last 8
         let mut compressed = *state;
         let mut loss = 0.0;
@@ -37,14 +43,16 @@ impl Transport for Spectral {
         if loss == 0.0 {
             Imperfect::Success(compressed)
         } else {
-            Imperfect::Partial(compressed, ShannonLoss::new(loss))
+            Imperfect::Partial(compressed, ScalarLoss::new(loss))
         }
     }
 }
 
 impl Closure for Spectral {
     type Fixed = &'static str;
-    fn close(&self) -> &&'static str { &"fate" }
+    fn close(&self) -> &&'static str {
+        &"fate"
+    }
 }
 
 fn traverse_tower<B: Bundle>(b: &B) -> bool

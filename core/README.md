@@ -38,9 +38,9 @@ Each stage's input type must equal the previous stage's output type. Mismatches 
 ## The DSL
 
 ```rust
-use prism_core::{Beam, Prism, PureBeam, Focus, Project, Refract};
+use prism_core::{Beam, Prism, Optic, Focus, Project, Refract};
 
-let result = PureBeam::ok((), input)
+let result = Optic::ok((), input)
     .apply(Focus(&my_prism))
     .apply(Project(&my_prism))
     .apply(Refract(&my_prism));
@@ -74,7 +74,7 @@ Wrap in named `Operation` implementations for reuse. That's application code, no
 
 ## Implementations
 
-**`PureBeam`** -- production beam. Flat struct: input + `Imperfect` result. No trace overhead.
+**`Optic`** -- production beam. Flat struct: source + `Imperfect` focus. No trace overhead.
 
 **`TraceBeam`** -- forthcoming. Records each step into a `Trace` for debugging and inspection.
 
@@ -84,4 +84,4 @@ Wrap in named `Operation` implementations for reuse. That's application code, no
 
 ## Dependencies
 
-Depends on `imperfect`. Zero external dependencies.
+Depends on `terni`. Zero external dependencies.

@@ -38,7 +38,11 @@ pub struct KernelSpec {
 impl KernelSpec {
     /// Create a kernel spec with explicit dimensions.
     pub fn new(dimensions: Vec<usize>, decomposition: Decomposition, precision: Precision) -> Self {
-        KernelSpec { dimensions, decomposition, precision }
+        KernelSpec {
+            dimensions,
+            decomposition,
+            precision,
+        }
     }
 
     /// Construct from logits: dimensions where logit > threshold are preserved.
@@ -49,7 +53,8 @@ impl KernelSpec {
         decomposition: Decomposition,
         precision: Precision,
     ) -> Self {
-        let dimensions: Vec<usize> = logits.iter()
+        let dimensions: Vec<usize> = logits
+            .iter()
             .enumerate()
             .filter(|(_, &l)| l > threshold)
             .map(|(i, _)| i)
@@ -57,7 +62,8 @@ impl KernelSpec {
 
         // Guard: never produce empty dimensions. Keep the best one.
         let dimensions = if dimensions.is_empty() && !logits.is_empty() {
-            let best = logits.iter()
+            let best = logits
+                .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .map(|(i, _)| i)
@@ -67,7 +73,11 @@ impl KernelSpec {
             dimensions
         };
 
-        KernelSpec { dimensions, decomposition, precision }
+        KernelSpec {
+            dimensions,
+            decomposition,
+            precision,
+        }
     }
 
     /// Number of preserved dimensions.
@@ -106,9 +116,15 @@ mod tests {
 
     #[test]
     fn kernel_spec_from_logits_filters_by_threshold() {
-        let logits = [1.0, -0.5, 2.0, -1.0, 0.3, -0.2, 1.5, -0.8,
-                      0.1, -0.3, 0.8, -0.1, 0.5, -0.4, 1.2, -0.6];
-        let spec = KernelSpec::from_logits(&logits, 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
+        let logits = [
+            1.0, -0.5, 2.0, -1.0, 0.3, -0.2, 1.5, -0.8, 0.1, -0.3, 0.8, -0.1, 0.5, -0.4, 1.2, -0.6,
+        ];
+        let spec = KernelSpec::from_logits(
+            &logits,
+            0.0,
+            Decomposition::Eigenvalue,
+            Precision::new(0.01),
+        );
         // Positive logits at indices: 0, 2, 4, 6, 8, 10, 12, 14
         assert_eq!(spec.dimensions, vec![0, 2, 4, 6, 8, 10, 12, 14]);
         assert_eq!(spec.rank(), 8);
@@ -116,8 +132,9 @@ mod tests {
 
     #[test]
     fn kernel_spec_from_logits_high_threshold() {
-        let logits = [1.0, -0.5, 2.0, -1.0, 0.3, -0.2, 1.5, -0.8,
-                      0.1, -0.3, 0.8, -0.1, 0.5, -0.4, 1.2, -0.6];
+        let logits = [
+            1.0, -0.5, 2.0, -1.0, 0.3, -0.2, 1.5, -0.8, 0.1, -0.3, 0.8, -0.1, 0.5, -0.4, 1.2, -0.6,
+        ];
         let spec = KernelSpec::from_logits(&logits, 1.0, Decomposition::Svd, Precision::new(0.1));
         // Logits > 1.0: indices 2 (2.0), 6 (1.5), 14 (1.2)
         assert_eq!(spec.dimensions, vec![2, 6, 14]);
@@ -126,23 +143,19 @@ mod tests {
 
     #[test]
     fn projection_matrix_diagonal() {
-        let spec = KernelSpec::new(
-            vec![0, 2],
-            Decomposition::MatVec,
-            Precision::new(0.01),
-        );
+        let spec = KernelSpec::new(vec![0, 2], Decomposition::MatVec, Precision::new(0.01));
         let matrix = spec.projection_matrix(4);
         // 4×4 matrix, 1s at (0,0) and (2,2)
-        assert_eq!(matrix[0 * 4 + 0], 1.0);  // (0,0)
-        assert_eq!(matrix[1 * 4 + 1], 0.0);  // (1,1) not preserved
-        assert_eq!(matrix[2 * 4 + 2], 1.0);  // (2,2)
-        assert_eq!(matrix[3 * 4 + 3], 0.0);  // (3,3) not preserved
+        assert_eq!(matrix[0 * 4 + 0], 1.0); // (0,0)
+        assert_eq!(matrix[1 * 4 + 1], 0.0); // (1,1) not preserved
+        assert_eq!(matrix[2 * 4 + 2], 1.0); // (2,2)
+        assert_eq!(matrix[3 * 4 + 3], 0.0); // (3,3) not preserved
     }
 
     #[test]
     fn projection_matrix_out_of_bounds_ignored() {
         let spec = KernelSpec::new(
-            vec![0, 5],  // 5 is out of bounds for n=4
+            vec![0, 5], // 5 is out of bounds for n=4
             Decomposition::MatVec,
             Precision::new(0.01),
         );
@@ -150,12 +163,13 @@ mod tests {
         assert_eq!(matrix[0 * 4 + 0], 1.0);
         // Index 5 silently ignored (d < n check)
         let sum: f64 = matrix.iter().sum();
-        assert_eq!(sum, 1.0);  // Only one 1.0 in the matrix
+        assert_eq!(sum, 1.0); // Only one 1.0 in the matrix
     }
 
     #[test]
     fn empty_logits_empty_spec() {
-        let spec = KernelSpec::from_logits(&[], 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
+        let spec =
+            KernelSpec::from_logits(&[], 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
         assert_eq!(spec.rank(), 0);
         assert!(spec.dimensions.is_empty());
     }
@@ -163,7 +177,12 @@ mod tests {
     #[test]
     fn from_logits_never_empty() {
         let logits = [-1.0, -2.0, -3.0, -4.0];
-        let spec = KernelSpec::from_logits(&logits, 0.0, Decomposition::Eigenvalue, Precision::new(0.01));
+        let spec = KernelSpec::from_logits(
+            &logits,
+            0.0,
+            Decomposition::Eigenvalue,
+            Precision::new(0.01),
+        );
         assert_eq!(spec.rank(), 1); // keeps the best one (-1.0 at index 0)
         assert_eq!(spec.dimensions, vec![0]);
     }

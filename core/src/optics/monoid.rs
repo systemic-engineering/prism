@@ -44,7 +44,9 @@ impl PrismMonoid for CountMonoid {
     }
 
     fn compose(self, other: Self) -> Self {
-        CountMonoid { count: self.count + other.count }
+        CountMonoid {
+            count: self.count + other.count,
+        }
     }
 }
 

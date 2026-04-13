@@ -162,9 +162,9 @@ mod tests {
     fn split_finds_last_nonzero() {
         // dp starts at 5 after Focus(5), cells 5+ are zero
         let program = vec![
-            Instruction::Focus(5),  // read 5 bytes, dp=5
-            Instruction::Split(5),  // scan 5 cells from dp=5, all zero, dp stays at 5
-            Instruction::Refract,   // output cell at dp
+            Instruction::Focus(5), // read 5 bytes, dp=5
+            Instruction::Split(5), // scan 5 cells from dp=5, all zero, dp stays at 5
+            Instruction::Refract,  // output cell at dp
         ];
         // Input: cells 0-4 have values, cells 5+ are zero
         let output = execute(&program, &[0, 0, 10, 0, 20]);
@@ -252,10 +252,7 @@ mod tests {
 
     #[test]
     fn zoom_adds_to_cell() {
-        let program = vec![
-            Instruction::Zoom(0, 42),
-            Instruction::Refract,
-        ];
+        let program = vec![Instruction::Zoom(0, 42), Instruction::Refract];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![42]);
     }
@@ -265,16 +262,16 @@ mod tests {
         // The Fate selector: read biases, argmax, output.
         // Input: 16 zero features + context 0 + biases [0, 10, 0, 0, 0]
         let mut input = vec![0u8; 16]; // features
-        input.push(0);                  // context
+        input.push(0); // context
         input.extend_from_slice(&[0, 10, 0, 0, 0]); // biases
 
         let program = vec![
-            Instruction::Focus(22),   // read all 22 bytes, dp=22
-            // Biases are now in cells 17-21. Cell 18 = 10.
-            // Need to find argmax over cells 17-21.
-            // Split scans from dp. We need dp=17.
-            // Hack: we know dp=22 after Focus. Can't move backward in Metal.
-            // Instead: set up a second tape region or accept dp=22.
+            Instruction::Focus(22), // read all 22 bytes, dp=22
+                                    // Biases are now in cells 17-21. Cell 18 = 10.
+                                    // Need to find argmax over cells 17-21.
+                                    // Split scans from dp. We need dp=17.
+                                    // Hack: we know dp=22 after Focus. Can't move backward in Metal.
+                                    // Instead: set up a second tape region or accept dp=22.
         ];
         // This test documents that Metal needs a SetDp or that Focus
         // should leave dp at a useful position. For now, just verify
@@ -290,9 +287,9 @@ mod tests {
             Instruction::Zoom(0, 5),
             Instruction::Zoom(1, 20),
             Instruction::Zoom(2, 3),
-            Instruction::Project(10),  // zero out < 10: cells 0,2 become 0
-            Instruction::Split(3),     // last nonzero = cell 1
-            Instruction::Refract,      // output cell at dp=1 = 20
+            Instruction::Project(10), // zero out < 10: cells 0,2 become 0
+            Instruction::Split(3),    // last nonzero = cell 1
+            Instruction::Refract,     // output cell at dp=1 = 20
         ];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![20]);
@@ -317,7 +314,7 @@ mod tests {
         let program = vec![
             Instruction::Zoom(0, 65), // 'A'
             Instruction::Refract,
-            Instruction::Zoom(0, 1),  // 65 + 1 = 66 = 'B'
+            Instruction::Zoom(0, 1), // 65 + 1 = 66 = 'B'
             Instruction::Refract,
         ];
         let output = execute(&program, &[]);

@@ -1,20 +1,20 @@
-use imperfect::{Imperfect, ShannonLoss};
-use prism_core::{
-    Beam, Focus, Prism, Project, PureBeam, Refract,
-};
+use prism_core::ScalarLoss;
+use prism_core::{Beam, Focus, Optic, Prism, Project, Refract};
 use std::convert::Infallible;
+use terni::Imperfect;
 
 /// A prism that tokenizes → counts → formats.
 struct TokenPrism;
 
 impl Prism for TokenPrism {
-    type Input     = PureBeam<(), String>;
-    type Focused   = PureBeam<String, Vec<String>>;
-    type Projected = PureBeam<Vec<String>, usize>;
-    type Refracted = PureBeam<usize, String>;
+    type Input = Optic<(), String>;
+    type Focused = Optic<String, Vec<String>>;
+    type Projected = Optic<Vec<String>, usize>;
+    type Refracted = Optic<usize, String>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
-        let tokens: Vec<String> = beam.result()
+        let tokens: Vec<String> = beam
+            .result()
             .ok()
             .expect("focus: Err beam")
             .split_whitespace()
@@ -36,7 +36,7 @@ impl Prism for TokenPrism {
 
 #[test]
 fn full_pipeline_dsl() {
-    let result = PureBeam::ok((), "hello world foo".to_string())
+    let result = Optic::ok((), "hello world foo".to_string())
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism))
         .apply(Refract(&TokenPrism));
@@ -47,13 +47,13 @@ fn full_pipeline_dsl() {
 
 #[test]
 fn full_pipeline_apply_fn() {
-    let result = prism_core::apply(&TokenPrism, PureBeam::ok((), "a b c d".to_string()));
+    let result = prism_core::apply(&TokenPrism, Optic::ok((), "a b c d".to_string()));
     assert_eq!(result.result().ok(), Some(&"4 tokens".to_string()));
 }
 
 #[test]
 fn smap_as_zoom_in_pipeline() {
-    let projected = PureBeam::ok((), "hello world".to_string())
+    let projected = Optic::ok((), "hello world".to_string())
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism));
 
@@ -63,20 +63,22 @@ fn smap_as_zoom_in_pipeline() {
 
 #[test]
 fn smap_as_split_in_pipeline() {
-    let focused = PureBeam::ok((), "hello world".to_string())
-        .apply(Focus(&TokenPrism));
+    let focused = Optic::ok((), "hello world".to_string()).apply(Focus(&TokenPrism));
 
-    let chars: PureBeam<Vec<String>, Vec<char>> = focused.smap(|tokens| {
+    let chars: Optic<Vec<String>, Vec<char>> = focused.smap(|tokens| {
         let all_chars: Vec<char> = tokens.iter().flat_map(|t| t.chars()).collect();
         Imperfect::Success(all_chars)
     });
-    assert_eq!(chars.result().ok(), Some(&vec!['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd']));
+    assert_eq!(
+        chars.result().ok(),
+        Some(&vec!['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd'])
+    );
 }
 
 #[test]
 fn partial_beam_propagates_loss() {
-    let b: PureBeam<(), String, Infallible, ShannonLoss> =
-        PureBeam::partial((), "hello world".to_string(), ShannonLoss::new(0.5));
+    let b: Optic<(), String, Infallible, ScalarLoss> =
+        Optic::partial((), "hello world".to_string(), ScalarLoss::new(0.5));
 
     let focused = TokenPrism.focus(b);
     assert!(focused.is_partial());
@@ -88,7 +90,7 @@ fn partial_beam_propagates_loss() {
 #[test]
 fn imperfect_result_interop() {
     let ok_result: Result<u32, String> = Ok(42);
-    let imp: Imperfect<u32, String> = ok_result.into();
+    let imp: Imperfect<u32, String, ScalarLoss> = ok_result.into();
     assert!(imp.is_ok());
 
     let back: Result<u32, String> = imp.into();
@@ -96,34 +98,22 @@ fn imperfect_result_interop() {
 }
 
 #[test]
-fn shannon_loss_methods_covered_in_integration() {
-    use imperfect::Loss;
+fn scalar_loss_methods_covered_in_integration() {
+    use terni::Loss;
 
-    // is_lossless: delegates to is_zero
-    let zero = ShannonLoss::zero();
-    assert!(zero.is_lossless());
+    let zero = ScalarLoss::zero();
+    assert!(zero.is_zero());
+    assert_eq!(zero.as_f64(), 0.0);
 
-    // Loss::total via trait method
-    let total = ShannonLoss::total();
+    let total = ScalarLoss::total();
     assert!(!total.is_zero());
+    assert!(total.as_f64().is_infinite());
 
-    // Add operator
-    let a = ShannonLoss::new(1.0);
-    let b = ShannonLoss::new(2.0);
-    let sum = a + b;
-    assert_eq!(sum.as_f64(), 3.0);
+    let a = ScalarLoss::new(1.0);
+    let b = ScalarLoss::new(2.0);
+    let combined = a.combine(b);
+    assert_eq!(combined.as_f64(), 3.0);
 
-    // AddAssign operator
-    let mut c = ShannonLoss::new(1.0);
-    c += ShannonLoss::new(0.5);
-    assert_eq!(c.as_f64(), 1.5);
-
-    // Display
-    let d = ShannonLoss::new(2.0);
-    assert_eq!(format!("{}", d), "2.000000 bits");
-
-    // From<f64>
-    let e: ShannonLoss = 3.14f64.into();
-    assert_eq!(e.as_f64(), 3.14);
+    let d = ScalarLoss::default();
+    assert!(d.is_zero());
 }
-
