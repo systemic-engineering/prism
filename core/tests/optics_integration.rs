@@ -1,7 +1,7 @@
 //! Integration test: optics with the new Beam/Prism API.
 //!
 //! These tests verify that all six optic types (Iso, Lens, OpticPrism,
-//! Traversal, Fold, Setter) work with the PureBeam-based Prism trait.
+//! Traversal, Fold, Setter) work with the Optic-based Prism trait.
 //! The old API (Beam struct, Stage, split, zoom) is gone.
 
 #![cfg(feature = "optics")]
@@ -14,12 +14,12 @@ use prism_core::optics::monoid::PrismMonoid;
 use prism_core::optics::optic_prism::OpticPrism;
 use prism_core::optics::setter::Setter;
 use prism_core::optics::traversal::Traversal;
-use prism_core::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
+use prism_core::{Beam, Optic, Prism};
 use prism_core::{Loss, ScalarLoss};
+use std::convert::Infallible;
 
-fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-    PureBeam::ok((), v)
+fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+    Optic::ok((), v)
 }
 
 // --- Iso ---
@@ -193,13 +193,13 @@ fn wrap_success_i32(v: &i32) -> terni::Imperfect<i32, String, ScalarLoss> {
 #[test]
 #[should_panic(expected = "smap on Err beam")]
 fn smap_on_err_panics_in_integration() {
-    let b: PureBeam<(), i32, String, ScalarLoss> = PureBeam::err((), "fail".into());
+    let b: Optic<(), i32, String, ScalarLoss> = Optic::err((), "fail".into());
     let _ = b.smap(wrap_success_i32);
 }
 
 #[test]
 fn smap_fn_ptr_executes_in_integration() {
-    let b: PureBeam<(), i32, String, ScalarLoss> = PureBeam::ok((), 5);
+    let b: Optic<(), i32, String, ScalarLoss> = Optic::ok((), 5);
     let n = b.smap(wrap_success_i32);
     assert_eq!(n.result().ok(), Some(&5));
 }
@@ -207,14 +207,13 @@ fn smap_fn_ptr_executes_in_integration() {
 #[test]
 #[should_panic(expected = "tick on Err beam")]
 fn tick_on_err_panics_in_integration() {
-    let b: PureBeam<(), i32, String, ScalarLoss> = PureBeam::err((), "fail".into());
+    let b: Optic<(), i32, String, ScalarLoss> = Optic::err((), "fail".into());
     let _ = b.next(99i32);
 }
 
 #[test]
 fn tick_partial_to_partial_accumulates_loss_in_integration() {
-    let b: PureBeam<(), i32, String, ScalarLoss> =
-        PureBeam::partial((), 1i32, ScalarLoss::new(1.0));
+    let b: Optic<(), i32, String, ScalarLoss> = Optic::partial((), 1i32, ScalarLoss::new(1.0));
     let n = b.tick(terni::Imperfect::<i32, String, ScalarLoss>::Partial(
         2,
         ScalarLoss::new(0.5),
@@ -225,8 +224,7 @@ fn tick_partial_to_partial_accumulates_loss_in_integration() {
 
 #[test]
 fn tick_partial_to_failure_in_integration() {
-    let b: PureBeam<(), i32, String, ScalarLoss> =
-        PureBeam::partial((), 1i32, ScalarLoss::new(1.0));
+    let b: Optic<(), i32, String, ScalarLoss> = Optic::partial((), 1i32, ScalarLoss::new(1.0));
     let n = b.tick(terni::Imperfect::<i32, String, ScalarLoss>::Failure(
         "e".into(),
         ScalarLoss::zero(),
@@ -244,7 +242,7 @@ fn optic_prism_review_covers_review_fn() {
 
 #[test]
 fn optic_prism_matching_focus_calls_next() {
-    // This test ensures PureBeam<(), Shape>::next::<i32> is called
+    // This test ensures Optic<(), Shape>::next::<i32> is called
     // (which happens in OpticPrism::focus on a matching shape)
     let p: OpticPrism<Shape, i32> = OpticPrism::new(is_circle, extract_circle, review_circle);
     let focused = p.focus(seed(Shape::Circle(42)));
@@ -274,8 +272,8 @@ fn count_monoid_identity_in_integration() {
 #[test]
 fn loss_propagation_through_optic_pipeline() {
     let iso: Iso<String, Vec<char>> = Iso::new(str_to_chars, chars_to_str);
-    let beam: PureBeam<(), String, Infallible, ScalarLoss> =
-        PureBeam::partial((), "hi".to_string(), ScalarLoss::new(0.5));
+    let beam: Optic<(), String, Infallible, ScalarLoss> =
+        Optic::partial((), "hi".to_string(), ScalarLoss::new(0.5));
     let focused = iso.focus(beam);
     assert!(focused.is_partial(), "loss must propagate through focus");
     let projected = iso.project(focused);

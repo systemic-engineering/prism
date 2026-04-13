@@ -6,9 +6,9 @@
 //! As a Prism: focus maps elements (Vec<A> → Vec<B>), project is identity,
 //! refract returns the mapped collection.
 
-use crate::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
 use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
+use std::convert::Infallible;
 
 #[derive(Clone, Copy)]
 pub struct Traversal<A, B> {
@@ -30,17 +30,17 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
     }
 }
 
-/// Traversal implements Prism with PureBeam.
+/// Traversal implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: map each element (Vec<A> → Vec<B>)
 /// - project: identity (Vec<B> → Vec<B>)
 /// - refract: identity (Vec<B> → Vec<B>)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
-    type Input = PureBeam<(), Vec<A>, Infallible, ScalarLoss>;
-    type Focused = PureBeam<Vec<A>, Vec<B>, Infallible, ScalarLoss>;
-    type Projected = PureBeam<Vec<B>, Vec<B>, Infallible, ScalarLoss>;
-    type Refracted = PureBeam<Vec<B>, Vec<B>, Infallible, ScalarLoss>;
+    type Input = Optic<(), Vec<A>, Infallible, ScalarLoss>;
+    type Focused = Optic<Vec<A>, Vec<B>, Infallible, ScalarLoss>;
+    type Projected = Optic<Vec<B>, Vec<B>, Infallible, ScalarLoss>;
+    type Refracted = Optic<Vec<B>, Vec<B>, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let items = beam.result().ok().expect("focus: Err beam").clone();
@@ -84,8 +84,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]

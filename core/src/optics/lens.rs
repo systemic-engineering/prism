@@ -9,9 +9,9 @@
 //! As a Prism: focus views (S→A), project is identity, refract returns A.
 //! The original S is available as the beam's input chain for reconstruction.
 
-use crate::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
 use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
+use std::convert::Infallible;
 
 #[derive(Clone, Copy)]
 pub struct Lens<S, A> {
@@ -50,17 +50,17 @@ impl<S: 'static, A: 'static> Lens<S, A> {
     }
 }
 
-/// Lens implements Prism with PureBeam.
+/// Lens implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: view (S → A)
 /// - project: identity (A → A)
 /// - refract: identity (A → A) — the focused value is the final output
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
-    type Input = PureBeam<(), S, Infallible, ScalarLoss>;
-    type Focused = PureBeam<S, A, Infallible, ScalarLoss>;
-    type Projected = PureBeam<A, A, Infallible, ScalarLoss>;
-    type Refracted = PureBeam<A, A, Infallible, ScalarLoss>;
+    type Input = Optic<(), S, Infallible, ScalarLoss>;
+    type Focused = Optic<S, A, Infallible, ScalarLoss>;
+    type Projected = Optic<A, A, Infallible, ScalarLoss>;
+    type Refracted = Optic<A, A, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -155,8 +155,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]

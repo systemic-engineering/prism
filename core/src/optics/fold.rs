@@ -5,9 +5,9 @@
 //!
 //! As a Prism: focus extracts (S → Vec<A>), project and refract pass through.
 
-use crate::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
 use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
+use std::convert::Infallible;
 
 #[derive(Clone, Copy)]
 pub struct Fold<S, A> {
@@ -29,17 +29,17 @@ impl<S: 'static, A: 'static> Fold<S, A> {
     }
 }
 
-/// Fold implements Prism with PureBeam.
+/// Fold implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: extract all elements (S → Vec<A>)
 /// - project: identity (Vec<A> → Vec<A>)
 /// - refract: identity (Vec<A> → Vec<A>)
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
-    type Input = PureBeam<(), S, Infallible, ScalarLoss>;
-    type Focused = PureBeam<S, Vec<A>, Infallible, ScalarLoss>;
-    type Projected = PureBeam<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
-    type Refracted = PureBeam<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
+    type Input = Optic<(), S, Infallible, ScalarLoss>;
+    type Focused = Optic<S, Vec<A>, Infallible, ScalarLoss>;
+    type Projected = Optic<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
+    type Refracted = Optic<Vec<A>, Vec<A>, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -92,8 +92,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]

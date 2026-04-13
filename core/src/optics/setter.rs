@@ -6,9 +6,9 @@
 //! As a Prism: all stages are identity on S. The modify operation is available
 //! as an inherent method. The pipeline preserves S through all stages.
 
-use crate::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
 use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
+use std::convert::Infallible;
 
 #[derive(Clone, Copy)]
 pub struct Setter<S, A> {
@@ -33,17 +33,17 @@ impl<S: 'static, A: 'static> Setter<S, A> {
     }
 }
 
-/// Setter implements Prism with PureBeam.
+/// Setter implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: identity (S → S) — no read access
 /// - project: identity (S → S)
 /// - refract: applies modify with identity to witness the closure, returns S
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
-    type Input = PureBeam<(), S, Infallible, ScalarLoss>;
-    type Focused = PureBeam<S, S, Infallible, ScalarLoss>;
-    type Projected = PureBeam<S, S, Infallible, ScalarLoss>;
-    type Refracted = PureBeam<S, S, Infallible, ScalarLoss>;
+    type Input = Optic<(), S, Infallible, ScalarLoss>;
+    type Focused = Optic<S, S, Infallible, ScalarLoss>;
+    type Projected = Optic<S, S, Infallible, ScalarLoss>;
+    type Refracted = Optic<S, S, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let s = beam.result().ok().expect("focus: Err beam").clone();
@@ -108,8 +108,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]

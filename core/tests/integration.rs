@@ -1,16 +1,16 @@
-use prism_core::{Beam, Focus, Prism, Project, PureBeam, Refract};
-use std::convert::Infallible;
 use prism_core::ScalarLoss;
+use prism_core::{Beam, Focus, Optic, Prism, Project, Refract};
+use std::convert::Infallible;
 use terni::Imperfect;
 
 /// A prism that tokenizes → counts → formats.
 struct TokenPrism;
 
 impl Prism for TokenPrism {
-    type Input = PureBeam<(), String>;
-    type Focused = PureBeam<String, Vec<String>>;
-    type Projected = PureBeam<Vec<String>, usize>;
-    type Refracted = PureBeam<usize, String>;
+    type Input = Optic<(), String>;
+    type Focused = Optic<String, Vec<String>>;
+    type Projected = Optic<Vec<String>, usize>;
+    type Refracted = Optic<usize, String>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let tokens: Vec<String> = beam
@@ -36,7 +36,7 @@ impl Prism for TokenPrism {
 
 #[test]
 fn full_pipeline_dsl() {
-    let result = PureBeam::ok((), "hello world foo".to_string())
+    let result = Optic::ok((), "hello world foo".to_string())
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism))
         .apply(Refract(&TokenPrism));
@@ -47,13 +47,13 @@ fn full_pipeline_dsl() {
 
 #[test]
 fn full_pipeline_apply_fn() {
-    let result = prism_core::apply(&TokenPrism, PureBeam::ok((), "a b c d".to_string()));
+    let result = prism_core::apply(&TokenPrism, Optic::ok((), "a b c d".to_string()));
     assert_eq!(result.result().ok(), Some(&"4 tokens".to_string()));
 }
 
 #[test]
 fn smap_as_zoom_in_pipeline() {
-    let projected = PureBeam::ok((), "hello world".to_string())
+    let projected = Optic::ok((), "hello world".to_string())
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism));
 
@@ -63,9 +63,9 @@ fn smap_as_zoom_in_pipeline() {
 
 #[test]
 fn smap_as_split_in_pipeline() {
-    let focused = PureBeam::ok((), "hello world".to_string()).apply(Focus(&TokenPrism));
+    let focused = Optic::ok((), "hello world".to_string()).apply(Focus(&TokenPrism));
 
-    let chars: PureBeam<Vec<String>, Vec<char>> = focused.smap(|tokens| {
+    let chars: Optic<Vec<String>, Vec<char>> = focused.smap(|tokens| {
         let all_chars: Vec<char> = tokens.iter().flat_map(|t| t.chars()).collect();
         Imperfect::Success(all_chars)
     });
@@ -77,8 +77,8 @@ fn smap_as_split_in_pipeline() {
 
 #[test]
 fn partial_beam_propagates_loss() {
-    let b: PureBeam<(), String, Infallible, ScalarLoss> =
-        PureBeam::partial((), "hello world".to_string(), ScalarLoss::new(0.5));
+    let b: Optic<(), String, Infallible, ScalarLoss> =
+        Optic::partial((), "hello world".to_string(), ScalarLoss::new(0.5));
 
     let focused = TokenPrism.focus(b);
     assert!(focused.is_partial());

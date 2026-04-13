@@ -49,7 +49,7 @@ pub mod ffi;
 #[cfg(feature = "bundle")]
 pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
-pub use beam::{Beam, Operation, PureBeam};
+pub use beam::{Beam, Operation, Optic};
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
@@ -164,10 +164,10 @@ mod tests {
     struct CountPrism;
 
     impl Prism for CountPrism {
-        type Input = PureBeam<(), String>;
-        type Focused = PureBeam<String, Vec<char>>;
-        type Projected = PureBeam<Vec<char>, usize>;
-        type Refracted = PureBeam<usize, String>;
+        type Input = Optic<(), String>;
+        type Focused = Optic<String, Vec<char>>;
+        type Projected = Optic<Vec<char>, usize>;
+        type Refracted = Optic<usize, String>;
 
         fn focus(&self, beam: Self::Input) -> Self::Focused {
             let chars: Vec<char> = beam
@@ -190,8 +190,8 @@ mod tests {
         }
     }
 
-    fn seed(s: &str) -> PureBeam<(), String> {
-        PureBeam::ok((), s.to_string())
+    fn seed(s: &str) -> Optic<(), String> {
+        Optic::ok((), s.to_string())
     }
 
     // --- Prism method tests ---

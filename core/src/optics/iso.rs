@@ -6,9 +6,9 @@
 //! As a Prism: focus applies forward, project is identity, refract applies backward.
 //! Round-trip is genuinely lossless — the only optic with this property.
 
-use crate::{Beam, Prism, PureBeam};
-use std::convert::Infallible;
 use crate::ScalarLoss;
+use crate::{Beam, Optic, Prism};
+use std::convert::Infallible;
 
 /// A total invertible pair (A → B, B → A).
 ///
@@ -45,17 +45,17 @@ impl<A: 'static, B: 'static> Iso<A, B> {
     }
 }
 
-/// Iso implements Prism with PureBeam.
+/// Iso implements Prism with Optic.
 ///
 /// Pipeline flow:
 /// - focus: applies forward (A → B)
 /// - project: identity pass-through (B → B)
 /// - refract: applies backward (B → A)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
-    type Input = PureBeam<(), A, Infallible, ScalarLoss>;
-    type Focused = PureBeam<A, B, Infallible, ScalarLoss>;
-    type Projected = PureBeam<B, B, Infallible, ScalarLoss>;
-    type Refracted = PureBeam<B, A, Infallible, ScalarLoss>;
+    type Input = Optic<(), A, Infallible, ScalarLoss>;
+    type Focused = Optic<A, B, Infallible, ScalarLoss>;
+    type Projected = Optic<B, B, Infallible, ScalarLoss>;
+    type Refracted = Optic<B, A, Infallible, ScalarLoss>;
 
     fn focus(&self, beam: Self::Input) -> Self::Focused {
         let a = beam.result().ok().expect("focus: Err beam").clone();
@@ -122,8 +122,8 @@ mod tests {
 
     // --- Prism trait tests ---
 
-    fn seed<T: Clone>(v: T) -> PureBeam<(), T, Infallible, ScalarLoss> {
-        PureBeam::ok((), v)
+    fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
+        Optic::ok((), v)
     }
 
     #[test]
