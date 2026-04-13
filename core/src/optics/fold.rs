@@ -141,7 +141,7 @@ mod tests {
         let focused = f.focus(seed(Tree {
             leaves: vec![10, 20, 30],
         }));
-        let sum = focused.smap(|v| terni::Imperfect::Success(v.iter().sum::<i32>()));
+        let sum = focused.smap(|v| terni::Imperfect::success(v.iter().sum::<i32>()));
         assert_eq!(sum.result().ok(), Some(&60));
     }
 

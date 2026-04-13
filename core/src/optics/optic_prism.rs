@@ -77,7 +77,7 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
         } else {
             // Non-match: extract the sentinel and mark with infinite loss.
             let sentinel = (self.extract_fn)(&s);
-            beam.tick(Imperfect::Partial(
+            beam.tick(Imperfect::partial(
                 sentinel,
                 ScalarLoss::new(f64::INFINITY),
             ))

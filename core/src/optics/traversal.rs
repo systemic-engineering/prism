@@ -152,7 +152,7 @@ mod tests {
         let focused = t.focus(seed(vec![1, 2, 3]));
         // smap can decompose the Vec into individual processing
         let first_element =
-            focused.smap(|v| terni::Imperfect::Success(v.first().cloned().unwrap_or(0)));
+            focused.smap(|v| terni::Imperfect::success(v.first().cloned().unwrap_or(0)));
         assert_eq!(first_element.result().ok(), Some(&2));
     }
 }

@@ -124,9 +124,9 @@ mod tests {
             let compressed = [state[0], state[1], 0.0, 0.0];
             let loss = state[2].abs() + state[3].abs();
             if loss == 0.0 {
-                Imperfect::Success(compressed)
+                Imperfect::success(compressed)
             } else {
-                Imperfect::Partial(compressed, ScalarLoss::new(loss))
+                Imperfect::partial(compressed, ScalarLoss::new(loss))
             }
         }
     }

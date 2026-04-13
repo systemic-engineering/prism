@@ -286,7 +286,7 @@ mod tests {
         let projected = seed("hello")
             .apply(Focus(&CountPrism))
             .apply(Project(&CountPrism));
-        let zoomed = projected.smap(|&n| Imperfect::Success(n * 2));
+        let zoomed = projected.smap(|&n| Imperfect::success(n * 2));
         assert_eq!(zoomed.result().ok(), Some(&10));
     }
 
@@ -295,7 +295,7 @@ mod tests {
         let projected = seed("abc")
             .apply(Focus(&CountPrism))
             .apply(Project(&CountPrism));
-        let split = projected.smap(|&n| Imperfect::Success((0..n as u32).collect::<Vec<_>>()));
+        let split = projected.smap(|&n| Imperfect::success((0..n as u32).collect::<Vec<_>>()));
         assert_eq!(split.result().ok(), Some(&vec![0, 1, 2]));
     }
 }
