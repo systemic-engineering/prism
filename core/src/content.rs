@@ -25,7 +25,9 @@ mod tests {
 
     #[test]
     fn content_addressed_impl() {
-        let t = Thing { id: "abc".to_owned() };
+        let t = Thing {
+            id: "abc".to_owned(),
+        };
         assert_eq!(t.oid().as_str(), "thing:abc");
     }
 }

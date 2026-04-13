@@ -24,12 +24,7 @@ extern "C" {
     );
 
     /// Pᵀ * focus → result  (embed from subspace into full space).
-    fn prism_review(
-        n: c_int,
-        projection: *const f64,
-        focus: *const f64,
-        result: *mut f64,
-    );
+    fn prism_review(n: c_int, projection: *const f64, focus: *const f64, result: *mut f64);
 
     /// (I - P) * source + T * (P * source) → result.
     fn prism_modify(
@@ -41,20 +36,10 @@ extern "C" {
     );
 
     /// P2 * P1 → composed.
-    fn prism_compose(
-        n: c_int,
-        p1: *const f64,
-        p2: *const f64,
-        composed: *mut f64,
-    );
+    fn prism_compose(n: c_int, p1: *const f64, p2: *const f64, composed: *mut f64);
 
     /// dsyev('N') — eigenvalues only.
-    fn spectral_eigenvalues(
-        n: c_int,
-        matrix: *const f64,
-        eigenvalues: *mut f64,
-        info: *mut c_int,
-    );
+    fn spectral_eigenvalues(n: c_int, matrix: *const f64, eigenvalues: *mut f64, info: *mut c_int);
 
     /// dsyev('V') — eigenvalues + eigenvectors.
     fn spectral_eigensystem(
@@ -140,7 +125,11 @@ pub fn preview(n: usize, projection: &[f64], source: &[f64]) -> Option<Vec<f64>>
         );
     }
 
-    if matched != 0 { Some(focus) } else { None }
+    if matched != 0 {
+        Some(focus)
+    } else {
+        None
+    }
 }
 
 /// Embed `focus` back into the full space via Pᵀ.
@@ -165,7 +154,7 @@ pub fn review(n: usize, projection: &[f64], focus: &[f64]) -> Vec<f64> {
 /// Computes `(I - P) * source + T * (P * source)`.
 pub fn modify(n: usize, projection: &[f64], source: &[f64], transform: &[f64]) -> Vec<f64> {
     let proj_cm = row_to_col_major(projection, n, n);
-    let xfm_cm  = row_to_col_major(transform,  n, n);
+    let xfm_cm = row_to_col_major(transform, n, n);
     let mut result = vec![0.0_f64; n];
 
     unsafe {
@@ -222,15 +211,14 @@ pub fn eigenvalues(n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
     let mut info: c_int = 0;
 
     unsafe {
-        spectral_eigenvalues(
-            n as c_int,
-            mat_cm.as_ptr(),
-            evals.as_mut_ptr(),
-            &mut info,
-        );
+        spectral_eigenvalues(n as c_int, mat_cm.as_ptr(), evals.as_mut_ptr(), &mut info);
     }
 
-    if info != 0 { Err(info) } else { Ok(evals) }
+    if info != 0 {
+        Err(info)
+    } else {
+        Ok(evals)
+    }
 }
 
 /// Compute eigenvalues and eigenvectors of a real symmetric `n×n` matrix.
@@ -298,7 +286,11 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, i
         );
     }
 
-    if info != 0 { Err(info) } else { Ok(svs) }
+    if info != 0 {
+        Err(info)
+    } else {
+        Ok(svs)
+    }
 }
 
 /// Compute the full SVD of an `m×n` matrix.
@@ -316,9 +308,9 @@ pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>, Ve
         return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
     let mat_cm = row_to_col_major(matrix, m, n);
-    let mut svs     = vec![0.0_f64; k];
-    let mut u_cm    = vec![0.0_f64; m * m];
-    let mut vt_cm   = vec![0.0_f64; n * n];
+    let mut svs = vec![0.0_f64; k];
+    let mut u_cm = vec![0.0_f64; m * m];
+    let mut vt_cm = vec![0.0_f64; n * n];
     let mut info: c_int = 0;
 
     unsafe {
@@ -337,7 +329,7 @@ pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>, Ve
         return Err(info);
     }
 
-    let u  = col_to_row_major(&u_cm,  m, m);
+    let u = col_to_row_major(&u_cm, m, m);
     let vt = col_to_row_major(&vt_cm, n, n);
     Ok((svs, u, vt))
 }
@@ -353,7 +345,7 @@ mod tests {
     #[test]
     fn preview_identity_is_passthrough() {
         let n = 3;
-        let identity = vec![1.0,0.0,0.0, 0.0,1.0,0.0, 0.0,0.0,1.0];
+        let identity = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
         let source = vec![1.0, 2.0, 3.0];
         let result = preview(n, &identity, &source).unwrap();
         for i in 0..n {

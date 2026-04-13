@@ -2,8 +2,8 @@
 
 #![cfg(feature = "bundle")]
 
-use prism_core::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 use prism_core::ScalarLoss;
+use prism_core::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 use std::convert::Infallible;
 use terni::Imperfect;
 

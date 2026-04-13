@@ -50,7 +50,11 @@ mod tests {
     #[test]
     fn concat_gather_joins_strings() {
         let g = ConcatGather;
-        let result = g.gather(vec!["hello".to_string(), " ".to_string(), "world".to_string()]);
+        let result = g.gather(vec![
+            "hello".to_string(),
+            " ".to_string(),
+            "world".to_string(),
+        ]);
         assert_eq!(result, "hello world");
     }
 
