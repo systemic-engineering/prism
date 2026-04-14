@@ -27,7 +27,7 @@ pub trait Operation<B: Beam> {
 /// Three required methods: `input`, `result`, `tick`.
 /// Everything else is derived.
 ///
-/// **Contract:** `tick` panics on Failure beams (use `smap` or `next` instead).
+/// **Contract:** `tick`, `smap`, and `next` propagate dark beams (Failure is a fixpoint).
 /// `input()` panics on dark propagated beams. Call `is_ok()` first.
 pub trait Beam: Sized {
     type In;
@@ -46,10 +46,11 @@ pub trait Beam: Sized {
 
     /// The primitive. One tick forward.
     ///
-    /// # Panics
-    ///
-    /// Panics if `self` is a Failure beam. Check `is_ok()` first.
-    fn tick<T, E>(self, imperfect: Imperfect<T, E, Self::Loss>) -> Self::Tick<T, E>;
+    /// On a Failure beam, propagates darkness: the error is converted via
+    /// `Into` and the provided `imperfect` is ignored.
+    fn tick<T, E>(self, imperfect: Imperfect<T, E, Self::Loss>) -> Self::Tick<T, E>
+    where
+        Self::Error: Into<E>;
 
     /// Whether this beam has a value (Ok or Partial).
     fn is_ok(&self) -> bool {
@@ -83,13 +84,15 @@ pub trait Beam: Sized {
     ///
     /// On a Failure beam, propagates darkness (returns a Failure beam with
     /// the same error and loss). The closure `f` is never called.
+    ///
+    /// Implementors should override this for dark beam handling.
     fn smap<T>(
         self,
         f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
     ) -> Self::Tick<T, Self::Error> {
         let imp = match self.result() {
             Imperfect::Success(v) | Imperfect::Partial(v, _) => f(v),
-            Imperfect::Failure(_, _) => panic!("smap on Err beam"),
+            Imperfect::Failure(_, _) => panic!("smap on Err beam — override smap for dark beam support"),
         };
         self.tick(imp)
     }
@@ -175,7 +178,10 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
         self.focus.as_ref()
     }
 
-    fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> Optic<Out, T, NE, L> {
+    fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> Optic<Out, T, NE, L>
+    where
+        E: Into<NE>,
+    {
         match self.focus {
             Imperfect::Success(old_out) => Optic {
                 source: Some(old_out),
@@ -307,7 +313,7 @@ mod tests {
 
     #[test]
     fn tick_ok_with_ok() {
-        let b: Optic<(), u32> = Optic::ok((), 5);
+        let b: Optic<(), u32, String> = Optic::ok((), 5);
         let n = b.tick(Imperfect::<&str, String, ScalarLoss>::success("hi"));
         assert!(n.is_ok());
         assert!(!n.is_partial());
@@ -315,7 +321,7 @@ mod tests {
 
     #[test]
     fn tick_ok_with_partial() {
-        let b: Optic<(), u32> = Optic::ok((), 5);
+        let b: Optic<(), u32, String> = Optic::ok((), 5);
         let n = b.tick(Imperfect::<&str, String, ScalarLoss>::partial(
             "hi",
             ScalarLoss::new(1.0),
@@ -326,21 +332,21 @@ mod tests {
 
     #[test]
     fn tick_ok_with_err() {
-        let b: Optic<(), u32> = Optic::ok((), 5);
+        let b: Optic<(), u32, i32> = Optic::ok((), 5);
         let n: Optic<u32, u32, i32> = b.tick(Imperfect::failure(-1));
         assert!(n.is_err());
     }
 
     #[test]
     fn tick_partial_with_ok_carries_loss() {
-        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let b: Optic<(), u32, String> = Optic::partial((), 5, ScalarLoss::new(1.0));
         let n = b.tick(Imperfect::<u32, String, ScalarLoss>::success(10));
         assert!(n.is_partial());
     }
 
     #[test]
     fn tick_partial_with_partial_accumulates() {
-        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let b: Optic<(), u32, String> = Optic::partial((), 5, ScalarLoss::new(1.0));
         let n = b.tick(Imperfect::<u32, String, ScalarLoss>::partial(
             10,
             ScalarLoss::new(0.5),
@@ -350,7 +356,7 @@ mod tests {
 
     #[test]
     fn tick_partial_with_err() {
-        let b: Optic<(), u32> = Optic::partial((), 5, ScalarLoss::new(1.0));
+        let b: Optic<(), u32, String> = Optic::partial((), 5, ScalarLoss::new(1.0));
         let n = b.tick(Imperfect::<u32, String, ScalarLoss>::failure_with_loss(
             "fail".into(),
             ScalarLoss::zero(),
@@ -359,10 +365,40 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "tick on Err beam")]
-    fn tick_on_err_panics() {
+    fn tick_on_err_propagates_dark() {
+        // Dark beam tick propagates the failure instead of panicking
         let b: Optic<(), u32, String> = Optic::err((), "err".into());
-        let _ = b.tick(Imperfect::<u32, String, ScalarLoss>::success(0));
+        let n = b.tick(Imperfect::<u32, String, ScalarLoss>::success(0));
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"err".to_string()));
+    }
+
+    #[test]
+    fn tick_on_err_cross_error_type() {
+        // Dark beam tick across error types: String -> i32 via From
+        #[derive(Debug, PartialEq)]
+        struct AppError(String);
+
+        impl From<String> for AppError {
+            fn from(s: String) -> Self {
+                AppError(s)
+            }
+        }
+
+        let b: Optic<(), u32, String> = Optic::err((), "fail".into());
+        let n: Optic<u32, u64, AppError, ScalarLoss> =
+            b.tick(Imperfect::<u64, AppError, ScalarLoss>::success(99));
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&AppError("fail".into())));
+    }
+
+    #[test]
+    fn tick_on_err_with_loss_preserves_loss() {
+        let b: Optic<(), u32, String> =
+            Optic::err_with_loss((), "err".into(), ScalarLoss::new(4.0));
+        let n = b.tick(Imperfect::<u32, String, ScalarLoss>::success(0));
+        assert!(n.is_err());
+        assert_eq!(n.result().loss().as_f64(), 4.0);
     }
 
     #[test]

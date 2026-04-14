@@ -72,6 +72,22 @@ fn dark_pipeline_next_10() -> bool {
     b.is_err()
 }
 
+/// Dark pipeline via tick: Failure at step 0, 10 ticks that propagate darkness.
+fn dark_pipeline_tick_10() -> bool {
+    let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(2));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(3));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(4));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(5));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(6));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(7));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(8));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(9));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(10));
+    let b = b.tick(Imperfect::<u32, String, ScalarLoss>::success(11));
+    b.is_err()
+}
+
 fn bench_pipelines(c: &mut Criterion) {
     let mut group = c.benchmark_group("beam_pipeline");
 
@@ -82,6 +98,9 @@ fn bench_pipelines(c: &mut Criterion) {
     });
     group.bench_function("dark_next_10", |b| {
         b.iter(|| black_box(dark_pipeline_next_10()))
+    });
+    group.bench_function("dark_tick_10", |b| {
+        b.iter(|| black_box(dark_pipeline_tick_10()))
     });
 
     group.finish();
