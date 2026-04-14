@@ -14,22 +14,16 @@ impl Oid {
     }
 
     /// Hash bytes to produce an Oid. Deterministic content addressing.
-    /// Uses a double-hash to fill 32 bytes, rendered as 64 hex chars.
-    /// TODO: Replace with CoincidenceHash<3>.
+    ///
+    /// Uses CoincidenceHash<3> — three independent projection observers
+    /// in a 16-dimensional space. The shared eigenvalue becomes the content
+    /// address, compressed through SHA-256 to a fixed 64-char hex string.
+    /// Falls back to SHA-256 with domain separation for degenerate input.
+    ///
+    /// Deterministic across Rust versions (no SipHash/DefaultHasher).
     pub fn hash(bytes: &[u8]) -> Self {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut result = [0u8; 32];
-        for chunk in 0..4 {
-            let mut hasher = DefaultHasher::new();
-            chunk.hash(&mut hasher);
-            bytes.hash(&mut hasher);
-            let h = hasher.finish().to_le_bytes();
-            result[chunk * 8..(chunk + 1) * 8].copy_from_slice(&h);
-        }
-        let hex: String = result.iter().map(|b| format!("{:02x}", b)).collect();
-        Oid(hex)
+        let hex_str = crate::coincidence::canonical_hash(bytes);
+        Oid(hex_str)
     }
 
     /// The dark OID. The address of absence. Constant.
