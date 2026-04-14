@@ -1,5 +1,41 @@
 //! Luminosity — how much signal is getting through.
 
+/// How much signal is getting through.
+/// The ternary state of a beam or crystal.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Luminosity {
+    /// Full signal. Zero holonomy. Crystal.
+    Light,
+    /// Partial signal. Nonzero holonomy. Oscillating.
+    Dimmed(f64),
+    /// No signal. Error and loss propagate. Fixpoint.
+    Dark,
+}
+
+impl Luminosity {
+    pub fn is_light(&self) -> bool { matches!(self, Luminosity::Light) }
+    pub fn is_dimmed(&self) -> bool { matches!(self, Luminosity::Dimmed(_)) }
+    pub fn is_dark(&self) -> bool { matches!(self, Luminosity::Dark) }
+
+    pub fn holonomy(&self) -> Option<f64> {
+        match self {
+            Luminosity::Light => Some(0.0),
+            Luminosity::Dimmed(h) => Some(*h),
+            Luminosity::Dark => None,
+        }
+    }
+
+    pub fn from_holonomy(h: f64) -> Self {
+        if h == 0.0 {
+            Luminosity::Light
+        } else if h.is_finite() {
+            Luminosity::Dimmed(h)
+        } else {
+            Luminosity::Dark
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
