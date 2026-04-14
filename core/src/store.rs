@@ -1,12 +1,34 @@
 //! Store — where crystals live.
 
+use crate::oid::Oid;
+use crate::luminosity::Luminosity;
+use terni::{Imperfect, Loss};
+
+/// Where crystals live. Every operation returns Imperfect.
+///
+/// The Store is the third primitive alongside Beam and Prism.
+/// - Beam: the value in motion
+/// - Prism: the transformation
+/// - Store: the persistence
+pub trait Store {
+    type Error;
+    type L: Loss;
+
+    /// Retrieve by address. Partial if some dimensions are dark.
+    fn get(&self, oid: &Oid) -> Imperfect<Vec<u8>, Self::Error, Self::L>;
+
+    /// Persist by address. Partial if not fully replicated.
+    fn put(&mut self, oid: Oid, data: Vec<u8>) -> Imperfect<Oid, Self::Error, Self::L>;
+
+    /// Check luminosity at address. Light, Dimmed, or Dark.
+    fn has(&self, oid: &Oid) -> Imperfect<Luminosity, Self::Error, Self::L>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::oid::{Oid, Addressable};
-    use crate::crystal::Crystal;
     use crate::luminosity::Luminosity;
-    use terni::{Imperfect, Loss};
     use std::collections::HashMap;
 
     #[derive(Debug, Clone, PartialEq)]
