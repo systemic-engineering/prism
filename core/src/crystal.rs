@@ -1,10 +1,43 @@
 //! Crystal — a settled Prism.
 
+use crate::luminosity::Luminosity;
+use crate::oid::{Oid, Addressable};
+
+/// A settled Prism. The Prism IS the value.
+/// The Crystal IS the Prism at rest.
+///
+/// Crystal(prism, luminosity) — the shape and its state.
+/// The Oid comes from the Prism. The Luminosity comes from the holonomy.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Crystal<P>(pub P, pub Luminosity);
+
+impl<P> Crystal<P> {
+    pub fn prism(&self) -> &P {
+        &self.0
+    }
+
+    pub fn luminosity(&self) -> &Luminosity {
+        &self.1
+    }
+
+    pub fn into_prism(self) -> P {
+        self.0
+    }
+
+    pub fn is_settled(&self) -> bool {
+        self.1.is_light()
+    }
+}
+
+impl<P: Addressable> Addressable for Crystal<P> {
+    fn oid(&self) -> Oid {
+        self.0.oid()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::luminosity::Luminosity;
-    use crate::oid::{Oid, Addressable};
 
     // A minimal Prism for testing
     #[derive(Debug, Clone, PartialEq)]
