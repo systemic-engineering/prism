@@ -110,4 +110,56 @@ mod tests {
         let b = a.clone();
         assert_eq!(a, b);
     }
+
+    // --- Foundation tests: hash, dark, Addressable ---
+
+    #[test]
+    fn oid_from_bytes() {
+        let a = Oid::hash(b"hello");
+        let b = Oid::hash(b"hello");
+        assert_eq!(a, b); // deterministic
+    }
+
+    #[test]
+    fn oid_different_content_different_hash() {
+        let a = Oid::hash(b"hello");
+        let b = Oid::hash(b"world");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn oid_display_is_hex() {
+        let oid = Oid::hash(b"test");
+        let s = format!("{}", oid);
+        assert_eq!(s.len(), 64); // 32 bytes = 64 hex chars
+        assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn oid_dark_is_constant() {
+        assert_eq!(Oid::dark(), Oid::dark());
+    }
+
+    #[test]
+    fn oid_dark_differs_from_any_content() {
+        assert_ne!(Oid::dark(), Oid::hash(b""));
+        assert_ne!(Oid::dark(), Oid::hash(b"anything"));
+    }
+
+    struct TestValue(u32);
+
+    impl Addressable for TestValue {
+        fn oid(&self) -> Oid {
+            Oid::hash(&self.0.to_le_bytes())
+        }
+    }
+
+    #[test]
+    fn addressable_impl() {
+        let a = TestValue(42);
+        let b = TestValue(42);
+        let c = TestValue(99);
+        assert_eq!(a.oid(), b.oid());
+        assert_ne!(a.oid(), c.oid());
+    }
 }
