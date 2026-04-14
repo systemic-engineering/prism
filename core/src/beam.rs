@@ -134,6 +134,14 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
             focus: Imperfect::failure(error),
         }
     }
+
+    /// Construct a failed optic with accumulated loss.
+    pub fn err_with_loss(source: In, error: E, loss: L) -> Self {
+        Self {
+            source,
+            focus: Imperfect::failure_with_loss(error, loss),
+        }
+    }
 }
 
 fn propagate<T, E, L: Loss>(loss: L, next: Imperfect<T, E, L>) -> Imperfect<T, E, L> {
@@ -372,5 +380,88 @@ mod tests {
     fn double_op_reports_project_op() {
         let op = DoubleOp;
         assert_eq!(op.op(), Op::Project);
+    }
+
+    // --- dark beam (Failure) fixpoint tests ---
+
+    #[test]
+    fn smap_id_on_failure_returns_failure() {
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let n = b.smap(wrap_success);
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"dark".to_string()));
+    }
+
+    #[test]
+    fn smap_f_on_failure_ignores_f() {
+        let called = std::cell::Cell::new(false);
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let n = b.smap(|v: &u32| {
+            called.set(true);
+            Imperfect::success(*v * 100)
+        });
+        assert!(!called.get(), "f should not be called on dark beam");
+        assert!(n.is_err());
+    }
+
+    #[test]
+    fn smap_composition_law_dark_beam() {
+        // smap(f . g) = smap(f) . smap(g) — both sides should stay dark
+        let b1: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let composed = b1.smap(|v: &u32| Imperfect::success(format!("{}", v * 2)));
+        assert!(composed.is_err());
+
+        let b2: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let step1 = b2.smap(wrap_success);
+        assert!(step1.is_err());
+    }
+
+    #[test]
+    fn tick_on_failure_propagates_darkness() {
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let n = b.tick(Imperfect::<u64, String, ScalarLoss>::success(999));
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"dark".to_string()));
+    }
+
+    #[test]
+    fn dark_beam_preserves_loss_through_smap() {
+        let b: Optic<(), u32, String> =
+            Optic::err_with_loss((), "dark".into(), ScalarLoss::new(3.5));
+        let n = b.smap(wrap_success);
+        assert!(n.is_err());
+        assert_eq!(n.result().loss().as_f64(), 3.5);
+    }
+
+    #[test]
+    fn dark_beam_preserves_loss_through_tick() {
+        let b: Optic<(), u32, String> =
+            Optic::err_with_loss((), "dark".into(), ScalarLoss::new(2.0));
+        let n = b.tick(Imperfect::<u64, String, ScalarLoss>::success(0));
+        assert!(n.is_err());
+        assert_eq!(n.result().loss().as_f64(), 2.0);
+    }
+
+    #[test]
+    fn dark_beam_pipeline_string_error() {
+        let b0: Optic<(), u32, String> = Optic::ok((), 1);
+        let b1 = b0.next(2u32);
+        // b1 is Optic<u32, u32, String>
+        // simulate failure at step 2:
+        let dark: Optic<u32, u32, String> = Optic::err(2, "pipeline failed".into());
+        // now tick forward — darkness should propagate
+        let b2 = dark.tick(Imperfect::<u64, String, ScalarLoss>::success(3));
+        assert!(b2.is_err());
+        let b3 = b2.tick(Imperfect::<String, String, ScalarLoss>::success("done".into()));
+        assert!(b3.is_err());
+        assert_eq!(b3.result().err(), Some(&"pipeline failed".to_string()));
+    }
+
+    #[test]
+    fn next_on_failure_propagates_darkness() {
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let n = b.next(42u32);
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"dark".to_string()));
     }
 }
