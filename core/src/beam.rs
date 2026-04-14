@@ -191,9 +191,7 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
                 source: Some(old_out),
                 focus: propagate(loss, next),
             },
-            Imperfect::Failure(_, _) => {
-                panic!("tick on Err beam — check is_ok() first or use smap/next for dark propagation")
-            }
+            Imperfect::Failure(e, l) => Optic::dark(Imperfect::failure_with_loss(e.into(), l)),
         }
     }
 
