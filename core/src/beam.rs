@@ -1,8 +1,8 @@
-//! Beam — the semifunctor. The pipeline value carrier.
+//! Beam — the functor. The pipeline value carrier.
 //!
 //! `tick` is the primitive: one step forward.
 //! `next` is the lossless shorthand.
-//! `smap` is the semifunctor map, derived from `tick`.
+//! `smap` is the functor map. Failure beams are dark: a fixpoint under `smap` and `next`.
 
 use crate::trace::Op;
 use crate::ScalarLoss;
