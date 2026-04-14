@@ -524,4 +524,104 @@ mod tests {
         // The error propagates, the value 42 was swallowed by darkness
         assert_eq!(n.result().err(), Some(&"dark".to_string()));
     }
+
+    // --- Seam adversarial tests ---
+
+    #[test]
+    #[should_panic(expected = "input() on dark beam")]
+    fn adversarial_input_on_propagated_dark_beam_panics() {
+        // A dark beam created via Optic::err has a source (Some).
+        // But after propagation through smap, source is None.
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let propagated = b.smap(wrap_success);
+        // This must panic — the propagated beam has no source
+        let _ = propagated.input();
+    }
+
+    #[test]
+    fn adversarial_original_dark_beam_has_source() {
+        // Optic::err still has a valid source — only propagated dark beams lose it
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        assert_eq!(b.input(), &());
+    }
+
+    #[test]
+    fn adversarial_dark_with_total_loss() {
+        // Edge case: dark beam with Loss::total() (infinite loss)
+        let b: Optic<(), u32, String> =
+            Optic::err_with_loss((), "total".into(), ScalarLoss::total());
+        let n = b.smap(wrap_success);
+        assert!(n.is_err());
+        assert!(n.result().loss().as_f64().is_infinite());
+    }
+
+    #[test]
+    fn adversarial_dark_with_zero_loss() {
+        // Edge case: dark beam with zero loss
+        let b: Optic<(), u32, String> = Optic::err((), "zero".into());
+        let n = b.smap(wrap_success);
+        assert!(n.is_err());
+        assert!(n.result().loss().is_zero());
+    }
+
+    #[test]
+    fn adversarial_deep_dark_pipeline_20_steps() {
+        // 20-step smap chain on dark beam — error and loss must survive
+        let err_msg = "deep dark".to_string();
+        let b: Optic<(), u32, String> =
+            Optic::err_with_loss((), err_msg.clone(), ScalarLoss::new(7.77));
+        // Chain 20 smaps
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        let b = b.smap(|&v| Imperfect::success(v + 1));
+        assert!(b.is_err());
+        assert_eq!(b.result().err(), Some(&err_msg));
+        assert_eq!(b.result().loss().as_f64(), 7.77);
+    }
+
+    #[test]
+    fn adversarial_smap_returning_failure_vs_dark_propagation() {
+        // A light beam where smap RETURNS a failure (creates a new error)
+        // vs a dark beam that propagates an existing failure.
+        // The returned-failure beam should have its OWN error, not the dark one.
+        let light: Optic<(), u32, String> = Optic::ok((), 5);
+        let failed = light.smap(|_| {
+            Imperfect::<u32, String, ScalarLoss>::failure("new error".into())
+        });
+        assert!(failed.is_err());
+        assert_eq!(failed.result().err(), Some(&"new error".to_string()));
+        // The source is valid because it came from a light beam
+        assert_eq!(failed.input(), &5);
+
+        // Now propagate THAT failure
+        let propagated = failed.smap(wrap_success);
+        assert!(propagated.is_err());
+        assert_eq!(propagated.result().err(), Some(&"new error".to_string()));
+    }
+
+    #[test]
+    fn adversarial_is_ok_is_err_consistent_on_dark() {
+        let b: Optic<(), u32, String> = Optic::err((), "dark".into());
+        let p = b.smap(wrap_success);
+        assert!(!p.is_ok());
+        assert!(p.is_err());
+        assert!(!p.is_partial());
+    }
 }
