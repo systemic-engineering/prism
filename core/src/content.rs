@@ -2,8 +2,6 @@
 //! not from where it lives or when it was created. Types that implement
 //! [`ContentAddressed`] produce an [`Oid`] that is their content-derived identity.
 
-use crate::oid::Oid;
-
 /// A type that has a content address.
 /// Alias for [`Addressable`](crate::oid::Addressable) — same trait, legacy name.
 pub trait ContentAddressed: crate::oid::Addressable {}
@@ -14,7 +12,7 @@ impl<T: crate::oid::Addressable> ContentAddressed for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oid::Addressable;
+    use crate::oid::{Addressable, Oid};
 
     struct Thing {
         id: String,

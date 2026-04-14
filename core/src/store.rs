@@ -112,7 +112,7 @@ mod tests {
         let before = store.has(&oid);
         assert_eq!(before.ok(), Some(Luminosity::Dark));
 
-        store.put(oid.clone(), b"data".to_vec());
+        let _ = store.put(oid.clone(), b"data".to_vec());
 
         let after = store.has(&oid);
         assert_eq!(after.ok(), Some(Luminosity::Light));
