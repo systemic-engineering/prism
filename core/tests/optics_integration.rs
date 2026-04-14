@@ -191,10 +191,11 @@ fn wrap_success_i32(v: &i32) -> terni::Imperfect<i32, String, ScalarLoss> {
 }
 
 #[test]
-#[should_panic(expected = "smap on Err beam")]
-fn smap_on_err_panics_in_integration() {
+fn smap_on_err_propagates_dark_in_integration() {
     let b: Optic<(), i32, String, ScalarLoss> = Optic::err((), "fail".into());
-    let _ = b.smap(wrap_success_i32);
+    let n = b.smap(wrap_success_i32);
+    assert!(n.is_err());
+    assert_eq!(n.result().err(), Some(&"fail".to_string()));
 }
 
 #[test]
@@ -205,10 +206,11 @@ fn smap_fn_ptr_executes_in_integration() {
 }
 
 #[test]
-#[should_panic(expected = "tick on Err beam")]
-fn tick_on_err_panics_in_integration() {
+fn next_on_err_propagates_dark_in_integration() {
     let b: Optic<(), i32, String, ScalarLoss> = Optic::err((), "fail".into());
-    let _ = b.next(99i32);
+    let n = b.next(99i32);
+    assert!(n.is_err());
+    assert_eq!(n.result().err(), Some(&"fail".to_string()));
 }
 
 #[test]

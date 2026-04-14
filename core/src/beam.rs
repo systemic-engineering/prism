@@ -17,20 +17,18 @@ pub trait Operation<B: Beam> {
     fn apply(self, beam: B) -> Self::Output;
 }
 
-/// The pipeline value carrier. A semifunctor over [`Imperfect`].
+/// The pipeline value carrier. A functor over [`Imperfect`].
 ///
-/// A semifunctor is like a functor (you can map a function over the carried
-/// value via [`smap`](Beam::smap)), but the identity law may not hold:
-/// mapping the identity function over a Failure beam panics instead of
-/// returning the same beam. This is deliberate — Failure beams have no
-/// value to map over, so the type system forces you to check `is_ok()`
-/// before transforming.
+/// Failure beams are dark: they propagate unchanged through `smap` and `next`,
+/// carrying their error and accumulated loss as a fixpoint. The closure passed
+/// to `smap` is never called on a dark beam. This makes Beam a proper functor
+/// (identity law holds: `smap(id, dark) = dark`).
 ///
 /// Three required methods: `input`, `result`, `tick`.
 /// Everything else is derived.
 ///
-/// **Contract:** `tick`, `next`, and `smap` panic on Failure beams.
-/// Call `is_ok()` first.
+/// **Contract:** `tick` panics on Failure beams (use `smap` or `next` instead).
+/// `input()` panics on dark propagated beams. Call `is_ok()` first.
 pub trait Beam: Sized {
     type In;
     type Out;
@@ -70,9 +68,8 @@ pub trait Beam: Sized {
 
     /// Lossless transition. Shorthand for `tick(Imperfect::success(value))`.
     ///
-    /// # Panics
-    ///
-    /// Panics if `self` is a Failure beam.
+    /// On a Failure beam, propagates darkness (returns a Failure beam with
+    /// the same error and loss). The provided value is ignored.
     fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
         self.tick(Imperfect::success(value))
     }
@@ -82,11 +79,10 @@ pub trait Beam: Sized {
         op.apply(self)
     }
 
-    /// Semifunctor map. Derived from `tick`.
+    /// Functor map. Derived from `tick`.
     ///
-    /// # Panics
-    ///
-    /// Panics if `self` is a Failure beam.
+    /// On a Failure beam, propagates darkness (returns a Failure beam with
+    /// the same error and loss). The closure `f` is never called.
     fn smap<T>(
         self,
         f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
@@ -106,7 +102,7 @@ pub trait Beam: Sized {
 /// A `TraceBeam` that records each step into a [`Trace`](crate::trace::Trace)
 /// is forthcoming.
 pub struct Optic<In, Out, E = Infallible, L: Loss = ScalarLoss> {
-    source: In,
+    source: Option<In>,
     focus: Imperfect<Out, E, L>,
 }
 
@@ -114,7 +110,7 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
     /// Construct a perfect optic (zero loss).
     pub fn ok(source: In, output: Out) -> Self {
         Self {
-            source,
+            source: Some(source),
             focus: Imperfect::success(output),
         }
     }
@@ -122,7 +118,7 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
     /// Construct a partial optic (value with loss).
     pub fn partial(source: In, output: Out, loss: L) -> Self {
         Self {
-            source,
+            source: Some(source),
             focus: Imperfect::partial(output, loss),
         }
     }
@@ -130,7 +126,7 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
     /// Construct a failed optic.
     pub fn err(source: In, error: E) -> Self {
         Self {
-            source,
+            source: Some(source),
             focus: Imperfect::failure(error),
         }
     }
@@ -138,8 +134,18 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
     /// Construct a failed optic with accumulated loss.
     pub fn err_with_loss(source: In, error: E, loss: L) -> Self {
         Self {
-            source,
+            source: Some(source),
             focus: Imperfect::failure_with_loss(error, loss),
+        }
+    }
+
+    /// Construct a dark (failed) optic with no source. Used internally
+    /// when propagating failure through `tick`/`smap` — the source from
+    /// the previous step does not exist because that step failed.
+    fn dark(focus: Imperfect<Out, E, L>) -> Self {
+        Self {
+            source: None,
+            focus,
         }
     }
 }
@@ -160,7 +166,9 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
     type Tick<T, NE> = Optic<Out, T, NE, L>;
 
     fn input(&self) -> &In {
-        &self.source
+        self.source
+            .as_ref()
+            .expect("input() on dark beam — check is_ok() first")
     }
 
     fn result(&self) -> Imperfect<&Out, &E, L> {
@@ -169,15 +177,54 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
 
     fn tick<T, NE>(self, next: Imperfect<T, NE, L>) -> Optic<Out, T, NE, L> {
         match self.focus {
-            Imperfect::Failure(_, _) => panic!("tick on Err beam — check is_ok() first"),
             Imperfect::Success(old_out) => Optic {
-                source: old_out,
+                source: Some(old_out),
                 focus: next,
             },
             Imperfect::Partial(old_out, loss) => Optic {
-                source: old_out,
+                source: Some(old_out),
                 focus: propagate(loss, next),
             },
+            Imperfect::Failure(_, _) => {
+                panic!("tick on Err beam — check is_ok() first or use smap/next for dark propagation")
+            }
+        }
+    }
+
+    fn smap<T>(
+        self,
+        f: impl FnOnce(&Self::Out) -> Imperfect<T, Self::Error, Self::Loss>,
+    ) -> Self::Tick<T, Self::Error> {
+        match &self.focus {
+            Imperfect::Success(v) | Imperfect::Partial(v, _) => {
+                let imp = f(v);
+                self.tick(imp)
+            }
+            Imperfect::Failure(_, _) => {
+                // Dark beam fixpoint: extract the error and loss, propagate unchanged.
+                // The closure f is never called — darkness absorbs.
+                match self.focus {
+                    Imperfect::Failure(e, l) => {
+                        Optic::dark(Imperfect::failure_with_loss(e, l))
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+
+    fn next<T>(self, value: T) -> Self::Tick<T, Self::Error> {
+        match &self.focus {
+            Imperfect::Failure(_, _) => {
+                // Dark beam fixpoint: darkness propagates, value is ignored.
+                match self.focus {
+                    Imperfect::Failure(e, l) => {
+                        Optic::dark(Imperfect::failure_with_loss(e, l))
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => self.tick(Imperfect::success(value)),
         }
     }
 }
@@ -251,10 +298,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "tick on Err beam")]
-    fn next_on_err_panics() {
+    fn next_on_err_propagates_dark() {
         let b: Optic<(), u32, String> = Optic::err((), "err".into());
-        let _ = b.next(0u32);
+        let n = b.next(0u32);
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"err".to_string()));
     }
 
     #[test]
@@ -363,10 +411,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "smap on Err beam")]
-    fn smap_on_err_panics() {
+    fn smap_on_err_propagates_dark() {
         let b: Optic<(), u32, String> = Optic::err((), "err".into());
-        let _ = b.smap(wrap_success);
+        let n = b.smap(wrap_success);
+        assert!(n.is_err());
+        assert_eq!(n.result().err(), Some(&"err".to_string()));
     }
 
     #[test]
@@ -417,9 +466,9 @@ mod tests {
     }
 
     #[test]
-    fn tick_on_failure_propagates_darkness() {
+    fn next_on_failure_preserves_error() {
         let b: Optic<(), u32, String> = Optic::err((), "dark".into());
-        let n = b.tick(Imperfect::<u64, String, ScalarLoss>::success(999));
+        let n = b.next(999u64);
         assert!(n.is_err());
         assert_eq!(n.result().err(), Some(&"dark".to_string()));
     }
@@ -434,34 +483,45 @@ mod tests {
     }
 
     #[test]
-    fn dark_beam_preserves_loss_through_tick() {
+    fn dark_beam_preserves_loss_through_next() {
         let b: Optic<(), u32, String> =
             Optic::err_with_loss((), "dark".into(), ScalarLoss::new(2.0));
-        let n = b.tick(Imperfect::<u64, String, ScalarLoss>::success(0));
+        let n = b.next(0u64);
         assert!(n.is_err());
         assert_eq!(n.result().loss().as_f64(), 2.0);
     }
 
     #[test]
-    fn dark_beam_pipeline_string_error() {
+    fn dark_beam_pipeline_propagates_through_next() {
         let b0: Optic<(), u32, String> = Optic::ok((), 1);
-        let b1 = b0.next(2u32);
-        // b1 is Optic<u32, u32, String>
+        let _b1 = b0.next(2u32);
         // simulate failure at step 2:
         let dark: Optic<u32, u32, String> = Optic::err(2, "pipeline failed".into());
-        // now tick forward — darkness should propagate
-        let b2 = dark.tick(Imperfect::<u64, String, ScalarLoss>::success(3));
+        // now next forward — darkness should propagate
+        let b2 = dark.next(3u64);
         assert!(b2.is_err());
-        let b3 = b2.tick(Imperfect::<String, String, ScalarLoss>::success("done".into()));
+        let b3 = b2.next("done".to_string());
         assert!(b3.is_err());
         assert_eq!(b3.result().err(), Some(&"pipeline failed".to_string()));
     }
 
     #[test]
-    fn next_on_failure_propagates_darkness() {
+    fn dark_beam_pipeline_propagates_through_smap() {
+        let dark: Optic<(), u32, String> = Optic::err((), "pipeline failed".into());
+        let b1 = dark.smap(|v: &u32| Imperfect::success(v.to_string()));
+        assert!(b1.is_err());
+        let b2 = b1.smap(|v: &String| Imperfect::success(v.len()));
+        assert!(b2.is_err());
+        assert_eq!(b2.result().err(), Some(&"pipeline failed".to_string()));
+    }
+
+    #[test]
+    fn next_on_failure_ignores_value() {
+        // Verifies the dark beam doesn't touch the provided value
         let b: Optic<(), u32, String> = Optic::err((), "dark".into());
         let n = b.next(42u32);
         assert!(n.is_err());
+        // The error propagates, the value 42 was swallowed by darkness
         assert_eq!(n.result().err(), Some(&"dark".to_string()));
     }
 }
