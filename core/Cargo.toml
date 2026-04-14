@@ -13,5 +13,12 @@ lapack = ["dep:cc"]
 [dependencies]
 terni = { path = "../imperfect" }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [build-dependencies]
 cc = { version = "1", optional = true }
+
+[[bench]]
+name = "beam_pipeline"
+harness = false
