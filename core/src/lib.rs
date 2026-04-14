@@ -38,6 +38,7 @@ pub mod named;
 pub mod metal;
 pub mod oid;
 pub mod precision;
+pub mod store;
 pub mod spectral_oid;
 
 #[cfg(feature = "optics")]
