@@ -351,8 +351,24 @@ impl<const N: usize> HashPrism for Detector<N> {
     type Input = [u8];
     type Output = String;
 
-    fn review(&self, _input: &[u8]) -> String {
-        todo!("HashPrism::review for Detector<N>")
+    fn review(&self, input: &[u8]) -> String {
+        let detection = self.detect(input);
+        match detection.eigenvalue_hex() {
+            Some(eigenvalue_hex) => {
+                let eigenvalue_bytes = hex::decode(eigenvalue_hex)
+                    .expect("eigenvalue_hex should be valid hex");
+                let mut hasher = Sha256::new();
+                hasher.update(b"prism-core:coincidence:");
+                hasher.update(&eigenvalue_bytes);
+                hex::encode(hasher.finalize())
+            }
+            None => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"prism-core:dark:");
+                hasher.update(input);
+                hex::encode(hasher.finalize())
+            }
+        }
     }
 }
 
@@ -369,29 +385,27 @@ static CANONICAL: LazyLock<Detector<3>> = LazyLock::new(|| {
 /// The eigenvalue (multi-observer agreement record) is hashed through SHA-256
 /// to produce a fixed 64-char hex string. Falls back to SHA-256 with domain
 /// separation for degenerate input (empty bytes, zero state vector).
+///
+/// Delegates to `HashPrism::review` on the canonical `Detector<3>`.
 pub fn canonical_hash(bytes: &[u8]) -> String {
-    let detection = CANONICAL.detect(bytes);
-    match detection.eigenvalue_hex() {
-        Some(eigenvalue_hex) => {
-            // The raw eigenvalue is variable-length (depends on N and dimension).
-            // Hash it through SHA-256 to produce a fixed 32-byte / 64-char address.
-            // The coincidence detection is preserved: the eigenvalue captures the
-            // multi-observer agreement, SHA-256 just compresses it to fixed size.
-            let eigenvalue_bytes = hex::decode(eigenvalue_hex)
-                .expect("eigenvalue_hex should be valid hex");
-            let mut hasher = Sha256::new();
-            hasher.update(b"prism-core:coincidence:");
-            hasher.update(&eigenvalue_bytes);
-            hex::encode(hasher.finalize())
-        }
-        None => {
-            // Fallback for degenerate input (empty bytes, zero state, disagreement).
-            // SHA-256 with domain separation prefix.
-            let mut hasher = Sha256::new();
-            hasher.update(b"prism-core:dark:");
-            hasher.update(bytes);
-            hex::encode(hasher.finalize())
-        }
+    CANONICAL.review(bytes)
+}
+
+/// The canonical detector as a Named optic: `@coincidence`.
+pub fn coincidence_hash() -> crate::named::Named<Detector<3>> {
+    crate::named::Named("@coincidence", Detector::canonical("content", DEFAULT_DIMENSION))
+}
+
+impl<const N: usize> crate::oid::Addressable for Detector<N> {
+    fn oid(&self) -> crate::oid::Oid {
+        let identity = format!("detector:{}:{}", N, self.space);
+        crate::oid::Oid::hash(identity.as_bytes())
+    }
+}
+
+impl<const N: usize> std::fmt::Display for Detector<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Detector<{}>({})", N, self.space)
     }
 }
 
@@ -534,5 +548,61 @@ mod tests {
         let h = detector.review(b"");
         assert_eq!(h.len(), 64);
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    // --- Detector Addressable + Display ---
+
+    #[test]
+    fn detector_addressable_deterministic() {
+        use crate::oid::Addressable;
+        let d1 = Detector::<3>::canonical("content", 16);
+        let d2 = Detector::<3>::canonical("content", 16);
+        assert_eq!(d1.oid(), d2.oid());
+    }
+
+    #[test]
+    fn detector_addressable_different_n() {
+        use crate::oid::Addressable;
+        let d2 = Detector::<2>::canonical("content", 16);
+        let d3 = Detector::<3>::canonical("content", 16);
+        assert_ne!(d2.oid(), d3.oid());
+    }
+
+    #[test]
+    fn detector_display() {
+        let d = Detector::<3>::canonical("content", 16);
+        assert_eq!(format!("{}", d), "Detector<3>(content)");
+    }
+
+    // --- Named<Detector<3>> ---
+
+    #[test]
+    fn named_detector_is_coincidence() {
+        let named = coincidence_hash();
+        assert_eq!(named.name(), "@coincidence");
+    }
+
+    #[test]
+    fn named_detector_review_matches_canonical() {
+        let named = coincidence_hash();
+        let review_result = named.inner().review(b"hello");
+        let canonical_result = canonical_hash(b"hello");
+        assert_eq!(review_result, canonical_result);
+    }
+
+    #[test]
+    fn named_detector_has_oid() {
+        use crate::oid::Addressable;
+        let named = coincidence_hash();
+        let oid = named.oid();
+        assert!(!oid.is_dark());
+    }
+
+    #[test]
+    fn named_detector_oid_deterministic() {
+        use crate::oid::Addressable;
+        let a = coincidence_hash();
+        let b = coincidence_hash();
+        assert_eq!(a.oid(), b.oid());
     }
 }
