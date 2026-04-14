@@ -60,10 +60,14 @@ pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};
 pub use content::ContentAddressed;
+pub use crystal::Crystal;
 pub use kernel::{Decomposition, KernelSpec};
+pub use luminosity::Luminosity;
+pub use named::Named;
 pub use oid::{Addressable, Oid};
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;
+pub use store::Store;
 
 // ---------------------------------------------------------------------------
 // Prism trait
