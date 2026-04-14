@@ -236,7 +236,7 @@ fn encode_into_basis(data: &[u8], space: impl Into<String>, labels: &[String]) -
 // --- Detector ---
 
 /// Detector with N independent projection matrices.
-pub(crate) struct Detector<const N: usize> {
+pub struct Detector<const N: usize> {
     projections: Vec<Projection>,
     space: String,
 }
@@ -250,7 +250,7 @@ const FRAGILE_THRESHOLD: f64 = 1e-6;
 impl<const N: usize> Detector<N> {
     /// Canonical detector: N deterministic orthogonal projections
     /// derived from SHA-256 seeds.
-    fn canonical(space: impl Into<String>, dimension: usize) -> Self {
+    pub fn canonical(space: impl Into<String>, dimension: usize) -> Self {
         let space = space.into();
         let projections: Vec<Projection> = (0..N)
             .map(|i| {
@@ -323,6 +323,36 @@ impl DetectionResult {
             DetectionResult::Agreed(hex) => Some(hex),
             _ => None,
         }
+    }
+}
+
+// --- HashPrism ---
+
+/// A one-way prism. review always succeeds. preview always fails.
+/// This IS a hash function expressed as an optic.
+///
+/// The asymmetry is the point: a hash projects high-dimensional input
+/// into a fixed-size fingerprint. The projection is total (always succeeds).
+/// The inverse is impossible (hashes are one-way). That's a Prism, not an Iso.
+pub trait HashPrism {
+    type Input: ?Sized;
+    type Output;
+
+    /// Hash/project/review — always succeeds.
+    fn review(&self, input: &Self::Input) -> Self::Output;
+
+    /// Reverse — always fails for hash functions.
+    fn preview(&self, _output: &Self::Output) -> Option<&Self::Input> {
+        None // hashes are one-way
+    }
+}
+
+impl<const N: usize> HashPrism for Detector<N> {
+    type Input = [u8];
+    type Output = String;
+
+    fn review(&self, _input: &[u8]) -> String {
+        todo!("HashPrism::review for Detector<N>")
     }
 }
 
@@ -463,5 +493,46 @@ mod tests {
         let a = encode_into_basis(b"hello", "test", &labels);
         let b = encode_into_basis(b"world", "test", &labels);
         assert_ne!(a, b);
+    }
+
+    // --- HashPrism tests (RED — review is todo!()) ---
+
+    #[test]
+    fn hash_prism_review_matches_canonical_hash() {
+        let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
+        let review_result = detector.review(b"hello");
+        let canonical_result = canonical_hash(b"hello");
+        assert_eq!(review_result, canonical_result);
+    }
+
+    #[test]
+    fn hash_prism_preview_always_none() {
+        let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
+        let hash = "abc123".to_string();
+        assert_eq!(detector.preview(&hash), None);
+    }
+
+    #[test]
+    fn hash_prism_review_deterministic() {
+        let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
+        let a = detector.review(b"test");
+        let b = detector.review(b"test");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hash_prism_review_different_input() {
+        let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
+        let a = detector.review(b"hello");
+        let b = detector.review(b"world");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_prism_review_empty_input() {
+        let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
+        let h = detector.review(b"");
+        assert_eq!(h.len(), 64);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }
