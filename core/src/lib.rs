@@ -60,8 +60,13 @@ pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
 pub use beam::{Beam, Operation, Optic};
 pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
-/// Re-export the `#[derive(Named)]` proc macro.
-pub use prism_derive::Named as DeriveNamed;
+/// Re-export the `#[derive(Prism)]` proc macro.
+///
+/// The derive macro and the `Prism` trait live in different namespaces:
+/// `#[derive(Prism)]` invokes the proc macro. `impl Prism for X` uses the trait.
+/// Rust resolves these without collision. The `DerivePrism` alias is provided
+/// for explicit disambiguation when needed.
+pub use prism_derive::Prism as DerivePrism;
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};

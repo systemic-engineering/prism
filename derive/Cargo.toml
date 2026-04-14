@@ -2,7 +2,7 @@
 name = "prism-derive"
 version = "0.1.0"
 edition = "2021"
-description = "Derive macros for prism-core: #[derive(Named)]"
+description = "Derive macros for prism-core: #[derive(Prism)]"
 
 [lib]
 proc-macro = true

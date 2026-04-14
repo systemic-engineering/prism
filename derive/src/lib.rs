@@ -1,6 +1,6 @@
 //! Derive macros for prism-core.
 //!
-//! `#[derive(Named)]` with `#[oid("@something")]` generates:
+//! `#[derive(Prism)]` with `#[oid("@something")]` generates:
 //! - `Addressable` impl (Oid from the `@name` string, deterministic)
 //! - `Display` impl (prints the `@name`)
 //!
@@ -25,14 +25,14 @@ use syn::{parse_macro_input, DeriveInput, Expr, Lit, Meta};
 /// # Example
 ///
 /// ```ignore
-/// #[derive(Named)]
+/// #[derive(Prism)]
 /// #[oid("@test")]
 /// struct MyStruct {
 ///     value: u32,
 /// }
 /// ```
-#[proc_macro_derive(Named, attributes(oid, prism))]
-pub fn derive_named(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Prism, attributes(oid, prism))]
+pub fn derive_prism(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -79,5 +79,5 @@ fn extract_oid_name(input: &DeriveInput) -> String {
             }
         }
     }
-    panic!("#[derive(Named)] requires #[oid(\"@name\")] attribute");
+    panic!("#[derive(Prism)] requires #[oid(\"@name\")] attribute");
 }

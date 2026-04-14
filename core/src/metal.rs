@@ -72,6 +72,27 @@ impl Default for Tape {
     }
 }
 
+/// A Prism expressed as a Metal program.
+/// The minimum. Everything above this is composition.
+pub struct MetalPrism {
+    program: Vec<Instruction>,
+}
+
+impl MetalPrism {
+    pub fn new(program: Vec<Instruction>) -> Self {
+        MetalPrism { program }
+    }
+
+    pub fn program(&self) -> &[Instruction] {
+        &self.program
+    }
+
+    /// Execute the Metal program on input bytes.
+    pub fn execute(&self, input: &[u8]) -> Vec<u8> {
+        execute(&self.program, input)
+    }
+}
+
 /// Execute a Metal program on a tape with input.
 /// Returns the output bytes.
 pub fn execute(program: &[Instruction], input: &[u8]) -> Vec<u8> {
@@ -307,6 +328,25 @@ mod tests {
     fn empty_program_no_output() {
         let output = execute(&[], &[1, 2, 3]);
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn metal_prism_executes() {
+        let prism = MetalPrism::new(vec![
+            Instruction::Focus(3),
+            Instruction::Zoom(0, 10),
+            Instruction::Refract,
+        ]);
+        let output = prism.execute(&[1, 2, 3]);
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0], 10);
+    }
+
+    #[test]
+    fn metal_prism_program_accessor() {
+        let prism = MetalPrism::new(vec![Instruction::Focus(1), Instruction::Refract]);
+        assert_eq!(prism.program().len(), 2);
+        assert_eq!(prism.program()[0], Instruction::Focus(1));
     }
 
     #[test]

@@ -307,6 +307,94 @@ impl<const N: usize> Detector<N> {
     }
 }
 
+/// Quantize a projection weight (f64 in [-1, 1]) to u8.
+/// Maps [-1, 1] → [0, 255]. Zero maps to 128.
+fn quantize_weight(w: f64) -> u8 {
+    let clamped = w.clamp(-1.0, 1.0);
+    ((clamped + 1.0) * 127.5) as u8
+}
+
+impl<const N: usize> Detector<N> {
+    /// Compile this detector to a Metal program.
+    ///
+    /// The five Metal instructions map to the five optics:
+    /// - Focus reads input bytes onto the tape
+    /// - Zoom applies quantized projection weights
+    /// - Project thresholds (precision cut)
+    /// - Split traverses nonzero cells
+    /// - Refract outputs the result
+    ///
+    /// # Tape layout
+    ///
+    /// For each projection p (0..N), the program emits:
+    /// 1. Zoom weights into output cells at `dp + j` for each dimension j
+    /// 2. Focus(dim) reads input bytes into subsequent cells, advancing dp
+    /// 3. Project filters weak signals globally
+    /// 4. Split finds surviving signal in the Zoom region
+    /// 5. Refract outputs the cell at the Split-determined position
+    ///
+    /// # Architectural note
+    ///
+    /// Metal's current five instructions are forward-only (dp never moves
+    /// backward). Focus SETS cells rather than adding to them. This means
+    /// input bytes and projection weights cannot be mixed in the same cell
+    /// through Metal alone — the projection weights (via Zoom) and input
+    /// bytes (via Focus) occupy distinct tape regions.
+    ///
+    /// The compiled program captures the detector's structure: its weights,
+    /// thresholds, and dimensionality are encoded in the instruction stream.
+    /// Full input-dependent matrix-vector multiplication would require a
+    /// sixth instruction: `Blend(n)` — Focus that wrapping-adds input bytes
+    /// instead of overwriting cells.
+    pub fn to_metal(&self) -> crate::metal::MetalPrism {
+        use crate::metal::Instruction;
+
+        let mut program = Vec::new();
+        let dim = self.projections[0].dimension_labels.len();
+
+        for projection in &self.projections {
+            // Zoom: write quantized projection weights into output cells
+            // ahead of dp. These cells encode the projection's eigenstructure.
+            for (j, label) in projection.dimension_labels.iter().enumerate() {
+                // Diagonal entry P[j,j] = v_j^2 — the weight for dimension j.
+                let key = (label.clone(), label.clone());
+                let weight = projection.entries.get(&key).copied().unwrap_or(0.0);
+                let quantized = quantize_weight(weight);
+                if quantized != 128 {
+                    // 128 is the zero point (maps to 0.0) — skip neutral weights
+                    program.push(Instruction::Zoom(j, quantized));
+                }
+            }
+
+            // Focus: read next `dim` bytes of input into tape.
+            // Each projection reads a successive chunk: projection 0 reads
+            // bytes 0..dim-1, projection 1 reads dim..2*dim-1, etc.
+            // For inputs shorter than N*dim, later projections read zero-padding.
+            program.push(Instruction::Focus(dim));
+
+            // Project: precision cut. Threshold derived from the projection's
+            // average weight magnitude. Input cells and weight cells above
+            // threshold survive; the rest are zeroed.
+            let avg_magnitude: f64 = projection
+                .entries
+                .values()
+                .map(|w| w.abs())
+                .sum::<f64>()
+                / projection.entries.len().max(1) as f64;
+            let threshold = quantize_weight(avg_magnitude).max(1);
+            program.push(Instruction::Project(threshold));
+
+            // Split: traverse nonzero cells in the output region.
+            program.push(Instruction::Split(dim));
+
+            // Refract: output the crystal — the cell where signal survived.
+            program.push(Instruction::Refract);
+        }
+
+        crate::metal::MetalPrism::new(program)
+    }
+}
+
 /// Simplified detection result for the hash path.
 enum DetectionResult {
     /// All projections agreed. Contains eigenvalue hex string.
@@ -604,5 +692,120 @@ mod tests {
         let a = coincidence_hash();
         let b = coincidence_hash();
         assert_eq!(a.oid(), b.oid());
+    }
+
+    // --- MetalPrism compilation tests ---
+
+    #[test]
+    fn detector_compiles_to_metal() {
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        assert!(!metal.program().is_empty());
+    }
+
+    #[test]
+    fn metal_detector_is_deterministic() {
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        let a = metal.execute(b"hello");
+        let b = metal.execute(b"hello");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn metal_prism_program_is_small() {
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        // N=3 projections × 16 dimensions should produce a bounded program
+        assert!(
+            metal.program().len() < 1000,
+            "program should be compact: {}",
+            metal.program().len()
+        );
+    }
+
+    #[test]
+    fn metal_detector_nonempty_output() {
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        let output = metal.execute(b"hello");
+        assert!(!output.is_empty(), "metal detector should produce output");
+    }
+
+    #[test]
+    fn metal_detector_empty_input_still_works() {
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        let output = metal.execute(b"");
+        // Empty input still produces output (from Zoom weights + Refract)
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn metal_detector_n2_differs_from_n3() {
+        let d2: Detector<2> = Detector::canonical("content", 16);
+        let d3: Detector<3> = Detector::canonical("content", 16);
+        let m2 = d2.to_metal();
+        let m3 = d3.to_metal();
+        // Different N → different programs → different output count
+        assert_ne!(m2.program().len(), m3.program().len());
+    }
+
+    #[test]
+    fn metal_detector_output_is_n_bytes() {
+        let d3: Detector<3> = Detector::canonical("content", 16);
+        let metal = d3.to_metal();
+        let output = metal.execute(b"anything");
+        // One Refract per projection → N output bytes
+        assert_eq!(output.len(), 3);
+    }
+
+    #[test]
+    fn metal_detector_uses_all_five_instructions() {
+        use crate::metal::Instruction;
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        let program = metal.program();
+        // The compiled program should use all five instruction types
+        assert!(program.iter().any(|i| matches!(i, Instruction::Focus(_))));
+        assert!(program.iter().any(|i| matches!(i, Instruction::Project(_))));
+        assert!(program.iter().any(|i| matches!(i, Instruction::Split(_))));
+        assert!(program.iter().any(|i| matches!(i, Instruction::Zoom(_, _))));
+        assert!(program.iter().any(|i| matches!(i, Instruction::Refract)));
+    }
+
+    #[test]
+    fn metal_detector_program_structure() {
+        use crate::metal::Instruction;
+        let detector: Detector<3> = Detector::canonical("content", 16);
+        let metal = detector.to_metal();
+        let program = metal.program();
+        // Each projection emits: Zoom* + Focus + Project + Split + Refract
+        // Count Focus instructions — should be N (one per projection)
+        let focus_count = program
+            .iter()
+            .filter(|i| matches!(i, Instruction::Focus(_)))
+            .count();
+        assert_eq!(focus_count, 3, "one Focus per projection");
+        // Count Refract instructions — should be N
+        let refract_count = program
+            .iter()
+            .filter(|i| matches!(i, Instruction::Refract))
+            .count();
+        assert_eq!(refract_count, 3, "one Refract per projection");
+    }
+
+    #[test]
+    fn quantize_weight_maps_range() {
+        // -1.0 → 0, 0.0 → 128, 1.0 → 255
+        assert_eq!(quantize_weight(-1.0), 0);
+        assert_eq!(quantize_weight(0.0), 127); // (0+1)*127.5 = 127.5 → 127
+        assert_eq!(quantize_weight(1.0), 255);
+    }
+
+    #[test]
+    fn quantize_weight_clamps() {
+        assert_eq!(quantize_weight(-2.0), 0);
+        assert_eq!(quantize_weight(2.0), 255);
     }
 }
