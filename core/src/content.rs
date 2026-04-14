@@ -5,19 +5,22 @@
 use crate::oid::Oid;
 
 /// A type that has a content address.
-pub trait ContentAddressed {
-    fn oid(&self) -> Oid;
-}
+/// Alias for [`Addressable`](crate::oid::Addressable) — same trait, legacy name.
+pub trait ContentAddressed: crate::oid::Addressable {}
+
+/// Blanket: every Addressable is ContentAddressed.
+impl<T: crate::oid::Addressable> ContentAddressed for T {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::oid::Addressable;
 
     struct Thing {
         id: String,
     }
 
-    impl ContentAddressed for Thing {
+    impl Addressable for Thing {
         fn oid(&self) -> Oid {
             Oid::new(format!("thing:{}", self.id))
         }
@@ -29,5 +32,16 @@ mod tests {
             id: "abc".to_owned(),
         };
         assert_eq!(t.oid().as_str(), "thing:abc");
+    }
+
+    #[test]
+    fn content_addressed_is_addressable() {
+        let t = Thing {
+            id: "test".to_owned(),
+        };
+        fn takes_ca(x: &impl ContentAddressed) -> Oid {
+            x.oid()
+        }
+        assert_eq!(takes_ca(&t).as_str(), "thing:test");
     }
 }

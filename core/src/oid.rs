@@ -5,7 +5,7 @@
 /// Content address. The identity of a thing is its content.
 /// Two values with the same bytes have the same Oid.
 /// Oids are the nodes in every graph this system builds.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Oid(String);
 
 impl Oid {
@@ -13,14 +13,53 @@ impl Oid {
         Oid(s.into())
     }
 
+    /// Hash bytes to produce an Oid. Deterministic content addressing.
+    /// Uses a double-hash to fill 32 bytes, rendered as 64 hex chars.
+    /// Replace with SHA-256 behind a feature flag later.
+    pub fn hash(bytes: &[u8]) -> Self {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut result = [0u8; 32];
+        for chunk in 0..4 {
+            let mut hasher = DefaultHasher::new();
+            chunk.hash(&mut hasher);
+            bytes.hash(&mut hasher);
+            let h = hasher.finish().to_le_bytes();
+            result[chunk * 8..(chunk + 1) * 8].copy_from_slice(&h);
+        }
+        let hex: String = result.iter().map(|b| format!("{:02x}", b)).collect();
+        Oid(hex)
+    }
+
+    /// The dark OID. The address of absence. Constant.
+    pub fn dark() -> Self {
+        Oid("0".repeat(64))
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Is this the dark OID?
+    pub fn is_dark(&self) -> bool {
+        self.0 == "0".repeat(64)
     }
 }
 
 impl std::fmt::Display for Oid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl std::fmt::Debug for Oid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.len() >= 12 {
+            write!(f, "Oid({})", &self.0[..12])
+        } else {
+            write!(f, "Oid({})", &self.0)
+        }
     }
 }
 
@@ -40,6 +79,11 @@ impl From<String> for Oid {
     fn from(s: String) -> Self {
         Oid(s)
     }
+}
+
+/// The thing has an address. That's all.
+pub trait Addressable {
+    fn oid(&self) -> Oid;
 }
 
 #[cfg(test)]
