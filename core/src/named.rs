@@ -73,9 +73,9 @@ mod tests {
         assert_ne!(a.oid(), b.oid());
     }
 
-    // --- #[derive(Named)] tests ---
+    // --- #[derive(Prism)] tests ---
 
-    #[derive(prism_derive::Named)]
+    #[derive(prism_derive::Prism)]
     #[oid("@test")]
     struct TestNamed {
         _value: u32,
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(a.oid(), b.oid());
     }
 
-    #[derive(prism_derive::Named)]
+    #[derive(prism_derive::Prism)]
     #[oid("@wrapper")]
     struct TestWrapper {
         #[prism(inner)]
@@ -126,5 +126,128 @@ mod tests {
             _extra: "test".into(),
         };
         assert!(!w.oid().is_dark());
+    }
+
+    // --- Cascade tests: three-level derive(Prism) ---
+
+    #[derive(prism_derive::Prism)]
+    #[oid("@test/simple")]
+    struct Simple;
+
+    #[derive(Clone, prism_derive::Prism)]
+    #[oid("@test/with-inner")]
+    struct WithInner {
+        #[prism(inner)]
+        _inner: crate::Crystal<u32>,
+        _extra: String,
+    }
+
+    #[derive(prism_derive::Prism)]
+    #[oid("@test/nested")]
+    struct Nested {
+        #[prism(inner)]
+        _inner: WithInner,
+    }
+
+    #[test]
+    fn derive_cascade_oids_differ() {
+        let s = Simple;
+        let w = WithInner {
+            _inner: crate::Crystal(42, crate::Luminosity::Light),
+            _extra: "x".into(),
+        };
+        let n = Nested { _inner: w.clone() };
+
+        // Different @oid strings → different Oids
+        assert_ne!(s.oid(), w.oid());
+        assert_ne!(w.oid(), n.oid());
+    }
+
+    #[test]
+    fn derive_cascade_display() {
+        assert_eq!(format!("{}", Simple), "@test/simple");
+        assert_eq!(
+            format!(
+                "{}",
+                WithInner {
+                    _inner: crate::Crystal(42, crate::Luminosity::Light),
+                    _extra: "x".into(),
+                }
+            ),
+            "@test/with-inner"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                Nested {
+                    _inner: WithInner {
+                        _inner: crate::Crystal(42, crate::Luminosity::Light),
+                        _extra: "x".into(),
+                    },
+                }
+            ),
+            "@test/nested"
+        );
+    }
+
+    #[test]
+    fn derive_cascade_three_levels() {
+        // Three nested derives. Each one is a Prism.
+        // The Oid at each level is derived from the @oid string, not the inner value.
+        let n = Nested {
+            _inner: WithInner {
+                _inner: crate::Crystal(42, crate::Luminosity::Light),
+                _extra: "x".into(),
+            },
+        };
+
+        // The Oid is from "@test/nested", not from the inner Crystal
+        let oid = n.oid();
+        assert!(!oid.is_dark());
+
+        // Same @oid string → same Oid regardless of inner value
+        let n2 = Nested {
+            _inner: WithInner {
+                _inner: crate::Crystal(99, crate::Luminosity::Dark),
+                _extra: "y".into(),
+            },
+        };
+        assert_eq!(n.oid(), n2.oid()); // same @oid string
+    }
+
+    #[test]
+    fn derive_vs_hand_written_same_oid() {
+        // Hand-written impl
+        struct HandWritten;
+        impl Addressable for HandWritten {
+            fn oid(&self) -> Oid {
+                Oid::hash("@test/simple".as_bytes())
+            }
+        }
+        // Derive-generated
+        let derived = Simple;
+        let hand = HandWritten;
+        assert_eq!(derived.oid(), hand.oid());
+    }
+
+    #[test]
+    fn derive_vs_hand_written_same_display() {
+        assert_eq!(format!("{}", Simple), "@test/simple");
+    }
+
+    #[test]
+    fn benchmark_derive_prism_hash() {
+        // Warm up
+        let _ = Simple.oid();
+
+        let start = std::time::Instant::now();
+        for _ in 0..1_000 {
+            let _ = Simple.oid();
+        }
+        let elapsed = start.elapsed();
+        eprintln!("--- derive(Prism) oid: 1k calls in {:?} ---", elapsed);
+        // Each call runs CoincidenceHash<3> (eigenvalue-based).
+        // No LazyLock in the derive — each call recomputes the hash.
+        // ~1ms per call is expected for the full coincidence detector pipeline.
     }
 }
