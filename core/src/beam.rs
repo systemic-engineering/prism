@@ -142,6 +142,19 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
         }
     }
 
+    /// Consume the optic and return the inner `Imperfect` focus.
+    ///
+    /// Drops the source. Useful when you need the owned result
+    /// without further pipeline steps.
+    pub fn into_focus(self) -> Imperfect<Out, E, L> {
+        self.focus
+    }
+
+    /// Extract the output value by reference, if present. Returns `None` on Failure.
+    pub fn value(&self) -> Option<&Out> {
+        self.focus.as_ref().ok()
+    }
+
     /// Construct a dark (failed) optic with no source. Used internally
     /// when propagating failure through `tick`/`smap` — the source from
     /// the previous step does not exist because that step failed.
@@ -257,6 +270,46 @@ mod tests {
         let b: Optic<(), u32> = Optic::ok((), 5);
         let n = b.apply(DoubleOp);
         assert_eq!(n.result().ok(), Some(&10));
+    }
+
+    #[test]
+    fn into_focus_ok() {
+        let b: Optic<(), u32> = Optic::ok((), 42);
+        let focus = b.into_focus();
+        assert_eq!(focus.as_ref().ok(), Some(&42));
+    }
+
+    #[test]
+    fn into_focus_partial() {
+        let b: Optic<(), u32> = Optic::partial((), 7, ScalarLoss::new(1.0));
+        let focus = b.into_focus();
+        assert!(focus.is_partial());
+        assert_eq!(focus.as_ref().ok(), Some(&7));
+    }
+
+    #[test]
+    fn into_focus_err() {
+        let b: Optic<(), u32, String> = Optic::err((), "oops".into());
+        let focus = b.into_focus();
+        assert!(focus.is_err());
+    }
+
+    #[test]
+    fn value_ok() {
+        let b: Optic<(), u32> = Optic::ok((), 42);
+        assert_eq!(b.value(), Some(&42));
+    }
+
+    #[test]
+    fn value_partial() {
+        let b: Optic<(), u32> = Optic::partial((), 7, ScalarLoss::new(1.0));
+        assert_eq!(b.value(), Some(&7));
+    }
+
+    #[test]
+    fn value_err() {
+        let b: Optic<(), u32, String> = Optic::err((), "oops".into());
+        assert_eq!(b.value(), None);
     }
 
     #[test]
