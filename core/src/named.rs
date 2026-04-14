@@ -1,9 +1,39 @@
 //! Named — a labeled Prism.
 
+use crate::oid::{Oid, Addressable};
+
+/// A labeled Prism. The name is for humans. The OID is for the graph.
+///
+/// Named("focus", optic) — the optic with a name.
+/// The OID is derived from both the name and the inner optic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Named<P>(pub &'static str, pub P);
+
+impl<P> Named<P> {
+    pub fn name(&self) -> &'static str {
+        self.0
+    }
+
+    pub fn inner(&self) -> &P {
+        &self.1
+    }
+
+    pub fn into_inner(self) -> P {
+        self.1
+    }
+}
+
+impl<P: Addressable> Addressable for Named<P> {
+    fn oid(&self) -> Oid {
+        let inner_oid = self.1.oid();
+        let combined = format!("named:{}:{}", self.0, inner_oid);
+        Oid::hash(combined.as_bytes())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::oid::{Oid, Addressable};
 
     #[derive(Debug, Clone, PartialEq)]
     struct FocusOptic(u32);
