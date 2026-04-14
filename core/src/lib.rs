@@ -25,6 +25,10 @@
 //! type-safe by construction — the compiler enforces that each stage's output
 //! type matches the next stage's input type.
 
+// Allow prism-derive proc macros to reference `prism_core::` paths
+// when used within this crate.
+extern crate self as prism_core;
+
 pub mod beam;
 pub mod coincidence;
 pub mod crystal;
@@ -56,6 +60,7 @@ pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
 pub use beam::{Beam, Operation, Optic};
 pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
+/// Re-export the `#[derive(Named)]` proc macro.
 pub use prism_derive::Named as DeriveNamed;
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
