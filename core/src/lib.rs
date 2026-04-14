@@ -26,6 +26,7 @@
 //! type matches the next stage's input type.
 
 pub mod beam;
+pub mod coincidence;
 pub mod crystal;
 pub mod luminosity;
 pub mod scalar_loss;

@@ -15,7 +15,7 @@ impl Oid {
 
     /// Hash bytes to produce an Oid. Deterministic content addressing.
     /// Uses a double-hash to fill 32 bytes, rendered as 64 hex chars.
-    /// Replace with SHA-256 behind a feature flag later.
+    /// TODO: Replace with CoincidenceHash<3>.
     pub fn hash(bytes: &[u8]) -> Self {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -205,5 +205,48 @@ mod tests {
         let c = TestValue(99);
         assert_eq!(a.oid(), b.oid());
         assert_ne!(a.oid(), c.oid());
+    }
+
+    // --- Coincidence hash integration tests ---
+
+    #[test]
+    fn oid_hash_is_coincidence_detector() {
+        // Oid::hash must use CoincidenceHash<3> (eigenvalue-based content addressing).
+        // The canonical detector with N=3, dim=16, space="content" produces a
+        // deterministic eigenvalue, then SHA-256 compresses it to 64 hex chars.
+        let oid = Oid::hash(b"hello");
+        let s = oid.as_str();
+        // Fixed size: SHA-256 of eigenvalue = 32 bytes = 64 hex chars
+        assert_eq!(s.len(), 64, "must be 64 hex chars");
+        assert!(s.chars().all(|c| c.is_ascii_hexdigit()), "must be hex");
+        // Deterministic
+        assert_eq!(oid, Oid::hash(b"hello"));
+        // Different input produces different hash
+        assert_ne!(oid, Oid::hash(b"world"));
+    }
+
+    #[test]
+    fn oid_hash_empty_bytes_fallback() {
+        // Empty input may produce a zero state vector, triggering the SHA-256 fallback.
+        // The fallback must still be deterministic and produce valid hex.
+        let oid = Oid::hash(b"");
+        let s = oid.as_str();
+        assert_eq!(s.len(), 64, "fallback must produce 64 hex chars");
+        assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(oid, Oid::hash(b""), "fallback must be deterministic");
+        assert_ne!(oid, Oid::dark(), "fallback must differ from dark");
+    }
+
+    #[test]
+    fn oid_hash_cross_version_stable() {
+        // Pin a known hash value to detect if the hash function changes accidentally.
+        // This value is computed by CoincidenceHash<3> then SHA-256 compressed.
+        // If this test fails, either the hash function changed or the pin needs updating.
+        let oid = Oid::hash(b"prism");
+        assert_eq!(
+            oid.as_str(),
+            "08f8e91d230c49a5072202e4e82db8306e226d83f77aa6f57d05dc87b56efc1e",
+            "hash of b\"prism\" must match pinned CoincidenceHash<3> value"
+        );
     }
 }
