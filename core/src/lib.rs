@@ -34,6 +34,7 @@ pub mod trace;
 pub mod connection;
 pub mod content;
 pub mod kernel;
+pub mod named;
 pub mod metal;
 pub mod oid;
 pub mod precision;
