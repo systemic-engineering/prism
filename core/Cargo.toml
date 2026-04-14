@@ -12,6 +12,7 @@ lapack = ["dep:cc"]
 
 [dependencies]
 terni = { path = "../imperfect" }
+prism-derive = { path = "../derive" }
 sha2 = "0.10"
 hex = "0.4"
 

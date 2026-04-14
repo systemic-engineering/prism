@@ -72,4 +72,59 @@ mod tests {
         let b = Named("focus", FocusOptic(2));
         assert_ne!(a.oid(), b.oid());
     }
+
+    // --- #[derive(Named)] tests ---
+
+    #[derive(prism_derive::Named)]
+    #[oid("@test")]
+    struct TestNamed {
+        _value: u32,
+    }
+
+    #[test]
+    fn derived_named_has_oid() {
+        let t = TestNamed { _value: 42 };
+        let oid = t.oid();
+        assert!(!oid.is_dark());
+    }
+
+    #[test]
+    fn derived_named_display() {
+        let t = TestNamed { _value: 42 };
+        assert_eq!(format!("{}", t), "@test");
+    }
+
+    #[test]
+    fn derived_named_oid_deterministic() {
+        let a = TestNamed { _value: 1 };
+        let b = TestNamed { _value: 2 };
+        // Same @oid string → same Oid (the oid comes from the name, not the value)
+        assert_eq!(a.oid(), b.oid());
+    }
+
+    #[derive(prism_derive::Named)]
+    #[oid("@wrapper")]
+    struct TestWrapper {
+        #[prism(inner)]
+        _inner: crate::Crystal<u32>,
+        _extra: String,
+    }
+
+    #[test]
+    fn derived_named_with_prism_inner_display() {
+        let w = TestWrapper {
+            _inner: crate::Crystal(42, crate::Luminosity::Light),
+            _extra: "test".into(),
+        };
+        assert_eq!(format!("{}", w), "@wrapper");
+    }
+
+    #[test]
+    fn derived_named_with_prism_inner_oid() {
+        let w = TestWrapper {
+            _inner: crate::Crystal(42, crate::Luminosity::Light),
+            _extra: "test".into(),
+        };
+        assert!(!w.oid().is_dark());
+    }
 }

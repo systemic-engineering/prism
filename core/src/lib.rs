@@ -56,6 +56,7 @@ pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
 
 pub use beam::{Beam, Operation, Optic};
 pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
+pub use prism_derive::Named as DeriveNamed;
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
