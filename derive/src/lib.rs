@@ -70,7 +70,7 @@ pub fn derive_prism(input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     // Extract #[oid("@something")] from struct attributes
-    let oid_name = extract_oid_name(&input);
+    let oid_name = extract_oid_name(&input, "Prism");
 
     // Extract annotated fields from struct body
     let annotated = extract_annotated_fields(&input);
@@ -105,7 +105,61 @@ pub fn derive_prism(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn extract_oid_name(input: &DeriveInput) -> String {
+/// Derive `Composable`, `LambdaImpl`, `Addressable`, and `Display` for a named lambda.
+///
+/// # Struct-level attributes
+///
+/// - `#[oid("@name")]` — required. The `@name` must start with `@`.
+///
+/// # Generated impls
+///
+/// - `Addressable` — Oid from the `@name` string
+/// - `Display` — prints the `@name`
+/// - `LambdaImpl` — default identity body (Abs(oid, Bind(oid)))
+/// - `Composable` — `.then()` composition producing `Composed<T>`
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(Lambda)]
+/// #[oid("@parse")]
+/// pub struct Parse;
+/// ```
+#[proc_macro_derive(Lambda, attributes(oid))]
+pub fn derive_lambda(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let oid_name = extract_oid_name(&input, "Lambda");
+
+    let expanded = quote! {
+        impl #impl_generics prism_core::Addressable for #name #ty_generics #where_clause {
+            fn oid(&self) -> prism_core::Oid {
+                prism_core::Oid::hash(#oid_name.as_bytes())
+            }
+        }
+
+        impl #impl_generics ::std::fmt::Display for #name #ty_generics #where_clause {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                write!(f, "{}", #oid_name)
+            }
+        }
+
+        impl<__LambdaT: Clone + PartialEq> ::std::convert::From<#name> for prism_core::lambda::Lambda<__LambdaT> {
+            fn from(_: #name) -> prism_core::lambda::Lambda<__LambdaT> {
+                let oid = prism_core::Oid::hash(#oid_name.as_bytes());
+                prism_core::lambda::Lambda::abs(oid.clone(), prism_core::lambda::Lambda::bind(oid))
+            }
+        }
+
+        impl<__LambdaT: Clone + PartialEq> prism_core::lambda::Composable<__LambdaT> for #name #ty_generics #where_clause {}
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn extract_oid_name(input: &DeriveInput, derive_name: &str) -> String {
     for attr in &input.attrs {
         if attr.path().is_ident("oid") {
             if let Meta::List(meta_list) = &attr.meta {
@@ -127,7 +181,7 @@ fn extract_oid_name(input: &DeriveInput) -> String {
             }
         }
     }
-    panic!("#[derive(Prism)] requires #[oid(\"@name\")] attribute");
+    panic!("#[derive({})] requires #[oid(\"@name\")] attribute", derive_name);
 }
 
 fn extract_annotated_fields(input: &DeriveInput) -> Vec<AnnotatedField> {

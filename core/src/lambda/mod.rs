@@ -5,8 +5,10 @@
 //! Partial (budget exhausted), Failure (stuck term).
 
 mod reduce;
+mod typed;
 
 pub use reduce::{reduce_bounded, ReductionError, ReductionLoss};
+pub use typed::{Composed, LambdaFn};
 
 use crate::merkle::MerkleTree;
 use crate::oid::{Addressable, Oid};
@@ -95,11 +97,14 @@ impl<T: Clone + PartialEq> Lambda<T> {
     /// Compose two lambdas: `self.then(next)` = `λx. next(self(x))`.
     ///
     /// The composition IS a lambda term. Not a Vec. Not a trait object.
-    pub fn then(self, next: Lambda<T>) -> Lambda<T> {
+    /// Accepts any type that converts `Into<Lambda<T>>`, so named phases
+    /// (structs with `#[derive(Lambda)]`) compose directly.
+    pub fn then<N: Into<Lambda<T>>>(self, next: N) -> Lambda<T> {
+        let next_lambda: Lambda<T> = next.into();
         let param = Oid::hash(b"__compose");
         Lambda::abs(
             param.clone(),
-            Lambda::apply(next, Lambda::apply(self, Lambda::bind(param))),
+            Lambda::apply(next_lambda, Lambda::apply(self, Lambda::bind(param))),
         )
     }
 }
@@ -141,6 +146,32 @@ fn pattern_oid<T: Clone + PartialEq>(pattern: &Pattern<T>) -> Oid {
         Pattern::Exact(_) => Oid::hash(b"Pattern:Exact"),
         Pattern::Bind(oid) => Oid::hash(format!("Pattern:Bind:{}", oid).as_bytes()),
         Pattern::Any => Oid::hash(b"Pattern:Any"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Composable — named lambdas that compose with .then()
+// ---------------------------------------------------------------------------
+
+/// A named lambda that can compose with other named lambdas.
+///
+/// Any type that converts `Into<Lambda<T>>` can compose with `.then()`.
+/// The trait is generic over T so that `#[derive(Lambda)]` can generate
+/// `impl<T: Clone + PartialEq> Composable<T> for MyStruct` without
+/// knowing the concrete tree type at macro expansion time.
+///
+/// The default implementations delegate to `Lambda<T>::then()` and
+/// `Lambda::apply()`, so implementors only need `Into<Lambda<T>>`.
+pub trait Composable<T: Clone + PartialEq>: Into<Lambda<T>> + Sized {
+    /// Chain: apply self, then apply next. `self.then(next)` = `λx. next(self(x))`.
+    fn then<C: Into<Lambda<T>>>(self, next: C) -> Lambda<T> {
+        let self_lambda: Lambda<T> = self.into();
+        self_lambda.then(next)
+    }
+
+    /// Wrap an argument as `Apply(self, argument)`.
+    fn apply_to<C: Into<Lambda<T>>>(self, argument: C) -> Lambda<T> {
+        Lambda::apply(self.into(), argument.into())
     }
 }
 
@@ -355,5 +386,88 @@ mod tests {
         let a = pattern_oid::<String>(&Pattern::Bind(Oid::hash(b"x")));
         let b = pattern_oid::<String>(&Pattern::Any);
         assert_ne!(a, b);
+    }
+
+    // -----------------------------------------------------------------------
+    // Arc 2: Composable tests
+    // -----------------------------------------------------------------------
+
+    /// Helper: create a named identity lambda (Abs(oid, Bind(oid))).
+    fn named_identity(name: &[u8]) -> Lambda<String> {
+        let oid = Oid::hash(name);
+        Lambda::abs(oid.clone(), Lambda::bind(oid))
+    }
+
+    /// A test composable: wraps Into<Lambda<String>> for a named phase.
+    struct TestPhaseA;
+    impl From<TestPhaseA> for Lambda<String> {
+        fn from(_: TestPhaseA) -> Lambda<String> {
+            named_identity(b"@test_a")
+        }
+    }
+    impl Composable<String> for TestPhaseA {}
+
+    struct TestPhaseB;
+    impl From<TestPhaseB> for Lambda<String> {
+        fn from(_: TestPhaseB) -> Lambda<String> {
+            named_identity(b"@test_b")
+        }
+    }
+    impl Composable<String> for TestPhaseB {}
+
+    struct TestPhaseC;
+    impl From<TestPhaseC> for Lambda<String> {
+        fn from(_: TestPhaseC) -> Lambda<String> {
+            named_identity(b"@test_c")
+        }
+    }
+    impl Composable<String> for TestPhaseC {}
+
+    #[test]
+    fn composable_then_produces_abs() {
+        let composed: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        assert!(matches!(composed, Lambda::Abs(_)));
+    }
+
+    #[test]
+    fn composable_oid_is_deterministic() {
+        let a: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        let b: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        assert_eq!(a.oid(), b.oid());
+    }
+
+    #[test]
+    fn composable_order_matters() {
+        let ab: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        let ba: Lambda<String> = TestPhaseB.then(TestPhaseA);
+        assert_ne!(ab.oid(), ba.oid());
+    }
+
+    #[test]
+    fn composable_apply_to_wraps_in_apply() {
+        let input = Lambda::<String>::bind(Oid::hash(b"input"));
+        let applied = TestPhaseA.apply_to(input);
+        assert!(matches!(applied, Lambda::Apply(_)));
+    }
+
+    #[test]
+    fn three_phase_composition() {
+        let pipeline: Lambda<String> = TestPhaseA.then(TestPhaseB).then(TestPhaseC);
+        assert!(!pipeline.oid().is_dark());
+        assert!(matches!(pipeline, Lambda::Abs(_)));
+    }
+
+    #[test]
+    fn same_composition_same_oid() {
+        let a: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        let b: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        assert_eq!(a.oid(), b.oid());
+    }
+
+    #[test]
+    fn different_composition_different_oid() {
+        let a: Lambda<String> = TestPhaseA.then(TestPhaseB);
+        let b: Lambda<String> = TestPhaseA.then(TestPhaseC);
+        assert_ne!(a.oid(), b.oid());
     }
 }

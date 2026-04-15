@@ -72,6 +72,9 @@ pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
 /// Rust resolves these without collision. The `DerivePrism` alias is provided
 /// for explicit disambiguation when needed.
 pub use prism_derive::Prism as DerivePrism;
+/// Re-export `#[derive(Lambda)]` for named lambda phases.
+#[cfg(feature = "lambda")]
+pub use prism_derive::Lambda as DeriveLambda;
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
