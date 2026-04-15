@@ -54,6 +54,9 @@ pub mod optics;
 #[cfg(feature = "bundle")]
 pub mod bundle;
 
+#[cfg(feature = "lambda")]
+pub mod lambda;
+
 #[cfg(feature = "lapack")]
 pub mod ffi;
 
