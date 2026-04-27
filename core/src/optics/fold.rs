@@ -29,6 +29,15 @@ impl<S: 'static, A: 'static> Fold<S, A> {
     }
 }
 
+/// Content address of a Fold: derived from its function pointer.
+/// Two Folds with the same function pointer have the same OID.
+impl<S: 'static, A: 'static> crate::Addressable for Fold<S, A> {
+    fn oid(&self) -> crate::Oid {
+        let bytes = (self.fold_fn as usize).to_le_bytes();
+        crate::Oid::hash(&bytes)
+    }
+}
+
 /// Fold implements Prism with Optic.
 ///
 /// Pipeline flow:
@@ -152,5 +161,26 @@ mod tests {
         let f3 = f2.clone(); // Clone
         let tree = Tree { leaves: vec![1] };
         assert_eq!(f3.to_list(&tree), vec![1]);
+    }
+
+    // --- Addressable tests ---
+
+    #[test]
+    fn fold_same_fn_same_oid() {
+        use crate::Addressable;
+        let a: Fold<Tree, i32> = Fold::new(tree_leaves);
+        let b: Fold<Tree, i32> = Fold::new(tree_leaves);
+        assert_eq!(a.oid(), b.oid());
+    }
+
+    #[test]
+    fn fold_different_fn_different_oid() {
+        use crate::Addressable;
+        fn tree_count(t: &Tree) -> Vec<i32> {
+            vec![t.leaves.len() as i32]
+        }
+        let a: Fold<Tree, i32> = Fold::new(tree_leaves);
+        let b: Fold<Tree, i32> = Fold::new(tree_count);
+        assert_ne!(a.oid(), b.oid());
     }
 }

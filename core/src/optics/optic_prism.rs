@@ -53,6 +53,18 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
     }
 }
 
+/// Content address of an OpticPrism: derived from its function pointers.
+/// Two OpticPrisms with the same three function pointers have the same OID.
+impl<S: 'static, A: 'static> crate::Addressable for OpticPrism<S, A> {
+    fn oid(&self) -> crate::Oid {
+        let mut bytes = Vec::with_capacity(24);
+        bytes.extend_from_slice(&(self.match_fn as usize).to_le_bytes());
+        bytes.extend_from_slice(&(self.extract_fn as usize).to_le_bytes());
+        bytes.extend_from_slice(&(self.review_fn as usize).to_le_bytes());
+        crate::Oid::hash(&bytes)
+    }
+}
+
 /// OpticPrism implements Prism with Optic.
 ///
 /// Pipeline flow:
@@ -204,5 +216,32 @@ mod tests {
         let p2 = p; // Copy
         let p3 = p2.clone(); // Clone
         assert!(p3.matches(&Shape::Circle(1)));
+    }
+
+    // --- Addressable tests ---
+
+    #[test]
+    fn optic_prism_same_fns_same_oid() {
+        use crate::Addressable;
+        let a = circle_prism();
+        let b = circle_prism();
+        assert_eq!(a.oid(), b.oid());
+    }
+
+    #[test]
+    fn optic_prism_different_fns_different_oid() {
+        use crate::Addressable;
+        fn square_match(s: &Shape) -> bool {
+            matches!(s, Shape::Square(_))
+        }
+        fn square_extract(s: &Shape) -> i32 {
+            if let Shape::Square(r) = s { *r } else { -1 }
+        }
+        fn square_review(r: i32) -> Shape {
+            Shape::Square(r)
+        }
+        let a = circle_prism();
+        let b = OpticPrism::new(square_match, square_extract, square_review);
+        assert_ne!(a.oid(), b.oid());
     }
 }
