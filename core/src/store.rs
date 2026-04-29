@@ -1,5 +1,6 @@
 //! Store — where crystals live.
 
+use crate::merkle::MerkleTree;
 use crate::oid::Oid;
 use crate::luminosity::Luminosity;
 use terni::{Imperfect, Loss};
@@ -10,15 +11,19 @@ use terni::{Imperfect, Loss};
 /// - Beam: the value in motion
 /// - Prism: the transformation
 /// - Store: the persistence
+///
+/// Typed over a MerkleTree — the store knows its tree shape.
 pub trait Store {
+    /// The tree type this store persists.
+    type Tree: MerkleTree;
     type Error;
     type L: Loss;
 
-    /// Retrieve by address. Partial if some dimensions are dark.
-    fn get(&self, oid: &Oid) -> Imperfect<Vec<u8>, Self::Error, Self::L>;
+    /// Retrieve a tree by address. Partial if some dimensions are dark.
+    fn get(&self, oid: &Oid) -> Imperfect<Self::Tree, Self::Error, Self::L>;
 
-    /// Persist by address. Partial if not fully replicated.
-    fn put(&mut self, oid: Oid, data: Vec<u8>) -> Imperfect<Oid, Self::Error, Self::L>;
+    /// Persist a tree. Returns its Oid. Partial if not fully replicated.
+    fn put(&mut self, tree: Self::Tree) -> Imperfect<Oid, Self::Error, Self::L>;
 
     /// Check luminosity at address. Light, Dimmed, or Dark.
     fn has(&self, oid: &Oid) -> Imperfect<Luminosity, Self::Error, Self::L>;
@@ -27,22 +32,36 @@ pub trait Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::merkle::MerkleTree;
     use crate::oid::{Oid, Addressable};
     use crate::luminosity::Luminosity;
     use std::collections::HashMap;
 
-    #[derive(Debug, Clone, PartialEq)]
-    struct TestPrism(Vec<u8>);
+    #[derive(Clone, Debug, PartialEq)]
+    struct TestNode {
+        name: String,
+        children: Vec<TestNode>,
+    }
 
-    impl Addressable for TestPrism {
+    impl Addressable for TestNode {
         fn oid(&self) -> Oid {
-            Oid::hash(&self.0)
+            let mut content = self.name.clone();
+            for child in &self.children {
+                content.push_str(&format!(":{}", child.oid()));
+            }
+            Oid::hash(content.as_bytes())
         }
+    }
+
+    impl MerkleTree for TestNode {
+        type Data = String;
+        fn data(&self) -> &String { &self.name }
+        fn children(&self) -> &[Self] { &self.children }
     }
 
     /// In-memory store for testing.
     struct MemoryStore {
-        data: HashMap<Oid, Vec<u8>>,
+        data: HashMap<Oid, TestNode>,
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
@@ -56,12 +75,13 @@ mod tests {
     }
 
     impl Store for MemoryStore {
+        type Tree = TestNode;
         type Error = String;
         type L = MemoryLoss;
 
-        fn get(&self, oid: &Oid) -> Imperfect<Vec<u8>, Self::Error, Self::L> {
+        fn get(&self, oid: &Oid) -> Imperfect<TestNode, Self::Error, Self::L> {
             match self.data.get(oid) {
-                Some(data) => Imperfect::Success(data.clone()),
+                Some(node) => Imperfect::Success(node.clone()),
                 None => Imperfect::Failure(
                     format!("not found: {:?}", oid),
                     MemoryLoss::zero(),
@@ -69,8 +89,9 @@ mod tests {
             }
         }
 
-        fn put(&mut self, oid: Oid, data: Vec<u8>) -> Imperfect<Oid, Self::Error, Self::L> {
-            self.data.insert(oid.clone(), data);
+        fn put(&mut self, tree: TestNode) -> Imperfect<Oid, Self::Error, Self::L> {
+            let oid = tree.oid();
+            self.data.insert(oid.clone(), tree);
             Imperfect::Success(oid)
         }
 
@@ -86,15 +107,15 @@ mod tests {
     #[test]
     fn store_put_get_roundtrip() {
         let mut store = MemoryStore { data: HashMap::new() };
-        let prism = TestPrism(b"hello".to_vec());
-        let oid = prism.oid();
+        let node = TestNode { name: "hello".into(), children: vec![] };
+        let oid = node.oid();
 
-        let put_result = store.put(oid.clone(), prism.0.clone());
+        let put_result = store.put(node.clone());
         assert!(put_result.is_ok());
 
         let get_result = store.get(&oid);
         assert!(get_result.is_ok());
-        assert_eq!(get_result.ok(), Some(b"hello".to_vec()));
+        assert_eq!(get_result.ok(), Some(node));
     }
 
     #[test]
@@ -107,12 +128,13 @@ mod tests {
     #[test]
     fn store_has_returns_luminosity() {
         let mut store = MemoryStore { data: HashMap::new() };
-        let oid = Oid::hash(b"test");
+        let node = TestNode { name: "test".into(), children: vec![] };
+        let oid = node.oid();
 
         let before = store.has(&oid);
         assert_eq!(before.ok(), Some(Luminosity::Dark));
 
-        let _ = store.put(oid.clone(), b"data".to_vec());
+        let _ = store.put(node);
 
         let after = store.has(&oid);
         assert_eq!(after.ok(), Some(Luminosity::Light));

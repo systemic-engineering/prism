@@ -39,9 +39,11 @@ pub mod trace;
 pub mod connection;
 pub mod content;
 pub mod kernel;
+pub mod merkle;
 pub mod named;
 pub mod metal;
 pub mod oid;
+pub mod optic_kind;
 pub mod precision;
 pub mod store;
 pub mod spectral_oid;
@@ -51,6 +53,9 @@ pub mod optics;
 
 #[cfg(feature = "bundle")]
 pub mod bundle;
+
+#[cfg(feature = "lambda")]
+pub mod lambda;
 
 #[cfg(feature = "lapack")]
 pub mod ffi;
@@ -67,6 +72,9 @@ pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
 /// Rust resolves these without collision. The `DerivePrism` alias is provided
 /// for explicit disambiguation when needed.
 pub use prism_derive::Prism as DerivePrism;
+/// Re-export `#[derive(Lambda)]` for named lambda phases.
+#[cfg(feature = "lambda")]
+pub use prism_derive::Lambda as DeriveLambda;
 pub use scalar_loss::ScalarLoss;
 pub use terni::{Imperfect, Loss};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
@@ -76,8 +84,10 @@ pub use content::ContentAddressed;
 pub use crystal::Crystal;
 pub use kernel::{Decomposition, KernelSpec};
 pub use luminosity::Luminosity;
+pub use merkle::{diff, Delta, MerkleTree};
 pub use named::Named;
 pub use oid::{Addressable, Oid};
+pub use optic_kind::{FieldOptic, OpticKind};
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;
 pub use store::Store;

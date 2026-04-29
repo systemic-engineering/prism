@@ -8,6 +8,7 @@ description = "Beam (semifunctor) + Prism (monoid). Three dimensions: focus, pro
 default = []
 optics = []
 bundle = ["optics"]
+lambda = []
 lapack = ["dep:cc"]
 
 [dependencies]
