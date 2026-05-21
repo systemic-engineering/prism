@@ -40,13 +40,13 @@ pub mod connection;
 pub mod content;
 pub mod kernel;
 pub mod merkle;
-pub mod named;
 pub mod metal;
+pub mod named;
 pub mod oid;
 pub mod optic_kind;
 pub mod precision;
-pub mod store;
 pub mod spectral_oid;
+pub mod store;
 
 #[cfg(feature = "optics")]
 pub mod optics;
@@ -61,10 +61,16 @@ pub mod lambda;
 pub mod ffi;
 
 #[cfg(feature = "bundle")]
-pub use bundle::{Bundle, Closure, Connection, Fiber, Gauge, Transport};
+pub use bundle::{
+    Bundle, Closure, Connection, Cyclic, Fiber, Gauge, GroupStructure, IdentityPrism,
+    LawvereFixedPoint, StableFiber, Transport,
+};
 
 pub use beam::{Beam, Operation, Optic};
 pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
+/// Re-export `#[derive(Lambda)]` for named lambda phases.
+#[cfg(feature = "lambda")]
+pub use prism_derive::Lambda as DeriveLambda;
 /// Re-export the `#[derive(Prism)]` proc macro.
 ///
 /// The derive macro and the `Prism` trait live in different namespaces:
@@ -72,11 +78,8 @@ pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
 /// Rust resolves these without collision. The `DerivePrism` alias is provided
 /// for explicit disambiguation when needed.
 pub use prism_derive::Prism as DerivePrism;
-/// Re-export `#[derive(Lambda)]` for named lambda phases.
-#[cfg(feature = "lambda")]
-pub use prism_derive::Lambda as DeriveLambda;
 pub use scalar_loss::ScalarLoss;
-pub use terni::{Imperfect, Loss};
+pub use terni::{Imperfect, Loss, Metric};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};
