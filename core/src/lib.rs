@@ -145,6 +145,48 @@ pub fn apply<P: Prism>(prism: &P, beam: P::Input) -> P::Refracted {
         .apply(Refract(prism))
 }
 
+/// Run a prism end-to-end on a *state value* (not a beam) and discard
+/// the source dimension, returning the focus of the refracted beam as
+/// an [`Imperfect`].
+///
+/// **Heterogeneous.** The input state's type (`SIn`) and the output
+/// state's type (`Out`) are independent — they need not coincide. This
+/// is the algebra-action shape: an element `P` of the algebra `A` acts
+/// on a state of type `SIn` and produces a state of type `Out`, with
+/// any accumulated residual ([`Loss`]) and any failure (`Error`)
+/// carried in the returned [`Imperfect`].
+///
+/// The seed beam is constructed internally as `Optic::ok((), state)`.
+/// Callers that already have a `P::Input` beam should use [`apply`]
+/// instead. The constraints bind:
+/// - `P::Input = Optic<(), SIn>` — the standard "seed" shape (source
+///   position is `()`, value position carries the input state),
+/// - `P::Refracted = Optic<In, Out, E, L>` — the final beam carries
+///   an output state of type `Out`, with arbitrary error and loss
+///   types `E` and `L`. The `In` parameter holds the previous stage's
+///   output type and is dropped by `into_focus`.
+///
+/// Returns `Imperfect<Out, E, L>` — the focus payload of the refracted
+/// beam: `Success(out)`, `Partial(out, loss)`, or `Failure(err, loss)`.
+///
+/// ## Why this exists (and isn't just `apply(...).into_focus()`)
+///
+/// The combination "seed the input + drop the source on the way out"
+/// is the canonical operator-action pattern throughout the mirror
+/// bootstrap and any future algebra-as-data consumer. Naming it
+/// `apply_h` (operator action on `H`) ties the implementation to its
+/// spectral-triple semantics and removes the need for every consumer
+/// to reinvent the heterogeneous wrapper — which, in practice, drifts
+/// toward over-constrained shapes (e.g. forcing `SIn = Out`) and then
+/// has to be bypassed when a heterogeneous parser/serializer arrives.
+pub fn apply_h<P, SIn, In, Out, E, L>(prism: &P, state: SIn) -> Imperfect<Out, E, L>
+where
+    P: Prism<Input = Optic<(), SIn>, Refracted = Optic<In, Out, E, L>>,
+    L: Loss,
+{
+    apply(prism, Optic::ok((), state)).into_focus()
+}
+
 // ---------------------------------------------------------------------------
 // Operation structs — three pipeline stages
 // ---------------------------------------------------------------------------
