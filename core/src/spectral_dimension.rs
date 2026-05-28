@@ -84,7 +84,13 @@ impl std::fmt::Display for SpectralDimension {
 /// `eigenvalues` are the Laplacian spectrum (any order). `N` is their count.
 /// Returns `0.0` for an empty spectrum.
 pub fn heat_return_probability(eigenvalues: &[f64], sigma: Sigma) -> f64 {
-    unimplemented!("green phase")
+    let n = eigenvalues.len();
+    if n == 0 {
+        return 0.0;
+    }
+    let s = sigma.as_f64();
+    let z: f64 = eigenvalues.iter().map(|&lambda| (-lambda * s).exp()).sum();
+    z / n as f64
 }
 
 /// The spectral dimension `d_s(σ) = 2σ · (Σ λ_k e^(−λ_k σ)) / (Σ e^(−λ_k σ))`.
@@ -92,7 +98,23 @@ pub fn heat_return_probability(eigenvalues: &[f64], sigma: Sigma) -> f64 {
 /// `eigenvalues` are the Laplacian spectrum (any order). Returns `0.0` for an
 /// empty spectrum.
 pub fn spectral_dimension(eigenvalues: &[f64], sigma: Sigma) -> SpectralDimension {
-    unimplemented!("green phase")
+    if eigenvalues.is_empty() {
+        return SpectralDimension(0.0);
+    }
+    let s = sigma.as_f64();
+    // Z = Σ e^(−λσ);  W = Σ λ e^(−λσ).  Both normalised by N cancels in the
+    // ratio, so we keep the unnormalised sums.
+    let mut z = 0.0_f64;
+    let mut w = 0.0_f64;
+    for &lambda in eigenvalues {
+        let weight = (-lambda * s).exp();
+        z += weight;
+        w += lambda * weight;
+    }
+    if z == 0.0 {
+        return SpectralDimension(0.0);
+    }
+    SpectralDimension(2.0 * s * w / z)
 }
 
 /// Build the combinatorial Laplacian `L = D − A` from an undirected edge list,
@@ -102,7 +124,16 @@ pub fn spectral_dimension(eigenvalues: &[f64], sigma: Sigma) -> SpectralDimensio
 /// degree of both endpoints. Self-loops and multi-edges are taken at face
 /// value (degree counts them). Vertices are `0..n`.
 pub fn laplacian_from_edges(n: usize, edges: &[(usize, usize)]) -> Vec<f64> {
-    unimplemented!("green phase")
+    let mut l = vec![0.0_f64; n * n];
+    for &(u, v) in edges {
+        // Off-diagonal: −A. Symmetric for an undirected edge.
+        l[u * n + v] -= 1.0;
+        l[v * n + u] -= 1.0;
+        // Diagonal: +degree.
+        l[u * n + u] += 1.0;
+        l[v * n + v] += 1.0;
+    }
+    l
 }
 
 /// Eigendecompose a graph's Laplacian (via LAPACK `dsyev`) and return
@@ -115,7 +146,9 @@ pub fn graph_spectral_dimension(
     edges: &[(usize, usize)],
     sigma: Sigma,
 ) -> Result<SpectralDimension, i32> {
-    unimplemented!("green phase")
+    let lap = laplacian_from_edges(n, edges);
+    let (evals, _evecs) = ffi::eigensystem(n, &lap)?;
+    Ok(spectral_dimension(&evals, sigma))
 }
 
 #[cfg(test)]
