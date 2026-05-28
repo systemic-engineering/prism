@@ -60,6 +60,9 @@ pub mod lambda;
 #[cfg(feature = "lapack")]
 pub mod ffi;
 
+#[cfg(feature = "lapack")]
+pub mod spectral_dimension;
+
 #[cfg(feature = "bundle")]
 pub use bundle::{
     Bundle, Closure, Connection, Cyclic, Fiber, Gauge, GroupStructure, IdentityPrism,
