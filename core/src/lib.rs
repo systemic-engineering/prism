@@ -34,6 +34,7 @@ pub mod coincidence;
 pub mod crystal;
 pub mod luminosity;
 pub mod scalar_loss;
+pub mod substrate_ref;
 pub mod trace;
 
 pub mod connection;
@@ -82,7 +83,8 @@ pub use prism_derive::Lambda as DeriveLambda;
 /// for explicit disambiguation when needed.
 pub use prism_derive::Prism as DerivePrism;
 pub use scalar_loss::ScalarLoss;
-pub use terni::{Imperfect, Loss, Metric};
+pub use substrate_ref::Ref;
+pub use terni::{Diagnostic, Imperfect, Loss, Metric, PropertyVerdict, Transparency};
 pub use trace::{Op, Step, StepOutput, Trace, Traced};
 
 pub use connection::{Carrier, ScalarConnection};
