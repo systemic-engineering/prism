@@ -1,16 +1,57 @@
-//! Substrate reference (`@`-prefixed nav-ref). STUB — failing on purpose.
+//! Substrate reference (`@`-prefixed nav-ref).
 //!
-//! Real implementation arrives in the 🟢 paired commit.
+//! `Ref` is a universal substrate-reference primitive — the path-shaped
+//! type any prism consumer uses to name a substrate location. The name is
+//! drawn from mirror's nav-ref vocabulary (`.`, `..`, `...`, `~`, `@`,
+//! `^`, `HEAD`); `@`-prefixed refs name substrate actions, paths, or
+//! addressable locations (e.g. `@kintsugi/fracture/rename`,
+//! `@quantize`, `@cli/new`).
+//!
+//! ## Hoisting from mirror
+//!
+//! `Ref` previously lived in `mirror::bootstrap::crystallize` and was
+//! mirror-specific. It moved to `prism_core` per the
+//! `[substrate-pull:realize]` discipline: every consumer of `prism_core`
+//! (mirror, cosmos-mirror, spectral-db, future engines) needs the same
+//! `@`-prefixed substrate reference. The validating constructor stays
+//! verbatim — non-empty, `@`-prefixed, no whitespace.
+//!
+//! ## No `Default`
+//!
+//! There is deliberately no `Default` impl. An "empty" `@`-prefixed ref
+//! is meaningless. The structural payoff: [`Transparency<Ref>`] does not
+//! require `Ref : Default` because `Transparency`'s identity element is
+//! structural (the `Clear` variant), not synthesised from `P::default()`.
+//!
+//! [`Transparency<Ref>`]: terni::Transparency
 
+/// A substrate reference, like `"@kintsugi/fracture/rename"`. Newtype
+/// with `@`-prefix, non-empty, no-whitespace validation at construction.
+///
+/// Hash-blind by design; carries no OID, performs no hash computation.
+/// Suitable as a `BTreeMap` key (derives `Ord`) and as a `HashMap` key
+/// (derives `Hash`). No `Default` — see the module docs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Ref(String);
 
 impl Ref {
-    pub fn new(_path: impl Into<String>) -> Result<Self, &'static str> {
-        // Wrong on purpose: accept everything (validation arrives in 🟢).
-        Ok(Ref(String::new()))
+    /// Construct. Returns `Err` if `path` is empty, lacks a `@` prefix,
+    /// or contains whitespace.
+    pub fn new(path: impl Into<String>) -> Result<Self, &'static str> {
+        let s = path.into();
+        if s.is_empty() {
+            return Err("Ref must be non-empty");
+        }
+        if !s.starts_with('@') {
+            return Err("Ref must start with '@'");
+        }
+        if s.chars().any(|c| c.is_whitespace()) {
+            return Err("Ref must not contain whitespace");
+        }
+        Ok(Ref(s))
     }
 
+    /// Borrow the underlying `&str`.
     pub fn as_str(&self) -> &str {
         &self.0
     }
