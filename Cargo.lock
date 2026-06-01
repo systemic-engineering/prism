@@ -535,12 +535,14 @@ name = "terni"
 version = "0.6.0"
 dependencies = [
  "criterion",
+ "serde",
+ "serde_json",
  "terni-macros",
 ]
 
 [[package]]
 name = "terni-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "proc-macro2",
  "quote",
