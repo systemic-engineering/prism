@@ -47,6 +47,7 @@ pub mod oid;
 pub mod optic_kind;
 pub mod precision;
 pub mod spectral_oid;
+pub mod spectral_uuid;
 pub mod store;
 
 #[cfg(feature = "optics")]
@@ -98,6 +99,7 @@ pub use oid::{Addressable, Oid};
 pub use optic_kind::{FieldOptic, OpticKind};
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;
+pub use spectral_uuid::{ParseError as SpectralUuidParseError, SpectralUuid};
 pub use store::Store;
 
 // ---------------------------------------------------------------------------
