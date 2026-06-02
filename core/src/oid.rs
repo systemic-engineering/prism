@@ -6,6 +6,8 @@
 /// Two values with the same bytes have the same Oid.
 /// Oids are the nodes in every graph this system builds.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "pq", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "pq", serde(transparent))]
 pub struct Oid(String);
 
 impl Oid {

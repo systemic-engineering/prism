@@ -364,6 +364,8 @@ dependencies = [
  "criterion",
  "hex",
  "prism-derive",
+ "serde",
+ "serde_json",
  "sha2",
  "terni",
 ]

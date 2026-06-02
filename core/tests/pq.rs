@@ -14,10 +14,10 @@
 #![cfg(feature = "pq")]
 
 use prism_core::pq::{
-    CasUpdate, Direction, Filter, OrderSpec, Output, Target, WalkDirection,
+    CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection,
     WhereClause, WhereOp,
 };
-use prism_core::{Oid, Ref};
+use prism_core::Oid;
 use serde_json::json;
 
 // ── Target round-trips ──────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ fn target_path_round_trips() {
 
 #[test]
 fn target_ref_round_trips() {
-    let t = Target::Ref { ref_: Ref::new("HEAD") };
+    let t = Target::Ref { ref_: Reference::new("HEAD") };
     let j = serde_json::to_value(&t).unwrap();
     assert_eq!(j, json!({"ref": "HEAD"}));
     let back: Target = serde_json::from_value(j).unwrap();
@@ -234,7 +234,7 @@ fn output_to_path_without_message_omits_field() {
 
 #[test]
 fn output_ref_round_trips() {
-    let o = Output::Ref { ref_: Ref::new("feature/x") };
+    let o = Output::Ref { ref_: Reference::new("feature/x") };
     let j = serde_json::to_value(&o).unwrap();
     assert_eq!(j, json!({"ref": "feature/x"}));
     let back: Output = serde_json::from_value(j).unwrap();
@@ -254,7 +254,7 @@ fn output_cas_round_trips() {
 
 #[test]
 fn output_to_ref_round_trips() {
-    let o = Output::ToRef { to_ref: Ref::new("main") };
+    let o = Output::ToRef { to_ref: Reference::new("main") };
     let j = serde_json::to_value(&o).unwrap();
     assert_eq!(j, json!({"to_ref": "main"}));
     let back: Output = serde_json::from_value(j).unwrap();
