@@ -20,9 +20,7 @@ chains. Three altitudes, one composition law.
 
 ## 0. The recognition in one sentence
 
-The Prism trait already has the right algebraic surface for an MCP
-server. Enumerating tools above it is decoration; refusing to expose
-it is insufficient. **`pq` is the trait, projected onto the wire.**
+**`pq` is the trait, projected onto the wire.**
 
 ```
 impl Prism for FrgmntMcp { ... }   // structural identity, not metaphor
@@ -212,7 +210,35 @@ final Beam is the agent's response.
 the target/filter/output DSLs are typed against the Prism's
 associated `Beam` types, so the wire stays verifiable.**
 
-### 3.1 What the table does NOT lose
+### 3.1 Type sketches for the non-obvious rows
+
+Three rows in the table take judgement to read; here is the Beam shape entering and leaving each step.
+
+**`commit(path, content, msg)`**. The chain needs a `focus` first to produce a `Beam<Focused>` for `refract` to consume:
+```
+focus({ content })          → Beam<Focused>   carrying the raw content
+project({ to_path: path })  → Beam<Projected> declaring the write target
+refract({ message: msg })   → Beam<Refracted> carrying the committed OID
+```
+The collapse table's `refract(beam_from_content, { to_path, message })` is the same chain elided. The full form is the type-correct one; the elided form is shorthand for the common case where `focus` + `project` are inferred from the `Output` shape.
+
+**`snapshot()`**. The terse `focus({}) → refract({ snapshot: true })` skips `project`, which the trait does not allow directly. The expanded chain inserts an identity project:
+```
+focus({})                   → Beam<Focused>   the shard's current focus
+project({ identity: true }) → Beam<Projected> passthrough
+refract({ snapshot: true }) → Beam<Refracted> the snapshot OID
+```
+The identity project is the algebraic unit; per the optics monoid in `prism_core::optics::monoid` it is the identity element under composition. Snapshot is therefore `focus ∘ id ∘ refract`.
+
+**`merge(a, b)`**. The chain is genuinely three-step, but `project({ kintsugi })` invokes the kintsugi-tournament loop, which itself dispatches pq chains. The shape:
+```
+focus({ pair: [a, b] })     → Beam<Focused>   the two-input position
+project({ kintsugi })       → Beam<Projected> the resolved merge plan
+refract({ to_ref: name })   → Beam<Refracted> the merged ref
+```
+The potential circularity — `project` calls kintsugi calls pq calls `project` — is resolved by the dispatch protocol: `project({ kintsugi })` returns a `Beam<Projected>` whose `imperfect` is `Partial { confidence }` until the loop converges, at which point a subsequent `refract` is what commits. If the agent re-invokes `refract` before convergence, the call is idempotent and returns the same Partial Beam. Convergence is observable on the `imperfect` field; the loop's sub-Turing bound (per [[../../../mirror/docs/specs/kintsugi-tournament]]) terminates the recursion.
+
+### 3.2 What the table does NOT lose
 
 Nothing the old surface expressed is unreachable. The chain shape
 is strictly more expressive — the agent can interleave projects,
@@ -239,15 +265,24 @@ Reasoning:
   large focus result (a blob, a tree) is what the agent asked for;
   passing it back to the next pq call costs one round-trip-worth
   of bandwidth, not a stateful server handle.
-- Server-side beam handles introduce GC questions, leak questions,
-  cross-session questions, and a layer of stateful protocol that
-  the wire doesn't need. CRDT discipline
-  ([[reality-shard-as-crdt]]) is already strong eventual
-  consistency; **adding a stateful overlay above it would weaken
-  the contract.**
-- The shard itself IS the server-side state — `ShardRef` (per
-  [[shard-ref-as-prism]]) is the per-session handle. Beam state is
-  per-pipeline transient.
+- Server-side beam handles couple Beam lifetime to MCP session
+  lifetime, which couples wire-protocol semantics to transport-
+  layer state. **The MCP 2025-06-18 §lifecycle treats requests as
+  independent units; the JSON-RPC layer is stateless by
+  construction.** A server-side handle layer would push wire
+  semantics into transport semantics. Reject. GC questions, leak
+  questions, cross-session questions all become moot once the
+  handle layer is rejected on this independent ground; the CRDT
+  contract per [[reality-shard-as-crdt]] is undisturbed by either
+  choice, but does not need the overlay either.
+- The shard itself IS the server-side state — `ShardRef` (per the
+  in-flight T9 design; see
+  [[../../../fragmentation/docs/specs/fragmentation-mcp]] §3.4 and
+  `fragmentation/src/shard_ref.rs`) is the per-session typed handle.
+  The Prism implementation that the wire dispatches on is
+  `FrgmntMcp`, which holds the shard registry; `ShardRef` is a typed
+  budget+context binding, not the Prism instance itself. Beam state
+  is per-pipeline transient.
 
 The tradeoff:
 
