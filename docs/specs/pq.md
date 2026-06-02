@@ -849,10 +849,7 @@ In-spec dependencies:
   [[../../../fragmentation/docs/specs/fragmentation-mcp]] §3.4
   and the T10 architectural reframe; no standalone spec exists
   yet)* — the per-session shard handle.
-- [[../../../mirror/docs/specs/properties-on-glass]] *(TBD —
-  referenced as load-bearing throughout the corpus but the
-  standalone spec does not exist at the path searched
-  2026-06-02)* — where typed verdicts live.
+- [[../../../mirror/docs/specs/properties-on-glass]] — where typed verdicts live. (70KB; landed on mirror's main per tasks #135/#136.)
 
 In-corpus prior art:
 
