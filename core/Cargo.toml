@@ -24,6 +24,10 @@ serde_json = { version = "1", optional = true }
 criterion = { version = "0.5", features = ["html_reports"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# pq schema tests validate the emitted JSON Schema against known-good payloads.
+# Disable default features (resolve-http, resolve-file, tls-aws-lc-rs) — we
+# only need in-memory schema compilation.
+jsonschema = { version = "0.46", default-features = false }
 
 [build-dependencies]
 cc = { version = "1", optional = true }
