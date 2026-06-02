@@ -30,13 +30,9 @@ use crate::Oid;
 #[serde(untagged)]
 pub enum Target {
     /// `{"oid": "..."}` — focus by content address.
-    Oid {
-        oid: Oid,
-    },
+    Oid { oid: Oid },
     /// `{"path": "..."}` — focus by working-tree path.
-    Path {
-        path: String,
-    },
+    Path { path: String },
     /// `{"ref": "..."}` — focus by named ref. `ref` is a Rust keyword,
     /// hence the trailing-underscore field name plus serde rename.
     Ref {
@@ -44,17 +40,11 @@ pub enum Target {
         ref_: Reference,
     },
     /// `{"pair": [a, b]}` — focus on the pair (diff/merge inputs).
-    Pair {
-        pair: Box<[Target; 2]>,
-    },
+    Pair { pair: Box<[Target; 2]> },
     /// `{"refs": true}` — focus the ref-set.
-    Refs {
-        refs: bool,
-    },
+    Refs { refs: bool },
     /// `{"shard": true}` — focus the shard's summary.
-    Shard {
-        shard: bool,
-    },
+    Shard { shard: bool },
     /// `{}` — the shard's current focus.
     Empty {},
 }

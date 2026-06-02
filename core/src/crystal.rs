@@ -1,7 +1,7 @@
 //! Crystal — a settled Prism.
 
 use crate::luminosity::Luminosity;
-use crate::oid::{Oid, Addressable};
+use crate::oid::{Addressable, Oid};
 
 /// A settled Prism. The Prism IS the value.
 /// The Crystal IS the Prism at rest.

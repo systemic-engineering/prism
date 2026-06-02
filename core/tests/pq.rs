@@ -14,8 +14,8 @@
 #![cfg(feature = "pq")]
 
 use prism_core::pq::{
-    CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection,
-    WhereClause, WhereOp,
+    CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection, WhereClause,
+    WhereOp,
 };
 use prism_core::Oid;
 use serde_json::json;
@@ -33,7 +33,9 @@ fn target_empty_round_trips() {
 
 #[test]
 fn target_oid_round_trips() {
-    let t = Target::Oid { oid: Oid::new("abc123") };
+    let t = Target::Oid {
+        oid: Oid::new("abc123"),
+    };
     let j = serde_json::to_value(&t).unwrap();
     assert_eq!(j, json!({"oid": "abc123"}));
     let back: Target = serde_json::from_value(j).unwrap();
@@ -42,7 +44,9 @@ fn target_oid_round_trips() {
 
 #[test]
 fn target_path_round_trips() {
-    let t = Target::Path { path: "src/foo.rs".into() };
+    let t = Target::Path {
+        path: "src/foo.rs".into(),
+    };
     let j = serde_json::to_value(&t).unwrap();
     assert_eq!(j, json!({"path": "src/foo.rs"}));
     let back: Target = serde_json::from_value(j).unwrap();
@@ -51,7 +55,9 @@ fn target_path_round_trips() {
 
 #[test]
 fn target_ref_round_trips() {
-    let t = Target::Ref { ref_: Reference::new("HEAD") };
+    let t = Target::Ref {
+        ref_: Reference::new("HEAD"),
+    };
     let j = serde_json::to_value(&t).unwrap();
     assert_eq!(j, json!({"ref": "HEAD"}));
     let back: Target = serde_json::from_value(j).unwrap();
@@ -94,14 +100,19 @@ fn target_shard_round_trips() {
 fn target_rejects_unknown_keys() {
     // deny_unknown_fields per variant; no variant accepts `{"unknown": ...}`.
     let result: Result<Target, _> = serde_json::from_value(json!({"unknown": "key"}));
-    assert!(result.is_err(), "unknown key must not stringly-coerce into a variant");
+    assert!(
+        result.is_err(),
+        "unknown key must not stringly-coerce into a variant"
+    );
 }
 
 // ── Filter round-trips ──────────────────────────────────────────────────────────
 
 #[test]
 fn filter_prefix_round_trips() {
-    let f = Filter::Prefix { prefix: "src/".into() };
+    let f = Filter::Prefix {
+        prefix: "src/".into(),
+    };
     assert_eq!(serde_json::to_value(&f).unwrap(), json!({"prefix": "src/"}));
     let back: Filter = serde_json::from_value(json!({"prefix": "src/"})).unwrap();
     assert_eq!(back, f);
@@ -109,7 +120,9 @@ fn filter_prefix_round_trips() {
 
 #[test]
 fn filter_match_round_trips() {
-    let f = Filter::Match { match_: "auth".into() };
+    let f = Filter::Match {
+        match_: "auth".into(),
+    };
     assert_eq!(serde_json::to_value(&f).unwrap(), json!({"match": "auth"}));
     let back: Filter = serde_json::from_value(json!({"match": "auth"})).unwrap();
     assert_eq!(back, f);
@@ -117,7 +130,9 @@ fn filter_match_round_trips() {
 
 #[test]
 fn filter_walk_back_round_trips() {
-    let f = Filter::Walk { walk: WalkDirection::Back };
+    let f = Filter::Walk {
+        walk: WalkDirection::Back,
+    };
     assert_eq!(serde_json::to_value(&f).unwrap(), json!({"walk": "back"}));
     let back: Filter = serde_json::from_value(json!({"walk": "back"})).unwrap();
     assert_eq!(back, f);
@@ -125,8 +140,13 @@ fn filter_walk_back_round_trips() {
 
 #[test]
 fn filter_walk_forward_round_trips() {
-    let f = Filter::Walk { walk: WalkDirection::Forward };
-    assert_eq!(serde_json::to_value(&f).unwrap(), json!({"walk": "forward"}));
+    let f = Filter::Walk {
+        walk: WalkDirection::Forward,
+    };
+    assert_eq!(
+        serde_json::to_value(&f).unwrap(),
+        json!({"walk": "forward"})
+    );
     let back: Filter = serde_json::from_value(json!({"walk": "forward"})).unwrap();
     assert_eq!(back, f);
 }
@@ -150,7 +170,10 @@ fn filter_kintsugi_round_trips() {
 #[test]
 fn filter_order_round_trips() {
     let f = Filter::Order {
-        order: vec![OrderSpec { field: "name".into(), direction: Direction::Asc }],
+        order: vec![OrderSpec {
+            field: "name".into(),
+            direction: Direction::Asc,
+        }],
     };
     let j = serde_json::to_value(&f).unwrap();
     assert_eq!(j, json!({"order": [{"field": "name", "direction": "asc"}]}));
@@ -160,7 +183,10 @@ fn filter_order_round_trips() {
 
 #[test]
 fn filter_order_direction_desc() {
-    let spec = OrderSpec { field: "timestamp".into(), direction: Direction::Desc };
+    let spec = OrderSpec {
+        field: "timestamp".into(),
+        direction: Direction::Desc,
+    };
     assert_eq!(
         serde_json::to_value(&spec).unwrap(),
         json!({"field": "timestamp", "direction": "desc"})
@@ -195,14 +221,20 @@ fn filter_where_round_trips() {
 
 #[test]
 fn where_op_serializes_each_variant() {
-    assert_eq!(serde_json::to_value(WhereOp::Eq).unwrap(),       json!("eq"));
-    assert_eq!(serde_json::to_value(WhereOp::Neq).unwrap(),      json!("neq"));
-    assert_eq!(serde_json::to_value(WhereOp::Gt).unwrap(),       json!("gt"));
-    assert_eq!(serde_json::to_value(WhereOp::Lt).unwrap(),       json!("lt"));
-    assert_eq!(serde_json::to_value(WhereOp::Gte).unwrap(),      json!("gte"));
-    assert_eq!(serde_json::to_value(WhereOp::Lte).unwrap(),      json!("lte"));
-    assert_eq!(serde_json::to_value(WhereOp::Contains).unwrap(), json!("contains"));
-    assert_eq!(serde_json::to_value(WhereOp::Matches).unwrap(),  json!("matches"));
+    assert_eq!(serde_json::to_value(WhereOp::Eq).unwrap(), json!("eq"));
+    assert_eq!(serde_json::to_value(WhereOp::Neq).unwrap(), json!("neq"));
+    assert_eq!(serde_json::to_value(WhereOp::Gt).unwrap(), json!("gt"));
+    assert_eq!(serde_json::to_value(WhereOp::Lt).unwrap(), json!("lt"));
+    assert_eq!(serde_json::to_value(WhereOp::Gte).unwrap(), json!("gte"));
+    assert_eq!(serde_json::to_value(WhereOp::Lte).unwrap(), json!("lte"));
+    assert_eq!(
+        serde_json::to_value(WhereOp::Contains).unwrap(),
+        json!("contains")
+    );
+    assert_eq!(
+        serde_json::to_value(WhereOp::Matches).unwrap(),
+        json!("matches")
+    );
 }
 
 // ── Output round-trips ──────────────────────────────────────────────────────────
@@ -214,7 +246,10 @@ fn output_to_path_with_message_round_trips() {
         message: Some("first commit".into()),
     };
     let j = serde_json::to_value(&o).unwrap();
-    assert_eq!(j, json!({"to_path": "notes/a.md", "message": "first commit"}));
+    assert_eq!(
+        j,
+        json!({"to_path": "notes/a.md", "message": "first commit"})
+    );
     let back: Output = serde_json::from_value(j).unwrap();
     assert_eq!(back, o);
 }
@@ -234,7 +269,9 @@ fn output_to_path_without_message_omits_field() {
 
 #[test]
 fn output_ref_round_trips() {
-    let o = Output::Ref { ref_: Reference::new("feature/x") };
+    let o = Output::Ref {
+        ref_: Reference::new("feature/x"),
+    };
     let j = serde_json::to_value(&o).unwrap();
     assert_eq!(j, json!({"ref": "feature/x"}));
     let back: Output = serde_json::from_value(j).unwrap();
@@ -244,7 +281,10 @@ fn output_ref_round_trips() {
 #[test]
 fn output_cas_round_trips() {
     let o = Output::Cas {
-        cas: CasUpdate { old: Oid::new("abc"), new: Oid::new("def") },
+        cas: CasUpdate {
+            old: Oid::new("abc"),
+            new: Oid::new("def"),
+        },
     };
     let j = serde_json::to_value(&o).unwrap();
     assert_eq!(j, json!({"cas": {"old": "abc", "new": "def"}}));
@@ -254,7 +294,9 @@ fn output_cas_round_trips() {
 
 #[test]
 fn output_to_ref_round_trips() {
-    let o = Output::ToRef { to_ref: Reference::new("main") };
+    let o = Output::ToRef {
+        to_ref: Reference::new("main"),
+    };
     let j = serde_json::to_value(&o).unwrap();
     assert_eq!(j, json!({"to_ref": "main"}));
     let back: Output = serde_json::from_value(j).unwrap();
@@ -284,7 +326,8 @@ fn types_implement_required_traits() {
     fn assert_bounds<T>()
     where
         T: Clone + std::fmt::Debug + PartialEq + serde::Serialize + serde::de::DeserializeOwned,
-    {}
+    {
+    }
     assert_bounds::<Target>();
     assert_bounds::<Filter>();
     assert_bounds::<Output>();

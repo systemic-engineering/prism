@@ -57,7 +57,10 @@ impl StateVector {
         }
     }
 
-    fn from_entries(space: impl Into<String>, entries: impl IntoIterator<Item = (String, f64)>) -> Self {
+    fn from_entries(
+        space: impl Into<String>,
+        entries: impl IntoIterator<Item = (String, f64)>,
+    ) -> Self {
         let mut map = BTreeMap::new();
         for (label, coeff) in entries {
             if coeff != 0.0 {
@@ -286,10 +289,7 @@ impl<const N: usize> Detector<N> {
                 return DetectionResult::Disagree;
             }
 
-            let coefficients: Vec<f64> = labels
-                .iter()
-                .map(|l| focus_sv.get(l))
-                .collect();
+            let coefficients: Vec<f64> = labels.iter().map(|l| focus_sv.get(l)).collect();
             let norm = coefficients.iter().map(|c| c * c).sum::<f64>().sqrt();
             if norm < min_magnitude {
                 min_magnitude = norm;
@@ -375,11 +375,7 @@ impl<const N: usize> Detector<N> {
             // Project: precision cut. Threshold derived from the projection's
             // average weight magnitude. Input cells and weight cells above
             // threshold survive; the rest are zeroed.
-            let avg_magnitude: f64 = projection
-                .entries
-                .values()
-                .map(|w| w.abs())
-                .sum::<f64>()
+            let avg_magnitude: f64 = projection.entries.values().map(|w| w.abs()).sum::<f64>()
                 / projection.entries.len().max(1) as f64;
             let threshold = quantize_weight(avg_magnitude).max(1);
             program.push(Instruction::Project(threshold));
@@ -443,8 +439,8 @@ impl<const N: usize> HashPrism for Detector<N> {
         let detection = self.detect(input);
         match detection.eigenvalue_hex() {
             Some(eigenvalue_hex) => {
-                let eigenvalue_bytes = hex::decode(eigenvalue_hex)
-                    .expect("eigenvalue_hex should be valid hex");
+                let eigenvalue_bytes =
+                    hex::decode(eigenvalue_hex).expect("eigenvalue_hex should be valid hex");
                 let mut hasher = Sha256::new();
                 hasher.update(b"prism-core:coincidence:");
                 hasher.update(&eigenvalue_bytes);
@@ -463,9 +459,8 @@ impl<const N: usize> HashPrism for Detector<N> {
 // --- Canonical hash ---
 
 /// The canonical N=3 detector for content addressing.
-static CANONICAL: LazyLock<Detector<3>> = LazyLock::new(|| {
-    Detector::canonical("content", DEFAULT_DIMENSION)
-});
+static CANONICAL: LazyLock<Detector<3>> =
+    LazyLock::new(|| Detector::canonical("content", DEFAULT_DIMENSION));
 
 /// Compute the canonical coincidence hash of raw bytes.
 ///
@@ -481,7 +476,10 @@ pub fn canonical_hash(bytes: &[u8]) -> String {
 
 /// The canonical detector as a Named optic: `@coincidence`.
 pub fn coincidence_hash() -> crate::named::Named<Detector<3>> {
-    crate::named::Named("@coincidence", Detector::canonical("content", DEFAULT_DIMENSION))
+    crate::named::Named(
+        "@coincidence",
+        Detector::canonical("content", DEFAULT_DIMENSION),
+    )
 }
 
 impl<const N: usize> crate::oid::Addressable for Detector<N> {
@@ -518,7 +516,11 @@ mod tests {
     #[test]
     fn canonical_hash_produces_valid_hex() {
         let h = canonical_hash(b"test");
-        assert_eq!(h.len(), 64, "SHA-256 of eigenvalue = 32 bytes = 64 hex chars");
+        assert_eq!(
+            h.len(),
+            64,
+            "SHA-256 of eigenvalue = 32 bytes = 64 hex chars"
+        );
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
@@ -527,7 +529,10 @@ mod tests {
         // Verify the hash path: detect -> eigenvalue -> SHA-256 compression.
         // The raw eigenvalue has the coincidence prefix; the final hash is SHA-256 of that.
         let detection = CANONICAL.detect(b"hello");
-        assert!(detection.eigenvalue_hex().is_some(), "detection must agree for non-empty input");
+        assert!(
+            detection.eigenvalue_hex().is_some(),
+            "detection must agree for non-empty input"
+        );
         let h = canonical_hash(b"hello");
         assert_eq!(h.len(), 64);
     }

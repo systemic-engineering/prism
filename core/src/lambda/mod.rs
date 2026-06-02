@@ -235,10 +235,8 @@ mod tests {
 
     #[test]
     fn apply_creates_application() {
-        let app = Lambda::<String>::apply(
-            Lambda::bind(Oid::hash(b"f")),
-            Lambda::bind(Oid::hash(b"x")),
-        );
+        let app =
+            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"x")));
         assert!(matches!(app, Lambda::Apply(_)));
     }
 
@@ -301,14 +299,10 @@ mod tests {
 
     #[test]
     fn apply_oid_depends_on_function_and_argument() {
-        let a = Lambda::<String>::apply(
-            Lambda::bind(Oid::hash(b"f")),
-            Lambda::bind(Oid::hash(b"x")),
-        );
-        let b = Lambda::<String>::apply(
-            Lambda::bind(Oid::hash(b"f")),
-            Lambda::bind(Oid::hash(b"y")),
-        );
+        let a =
+            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"x")));
+        let b =
+            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"y")));
         assert_ne!(a.oid(), b.oid());
     }
 

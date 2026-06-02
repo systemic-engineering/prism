@@ -235,7 +235,11 @@ mod tests {
             matches!(s, Shape::Square(_))
         }
         fn square_extract(s: &Shape) -> i32 {
-            if let Shape::Square(r) = s { *r } else { -1 }
+            if let Shape::Square(r) = s {
+                *r
+            } else {
+                -1
+            }
         }
         fn square_review(r: i32) -> Shape {
             Shape::Square(r)

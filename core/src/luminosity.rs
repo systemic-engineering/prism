@@ -13,9 +13,15 @@ pub enum Luminosity {
 }
 
 impl Luminosity {
-    pub fn is_light(&self) -> bool { matches!(self, Luminosity::Light) }
-    pub fn is_dimmed(&self) -> bool { matches!(self, Luminosity::Dimmed(_)) }
-    pub fn is_dark(&self) -> bool { matches!(self, Luminosity::Dark) }
+    pub fn is_light(&self) -> bool {
+        matches!(self, Luminosity::Light)
+    }
+    pub fn is_dimmed(&self) -> bool {
+        matches!(self, Luminosity::Dimmed(_))
+    }
+    pub fn is_dark(&self) -> bool {
+        matches!(self, Luminosity::Dark)
+    }
 
     pub fn holonomy(&self) -> Option<f64> {
         match self {

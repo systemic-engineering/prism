@@ -66,15 +66,11 @@ where
     fn reduce(self, input: A::Input) -> Imperfect<B::Output, A::Error, A::Loss> {
         match self.0.reduce(input) {
             Imperfect::Success(mid) => self.1.reduce(mid),
-            Imperfect::Partial(mid, loss) => {
-                match self.1.reduce(mid) {
-                    Imperfect::Success(out) => Imperfect::Partial(out, loss),
-                    Imperfect::Partial(out, loss2) => Imperfect::Partial(out, loss.combine(loss2)),
-                    Imperfect::Failure(err, loss2) => {
-                        Imperfect::Failure(err, loss.combine(loss2))
-                    }
-                }
-            }
+            Imperfect::Partial(mid, loss) => match self.1.reduce(mid) {
+                Imperfect::Success(out) => Imperfect::Partial(out, loss),
+                Imperfect::Partial(out, loss2) => Imperfect::Partial(out, loss.combine(loss2)),
+                Imperfect::Failure(err, loss2) => Imperfect::Failure(err, loss.combine(loss2)),
+            },
             Imperfect::Failure(err, loss) => Imperfect::Failure(err, loss),
         }
     }
@@ -188,10 +184,7 @@ mod tests {
         let pipeline = TestPartialParse.then(TestResolve);
         let result = pipeline.reduce(SourceText("hello".into()));
         assert!(result.is_partial());
-        assert_eq!(
-            result.ok().unwrap().0,
-            "resolved(partial(hello))"
-        );
+        assert_eq!(result.ok().unwrap().0, "resolved(partial(hello))");
     }
 
     #[test]
@@ -204,10 +197,7 @@ mod tests {
             type Error = String;
             type Loss = ReductionLoss;
 
-            fn reduce(
-                self,
-                input: ParsedAst,
-            ) -> Imperfect<ResolvedAst, String, ReductionLoss> {
+            fn reduce(self, input: ParsedAst) -> Imperfect<ResolvedAst, String, ReductionLoss> {
                 Imperfect::Partial(
                     ResolvedAst(format!("resolved({})", input.0)),
                     ReductionLoss {
@@ -263,10 +253,7 @@ mod tests {
         let pipeline = TestParse.then(TestResolve).then(TestEmit);
         let result = pipeline.reduce(SourceText("src".into()));
         assert!(result.is_ok());
-        assert_eq!(
-            result.ok().unwrap(),
-            "emitted(resolved(parsed(src)))"
-        );
+        assert_eq!(result.ok().unwrap(), "emitted(resolved(parsed(src)))");
     }
 
     // compile-time check: this test just verifies the types align

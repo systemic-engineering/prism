@@ -192,9 +192,8 @@ mod tests {
     fn torus_3d(l: usize) -> (usize, Vec<(usize, usize)>) {
         let n = l * l * l;
         let mut edges = Vec::new();
-        let idx = |i: usize, j: usize, k: usize| -> usize {
-            (i % l) * l * l + (j % l) * l + (k % l)
-        };
+        let idx =
+            |i: usize, j: usize, k: usize| -> usize { (i % l) * l * l + (j % l) * l + (k % l) };
         for i in 0..l {
             for j in 0..l {
                 for k in 0..l {
@@ -229,10 +228,7 @@ mod tests {
     #[test]
     fn empty_spectrum_is_zero() {
         assert_eq!(heat_return_probability(&[], Sigma::new(1.0)), 0.0);
-        assert_eq!(
-            spectral_dimension(&[], Sigma::new(1.0)).as_f64(),
-            0.0
-        );
+        assert_eq!(spectral_dimension(&[], Sigma::new(1.0)).as_f64(), 0.0);
     }
 
     #[test]

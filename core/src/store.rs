@@ -1,8 +1,8 @@
 //! Store — where crystals live.
 
+use crate::luminosity::Luminosity;
 use crate::merkle::MerkleTree;
 use crate::oid::Oid;
-use crate::luminosity::Luminosity;
 use terni::{Imperfect, Loss};
 
 /// Where crystals live. Every operation returns Imperfect.
@@ -32,9 +32,9 @@ pub trait Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::merkle::MerkleTree;
-    use crate::oid::{Oid, Addressable};
     use crate::luminosity::Luminosity;
+    use crate::merkle::MerkleTree;
+    use crate::oid::{Addressable, Oid};
     use std::collections::HashMap;
 
     #[derive(Clone, Debug, PartialEq)]
@@ -55,8 +55,12 @@ mod tests {
 
     impl MerkleTree for TestNode {
         type Data = String;
-        fn data(&self) -> &String { &self.name }
-        fn children(&self) -> &[Self] { &self.children }
+        fn data(&self) -> &String {
+            &self.name
+        }
+        fn children(&self) -> &[Self] {
+            &self.children
+        }
     }
 
     /// In-memory store for testing.
@@ -68,10 +72,18 @@ mod tests {
     struct MemoryLoss(u32);
 
     impl Loss for MemoryLoss {
-        fn zero() -> Self { MemoryLoss(0) }
-        fn total() -> Self { MemoryLoss(u32::MAX) }
-        fn is_zero(&self) -> bool { self.0 == 0 }
-        fn combine(self, other: Self) -> Self { MemoryLoss(self.0 + other.0) }
+        fn zero() -> Self {
+            MemoryLoss(0)
+        }
+        fn total() -> Self {
+            MemoryLoss(u32::MAX)
+        }
+        fn is_zero(&self) -> bool {
+            self.0 == 0
+        }
+        fn combine(self, other: Self) -> Self {
+            MemoryLoss(self.0 + other.0)
+        }
     }
 
     impl Store for MemoryStore {
@@ -82,10 +94,7 @@ mod tests {
         fn get(&self, oid: &Oid) -> Imperfect<TestNode, Self::Error, Self::L> {
             match self.data.get(oid) {
                 Some(node) => Imperfect::Success(node.clone()),
-                None => Imperfect::Failure(
-                    format!("not found: {:?}", oid),
-                    MemoryLoss::zero(),
-                ),
+                None => Imperfect::Failure(format!("not found: {:?}", oid), MemoryLoss::zero()),
             }
         }
 
@@ -106,8 +115,13 @@ mod tests {
 
     #[test]
     fn store_put_get_roundtrip() {
-        let mut store = MemoryStore { data: HashMap::new() };
-        let node = TestNode { name: "hello".into(), children: vec![] };
+        let mut store = MemoryStore {
+            data: HashMap::new(),
+        };
+        let node = TestNode {
+            name: "hello".into(),
+            children: vec![],
+        };
         let oid = node.oid();
 
         let put_result = store.put(node.clone());
@@ -120,15 +134,22 @@ mod tests {
 
     #[test]
     fn store_get_missing_is_failure() {
-        let store = MemoryStore { data: HashMap::new() };
+        let store = MemoryStore {
+            data: HashMap::new(),
+        };
         let result = store.get(&Oid::hash(b"nonexistent"));
         assert!(result.is_err());
     }
 
     #[test]
     fn store_has_returns_luminosity() {
-        let mut store = MemoryStore { data: HashMap::new() };
-        let node = TestNode { name: "test".into(), children: vec![] };
+        let mut store = MemoryStore {
+            data: HashMap::new(),
+        };
+        let node = TestNode {
+            name: "test".into(),
+            children: vec![],
+        };
         let oid = node.oid();
 
         let before = store.has(&oid);

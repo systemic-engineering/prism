@@ -92,7 +92,9 @@ pub trait Beam: Sized {
     ) -> Self::Tick<T, Self::Error> {
         let imp = match self.result() {
             Imperfect::Success(v) | Imperfect::Partial(v, _) => f(v),
-            Imperfect::Failure(_, _) => panic!("smap on Err beam — override smap for dark beam support"),
+            Imperfect::Failure(_, _) => {
+                panic!("smap on Err beam — override smap for dark beam support")
+            }
         };
         self.tick(imp)
     }
@@ -221,9 +223,7 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
                 // Dark beam fixpoint: extract the error and loss, propagate unchanged.
                 // The closure f is never called — darkness absorbs.
                 match self.focus {
-                    Imperfect::Failure(e, l) => {
-                        Optic::dark(Imperfect::failure_with_loss(e, l))
-                    }
+                    Imperfect::Failure(e, l) => Optic::dark(Imperfect::failure_with_loss(e, l)),
                     _ => unreachable!(),
                 }
             }
@@ -235,9 +235,7 @@ impl<In, Out, E, L: Loss> Beam for Optic<In, Out, E, L> {
             Imperfect::Failure(_, _) => {
                 // Dark beam fixpoint: darkness propagates, value is ignored.
                 match self.focus {
-                    Imperfect::Failure(e, l) => {
-                        Optic::dark(Imperfect::failure_with_loss(e, l))
-                    }
+                    Imperfect::Failure(e, l) => Optic::dark(Imperfect::failure_with_loss(e, l)),
                     _ => unreachable!(),
                 }
             }
@@ -689,9 +687,8 @@ mod tests {
         // vs a dark beam that propagates an existing failure.
         // The returned-failure beam should have its OWN error, not the dark one.
         let light: Optic<(), u32, String> = Optic::ok((), 5);
-        let failed = light.smap(|_| {
-            Imperfect::<u32, String, ScalarLoss>::failure("new error".into())
-        });
+        let failed =
+            light.smap(|_| Imperfect::<u32, String, ScalarLoss>::failure("new error".into()));
         assert!(failed.is_err());
         assert_eq!(failed.result().err(), Some(&"new error".to_string()));
         // The source is valid because it came from a light beam

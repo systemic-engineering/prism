@@ -81,9 +81,7 @@ pub fn reduce_bounded<T: Clone + PartialEq>(
     loop {
         if steps >= budget {
             return Imperfect::Failure(
-                ReductionError::BudgetExhausted {
-                    steps_taken: steps,
-                },
+                ReductionError::BudgetExhausted { steps_taken: steps },
                 ReductionLoss {
                     steps,
                     budget_remaining: 0,
@@ -226,10 +224,8 @@ mod tests {
         // (λx. λy. x) a b → a
         let x = Oid::hash(b"x");
         let y = Oid::hash(b"y");
-        let konst = Lambda::<String>::abs(
-            x.clone(),
-            Lambda::abs(y.clone(), Lambda::bind(x.clone())),
-        );
+        let konst =
+            Lambda::<String>::abs(x.clone(), Lambda::abs(y.clone(), Lambda::bind(x.clone())));
         let a = Lambda::bind(Oid::hash(b"a"));
         let b = Lambda::bind(Oid::hash(b"b"));
         let app = Lambda::apply(Lambda::apply(konst, a.clone()), b);
@@ -274,10 +270,8 @@ mod tests {
     fn shadowed_variable_not_substituted() {
         // (λx. λx. x) a → λx. x  (inner x shadows outer)
         let x = Oid::hash(b"x");
-        let shadowed = Lambda::<String>::abs(
-            x.clone(),
-            Lambda::abs(x.clone(), Lambda::bind(x.clone())),
-        );
+        let shadowed =
+            Lambda::<String>::abs(x.clone(), Lambda::abs(x.clone(), Lambda::bind(x.clone())));
         let a = Lambda::bind(Oid::hash(b"a"));
         let app = Lambda::apply(shadowed, a);
 

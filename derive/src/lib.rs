@@ -82,7 +82,8 @@ pub fn derive_prism(input: TokenStream) -> TokenStream {
     let accessor_structs = generate_accessors(name, &annotated);
 
     // Generate optic_fields() metadata
-    let optic_fields_impl = generate_optic_fields(name, &annotated, &impl_generics, &ty_generics, where_clause);
+    let optic_fields_impl =
+        generate_optic_fields(name, &annotated, &impl_generics, &ty_generics, where_clause);
 
     let expanded = quote! {
         impl #impl_generics prism_core::Addressable for #name #ty_generics #where_clause {
@@ -169,10 +170,7 @@ fn extract_oid_name(input: &DeriveInput, derive_name: &str) -> String {
                         if let Lit::Str(s) = &lit.lit {
                             let val = s.value();
                             if !val.starts_with('@') {
-                                panic!(
-                                    "#[oid(\"...\")] value must start with '@', got: {:?}",
-                                    val
-                                );
+                                panic!("#[oid(\"...\")] value must start with '@', got: {:?}", val);
                             }
                             return val;
                         }
@@ -181,7 +179,10 @@ fn extract_oid_name(input: &DeriveInput, derive_name: &str) -> String {
             }
         }
     }
-    panic!("#[derive({})] requires #[oid(\"@name\")] attribute", derive_name);
+    panic!(
+        "#[derive({})] requires #[oid(\"@name\")] attribute",
+        derive_name
+    );
 }
 
 fn extract_annotated_fields(input: &DeriveInput) -> Vec<AnnotatedField> {
@@ -302,7 +303,10 @@ fn to_pascal_case(s: &str) -> String {
         .collect()
 }
 
-fn generate_accessors(struct_name: &syn::Ident, fields: &[AnnotatedField]) -> proc_macro2::TokenStream {
+fn generate_accessors(
+    struct_name: &syn::Ident,
+    fields: &[AnnotatedField],
+) -> proc_macro2::TokenStream {
     let mut tokens = proc_macro2::TokenStream::new();
 
     for field in fields {

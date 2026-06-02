@@ -34,19 +34,11 @@ pub enum Output {
         ref_: Reference,
     },
     /// `{"cas": {"old": "...", "new": "..."}}` — CAS-safe ref update.
-    Cas {
-        cas: CasUpdate,
-    },
+    Cas { cas: CasUpdate },
     /// `{"to_ref": "..."}` — write merged result to a ref.
-    ToRef {
-        to_ref: Reference,
-    },
+    ToRef { to_ref: Reference },
     /// `{"snapshot": true}` — crystallize without committing.
-    Snapshot {
-        snapshot: bool,
-    },
+    Snapshot { snapshot: bool },
     /// `{"flush": true}` — shard flush to disk.
-    Flush {
-        flush: bool,
-    },
+    Flush { flush: bool },
 }

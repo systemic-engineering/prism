@@ -59,9 +59,7 @@ pub struct WhereClause {
 #[serde(untagged)]
 pub enum Filter {
     /// `{"prefix": "..."}` — string-prefix narrowing.
-    Prefix {
-        prefix: String,
-    },
+    Prefix { prefix: String },
     /// `{"match": "..."}` — pattern/substring narrowing. `match` is
     /// a Rust keyword.
     Match {
@@ -69,25 +67,15 @@ pub enum Filter {
         match_: String,
     },
     /// `{"walk": "back"|"forward"}` — DAG walk direction.
-    Walk {
-        walk: WalkDirection,
-    },
+    Walk { walk: WalkDirection },
     /// `{"compare": true}` — structural diff of a focused pair.
-    Compare {
-        compare: bool,
-    },
+    Compare { compare: bool },
     /// `{"kintsugi": true}` — tournament merge of a focused pair.
-    Kintsugi {
-        kintsugi: bool,
-    },
+    Kintsugi { kintsugi: bool },
     /// `{"order": [...]}` — ordering.
-    Order {
-        order: Vec<OrderSpec>,
-    },
+    Order { order: Vec<OrderSpec> },
     /// `{"limit": N}` — bounded results.
-    Limit {
-        limit: u32,
-    },
+    Limit { limit: u32 },
     /// `{"where": [...]}` — typed predicate. `where` is a Rust keyword.
     Where {
         #[serde(rename = "where")]

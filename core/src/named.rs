@@ -1,6 +1,6 @@
 //! Named — a labeled Prism.
 
-use crate::oid::{Oid, Addressable};
+use crate::oid::{Addressable, Oid};
 
 /// A labeled Prism. The name is for humans. The OID is for the graph.
 ///
@@ -296,7 +296,9 @@ mod tests {
             items: Vec<i32>,
         }
         assert_eq!(Baz::optic_fields()[0].kind, crate::OpticKind::Traversal);
-        let baz = Baz { items: vec![1, 2, 3] };
+        let baz = Baz {
+            items: vec![1, 2, 3],
+        };
         assert_eq!(ItemsTraversal::traverse(&baz).len(), 3);
     }
 
@@ -399,7 +401,9 @@ mod tests {
             #[lens]
             name: String,
         }
-        let t = RefTest { name: "hello".to_string() };
+        let t = RefTest {
+            name: "hello".to_string(),
+        };
         let r: &String = NameLens::view(&t);
         assert_eq!(r, "hello");
     }
