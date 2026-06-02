@@ -10,6 +10,7 @@
 mod filter;
 mod output;
 mod reference;
+pub mod schema;
 mod target;
 
 pub use filter::{Direction, Filter, OrderSpec, WalkDirection, WhereClause, WhereOp};

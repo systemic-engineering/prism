@@ -18,8 +18,8 @@
 use jsonschema::Validator;
 use prism_core::pq::{
     schema::{filter_schema, output_schema, target_schema},
-    CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection,
-    WhereClause, WhereOp,
+    CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection, WhereClause,
+    WhereOp,
 };
 use prism_core::Oid;
 use serde_json::{json, Value};
