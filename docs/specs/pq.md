@@ -2,6 +2,8 @@
 
 *2026-06-02. Reed + Alex + Mara. Status: load-bearing recognition; spec.*
 
+*§6.5 added 2026-06-02. Reed + Alex + you. Status: load-bearing recognition.*
+
 `pq` is the minimal wire primitive for any MCP server whose substrate is
 a `prism_core::Prism`. Three operations cross the wire: `focus`,
 `project`, `refract`. Every domain-specific MCP tool an agent might
@@ -410,6 +412,106 @@ expressiveness lives in the typed DSL.
 
 ---
 
+## 6.5 LAPACKPrism — the numerical substrate
+
+*2026-06-02. Reed + Alex + you. Status: load-bearing recognition.*
+
+pq's three operations are not just *like* linear-algebra operations on a vector space — they **are** linear-algebra operations on a vector space, and the substrate the spectral stack ships on makes that identification structural, not metaphorical.
+
+### 6.5.1 The recognition in one sentence
+
+**pq is the typed surface of a numerical substrate.** Concretely, a shard is functionally a sparse matrix `M` indexed by `OID × path`; every pq call is a linear operator on that matrix, composed by the optic algebra of §6 and committed by `refract`. The Beam's `imperfect.loss` IS the residual norm — how much variance the operation left uncommitted.
+
+### 6.5.2 The operation table
+
+Every wire-altitude DSL variant from §5 maps to a numerical operation on the shard matrix `M`:
+
+| pq op | numerical interpretation |
+|---|---|
+| `focus({oid})` | `eᵀ_{oid} · M` — row select |
+| `focus({path})` | `M · e_{path}` — column select |
+| `focus({})` | identity (the whole shard) |
+| `focus({pair: [a, b]})` | concatenated row select: `[eᵀ_a; eᵀ_b] · M` |
+| `project({prefix})` | `P · M` where `P` projects onto the matching-path subspace |
+| `project({match})` | regex-encoded selector matrix; semi-deterministic projection (an `OpticPrism` per §6) |
+| `project({walk: "back"})` | adjacency-power: walk `k` steps = `Aᵏ · v` against the DAG adjacency `A` |
+| `project({compare})` | difference operator: `M_a − M_b` |
+| `project({kintsugi})` | Banach iteration: `M_{n+1} = T(M_n)` until `‖M_{n+1} − M_n‖ ≤ ε` (see §6.5.4) |
+| `project({order})` | sort by the given column |
+| `project({limit, where})` | row-filter (a `Setter`-shaped predicate matrix) + truncation |
+| `refract({to_path})` | rank-1 update: `M ← M + v · eᵀ_{path}` |
+| `refract({ref})` / `refract({cas})` | conditional rank-1 update (CAS-guarded) |
+| `refract({snapshot})` / `refract({flush})` | persist (write to durable storage) |
+| `Beam.imperfect.loss` | residual norm — variance the operation left uncommitted |
+
+The optic vocabulary of §6 falls out as the linear-algebra interpretation of the same operations: `Iso` is a basis change (invertible operator), `Lens` is a projector (idempotent operator), `OpticPrism` is a semi-deterministic variant matcher (selector matrix), `Traversal` is a multi-focus projection, `Fold` is a read-only summary morphism, `Setter` is a write-only update. The Prism algebra IS the operator algebra.
+
+### 6.5.3 LAPACKPrism is the canonical Prism impl
+
+**`LAPACKPrism` is the canonical `Prism` impl that backs pq's wire surface.** The numerical engine already ships: mirror links flang (the LAPACK provider in mirror's substrate); `mirror/bootstrap/src/spectral.rs` is currently ~199KB of spectral operations doing eigenvalue work today. What's missing is the **`LAPACKPrism: Prism` wrapper** that exposes the linear-algebra substrate as a Prism so that `impl PrismQuery for FrgmntMcp` (per §12 and [[../../../fragmentation/docs/specs/fragmentation-mcp]] §0.5) can dispatch into it.
+
+The altitude triple is now:
+
+```
+   PrismQuery        (the wire trait — adds Target/Filter/Output DSLs over a Prism)
+        │ dispatches into
+        ▼
+   LAPACKPrism       (the canonical Prism impl — backed by flang/LAPACK)
+        │ is-a
+        ▼
+   prism_core::Prism (the operator algebra — focus / project / refract)
+```
+
+The per-altitude vocabulary the spec graph uses, consistently from this point onward:
+
+- **pq** — the wire DSL: three calls (`focus`, `project`, `refract`) with typed `Target`/`Filter`/`Output` arguments, JSON-shaped Beams.
+- **`PrismQuery`** — the Rust trait that lifts a `Prism` to the wire altitude (the §5.4 sketch).
+- **`prism_core::Prism`** — the operator algebra; three methods; closed under composition.
+- **`LAPACKPrism`** — the canonical numerical Prism impl; LAPACK-backed; what `impl PrismQuery for FrgmntMcp` dispatches into.
+
+### 6.5.4 The numerics references are now operational
+
+The four 2026-06-02 numerics-sweep papers (see [[../../../mirror/docs/specs/kintsugi-variety]] §11) stop being background reading once LAPACKPrism is named:
+
+- **Saha & Ye (ICML 2024)** I/O lower bound applies to LAPACKPrism's memory traffic — literally, not metaphorically. The shard matrix lives partly in fast memory (HamiltonScheduler-governed) and partly on disk (`.frgmnt/`); the red-blue pebble model is the cost model for pq chains.
+- **Kerimkulov et al. (2023)** Fisher-Rao gradient flow **IS** the `project({kintsugi})` update rule. The Banach iteration in the operation table above is the entropy-regularised policy mirror descent flow projected onto the shard's posterior manifold.
+- **Villegas et al. (Nature Physics 2022)** Laplacian Renormalization Group determines how fast Fisher information accumulates per pq step — `d_s(σ)` IS the decay exponent of the per-step variance-reduction curve.
+- **Connes / Dąbrowski et al.** (per [[../../../systemic.engineering/practice/insights/math/numerics/noncommutative-geometry-standard-model]]) gives the 16-dim spectral-triple grounding the 16→5 lift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]].
+
+### 6.5.5 Cramér-Rao becomes operational
+
+Each `project` step adds rank; each `refract` commits residual variance. The Cramér-Rao bound
+
+```
+Var[T] ≥ (∂_θ E[T])² / I(t)
+```
+
+shows up in `Beam.imperfect.loss` as **actual numbers, not a metaphor**. The variety verdict per [[../../../mirror/docs/specs/kintsugi-variety]] §6 reads `imperfect.loss` directly as the per-call increment of the residual posterior variance.
+
+### 6.5.6 `WhereClause::value` tightening — substrate-typed
+
+Mara's open question on `WhereClause::value` from the T12.2 hand-off gets a numerical answer: the substrate's column types are inferred from the LAPACK matrix structure of the shard. Specifically:
+
+- `gt`/`lt` require **ordered real-valued columns** (the column's entries are `f64`-shaped per LAPACK convention).
+- `eq`/`neq` work on any column with a defined equality (content-OID columns, ref-name columns, real-valued columns).
+- `matches` requires **regex-encodable string columns** (the column's entries are blob-OIDs whose decoded shape is `text`).
+
+The wire stays JSON; agents still speak the typed DSL of §5; the column-type inference happens at the `LAPACKPrism` boundary, not at the wire. Wire-altitude type errors surface as `imperfect.kind = failure` with a typed verdict naming the column.
+
+### 6.5.7 The JSON wire stays JSON
+
+**The numerical substrate is invisible above the glass wall.** Agents speak the typed DSL of §5; the wire schema of §10 stays unchanged. Nothing at the wire altitude needs to know LAPACK exists. The substrate-pull discipline ([[feedback-substrate-pull]]) lives at the implementation altitude — pq's wire is the same whether the Prism is `LAPACKPrism`, a `Lens`, or a future `MetalPrism`/`OpenCLPrism` per the NumericalPrism backend ladder.
+
+This is what "impl Prism for FrgmntMcp is structural identity, not metaphor" (per §0) actually buys: the same algebra at three altitudes — the wire DSL, the trait, the LAPACK matrix — with the type chain forcing each altitude to honour the law of the one below.
+
+### 6.5.8 What this changes
+
+- The T12.2 implementation tick **splits into two**: T12.2a (the `LAPACKPrism` numerical engine — a new `LAPACKPrism: Prism` impl); T12.2b (the `impl PrismQuery for FrgmntMcp` dispatcher that calls into `LAPACKPrism`). The tick decomposition lives in [[../../../fragmentation/docs/specs/fragmentation-mcp]] §0.5 and §9; this spec only states the *type* claim.
+- The kintsugi-variety spec's §3 Cramér-Rao bound and §4 Knapsack framing stop being "plausible correspondence, precise correspondence open" and become operational. See [[../../../mirror/docs/specs/kintsugi-variety]] §3 and §4 (post-2026-06-02 tightening).
+- The 16→5 lift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]] gets a typed home: flang IS the LAPACKPrism's numerical backend; mirror's 5×5 composition IS the Prism's monoid composition law (per §6 and the `PrismMonoid` trait).
+
+---
+
 ## 7. Five vs three — split and zoom are CLI sugar
 
 The project-level surface declares five operations: `focus`,
@@ -686,11 +788,14 @@ This spec deliberately does NOT:
    `PrismQuery::Target/Filter/Output` types. Surface lives in
    `prism_core::pq::schema`.
 
-3. **`impl PrismQuery for FrgmntMcp` in
-   `fragmentation/vcs/mcp`.** The 18-tool registry collapses to
-   3. The `dispatch` arm folds 18 cases into 3. Per
-   [[../../../fragmentation/docs/specs/fragmentation-mcp]] §3,
-   each prior tool's body becomes a chain.
+3. **`impl Prism for LAPACKPrism` + `impl PrismQuery for FrgmntMcp`
+   in `fragmentation/vcs/mcp`** (the original T12.2, now split into
+   T12.2a + T12.2b per §6.5.8). T12.2a wraps the LAPACK substrate as
+   a canonical `Prism` impl; T12.2b dispatches the wire into it. The
+   18-tool registry collapses to 3; the `dispatch` arm folds 18
+   cases into 3 chains. Per
+   [[../../../fragmentation/docs/specs/fragmentation-mcp]] §0.5 and
+   §9, each prior tool's body becomes a chain over `LAPACKPrism`.
 
 4. **`mq.compile` desugaring in mirror.** The template in
    `boot/std/code/mq.mirror` opens. Emits typed
@@ -733,6 +838,13 @@ In-spec dependencies:
   parser is a Prism; pq is the wire algebra of any Prism.
 - [[../../../mirror/docs/specs/prism-core-as-spectral-triple]] —
   why the three-operation algebra is structurally right.
+- [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]]
+  — flang IS the LAPACKPrism's numerical backend; the 16→5 lift
+  is the monadic seam between the LAPACK substrate and the
+  five-operation composition algebra (per §6.5.3).
+- [[../../../mirror/docs/specs/numerical-substrate-via-fortran]] —
+  the `@code/fortran` grammar and flang LLVM-IR pathway that
+  LAPACKPrism delegates into.
 - [[shard-ref-as-prism]] *(TBD — fragmentation T9/T10 spec; see
   [[../../../fragmentation/docs/specs/fragmentation-mcp]] §3.4
   and the T10 architectural reframe; no standalone spec exists
