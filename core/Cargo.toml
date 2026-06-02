@@ -10,15 +10,20 @@ optics = []
 bundle = ["optics"]
 lambda = []
 lapack = ["dep:cc"]
+pq = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 terni = { path = "../imperfect" }
 prism-derive = { path = "../derive" }
 sha2 = "0.10"
 hex = "0.4"
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [build-dependencies]
 cc = { version = "1", optional = true }

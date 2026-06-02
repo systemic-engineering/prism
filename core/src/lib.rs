@@ -53,6 +53,9 @@ pub mod store;
 #[cfg(feature = "optics")]
 pub mod optics;
 
+#[cfg(feature = "pq")]
+pub mod pq;
+
 #[cfg(feature = "bundle")]
 pub mod bundle;
 
