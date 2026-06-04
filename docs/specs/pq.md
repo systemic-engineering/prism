@@ -512,18 +512,26 @@ This is what "impl Prism for FrgmntMcp is structural identity, not metaphor" (pe
 
 ---
 
-## 7. Five vs three — split and zoom are CLI sugar
+## 7. Five vs three — split and lift are CLI sugar
 
 The project-level surface declares five operations: `focus`,
-`project`, `split`, `zoom`, `refract`. Why does pq publish only
+`project`, `split`, `lift`, `refract`. Why does pq publish only
 three on the wire?
 
-Because `split` and `zoom` are **compositions** of the three.
+Because `split` and `lift` are **compositions** of the three.
 They are spectral-CLI verbs, not Prism trait methods. Look at
 `prism/core/src/lib.rs` — the trait has exactly three methods:
 `focus`, `project`, `refract`. The Prism's algebra is closed at
 three; the five-operation framing belongs to the CLI altitude,
-where `split` and `zoom` desugar.
+where `split` and `lift` desugar.
+
+(Earlier drafts of the project-level surface named this verb `zoom`
+— a visual-scale metaphor. The rename to `lift` closes the loop
+with the algebra: `lift` IS the functor operation, `lift f : T(A)
+-> T(B)` when `f : A -> B`. See [[../../../mirror/boot/00-prism.mirror]]
+functor-laws comment and the substrate-pull collapse in
+`boot/std/{option,result}.mirror` where the action `lift` was
+already paired with the trait method.)
 
 ### `split` as a chain
 
@@ -534,14 +542,15 @@ option — and renders the resulting beams as the variants. The
 split happens at the CLI altitude; the wire sees N independent
 focus/project/refract chains.
 
-### `zoom` as a chain
+### `lift` as a chain
 
-`zoom(transform)` = `focus({ target }) → project({ where: transform.scope }) → refract({ to: transform.output })`.
+`lift(transform)` = `focus({ target }) → project({ where: transform.scope }) → refract({ to: transform.output })`.
 
-zoom is a transform-at-scale verb in the CLI. On the wire, it is a
-standard focus-project-refract triple — the transform shape and
-scale are arguments to filter and output. No new wire op is
-needed.
+lift is a transform-at-scale verb in the CLI — the functor lift
+`lift f : T(A) -> T(B)` projected onto a focus/project/refract
+composition. On the wire, it is a standard focus-project-refract
+triple — the transform shape and scale are arguments to filter
+and output. No new wire op is needed.
 
 ### Why three is the wire minimum
 
@@ -593,7 +602,7 @@ compile(project_query { source, filters, ordering, limit }, ctx)
 compile(split_query { options, depth }, ctx)
     => parallel(option in options) { pq.focus({ ref: option }) → pq.project({ depth }) → pq.refract({ snapshot }) }
 
-compile(zoom_query { diff, blame, branches, log }, ctx)
+compile(lift_query { diff, blame, branches, log }, ctx)
     => pq.focus(target(diff|blame|...)) → pq.project(filter) → pq.refract(output)
 
 compile(refract_query { store, crystallize, index }, ctx)
@@ -629,7 +638,7 @@ the intent to:
 project_query {
   source:    find(ref("HEAD")),
   filters: [
-    where_clause("kind",      eq,  ref_val("zoom")),
+    where_clause("kind",      eq,  ref_val("lift")),
     where_clause("name",      contains, text_val("auth")),
     where_clause("name",      contains, text_val("token"))  -- OR-fused upstream
   ],
@@ -645,7 +654,7 @@ pq.focus({ ref: "HEAD" })
   → pq.project({
       walk: "back",
       where: [
-        { field: "kind", op: eq, value: "zoom" },
+        { field: "kind", op: eq, value: "lift" },
         { field: "name", op: matches, value: "(auth|token)" }
       ],
       order: [{ field: "witnessed", direction: desc }],
