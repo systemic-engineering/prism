@@ -5,7 +5,7 @@
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](https://github.com/systemic-engineering/prism)
 [![unsafe](https://img.shields.io/badge/unsafe-0-green)](https://github.com/systemic-engineering/prism)
 
-Focus | project | refract. A typed transformation pipeline in Rust.
+Focus | project | settle. A typed transformation pipeline in Rust.
 
 ## Crates
 
@@ -15,7 +15,7 @@ Focus | project | refract. A typed transformation pipeline in Rust.
 
 ### `prism-core`
 
-Beam (semifunctor) + Prism (monoid). A `Beam` carries a value, the input that produced it, and accumulated loss through a pipeline. A `Prism` defines three operations over beams: focus (select), project (transform), refract (produce output). The three operations compose into type-safe pipelines enforced at compile time.
+Beam (semifunctor) + Prism (monoid). A `Beam` carries a value, the input that produced it, and accumulated loss through a pipeline. A `Prism` defines three operations over beams: focus (select), project (transform), settle (produce output). The three operations compose into type-safe pipelines enforced at compile time.
 
 ## Dependency relationship
 
@@ -29,14 +29,14 @@ prism-core         (depends on imperfect, zero external dependencies)
 ## Example
 
 ```rust
-use prism_core::{Beam, Prism, Optic, Focus, Project, Refract};
+use prism_core::{Beam, Prism, Optic, Focus, Project, Settle};
 use terni::Imperfect;
 
 // Seed a beam and run it through a prism
 let result = Optic::ok((), "hello".to_string())
     .apply(Focus(&my_prism))
     .apply(Project(&my_prism))
-    .apply(Refract(&my_prism));
+    .apply(Settle(&my_prism));
 
 assert!(result.is_ok());
 ```

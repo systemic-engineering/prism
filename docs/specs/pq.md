@@ -6,7 +6,7 @@
 
 `pq` is the minimal wire primitive for any MCP server whose substrate is
 a `prism_core::Prism`. Three operations cross the wire: `focus`,
-`project`, `refract`. Every domain-specific MCP tool an agent might
+`project`, `settle`. Every domain-specific MCP tool an agent might
 want — `commit`, `read`, `history`, `diff`, `merge`, `branch`,
 `search`, `status`, `observe` — decomposes into a chain of those
 three. The wire stops enumerating; the algebra of the trait does the
@@ -29,7 +29,7 @@ impl Prism for FrgmntMcp { ... }   // structural identity, not metaphor
 
 pq.focus(target)         → Beam     # observe the spectral state
 pq.project(beam, filter) → Beam     # narrow by criterion
-pq.refract(beam, output) → Beam     # settle / crystallize
+pq.settle(beam, output)  → Beam     # settle / crystallize
 ```
 
 Three calls. Closed under composition. Every previous frgmnt tool
@@ -59,7 +59,7 @@ Two things make this wrong:
    carries.
 
 2. **18 tools where 3 would do.** Every previous tool is a chain of
-   focus → (project*) → refract. The Prism trait IS the algebra
+   focus → (project*) → settle. The Prism trait IS the algebra
    that closes under composition. Exposing 18 names instead of 3
    pays the enumeration tax forever — every new capability becomes
    a new tool, a new schema, a new wire breakage, a new round of
@@ -136,23 +136,23 @@ that lets every prior tool collapse into a sequence.
 Project maps to `prism_core::Prism::project`. The filter DSL is
 spec'd at §6.2.
 
-### 2.3 `refract(beam, output) → Beam`
+### 2.3 `settle(beam, output) → Beam`
 
 Settle. Commit. Crystallize. `output` is a typed selector into the
-Prism's `Refracted` space: a path to write to, a ref to advance, a
+Prism's `Settled` space: a path to write to, a ref to advance, a
 shard to flush, a crystal to seal.
 
 ```
-refract(beam: Beam<Projected>, output: Output) -> Beam<Refracted>
+settle(beam: Beam<Projected>, output: Output) -> Beam<Settled>
 ```
 
-Returns a `Beam<P::Refracted>`. The output is the side-effecting
-step — refract is where the commit goes to disk, the ref advances,
-the merge writes. Per [[reality-shard-as-crdt]], the refract
+Returns a `Beam<P::Settled>`. The output is the side-effecting
+step — settle is where the commit goes to disk, the ref advances,
+the merge writes. Per [[reality-shard-as-crdt]], the settle
 step IS the lattice join — the result is monotonically `≥` the
 prior shard state.
 
-Refract maps to `prism_core::Prism::refract`. The output DSL is
+Settle maps to `prism_core::Prism::settle`. The output DSL is
 spec'd at §6.3.
 
 ### 2.4 The Beam shape on the wire
@@ -189,22 +189,22 @@ final Beam is the agent's response.
 
 | Old tool | pq chain |
 |---|---|
-| `commit(path, content, msg)` | `refract(beam_from_content, { to_path, message: msg })` |
+| `commit(path, content, msg)` | `settle(beam_from_content, { to_path, message: msg })` |
 | `show(oid)` (was `read(oid)`) | `focus({ oid })` |
 | `cat(path)` (was `read_path(path)`) | `focus({ path })` |
 | `context()` (the shard summary) | `focus({})` |
 | `list(prefix)` | `focus({}) → project({ prefix })` |
 | `search(q)` | `focus({}) → project({ match: q })` |
 | `history(oid)` | `focus({ oid }) → project({ walk: "back" })` |
-| `branch(name, oid)` | `focus({ oid }) → refract({ ref: name })` |
+| `branch(name, oid)` | `focus({ oid }) → settle({ ref: name })` |
 | `diff(a, b)` | `focus({ pair: [a, b] }) → project({ compare })` |
-| `merge(a, b)` | `focus({ pair: [a, b] }) → project({ kintsugi }) → refract({ to_ref })` |
-| `snapshot()` | `focus({}) → refract({ snapshot: true })` |
+| `merge(a, b)` | `focus({ pair: [a, b] }) → project({ kintsugi }) → settle({ to_ref })` |
+| `snapshot()` | `focus({}) → settle({ snapshot: true })` |
 | `refs.list(prefix)` | `focus({ refs: true }) → project({ prefix })` |
-| `refs.update(ref, new, old?)` | `focus({ ref }) → refract({ cas: { old, new } })` |
+| `refs.update(ref, new, old?)` | `focus({ ref }) → settle({ cas: { old, new } })` |
 | `observe(scope, since?)` | falls out for free — every Beam carries `imperfect` |
 | `shard.status()` | `focus({ shard: true })` (the shard's summary is its focus) |
-| `shard.flush()` | `focus({ shard: true }) → refract({ flush: true })` |
+| `shard.flush()` | `focus({ shard: true }) → settle({ flush: true })` |
 | `shard.open(path, budget)` | implicit on session bootstrap (per [[shard-ref-as-prism]] / T10); no tool needed |
 | `shard.close()` | implicit on session teardown; no tool needed |
 
@@ -216,29 +216,29 @@ associated `Beam` types, so the wire stays verifiable.**
 
 Three rows in the table take judgement to read; here is the Beam shape entering and leaving each step.
 
-**`commit(path, content, msg)`**. The chain needs a `focus` first to produce a `Beam<Focused>` for `refract` to consume:
+**`commit(path, content, msg)`**. The chain needs a `focus` first to produce a `Beam<Focused>` for `settle` to consume:
 ```
 focus({ content })          → Beam<Focused>   carrying the raw content
 project({ to_path: path })  → Beam<Projected> declaring the write target
-refract({ message: msg })   → Beam<Refracted> carrying the committed OID
+settle({ message: msg })    → Beam<Settled>   carrying the committed OID
 ```
-The collapse table's `refract(beam_from_content, { to_path, message })` is the same chain elided. The full form is the type-correct one; the elided form is shorthand for the common case where `focus` + `project` are inferred from the `Output` shape.
+The collapse table's `settle(beam_from_content, { to_path, message })` is the same chain elided. The full form is the type-correct one; the elided form is shorthand for the common case where `focus` + `project` are inferred from the `Output` shape.
 
-**`snapshot()`**. The terse `focus({}) → refract({ snapshot: true })` skips `project`, which the trait does not allow directly. The expanded chain inserts an identity project:
+**`snapshot()`**. The terse `focus({}) → settle({ snapshot: true })` skips `project`, which the trait does not allow directly. The expanded chain inserts an identity project:
 ```
 focus({})                   → Beam<Focused>   the shard's current focus
 project({ identity: true }) → Beam<Projected> passthrough
-refract({ snapshot: true }) → Beam<Refracted> the snapshot OID
+settle({ snapshot: true })  → Beam<Settled>   the snapshot OID
 ```
-The identity project is the algebraic unit; per the optics monoid in `prism_core::optics::monoid` it is the identity element under composition. Snapshot is therefore `focus ∘ id ∘ refract`.
+The identity project is the algebraic unit; per the optics monoid in `prism_core::optics::monoid` it is the identity element under composition. Snapshot is therefore `focus ∘ id ∘ settle`.
 
 **`merge(a, b)`**. The chain is genuinely three-step, but `project({ kintsugi })` invokes the kintsugi-tournament loop, which itself dispatches pq chains. The shape:
 ```
 focus({ pair: [a, b] })     → Beam<Focused>   the two-input position
 project({ kintsugi })       → Beam<Projected> the resolved merge plan
-refract({ to_ref: name })   → Beam<Refracted> the merged ref
+settle({ to_ref: name })    → Beam<Settled>   the merged ref
 ```
-The potential circularity — `project` calls kintsugi calls pq calls `project` — is resolved by the dispatch protocol: `project({ kintsugi })` returns a `Beam<Projected>` whose `imperfect` is `Partial { confidence }` until the loop converges, at which point a subsequent `refract` is what commits. If the agent re-invokes `refract` before convergence, the call is idempotent and returns the same Partial Beam. Convergence is observable on the `imperfect` field; the loop's sub-Turing bound (per [[../../../mirror/docs/specs/kintsugi-tournament]]) terminates the recursion.
+The potential circularity — `project` calls kintsugi calls pq calls `project` — is resolved by the dispatch protocol: `project({ kintsugi })` returns a `Beam<Projected>` whose `imperfect` is `Partial { confidence }` until the loop converges, at which point a subsequent `settle` is what commits. If the agent re-invokes `settle` before convergence, the call is idempotent and returns the same Partial Beam. Convergence is observable on the `imperfect` field; the loop's sub-Turing bound (per [[../../../mirror/docs/specs/kintsugi-tournament]]) terminates the recursion.
 
 ### 3.2 What the table does NOT lose
 
@@ -345,7 +345,7 @@ Multiple project filters compose; each narrows the beam further.
 The project DSL is the structural counterpart to mq's
 `project_query.filters`.
 
-### 5.3 `Output` — the refract DSL
+### 5.3 `Output` — the settle DSL
 
 ```
 Output =
@@ -357,8 +357,8 @@ Output =
   | { flush:    true }                 -- shard flush to disk
 ```
 
-Output verifies against the Prism's `Refracted::Out` type. The
-refract step is where the substrate-side effect happens; the
+Output verifies against the Prism's `Settled::Out` type. The
+settle step is where the substrate-side effect happens; the
 verdict tells the agent whether it landed.
 
 ### 5.4 Where the DSL lives
@@ -396,7 +396,7 @@ the extensible vocabulary for `Filter` and `Output`.
 | `OpticPrism<S, A>` | A semi-deterministic variant matcher; `{ where: kind = ... }` is an optic prism |
 | `Traversal` | Multi-focus projection; underlies `{ walk: ... }` |
 | `Fold` | Read-only summary; underlies `focus({ refs: true })` |
-| `Setter` | Write-only update; underlies `refract({ ref: ... })` |
+| `Setter` | Write-only update; underlies `settle({ ref: ... })` |
 
 Each optic implements `Prism`. So a `Lens<S, A>` is a Prism the
 frgmnt MCP can hand back as a Beam, and the agent can chain pq
@@ -420,7 +420,7 @@ pq's three operations are not just *like* linear-algebra operations on a vector 
 
 ### 6.5.1 The recognition in one sentence
 
-**pq is the typed surface of a numerical substrate.** Concretely, a shard is functionally a sparse matrix `M` indexed by `OID × path`; every pq call is a linear operator on that matrix, composed by the optic algebra of §6 and committed by `refract`. The Beam's `imperfect.loss` IS the residual norm — how much variance the operation left uncommitted.
+**pq is the typed surface of a numerical substrate.** Concretely, a shard is functionally a sparse matrix `M` indexed by `OID × path`; every pq call is a linear operator on that matrix, composed by the optic algebra of §6 and committed by `settle`. The Beam's `imperfect.loss` IS the residual norm — how much variance the operation left uncommitted.
 
 ### 6.5.2 The operation table
 
@@ -439,9 +439,9 @@ Every wire-altitude DSL variant from §5 maps to a numerical operation on the sh
 | `project({kintsugi})` | Banach iteration: `M_{n+1} = T(M_n)` until `‖M_{n+1} − M_n‖ ≤ ε` (see §6.5.4) |
 | `project({order})` | sort by the given column |
 | `project({limit, where})` | row-filter (a `Setter`-shaped predicate matrix) + truncation |
-| `refract({to_path})` | rank-1 update: `M ← M + v · eᵀ_{path}` |
-| `refract({ref})` / `refract({cas})` | conditional rank-1 update (CAS-guarded) |
-| `refract({snapshot})` / `refract({flush})` | persist (write to durable storage) |
+| `settle({to_path})` | rank-1 update: `M ← M + v · eᵀ_{path}` |
+| `settle({ref})` / `settle({cas})` | conditional rank-1 update (CAS-guarded) |
+| `settle({snapshot})` / `settle({flush})` | persist (write to durable storage) |
 | `Beam.imperfect.loss` | residual norm — variance the operation left uncommitted |
 
 The optic vocabulary of §6 falls out as the linear-algebra interpretation of the same operations: `Iso` is a basis change (invertible operator), `Lens` is a projector (idempotent operator), `OpticPrism` is a semi-deterministic variant matcher (selector matrix), `Traversal` is a multi-focus projection, `Fold` is a read-only summary morphism, `Setter` is a write-only update. The Prism algebra IS the operator algebra.
@@ -459,13 +459,13 @@ The altitude triple is now:
    LAPACKPrism       (the canonical Prism impl — backed by flang/LAPACK)
         │ is-a
         ▼
-   prism_core::Prism (the operator algebra — focus / project / refract)
+   prism_core::Prism (the operator algebra — focus / project / settle)
 ```
 
 The per-altitude vocabulary the spec graph uses, consistently from this point onward:
 
-- **pq** — the wire DSL: three calls (`focus`, `project`, `refract`) with typed `Target`/`Filter`/`Output` arguments, JSON-shaped Beams.
-- **`PrismQuery`** — the Rust trait that lifts a `Prism` to the wire altitude (the §5.4 sketch).
+- **pq** — the wire DSL: three calls (`focus`, `project`, `settle`) with typed `Target`/`Filter`/`Output` arguments, JSON-shaped Beams.
+- **`PrismQuery`** — the Rust trait that shifts a `Prism` to the wire altitude (the §5.4 sketch).
 - **`prism_core::Prism`** — the operator algebra; three methods; closed under composition.
 - **`LAPACKPrism`** — the canonical numerical Prism impl; LAPACK-backed; what `impl PrismQuery for FrgmntMcp` dispatches into.
 
@@ -476,11 +476,11 @@ The four 2026-06-02 numerics-sweep papers (see [[../../../mirror/docs/specs/kint
 - **Saha & Ye (ICML 2024)** I/O lower bound applies to LAPACKPrism's memory traffic — literally, not metaphorically. The shard matrix lives partly in fast memory (HamiltonScheduler-governed) and partly on disk (`.frgmnt/`); the red-blue pebble model is the cost model for pq chains.
 - **Kerimkulov et al. (2023)** Fisher-Rao gradient flow **IS** the `project({kintsugi})` update rule. The Banach iteration in the operation table above is the entropy-regularised policy mirror descent flow projected onto the shard's posterior manifold.
 - **Villegas et al. (Nature Physics 2022)** Laplacian Renormalization Group determines how fast Fisher information accumulates per pq step — `d_s(σ)` IS the decay exponent of the per-step variance-reduction curve.
-- **Connes / Dąbrowski et al.** (per [[../../../systemic.engineering/practice/insights/math/numerics/noncommutative-geometry-standard-model]]) gives the 16-dim spectral-triple grounding the 16→5 lift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]].
+- **Connes / Dąbrowski et al.** (per [[../../../systemic.engineering/practice/insights/math/numerics/noncommutative-geometry-standard-model]]) gives the 16-dim spectral-triple grounding the 16→5 shift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]].
 
 ### 6.5.5 Cramér-Rao becomes operational
 
-Each `project` step adds rank; each `refract` commits residual variance. The Cramér-Rao bound
+Each `project` step adds rank; each `settle` commits residual variance. The Cramér-Rao bound
 
 ```
 Var[T] ≥ (∂_θ E[T])² / I(t)
@@ -508,60 +508,61 @@ This is what "impl Prism for FrgmntMcp is structural identity, not metaphor" (pe
 
 - The T12.2 implementation tick **splits into two**: T12.2a (the `LAPACKPrism` numerical engine — a new `LAPACKPrism: Prism` impl); T12.2b (the `impl PrismQuery for FrgmntMcp` dispatcher that calls into `LAPACKPrism`). The tick decomposition lives in [[../../../fragmentation/docs/specs/fragmentation-mcp]] §0.5 and §9; this spec only states the *type* claim.
 - The kintsugi-variety spec's §3 Cramér-Rao bound and §4 Knapsack framing stop being "plausible correspondence, precise correspondence open" and become operational. See [[../../../mirror/docs/specs/kintsugi-variety]] §3 and §4 (post-2026-06-02 tightening).
-- The 16→5 lift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]] gets a typed home: flang IS the LAPACKPrism's numerical backend; mirror's 5×5 composition IS the Prism's monoid composition law (per §6 and the `PrismMonoid` trait).
+- The 16→5 shift in [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]] gets a typed home: flang IS the LAPACKPrism's numerical backend; mirror's 5×5 composition IS the Prism's monoid composition law (per §6 and the `PrismMonoid` trait).
 
 ---
 
-## 7. Five vs three — split and lift are CLI sugar
+## 7. Five vs three — split and shift are CLI sugar
 
 The project-level surface declares five operations: `focus`,
-`project`, `split`, `lift`, `refract`. Why does pq publish only
+`project`, `split`, `shift`, `settle`. Why does pq publish only
 three on the wire?
 
-Because `split` and `lift` are **compositions** of the three.
+Because `split` and `shift` are **compositions** of the three.
 They are spectral-CLI verbs, not Prism trait methods. Look at
 `prism/core/src/lib.rs` — the trait has exactly three methods:
-`focus`, `project`, `refract`. The Prism's algebra is closed at
+`focus`, `project`, `settle`. The Prism's algebra is closed at
 three; the five-operation framing belongs to the CLI altitude,
-where `split` and `lift` desugar.
+where `split` and `shift` desugar.
 
 (Earlier drafts of the project-level surface named this verb `zoom`
-— a visual-scale metaphor. The rename to `lift` closes the loop
-with the algebra: `lift` IS the functor operation, `lift f : T(A)
--> T(B)` when `f : A -> B`. See [[../../../mirror/boot/00-prism.mirror]]
+(visual-scale metaphor) and then `lift` (vertical-against-gravity).
+The substrate-pull rename to `shift` lands the lateral, hardware-
+shift-register semantics: same bytes, different declared shape,
+zero-cost-by-construction. See [[../../../mirror/boot/00-prism.mirror]]
 functor-laws comment and the substrate-pull collapse in
-`boot/std/{option,result}.mirror` where the action `lift` was
-already paired with the trait method.)
+`boot/std/{option,result}.mirror` where the action `shift` is now
+paired with the trait method.)
 
 ### `split` as a chain
 
-`split(options)` = `focus({}) → project({ where: option ∈ options }) → refract({ snapshot })` per branch.
+`split(options)` = `focus({}) → project({ where: option ∈ options }) → settle({ snapshot })` per branch.
 
 The spectral CLI command runs N pq pipelines in parallel — one per
 option — and renders the resulting beams as the variants. The
 split happens at the CLI altitude; the wire sees N independent
-focus/project/refract chains.
+focus/project/settle chains.
 
-### `lift` as a chain
+### `shift` as a chain
 
-`lift(transform)` = `focus({ target }) → project({ where: transform.scope }) → refract({ to: transform.output })`.
+`shift(transform)` = `focus({ target }) → project({ where: transform.scope }) → settle({ to: transform.output })`.
 
-lift is a transform-at-scale verb in the CLI — the functor lift
-`lift f : T(A) -> T(B)` projected onto a focus/project/refract
-composition. On the wire, it is a standard focus-project-refract
+shift is a transform-at-scale verb in the CLI — the functor shift
+`shift f : T(A) -> T(B)` projected onto a focus/project/settle
+composition. On the wire, it is a standard focus-project-settle
 triple — the transform shape and scale are arguments to filter
 and output. No new wire op is needed.
 
 ### Why three is the wire minimum
 
-The Prism trait's `focus → project → refract` triple is
+The Prism trait's `focus → project → settle` triple is
 structurally:
 
 - **`focus`** is the *observe* — the algebra's left-acting
   morphism that maps the input state into the algebra's domain.
 - **`project`** is the *transform* — the algebra's endomorphism
   on its own domain. Iterates freely. Closed.
-- **`refract`** is the *commit* — the algebra's right-acting
+- **`settle`** is the *commit* — the algebra's right-acting
   morphism that maps back into a settled output state.
 
 This is the minimum structure that supports a closed composition
@@ -600,13 +601,13 @@ compile(project_query { source, filters, ordering, limit }, ctx)
     => pq.focus(source) → pq.project({ filters, ordering, limit })
 
 compile(split_query { options, depth }, ctx)
-    => parallel(option in options) { pq.focus({ ref: option }) → pq.project({ depth }) → pq.refract({ snapshot }) }
+    => parallel(option in options) { pq.focus({ ref: option }) → pq.project({ depth }) → pq.settle({ snapshot }) }
 
-compile(lift_query { diff, blame, branches, log }, ctx)
-    => pq.focus(target(diff|blame|...)) → pq.project(filter) → pq.refract(output)
+compile(shift_query { diff, blame, branches, log }, ctx)
+    => pq.focus(target(diff|blame|...)) → pq.project(filter) → pq.settle(output)
 
-compile(refract_query { store, crystallize, index }, ctx)
-    => pq.focus({}) → pq.refract({ to_path|to_ref|crystallize, ... })
+compile(settle_query { store, crystallize, index }, ctx)
+    => pq.focus({}) → pq.settle({ to_path|to_ref|crystallize, ... })
 
 compile(intent_query { intent }, ctx)
     => @fate.tournament(intent, ctx) → compile(resolved, ctx)
@@ -638,7 +639,7 @@ the intent to:
 project_query {
   source:    find(ref("HEAD")),
   filters: [
-    where_clause("kind",      eq,  ref_val("lift")),
+    where_clause("kind",      eq,  ref_val("shift")),
     where_clause("name",      contains, text_val("auth")),
     where_clause("name",      contains, text_val("token"))  -- OR-fused upstream
   ],
@@ -654,7 +655,7 @@ pq.focus({ ref: "HEAD" })
   → pq.project({
       walk: "back",
       where: [
-        { field: "kind", op: eq, value: "lift" },
+        { field: "kind", op: eq, value: "shift" },
         { field: "name", op: matches, value: "(auth|token)" }
       ],
       order: [{ field: "witnessed", direction: desc }],
@@ -674,11 +675,11 @@ The agent then asks to stage the redact-lens change. Mq compiles:
 ```
 pq.focus({})                                                  -- the shard
   → pq.project({ prefix: "property/" })                        -- narrow to property chain
-  → pq.refract({ to_path: "property/redact.mirror", ...content })
+  → pq.settle({ to_path: "property/redact.mirror", ...content })
 ```
 
 Three-call wire. The composition is associative — the agent could
-have chained the search and the refract in a single pipeline if
+have chained the search and the settle in a single pipeline if
 they wanted to.
 
 ---
@@ -707,11 +708,11 @@ Claim: pq's three operations under sequential composition form a
    composes the three.
 
 4. **No fixed point.** A chain of pq calls terminates after the
-   refract step — there is no `while` at the wire altitude. The
+   settle step — there is no `while` at the wire altitude. The
    agent decides whether to issue a second pipeline; the wire
    does not loop on its own.
 
-The combinator algebra is `(focus | project*  | refract)` —
+The combinator algebra is `(focus | project*  | settle)` —
 structurally a finite-arity composition that monoidally extends
 but does not Turing-complete. This satisfies the substrate-pull
 discipline ([[feedback-substrate-pull]]) at the wire altitude:
@@ -736,7 +737,7 @@ HTTP). Three methods on the wire:
 {
   "jsonrpc": "2.0", "id": 17, "method": "tools/call",
   "params": {
-    "name":      "focus" | "project" | "refract",
+    "name":      "focus" | "project" | "settle",
     "arguments": <Beam-shaped or Target-shaped per §2>
   }
 }
@@ -836,7 +837,7 @@ In-spec dependencies:
   this spec layers on.
 - [[../../../mirror/docs/specs/kintsugi-variety]] — pq's
   `imperfect` field carries the variety verdict per crossing.
-- [[../../../mirror/docs/specs/reality-shard-as-crdt]] — refract
+- [[../../../mirror/docs/specs/reality-shard-as-crdt]] — settle
   is the lattice join; pq composition respects strong eventual
   consistency.
 - [[../../../mirror/docs/specs/parse-as-fate-tournament]] — how
@@ -848,7 +849,7 @@ In-spec dependencies:
 - [[../../../mirror/docs/specs/prism-core-as-spectral-triple]] —
   why the three-operation algebra is structurally right.
 - [[../../../mirror/docs/specs/architecture-flang-mirror-numerical-split]]
-  — flang IS the LAPACKPrism's numerical backend; the 16→5 lift
+  — flang IS the LAPACKPrism's numerical backend; the 16→5 shift
   is the monadic seam between the LAPACK substrate and the
   five-operation composition algebra (per §6.5.3).
 - [[../../../mirror/docs/specs/numerical-substrate-via-fortran]] —

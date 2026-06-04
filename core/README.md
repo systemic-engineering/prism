@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/prism-core.svg)](https://crates.io/crates/prism-core)
 [![docs.rs](https://docs.rs/prism-core/badge.svg)](https://docs.rs/prism-core)
 
-Beam (semifunctor) + Prism (monoid). Three operations: focus, project, refract.
+Beam (semifunctor) + Prism (monoid). Three operations: focus, project, settle.
 
 ## Beam
 
@@ -25,12 +25,12 @@ A `Prism` defines three operations over beams:
 
 - **focus** -- select what matters from the input. The narrowing step.
 - **project** -- transform the focused value. The lossy step, where information may not survive (precision cut, eigenvalue threshold, compression).
-- **refract** -- produce the output from what survived projection. The reconstruction step.
+- **settle** -- produce the output from what survived projection. The reconstruction step.
 
 The associated types form a chain enforced by the compiler:
 
 ```
-Input -> [focus] -> Focused -> [project] -> Projected -> [refract] -> Refracted
+Input -> [focus] -> Focused -> [project] -> Projected -> [settle] -> Settled
 ```
 
 Each stage's input type must equal the previous stage's output type. Mismatches are compile errors.
@@ -38,12 +38,12 @@ Each stage's input type must equal the previous stage's output type. Mismatches 
 ## The DSL
 
 ```rust
-use prism_core::{Beam, Prism, Optic, Focus, Project, Refract};
+use prism_core::{Beam, Prism, Optic, Focus, Project, Settle};
 
 let result = Optic::ok((), input)
     .apply(Focus(&my_prism))
     .apply(Project(&my_prism))
-    .apply(Refract(&my_prism));
+    .apply(Settle(&my_prism));
 ```
 
 Or use the convenience function:
@@ -56,7 +56,7 @@ let result = prism_core::apply(&my_prism, beam);
 
 **Beam is a semifunctor.** You can map over the carried value (`smap`), but the identity law does not hold: mapping the identity function over a Failure beam panics instead of returning the same beam. This is deliberate -- Failure beams have no value to map over, so the type system forces you to check `is_ok()` before transforming.
 
-**Prism is a monoid.** Prisms compose associatively (focus-project-refract chains), and an identity prism exists (passthrough on all three stages). This means pipelines are type-safe by construction.
+**Prism is a monoid.** Prisms compose associatively (focus-project-settle chains), and an identity prism exists (passthrough on all three stages). This means pipelines are type-safe by construction.
 
 ## Split and zoom
 

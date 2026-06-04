@@ -78,13 +78,13 @@ basis labels the encoding produces). This is independent of N.
 N is the number of independent observers (projections). Currently:
 
 - `CoincidenceHash<2>` -- Bothe's original: two counters, minimal
-- `CoincidenceHash<5>` -- mirror's five optics (focus, project, refract, split, zoom)
+- `CoincidenceHash<5>` -- mirror's five optics (focus, project, settle, split, shift)
 - `CoincidenceHash<6>` -- used in some tests
 
 For prism-core's `Oid::hash()`, **N=3** is the right default. Three is the
 minimum for non-trivial coincidence (two can be accidental agreement; three
 starts being structural). It matches prism's three operations (focus, project,
-refract). It's cheap enough to be the default hash.
+settle). It's cheap enough to be the default hash.
 
 The const generic stays -- callers can use any N by constructing a detector
 directly. The default canonical hash uses N=3.

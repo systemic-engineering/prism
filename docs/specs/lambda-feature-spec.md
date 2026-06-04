@@ -28,18 +28,18 @@ provide.
 | **Abstraction** (`λx. body`) | **Project** | Extract structure. Threshold cut — the body only makes sense under substitution. |
 | **Application** (`f x`) | `smap` / pipeline composition | Apply a transformation to a value. The functor map. |
 | **Case/Match** | **Split** (Metal) / `smap` branching | Pattern match. Branch on structure. |
-| **Value** (normal form) | **Refract** | The settled result. No more reductions possible. Crystal. |
+| **Value** (normal form) | **Settle** | The settled result. No more reductions possible. Crystal. |
 
 The three-stage Prism trait maps to a specific reduction pattern:
 
 ```
 Focus   = bind the input (introduce the variable)
 Project = apply the transformation (the lossy step — beta reduction)
-Refract = produce the output (reach normal form)
+Settle  = produce the output (reach normal form)
 ```
 
 This is structurally sound. A Prism IS a single beta-reduction step with
-explicit loss tracking. The pipeline `focus | project | refract` IS
+explicit loss tracking. The pipeline `focus | project | settle` IS
 `bind | reduce | normalize`.
 
 ### 1.2 What Makes This More Than Analogy
@@ -89,8 +89,8 @@ The correspondence is structural, not metaphorical, because:
   target, not an equivalence. A Term compiles TO Metal instructions.
   Metal instructions do not compose as lambda terms.
 
-- **Split and Zoom are not in the Prism trait.** The Prism trait has three
-  operations: Focus, Project, Refract. Split and Zoom exist only in Metal
+- **Split and Shift are not in the Prism trait.** The Prism trait has three
+  operations: Focus, Project, Settle. Split and Shift exist only in Metal
   (as instructions) and in `smap` (as user-space operations on beams).
   The five-way mapping requires looking past the trait boundary.
 
@@ -120,7 +120,7 @@ pub enum Term<T: MerkleTree> {
     /// Scrutinee + list of (pattern, body) arms.
     Case(Box<Term<T>>, Vec<(Pattern<T>, Term<T>)>),
 
-    /// Value. Refract — normal form. A settled MerkleTree node.
+    /// Value. Settle — normal form. A settled MerkleTree node.
     Val(T),
 }
 
@@ -466,9 +466,9 @@ This is a COMPILATION, not an equivalence.
 ```
 Term::Var(x)        → Focus(n)        Read the binding from tape
 Term::Abs(x, body)  → Project(t)      Set threshold (the abstraction barrier)
-Term::App(f, a)     → Zoom(off, val)  Apply weight (the function application)
+Term::App(f, a)     → Shift(off, val) Apply weight (the function application)
 Term::Case(s, arms) → Split(n)        Scan cells, branch on nonzero
-Term::Val(t)        → Refract          Output the settled value
+Term::Val(t)        → Settle          Output the settled value
 ```
 
 ### 6.1 How Compilation Would Work
@@ -509,7 +509,7 @@ fn emit_instructions<T: MerkleTree>(term: &Term<T>, program: &mut Vec<Instructio
             }
         }
         Term::Val(_) => {
-            program.push(Instruction::Refract);
+            program.push(Instruction::Settle);
         }
     }
 }
@@ -727,7 +727,7 @@ The lambda calculus in prism-core uses all existing primitives:
 | **Luminosity** | Success = Light (normal form). Partial = Dimmed (budget exhausted). Failure = Dark (stuck). |
 | **Crystal** | A Term that has reached normal form IS a Crystal. |
 | **Beam** | A Term flowing through a reduction pipeline IS a Beam. |
-| **Prism** | A single reduction step IS a Prism (focus the redex, project/reduce, refract the result). |
+| **Prism** | A single reduction step IS a Prism (focus the redex, project/reduce, settle the result). |
 | **Loss** | ReductionLoss tracks steps consumed. Combines across phases. |
 
 The lambda feature does not add a foreign concept. It names a structure

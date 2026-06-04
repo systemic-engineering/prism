@@ -19,8 +19,8 @@ a hardware unit.
 | `Focus(n)` | focus | DMA read: input bus → register file | ~50 gates |
 | `Project(t)` | project | Threshold comparator array, parallel across all registers | ~200 gates |
 | `Split(n)` | split | Priority encoder, nonzero scan | ~100 gates |
-| `Zoom(off, val)` | zoom | Adder with offset addressing | ~80 gates |
-| `Refract` | refract | Output latch | ~20 gates |
+| `Shift(off, val)` | shift | Adder with offset addressing | ~80 gates |
+| `Settle` | settle | Output latch | ~20 gates |
 
 Total: ~450 gates for the core. Plus register file (256 × 8-bit = 2048 flip-flops).
 
@@ -48,7 +48,7 @@ Total: ~450 gates for the core. Plus register file (256 × 8-bit = 2048 flip-flo
                     │            └──────┬───────┘     │
                     │                   │             │
                     │            ┌──────▼───────┐     │
-                    │  Refract──│  Output      │────►│── Output (8-bit)
+                    │  Settle───│  Output      │────►│── Output (8-bit)
                     │  (Latch)  │  Latch       │     │
                     │            └──────────────┘     │
                     │                                 │
@@ -64,7 +64,7 @@ Total: ~450 gates for the core. Plus register file (256 × 8-bit = 2048 flip-flo
                     │  │  Drives the 5 units in   │    │
                     │  │  program order.           │    │
                     │  │  4-instruction Fate:      │    │
-                    │  │  Focus→Zoom→Split→Refract │    │
+                    │  │  Focus→Shift→Split→Settle │    │
                     │  └─────────────────────────┘    │
                     └─────────────────────────────────┘
 ```
@@ -92,10 +92,10 @@ gate utilization = different power consumption.
 
 | Precision | Pins | Instructions | Cycle Count | Power |
 |-----------|------|-------------|-------------|-------|
-| Low | 00 | Focus, Split, Refract | 3 | ~1mW |
-| Medium | 01 | Focus, Zoom(1), Split, Refract | 4 | ~1.5mW |
-| High | 10 | Focus, Zoom(16), Split, Refract | 19 | ~3mW |
-| Full | 11 | Focus, Zoom(80), Project, Split, Refract | 83 | ~8mW |
+| Low | 00 | Focus, Split, Settle | 3 | ~1mW |
+| Medium | 01 | Focus, Shift(1), Split, Settle | 4 | ~1.5mW |
+| High | 10 | Focus, Shift(16), Split, Settle | 19 | ~3mW |
+| Full | 11 | Focus, Shift(80), Project, Split, Settle | 83 | ~8mW |
 
 At Low precision: the chip reads biases, finds the largest, outputs it.
 One clock cycle per instruction. Three cycles total. At 100MHz: **30ns
@@ -111,9 +111,9 @@ a hardware pipeline:
 
 ```
 Cycle 1:     Focus(22)    — DMA 22 bytes from input bus to tape
-Cycle 2:     Zoom(19, f0) — add feature[0] weight to cell 19
-Cycle 3:     Split(5)     — argmax over cells 17-21
-Cycle 4:     Refract      — latch winner to output bus
+Cycle 2:     Shift(19, f0) — add feature[0] weight to cell 19
+Cycle 3:     Split(5)      — argmax over cells 17-21
+Cycle 4:     Settle        — latch winner to output bus
 ```
 
 Four cycles. At 100MHz: **40 nanoseconds per model selection.**
@@ -198,7 +198,7 @@ clock budget.
 
 The chip IS the Prism. Not a chip that runs Prism. The gates ARE the
 five operations. Focus is a DMA channel. Project is a comparator bank.
-Split is a priority encoder. Zoom is an accumulator. Refract is a latch.
+Split is a priority encoder. Shift is an accumulator. Settle is a latch.
 
 One algorithm. Five operations. 450 gates. 40 nanoseconds.
 The thing you look into that looks back — in silicon.
@@ -368,9 +368,12 @@ processors. The chip's simplicity is its certification advantage.
 
 > **Status:** Research phase. 2026-04-05.
 >
-> The operations are named Focus, Project, Split, Zoom, Refract.
-> Those aren't metaphors. They're optical operations. The Beam type
+> The operations are named Focus, Project, Split, Shift, Settle.
+> Those aren't metaphors. They're shift-register operations. The Beam type
 > isn't named after a data structure. It's named after light.
+> (The five operations went through three renames: visual-metaphor zoom
+> → vertical lift → lateral shift; and optical refract → dynamical settle.
+> Earlier drafts of this spec used Zoom / Refract.)
 
 ### The Substrate Stack
 
@@ -476,8 +479,8 @@ The operations are literal:
 - Focus = lens concentrating input
 - Project = beam splitter selecting subspace
 - Split = prism separating channels
-- Zoom = magnification changing resolution
-- Refract = medium-dependent path encoding the classification boundary
+- Shift = lateral re-addressing (the shift-register grounding)
+- Settle = dynamical convergence to the classification boundary
 
 The `Beam<T>` type was a specification for a physical object.
 
@@ -506,8 +509,8 @@ system where each layer does one operation:
 | Ferrofluid | Focus | Concentrates biological signal into magnetic field |
 | Magnetoresistive | Project | Projects field into 16 spectral features |
 | Memristive crossbar | Split | Maps features across 5 model outputs via Ohm's law |
-| MRAM | Zoom | Stores/restores weight state across scales (backup ↔ active) |
-| CMOS | Refract | Crystallizes the decision. Output latch. Shannon loss. Done. |
+| MRAM | Shift | Stores/restores weight state across scales (backup ↔ active) |
+| CMOS | Settle | Crystallizes the decision. Output latch. Shannon loss. Done. |
 
 Five layers. Five operations. The Pack. The architecture. The physics.
 
@@ -570,7 +573,7 @@ the vertical path selects. No routing logic — the route IS the geometry.
 
 The five operations already have three-dimensional structure:
 Focus/Project = input (top). Split = boundary (middle).
-Zoom/Refract = output (bottom). In. Boundary. Out. Three layers.
+Shift/Settle = output (bottom). In. Boundary. Out. Three layers.
 
 ### Pipelined Loss Accumulation
 
