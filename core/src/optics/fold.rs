@@ -3,7 +3,7 @@
 //! A Fold<S, A> extracts zero or more As from an S. No modification side.
 //! Think of it as a Traversal without the put-back direction.
 //!
-//! As a Prism: focus extracts (S → Vec<A>), project and refract pass through.
+//! As a Prism: focus extracts (S → Vec<A>), project and settle pass through.
 
 use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
@@ -43,7 +43,7 @@ impl<S: 'static, A: 'static> crate::Addressable for Fold<S, A> {
 /// Pipeline flow:
 /// - focus: extract all elements (S → Vec<A>)
 /// - project: identity (Vec<A> → Vec<A>)
-/// - refract: identity (Vec<A> → Vec<A>)
+/// - settle: identity (Vec<A> → Vec<A>)
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
     type Input = Optic<(), S, Infallible, ScalarLoss>;
     type Focused = Optic<S, Vec<A>, Infallible, ScalarLoss>;
@@ -61,8 +61,8 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
         beam.next(v)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let v = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let v = beam.result().ok().expect("settle: Err beam").clone();
         beam.next(v)
     }
 }
@@ -132,7 +132,7 @@ mod tests {
         let f: Fold<Tree, i32> = Fold::new(tree_leaves);
         let focused = f.focus(seed(Tree { leaves: vec![1, 2] }));
         let projected = f.project(focused);
-        let refracted = f.refract(projected);
+        let refracted = f.settle(projected);
         assert_eq!(refracted.result().ok(), Some(&vec![1, 2]));
     }
 

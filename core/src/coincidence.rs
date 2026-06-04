@@ -322,7 +322,7 @@ impl<const N: usize> Detector<N> {
     /// - Zoom applies quantized projection weights
     /// - Project thresholds (precision cut)
     /// - Split traverses nonzero cells
-    /// - Refract outputs the result
+    /// - Settle outputs the result
     ///
     /// # Tape layout
     ///
@@ -331,7 +331,7 @@ impl<const N: usize> Detector<N> {
     /// 2. Focus(dim) reads input bytes into subsequent cells, advancing dp
     /// 3. Project filters weak signals globally
     /// 4. Split finds surviving signal in the Zoom region
-    /// 5. Refract outputs the cell at the Split-determined position
+    /// 5. Settle outputs the cell at the Split-determined position
     ///
     /// # Architectural note
     ///
@@ -383,8 +383,8 @@ impl<const N: usize> Detector<N> {
             // Split: traverse nonzero cells in the output region.
             program.push(Instruction::Split(dim));
 
-            // Refract: output the crystal — the cell where signal survived.
-            program.push(Instruction::Refract);
+            // Settle: output the crystal — the cell where signal survived.
+            program.push(Instruction::Settle);
         }
 
         crate::metal::MetalPrism::new(program)
@@ -742,7 +742,7 @@ mod tests {
         let detector: Detector<3> = Detector::canonical("content", 16);
         let metal = detector.to_metal();
         let output = metal.execute(b"");
-        // Empty input still produces output (from Zoom weights + Refract)
+        // Empty input still produces output (from Zoom weights + Settle)
         assert!(!output.is_empty());
     }
 
@@ -761,7 +761,7 @@ mod tests {
         let d3: Detector<3> = Detector::canonical("content", 16);
         let metal = d3.to_metal();
         let output = metal.execute(b"anything");
-        // One Refract per projection → N output bytes
+        // One Settle per projection → N output bytes
         assert_eq!(output.len(), 3);
     }
 
@@ -776,7 +776,7 @@ mod tests {
         assert!(program.iter().any(|i| matches!(i, Instruction::Project(_))));
         assert!(program.iter().any(|i| matches!(i, Instruction::Split(_))));
         assert!(program.iter().any(|i| matches!(i, Instruction::Zoom(_, _))));
-        assert!(program.iter().any(|i| matches!(i, Instruction::Refract)));
+        assert!(program.iter().any(|i| matches!(i, Instruction::Settle)));
     }
 
     #[test]
@@ -785,19 +785,19 @@ mod tests {
         let detector: Detector<3> = Detector::canonical("content", 16);
         let metal = detector.to_metal();
         let program = metal.program();
-        // Each projection emits: Zoom* + Focus + Project + Split + Refract
+        // Each projection emits: Zoom* + Focus + Project + Split + Settle
         // Count Focus instructions — should be N (one per projection)
         let focus_count = program
             .iter()
             .filter(|i| matches!(i, Instruction::Focus(_)))
             .count();
         assert_eq!(focus_count, 3, "one Focus per projection");
-        // Count Refract instructions — should be N
+        // Count Settle instructions — should be N
         let refract_count = program
             .iter()
-            .filter(|i| matches!(i, Instruction::Refract))
+            .filter(|i| matches!(i, Instruction::Settle))
             .count();
-        assert_eq!(refract_count, 3, "one Refract per projection");
+        assert_eq!(refract_count, 3, "one Settle per projection");
     }
 
     #[test]

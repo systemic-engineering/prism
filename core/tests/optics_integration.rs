@@ -37,7 +37,7 @@ fn iso_full_pipeline_round_trips() {
     let beam = seed("hello".to_string());
     let focused = iso.focus(beam);
     let projected = iso.project(focused);
-    let refracted = iso.refract(projected);
+    let refracted = iso.settle(projected);
     assert_eq!(refracted.result().ok(), Some(&"hello".to_string()));
 }
 
@@ -61,7 +61,7 @@ fn lens_pipeline_extracts_field() {
     let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
     let focused = x_lens.focus(seed(Point { x: 42, y: 7 }));
     let projected = x_lens.project(focused);
-    let refracted = x_lens.refract(projected);
+    let refracted = x_lens.settle(projected);
     assert_eq!(refracted.result().ok(), Some(&42));
 }
 
@@ -155,7 +155,7 @@ fn setter_pipeline_preserves_value() {
     };
     let focused = s.focus(seed(b.clone()));
     let projected = s.project(focused);
-    let refracted = s.refract(projected);
+    let refracted = s.settle(projected);
     assert_eq!(refracted.result().ok(), Some(&b));
 }
 
@@ -283,9 +283,9 @@ fn loss_propagation_through_optic_pipeline() {
         projected.is_partial(),
         "loss must propagate through project"
     );
-    let refracted = iso.refract(projected);
+    let refracted = iso.settle(projected);
     assert!(
         refracted.is_partial(),
-        "loss must propagate through refract"
+        "loss must propagate through settle"
     );
 }

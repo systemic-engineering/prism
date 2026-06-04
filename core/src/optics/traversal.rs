@@ -4,7 +4,7 @@
 //! Given a mapping fn(A) -> B and a Vec<A>, produces Vec<B>.
 //!
 //! As a Prism: focus maps elements (Vec<A> → Vec<B>), project is identity,
-//! refract returns the mapped collection.
+//! settle returns the mapped collection.
 
 use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
@@ -35,7 +35,7 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
 /// Pipeline flow:
 /// - focus: map each element (Vec<A> → Vec<B>)
 /// - project: identity (Vec<B> → Vec<B>)
-/// - refract: identity (Vec<B> → Vec<B>)
+/// - settle: identity (Vec<B> → Vec<B>)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
     type Input = Optic<(), Vec<A>, Infallible, ScalarLoss>;
     type Focused = Optic<Vec<A>, Vec<B>, Infallible, ScalarLoss>;
@@ -53,8 +53,8 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
         beam.next(v)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let v = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let v = beam.result().ok().expect("settle: Err beam").clone();
         beam.next(v)
     }
 }
@@ -109,7 +109,7 @@ mod tests {
         let t: Traversal<i32, i32> = Traversal::new(double);
         let focused = t.focus(seed(vec![5, 10]));
         let projected = t.project(focused);
-        let refracted = t.refract(projected);
+        let refracted = t.settle(projected);
         assert_eq!(refracted.result().ok(), Some(&vec![10, 20]));
     }
 
@@ -120,7 +120,7 @@ mod tests {
         assert!(!focused.is_partial());
         let projected = t.project(focused);
         assert!(!projected.is_partial());
-        let refracted = t.refract(projected);
+        let refracted = t.settle(projected);
         assert!(!refracted.is_partial());
     }
 

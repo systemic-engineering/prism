@@ -5,7 +5,7 @@
 //! (the case doesn't match), but review always reconstructs the whole.
 //!
 //! As a Prism: focus extracts (using Failure on non-match), project is identity,
-//! refract returns the extracted value.
+//! settle returns the extracted value.
 
 use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
@@ -70,7 +70,7 @@ impl<S: 'static, A: 'static> crate::Addressable for OpticPrism<S, A> {
 /// Pipeline flow:
 /// - focus: extract (S → A), using Partial with infinite loss on non-match
 /// - project: identity pass-through
-/// - refract: identity pass-through
+/// - settle: identity pass-through
 ///
 /// Non-matching inputs produce a Partial beam with ScalarLoss::total()
 /// (infinite loss), signaling refutation through the loss channel rather
@@ -98,8 +98,8 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for OpticPrism<S, A> {
         beam.next(a)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let a = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let a = beam.result().ok().expect("settle: Err beam").clone();
         beam.next(a)
     }
 }
@@ -193,7 +193,7 @@ mod tests {
         let p = circle_prism();
         let focused = p.focus(seed(Shape::Circle(10)));
         let projected = p.project(focused);
-        let refracted = p.refract(projected);
+        let refracted = p.settle(projected);
         assert_eq!(refracted.result().ok(), Some(&10));
         assert!(!refracted.is_partial());
     }
@@ -206,7 +206,7 @@ mod tests {
         let projected = p.project(focused);
         // Loss propagates through the pipeline
         assert!(projected.is_partial());
-        let refracted = p.refract(projected);
+        let refracted = p.settle(projected);
         assert!(refracted.is_partial());
     }
 

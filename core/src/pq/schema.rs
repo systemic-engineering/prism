@@ -250,7 +250,7 @@ pub fn output_schema() -> Value {
         "$schema": DRAFT_2020_12,
         "$id": "https://prism.engineer/pq/output.schema.json",
         "title": "pq.Output",
-        "description": "Refract DSL — per pq spec §5.3.",
+        "description": "Settle DSL — per pq spec §5.3.",
         "type": "object",
         "oneOf": one_of,
     })

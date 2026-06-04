@@ -3,7 +3,7 @@
 //! An Iso<A, B> is a pair of functions (forward: A → B, backward: B → A)
 //! such that `backward(forward(a)) = a` and `forward(backward(b)) = b`.
 //!
-//! As a Prism: focus applies forward, project is identity, refract applies backward.
+//! As a Prism: focus applies forward, project is identity, settle applies backward.
 //! Round-trip is genuinely lossless — the only optic with this property.
 
 use crate::ScalarLoss;
@@ -50,7 +50,7 @@ impl<A: 'static, B: 'static> Iso<A, B> {
 /// Pipeline flow:
 /// - focus: applies forward (A → B)
 /// - project: identity pass-through (B → B)
-/// - refract: applies backward (B → A)
+/// - settle: applies backward (B → A)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
     type Input = Optic<(), A, Infallible, ScalarLoss>;
     type Focused = Optic<A, B, Infallible, ScalarLoss>;
@@ -68,8 +68,8 @@ impl<A: Clone + 'static, B: Clone + 'static> Prism for Iso<A, B> {
         beam.next(b)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let b = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let b = beam.result().ok().expect("settle: Err beam").clone();
         let a = (self.backward_fn)(b);
         beam.next(a)
     }
@@ -148,7 +148,7 @@ mod tests {
         let iso: Iso<String, Vec<char>> = Iso::new(str_to_chars, chars_to_str);
         let focused = iso.focus(seed("hi".to_string()));
         let projected = iso.project(focused);
-        let refracted = iso.refract(projected);
+        let refracted = iso.settle(projected);
         assert_eq!(refracted.result().ok(), Some(&"hi".to_string()));
     }
 
@@ -158,8 +158,8 @@ mod tests {
         let beam = seed("test".to_string());
         let focused = iso.focus(beam);
         let projected = iso.project(focused);
-        let refracted = iso.refract(projected);
-        // Iso round-trips perfectly: refract(project(focus(a))) == a
+        let refracted = iso.settle(projected);
+        // Iso round-trips perfectly: settle(project(focus(a))) == a
         assert_eq!(refracted.result().ok(), Some(&"test".to_string()));
         assert!(refracted.is_ok());
         assert!(!refracted.is_partial());
@@ -172,7 +172,7 @@ mod tests {
         assert!(!focused.is_partial());
         let projected = iso.project(focused);
         assert!(!projected.is_partial());
-        let refracted = iso.refract(projected);
+        let refracted = iso.settle(projected);
         assert!(!refracted.is_partial());
     }
 

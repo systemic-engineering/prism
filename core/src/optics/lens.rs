@@ -6,7 +6,7 @@
 //! - `set(s, view(s)) = s`        (view-set)
 //! - `set(set(s, a1), a2) = set(s, a2)`  (set-set)
 //!
-//! As a Prism: focus views (S→A), project is identity, refract returns A.
+//! As a Prism: focus views (S→A), project is identity, settle returns A.
 //! The original S is available as the beam's input chain for reconstruction.
 
 use crate::ScalarLoss;
@@ -55,7 +55,7 @@ impl<S: 'static, A: 'static> Lens<S, A> {
 /// Pipeline flow:
 /// - focus: view (S → A)
 /// - project: identity (A → A)
-/// - refract: identity (A → A) — the focused value is the final output
+/// - settle: identity (A → A) — the focused value is the final output
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
     type Input = Optic<(), S, Infallible, ScalarLoss>;
     type Focused = Optic<S, A, Infallible, ScalarLoss>;
@@ -73,8 +73,8 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Lens<S, A> {
         beam.next(a)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let a = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let a = beam.result().ok().expect("settle: Err beam").clone();
         beam.next(a)
     }
 }
@@ -182,7 +182,7 @@ mod tests {
         let x_lens: Lens<Point, i32> = Lens::new(point_view_x, point_set_x);
         let focused = x_lens.focus(seed(Point { x: 5, y: 2 }));
         let projected = x_lens.project(focused);
-        let refracted = x_lens.refract(projected);
+        let refracted = x_lens.settle(projected);
         assert_eq!(refracted.result().ok(), Some(&5));
     }
 
@@ -193,7 +193,7 @@ mod tests {
         assert!(!focused.is_partial());
         let projected = x_lens.project(focused);
         assert!(!projected.is_partial());
-        let refracted = x_lens.refract(projected);
+        let refracted = x_lens.settle(projected);
         assert!(!refracted.is_partial());
     }
 

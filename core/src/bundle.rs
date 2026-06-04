@@ -107,7 +107,7 @@ pub trait Fiber {
 /// The connection IS an element of the optic algebra `A`: the supertrait
 /// constraint `Optic: Prism` forces it to compose under Tambara module
 /// composition (carried by `prism_core::Prism` via the
-/// focus/project/refract chain). The `Input: Beam<In = Self::State>`
+/// focus/project/settle chain). The `Input: Beam<In = Self::State>`
 /// bound enforces that the connection acts on the fiber's state.
 /// (Gap 1 of `docs/specs/spectral-triple-grammar.md`.)
 pub trait Connection: Fiber
@@ -256,11 +256,11 @@ impl<S: Clone + 'static> Prism for IdentityPrism<S> {
         beam.next(v)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
         let v = beam
             .value()
             .cloned()
-            .expect("IdentityPrism::refract on dark beam");
+            .expect("IdentityPrism::settle on dark beam");
         beam.next(v)
     }
 }
@@ -374,7 +374,7 @@ mod tests {
         let beam: Optic<(), [f64; 4]> = Optic::ok((), [1.0, 2.0, 3.0, 4.0]);
         let focused = p.focus(beam);
         let projected = p.project(focused);
-        let refracted = p.refract(projected);
+        let refracted = p.settle(projected);
         assert_eq!(refracted.value(), Some(&[1.0, 2.0, 3.0, 4.0]));
     }
 

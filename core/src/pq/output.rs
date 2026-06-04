@@ -1,7 +1,7 @@
-//! `pq::Output` — the refract DSL.
+//! `pq::Output` — the settle DSL.
 //!
 //! Per pq spec §5.3, `Output` is a discriminated union over the
-//! refract step's settle target. Each variant is a distinct JSON
+//! settle step's settle target. Each variant is a distinct JSON
 //! key-shape.
 
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct CasUpdate {
     pub new: Oid,
 }
 
-/// Refract DSL. Each variant maps to a distinct JSON key-shape.
+/// Settle DSL. Each variant maps to a distinct JSON key-shape.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Output {

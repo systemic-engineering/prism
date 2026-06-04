@@ -15,7 +15,7 @@ use crate::ScalarLoss;
 pub enum Op {
     Focus,
     Project,
-    Refract,
+    Settle,
 }
 
 /// Any value that is `Debug + Any + Send + Sync` can be stored in a `Trace`.
@@ -139,8 +139,8 @@ mod tests {
     #[test]
     fn op_variants_are_distinct() {
         assert_ne!(Op::Focus, Op::Project);
-        assert_ne!(Op::Project, Op::Refract);
-        assert_ne!(Op::Focus, Op::Refract);
+        assert_ne!(Op::Project, Op::Settle);
+        assert_ne!(Op::Focus, Op::Settle);
     }
 
     #[test]
@@ -148,7 +148,7 @@ mod tests {
         let mut t = Trace::new();
         t.push(Step {
             prism: "p",
-            op: Op::Refract,
+            op: Op::Settle,
             loss: ScalarLoss::zero(),
             input: Box::new(1u32),
             output: StepOutput::Value(Box::new(2u32)),

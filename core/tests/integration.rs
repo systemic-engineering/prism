@@ -1,5 +1,5 @@
 use prism_core::ScalarLoss;
-use prism_core::{Beam, Focus, Optic, Prism, Project, Refract};
+use prism_core::{Beam, Focus, Optic, Prism, Project, Settle};
 use std::convert::Infallible;
 use terni::Imperfect;
 
@@ -28,8 +28,8 @@ impl Prism for TokenPrism {
         beam.next(count)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let n = *beam.result().ok().expect("refract: Err beam");
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let n = *beam.result().ok().expect("settle: Err beam");
         beam.next(format!("{} tokens", n))
     }
 }
@@ -39,7 +39,7 @@ fn full_pipeline_dsl() {
     let result = Optic::ok((), "hello world foo".to_string())
         .apply(Focus(&TokenPrism))
         .apply(Project(&TokenPrism))
-        .apply(Refract(&TokenPrism));
+        .apply(Settle(&TokenPrism));
 
     assert!(result.is_ok());
     assert_eq!(result.result().ok(), Some(&"3 tokens".to_string()));

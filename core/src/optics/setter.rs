@@ -38,7 +38,7 @@ impl<S: 'static, A: 'static> Setter<S, A> {
 /// Pipeline flow:
 /// - focus: identity (S → S) — no read access
 /// - project: identity (S → S)
-/// - refract: applies modify with identity to witness the closure, returns S
+/// - settle: applies modify with identity to witness the closure, returns S
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
     type Input = Optic<(), S, Infallible, ScalarLoss>;
     type Focused = Optic<S, S, Infallible, ScalarLoss>;
@@ -55,8 +55,8 @@ impl<S: Clone + 'static, A: Clone + 'static> Prism for Setter<S, A> {
         beam.next(s)
     }
 
-    fn refract(&self, beam: Self::Projected) -> Self::Refracted {
-        let s = beam.result().ok().expect("refract: Err beam").clone();
+    fn settle(&self, beam: Self::Projected) -> Self::Refracted {
+        let s = beam.result().ok().expect("settle: Err beam").clone();
         // Witness: run modify with identity to prove the closure is reachable
         let witnessed = (self.modify_fn)(s, &|a| a);
         beam.next(witnessed)
@@ -144,8 +144,8 @@ mod tests {
         };
         let focused = s.focus(seed(b.clone()));
         let projected = s.project(focused);
-        let refracted = s.refract(projected);
-        // refract applies identity modify, so value is unchanged
+        let refracted = s.settle(projected);
+        // settle applies identity modify, so value is unchanged
         assert_eq!(refracted.result().ok(), Some(&b));
     }
 

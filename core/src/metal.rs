@@ -7,7 +7,7 @@
 /// Project — precision cut on accumulated values
 /// Split  — walk cells, test nonzero
 /// Zoom   — add value to cell (weight application, the transform)
-/// Refract — output the result. Crystallize.
+/// Settle — output the result. Crystallize.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
     /// Focus: read N bytes from input into tape starting at dp.
@@ -23,8 +23,8 @@ pub enum Instruction {
     /// Zoom: add value to cell at dp + offset.
     /// The weight application. The transform.
     Zoom(usize, u8),
-    /// Refract: output cell at dp. The crystal. The answer.
-    Refract,
+    /// Settle: output cell at dp. The crystal. The answer.
+    Settle,
 }
 
 /// The tape. The state that Metal operates on.
@@ -131,7 +131,7 @@ pub fn execute(program: &[Instruction], input: &[u8]) -> Vec<u8> {
             Instruction::Zoom(offset, value) => {
                 tape.add(*offset, *value);
             }
-            Instruction::Refract => {
+            Instruction::Settle => {
                 output.push(tape.cells[tape.dp]);
             }
         }
@@ -169,11 +169,11 @@ mod tests {
         // Read 2 inputs, add a weight, output the result
         // Focus(2): cells[0]=5, cells[1]=7, dp=2
         // Zoom(0, 10): cells[2] += 10 → cells[2]=10
-        // Refract: output cells[dp=2] = 10
+        // Settle: output cells[dp=2] = 10
         let program = vec![
             Instruction::Focus(2),    // read 2 bytes → cells 0,1; dp=2
             Instruction::Zoom(0, 10), // add 10 to cell at dp+0 = cell 2
-            Instruction::Refract,     // output cell at dp (cell 2) = 10
+            Instruction::Settle,     // output cell at dp (cell 2) = 10
         ];
         let output = execute(&program, &[5, 7]);
         assert_eq!(output, vec![10]);
@@ -185,7 +185,7 @@ mod tests {
         let program = vec![
             Instruction::Focus(5), // read 5 bytes, dp=5
             Instruction::Split(5), // scan 5 cells from dp=5, all zero, dp stays at 5
-            Instruction::Refract,  // output cell at dp
+            Instruction::Settle,  // output cell at dp
         ];
         // Input: cells 0-4 have values, cells 5+ are zero
         let output = execute(&program, &[0, 0, 10, 0, 20]);
@@ -201,7 +201,7 @@ mod tests {
 
         let program = vec![Instruction::Focus(22)];
         let output = execute(&program, &input);
-        assert!(output.is_empty()); // no Refract yet
+        assert!(output.is_empty()); // no Settle yet
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
             Instruction::Project(5), // zero cells < 5 → cells[0]=0
         ];
         let output = execute(&program, &[1, 5, 10]);
-        assert!(output.is_empty()); // no Refract
+        assert!(output.is_empty()); // no Settle
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
             Instruction::Focus(22),  // 1 instruction
             Instruction::Zoom(0, 0), // feature contribution (placeholder)
             Instruction::Split(5),   // argmax
-            Instruction::Refract,    // output
+            Instruction::Settle,    // output
         ];
         assert_eq!(program.len(), 4); // The entire decision in 4 instructions
     }
@@ -230,7 +230,7 @@ mod tests {
     fn refract_outputs_current_cell() {
         let program = vec![
             Instruction::Focus(1), // read 1 byte into cell 0, dp=1
-            Instruction::Refract,  // output cell at dp=1 (which is 0)
+            Instruction::Settle,  // output cell at dp=1 (which is 0)
         ];
         let output = execute(&program, &[42]);
         assert_eq!(output, vec![0]); // dp=1 after focus, cell 1 is 0
@@ -241,7 +241,7 @@ mod tests {
         let program = vec![
             Instruction::Zoom(0, 255),
             Instruction::Zoom(0, 2), // 255 + 2 = 1 (wrapping)
-            Instruction::Refract,
+            Instruction::Settle,
         ];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![1]);
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn zoom_adds_to_cell() {
-        let program = vec![Instruction::Zoom(0, 42), Instruction::Refract];
+        let program = vec![Instruction::Zoom(0, 42), Instruction::Settle];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![42]);
     }
@@ -298,7 +298,7 @@ mod tests {
         // should leave dp at a useful position. For now, just verify
         // Focus reads correctly.
         let output = execute(&program, &input);
-        assert!(output.is_empty()); // no Refract
+        assert!(output.is_empty()); // no Settle
     }
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
             Instruction::Zoom(2, 3),
             Instruction::Project(10), // zero out < 10: cells 0,2 become 0
             Instruction::Split(3),    // last nonzero = cell 1
-            Instruction::Refract,     // output cell at dp=1 = 20
+            Instruction::Settle,     // output cell at dp=1 = 20
         ];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![20]);
@@ -335,7 +335,7 @@ mod tests {
         let prism = MetalPrism::new(vec![
             Instruction::Focus(3),
             Instruction::Zoom(0, 10),
-            Instruction::Refract,
+            Instruction::Settle,
         ]);
         let output = prism.execute(&[1, 2, 3]);
         assert_eq!(output.len(), 1);
@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn metal_prism_program_accessor() {
-        let prism = MetalPrism::new(vec![Instruction::Focus(1), Instruction::Refract]);
+        let prism = MetalPrism::new(vec![Instruction::Focus(1), Instruction::Settle]);
         assert_eq!(prism.program().len(), 2);
         assert_eq!(prism.program()[0], Instruction::Focus(1));
     }
@@ -353,9 +353,9 @@ mod tests {
     fn multiple_refracts() {
         let program = vec![
             Instruction::Zoom(0, 65), // 'A'
-            Instruction::Refract,
+            Instruction::Settle,
             Instruction::Zoom(0, 1), // 65 + 1 = 66 = 'B'
-            Instruction::Refract,
+            Instruction::Settle,
         ];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![65, 66]);
