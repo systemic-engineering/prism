@@ -28,6 +28,11 @@ serde_json = "1"
 # Disable default features (resolve-http, resolve-file, tls-aws-lc-rs) — we
 # only need in-memory schema compilation.
 jsonschema = { version = "0.46", default-features = false }
+# T23 declaration-round-trip test: round-trip Rust items through syn
+# at the canonical-form altitude. Used by
+# `tests/declaration_round_trip.rs`.
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
 
 [build-dependencies]
 cc = { version = "1", optional = true }

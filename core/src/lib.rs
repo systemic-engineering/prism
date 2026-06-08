@@ -76,6 +76,13 @@ pub use bundle::{
 
 pub use beam::{Beam, Operation, Optic};
 pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
+/// Re-export the `declaration!{}` function-like proc-macro — the
+/// `@code/rust/macro.shim_type` reception entry point (T23, per
+/// `mirror/shards/code/rust/macro.mirror` and
+/// `mirror/docs/specs/code-macro-surface.md`). Reads a substrate
+/// `type` declaration as input tokens and emits the Rust
+/// struct/enum that realises it.
+pub use prism_derive::declaration;
 /// Re-export `#[derive(Lambda)]` for named lambda phases.
 #[cfg(feature = "lambda")]
 pub use prism_derive::Lambda as DeriveLambda;

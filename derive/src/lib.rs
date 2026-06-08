@@ -19,6 +19,58 @@ use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, Data, DeriveInput, Expr, Fields, Lit, Meta, Type};
 
+// T23 (2026-06-08): the macro-reception sub-prism. Realises
+// `@code/rust/macro.shim_type` per
+// `mirror/shards/code/rust/macro.mirror`. The function-like
+// proc-macro `declaration!{}` reads a substrate `type` declaration
+// and emits the Rust struct/enum that realises it. Round-trip OID
+// witness: emission is a deterministic function of the substrate
+// input (the `oid_function(shim_type)` law). Per the spec's §12
+// implementation cascade, this tick lands `type` only; `prism`,
+// `action`, `grammar` are next cascade ticks.
+mod declaration;
+
+/// `declaration!{}` — the @code/rust/macro reception entry point.
+///
+/// Realises `@code/rust/macro.shim_type` per
+/// `mirror/shards/code/rust/macro.mirror`. Reads a substrate `type`
+/// declaration (passed as token-tree input) and emits the Rust
+/// struct (for record-shaped types) or enum (for sum-shaped types)
+/// that realises it.
+///
+/// # Input grammar (this tick: `type` only)
+///
+/// ```ignore
+/// // Record shape:
+/// declaration!{ type Foo { a: u32, b: u64 } }
+///
+/// // Sum shape (closed sum of unit variants):
+/// declaration!{ type Color = red | green | blue }
+///
+/// // Sum shape with parametric variants:
+/// declaration!{ type Result = ok(u32) | err(u32) }
+/// ```
+///
+/// # Four laws (per spec §5)
+///
+/// 1. Type-soundness: emitted Rust is well-typed when the substrate
+///    declaration is well-typed.
+/// 2. Round-trip identity: `syn::parse2::<DeriveInput>(emission)`
+///    succeeds — emission is itself a valid Rust declaration.
+/// 3. OID functionality: same substrate input → byte-identical Rust
+///    emission → same OID.
+/// 4. Substrate-pull preservation: emission references only
+///    primitive Rust types and constructs already at the
+///    `@code/rust` altitude (`pub struct`, `pub enum`, primitive
+///    integer types).
+///
+/// `prism`, `action`, `grammar` declarations panic with
+/// `unimplemented!()` and are the next cascade ticks.
+#[proc_macro]
+pub fn declaration(input: TokenStream) -> TokenStream {
+    declaration::expand(input.into()).into()
+}
+
 /// Which optic annotation a field carries.
 #[derive(Clone, Copy)]
 enum FieldKind {

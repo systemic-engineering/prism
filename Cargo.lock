@@ -784,9 +784,11 @@ dependencies = [
  "hex",
  "jsonschema",
  "prism-derive",
+ "quote",
  "serde",
  "serde_json",
  "sha2",
+ "syn",
  "terni",
 ]
 
