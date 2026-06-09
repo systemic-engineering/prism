@@ -1,3 +1,15 @@
 [workspace]
 members = ["imperfect", "core", "derive"]
 resolver = "2"
+
+# Per Taut's profiling survey (mirror #286 Win 1, mirrored here on
+# 2026-06-09): the default dev / test profiles inherit small
+# codegen-units counts which serialise the per-test-binary codegen
+# and dominate incremental rebuild wall-time. Bumping to 256 splits
+# the codegen across cores. No behavioural impact (dev / test are
+# not the artefacts we ship); strictly a tooling tick.
+[profile.dev]
+codegen-units = 256
+
+[profile.test]
+codegen-units = 256

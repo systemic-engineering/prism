@@ -32,40 +32,55 @@ mod declaration;
 
 /// `declaration!{}` — the @code/rust/macro reception entry point.
 ///
-/// Realises `@code/rust/macro.shim_type` per
-/// `mirror/shards/code/rust/macro.mirror`. Reads a substrate `type`
-/// declaration (passed as token-tree input) and emits the Rust
-/// struct (for record-shaped types) or enum (for sum-shaped types)
-/// that realises it.
+/// Realises the four shims declared at
+/// `mirror/shards/code/metalogue.mirror` (universal ground; the
+/// 34th-instance reframe lifted the contract from per-species
+/// `@code/X/macro` to `@code/metalogue`) and bound to
+/// `code/rust.ast` at `mirror/shards/code/rust/macro.mirror`. Reads
+/// a substrate declaration (passed as token-tree input) and emits
+/// the Rust item that realises it.
 ///
-/// # Input grammar (this tick: `type` only)
+/// # Input grammar (T23 + T24)
 ///
 /// ```ignore
+/// // T23 — `type` declarations.
 /// // Record shape:
 /// declaration!{ type Foo { a: u32, b: u64 } }
-///
 /// // Sum shape (closed sum of unit variants):
 /// declaration!{ type Color = red | green | blue }
-///
 /// // Sum shape with parametric variants:
 /// declaration!{ type Result = ok(u32) | err(u32) }
+///
+/// // T24 — `prism` declarations.
+/// // Bare path:
+/// declaration!{ prism @parse }
+/// // With five-op block:
+/// declaration!{
+///     prism @kernel {
+///         focus kernel  project kernel  split kernel
+///         shift kernel  settle kernel
+///     }
+/// }
 /// ```
 ///
 /// # Four laws (per spec §5)
 ///
 /// 1. Type-soundness: emitted Rust is well-typed when the substrate
 ///    declaration is well-typed.
-/// 2. Round-trip identity: `syn::parse2::<DeriveInput>(emission)`
-///    succeeds — emission is itself a valid Rust declaration.
+/// 2. Round-trip identity: `syn::parse2::<Item>(emission)` succeeds
+///    — emission is itself a valid Rust declaration.
 /// 3. OID functionality: same substrate input → byte-identical Rust
-///    emission → same OID.
+///    emission → same OID. For `prism` declarations, the runtime
+///    `Addressable::oid(&Path)` equals `Oid::hash("@path".as_bytes())`
+///    — the substrate path IS the runtime address.
 /// 4. Substrate-pull preservation: emission references only
 ///    primitive Rust types and constructs already at the
-///    `@code/rust` altitude (`pub struct`, `pub enum`, primitive
-///    integer types).
+///    `@code/rust` altitude (`pub struct`, `pub enum`,
+///    `#[derive(prism_core::DerivePrism)]`, primitive integer
+///    types).
 ///
-/// `prism`, `action`, `grammar` declarations panic with
-/// `unimplemented!()` and are the next cascade ticks.
+/// `action` (T25) and `grammar` (T26) declarations surface a
+/// compile-time error pointing at the next cascade tick.
 #[proc_macro]
 pub fn declaration(input: TokenStream) -> TokenStream {
     declaration::expand(input.into()).into()

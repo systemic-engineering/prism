@@ -1,16 +1,21 @@
-//! `@code/rust/macro.shim_type` — the substrate-`type` → Rust emission.
+//! `@code/rust/macro.shim_{type,prism,...}` — the substrate → Rust
+//! emission. Realises the four shims declared at
+//! `mirror/shards/code/metalogue.mirror` (the universal ground; the
+//! 34th-instance reframe lifts the contract from per-species
+//! `@code/X/macro` to `@code/metalogue`) and bound to
+//! `code/rust.ast` at `mirror/shards/code/rust/macro.mirror`. The
+//! spec is `mirror/docs/specs/code-metalogue-surface.md` §4.1 (the
+//! four declaration kinds) and §5 (the four laws).
 //!
-//! Realises `shim_type(d: declaration) -> code/rust.ast` per
-//! `mirror/shards/code/rust/macro.mirror`. The spec is
-//! `mirror/docs/specs/code-macro-surface.md` §4.1 (the four
-//! declaration kinds) and §5 (the four laws).
+//! # Input grammar (T23 + T24)
 //!
-//! # Input grammar (this tick)
-//!
-//! The proc-macro's input is a single substrate `type` declaration
-//! in one of three shapes:
+//! The proc-macro's input is a single substrate declaration. Two
+//! kinds are now supported; the cascade continues with `action`
+//! (T25) and `grammar` (T26).
 //!
 //! ```ignore
+//! // T23 — `type` declarations.
+//! //
 //! // Record shape — emits a Rust `pub struct`:
 //! type Foo { a: u32, b: u64 }
 //!
@@ -20,19 +25,37 @@
 //! // Sum shape, parametric variants — emits a Rust `pub enum`
 //! // with tuple variants:
 //! type Result = ok(u32) | err(u32)
+//!
+//! // T24 — `prism` declarations.
+//! //
+//! // Bare path — emits a Rust unit struct with #[derive(Prism)]:
+//! prism @parse
+//!
+//! // With five-op block — same emission (the block is the
+//! // universal Prism algebra; #[derive(Prism)] fills it in):
+//! prism @kernel {
+//!     focus kernel
+//!     project kernel
+//!     split kernel
+//!     shift kernel
+//!     settle kernel
+//! }
 //! ```
 //!
 //! # The dispatch
 //!
-//! Per the spec's §10.1 dispatch table:
+//! Per the spec's §10.1 dispatch table (now declared at
+//! `@code/metalogue` per the 34th-instance reframe):
 //!
 //! ```text
 //! shim(D, @code/rust) match D.kind:
 //!    | type(name, params, variants) ->
 //!         emit Rust struct/enum per §4.1.1
-//!    | prism(...) -> unimplemented!()  -- next cascade tick
-//!    | action(...) -> unimplemented!()  -- next cascade tick
-//!    | grammar(...) -> unimplemented!()  -- next cascade tick
+//!    | prism(@path, five_op_block) ->
+//!         emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//!         + #[oid("@path")] per §4.1.2
+//!    | action(...) -> unimplemented!()  -- T25 cascade tick
+//!    | grammar(...) -> unimplemented!()  -- T26 cascade tick
 //! ```
 //!
 //! # The four laws witnessed
@@ -58,10 +81,130 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
-use syn::{braced, parenthesized, Ident, Result, Token};
+use syn::{braced, parenthesized, Ident, LitStr, Result, Token};
+
+/// The substrate declaration carrier — the outer dispatch over the
+/// four declaration kinds per `@code/metalogue`'s `declaration_kind`
+/// enum. T23 lands `Type`; T24 lands `Prism`; T25/T26 forward-promise
+/// `Action` and `Grammar`.
+enum SubstrateDecl {
+    Type(SubstrateTypeDecl),
+    Prism(SubstratePrismDecl),
+}
+
+impl Parse for SubstrateDecl {
+    fn parse(input: ParseStream) -> Result<Self> {
+        // Dispatch on the leading keyword. Rust's `type` is a
+        // reserved keyword (Token![type]); the substrate's `prism`
+        // is not (it's a substrate-level keyword that surfaces as a
+        // plain `Ident` in the Rust token stream). Peek for `type`
+        // first; otherwise look for the `prism` identifier.
+        if input.peek(Token![type]) {
+            Ok(SubstrateDecl::Type(input.parse()?))
+        } else if input.peek(Ident::peek_any) {
+            // The next token is an identifier; check its text.
+            let fork = input.fork();
+            let ident: Ident = fork.call(Ident::parse_any)?;
+            match ident.to_string().as_str() {
+                "prism" => Ok(SubstrateDecl::Prism(input.parse()?)),
+                // Forward-promised kinds — the cascade continues at
+                // T25 (`action`) and T26 (`grammar`). For now, surface
+                // a clear compile-time error rather than panicking.
+                "action" => Err(syn::Error::new(
+                    ident.span(),
+                    "`action` declarations not yet supported — T25 cascade tick. See \
+                     mirror/docs/specs/code-metalogue-surface.md §4.1 + §12.",
+                )),
+                "grammar" => Err(syn::Error::new(
+                    ident.span(),
+                    "`grammar` declarations not yet supported — T26 cascade tick. See \
+                     mirror/docs/specs/code-metalogue-surface.md §4.1 + §12.",
+                )),
+                other => Err(syn::Error::new(
+                    ident.span(),
+                    format!(
+                        "unexpected substrate declaration kind `{other}`; expected one of \
+                         `type`, `prism`, `action`, `grammar` per \
+                         mirror/shards/code/metalogue.mirror's `declaration_kind`."
+                    ),
+                )),
+            }
+        } else {
+            Err(input
+                .error("expected a substrate declaration: `type`, `prism`, `action`, or `grammar`"))
+        }
+    }
+}
+
+/// The substrate-`prism` declaration carrier — what the macro parses
+/// from its input token stream when the leading keyword is `prism`.
+///
+/// Per spec §4.1.2: `prism @path { five_op_block }` emits a Rust
+/// unit struct with `#[derive(prism_core::DerivePrism)]` and
+/// `#[oid("@path")]`. The five-op block is the universal Prism
+/// algebra; `#[derive(Prism)]` fills it in. This tick supports the
+/// single-segment path case (`@parse`); multi-segment paths
+/// (`@code/parse`) are forward-promised.
+struct SubstratePrismDecl {
+    /// The substrate path, with the leading `@` (e.g. `"@parse"`).
+    /// Carried verbatim because it IS the OID hash input — the
+    /// substrate-pull discipline names the path as the
+    /// content-address.
+    path: String,
+    /// The PascalCased final segment of the path — the Rust struct
+    /// name. `"@parse"` → `Parse`; `"@code/rust/macro"` → `Macro`.
+    struct_name: Ident,
+}
+
+impl Parse for SubstratePrismDecl {
+    fn parse(input: ParseStream) -> Result<Self> {
+        // Consume the `prism` keyword (an Ident at the Rust token
+        // altitude). We've already peeked at it in the outer
+        // dispatch; consume it here as the per-decl parser.
+        let _prism_kw: Ident = input.call(Ident::parse_any)?;
+
+        // Parse the substrate path — `@` then a slash-separated
+        // identifier chain. Per the substrate convention the leading
+        // `@` marks the path as a substrate reference.
+        input.parse::<Token![@]>()?;
+        let mut segments: Vec<String> = Vec::new();
+        loop {
+            let seg: Ident = input.call(Ident::parse_any)?;
+            segments.push(seg.to_string());
+            if input.peek(Token![/]) {
+                input.parse::<Token![/]>()?;
+                continue;
+            }
+            break;
+        }
+        let path = format!("@{}", segments.join("/"));
+        // The struct name is the PascalCased final segment.
+        let final_seg = segments.last().expect("path has at least one segment");
+        let struct_name = format_ident!("{}", to_pascal_case(final_seg));
+
+        // Optional five-op block. Consume-but-don't-encode: the
+        // universal Prism algebra is supplied by #[derive(Prism)]
+        // at the Rust altitude. Parsing it here lets the substrate
+        // surface form match the spec's §4.1.2 grammar; emitting it
+        // is not needed for round-trip identity (the canonical Rust
+        // form is the unit struct + derive + oid attribute).
+        if input.peek(syn::token::Brace) {
+            let content;
+            braced!(content in input);
+            // Drain the block. The grammar is `focus IDENT \n project
+            // IDENT \n ...`; we don't validate the five operations
+            // strictly here — the substrate compiler does that.
+            while !content.is_empty() {
+                let _tok: proc_macro2::TokenTree = content.parse()?;
+            }
+        }
+
+        Ok(SubstratePrismDecl { path, struct_name })
+    }
+}
 
 /// The substrate-`type` declaration carrier — what the macro parses
-/// from its input token stream.
+/// from its input token stream when the leading keyword is `type`.
 enum SubstrateTypeDecl {
     /// `type Name { field: ty, ... }` — emits a Rust `pub struct`.
     Record {
@@ -86,11 +229,7 @@ impl Parse for SubstrateTypeDecl {
     fn parse(input: ParseStream) -> Result<Self> {
         // Mandatory `type` keyword. Rust's `type` is a reserved
         // keyword (Token![type]) — the substrate uses the same
-        // surface form. Consuming it here also dispatches: only
-        // `type` declarations land in this cascade tick. `prism`,
-        // `action`, `grammar` declarations would be a different
-        // keyword at the input position and `Token![type]` will
-        // surface the missing-keyword error.
+        // surface form.
         input.parse::<Token![type]>()?;
 
         // `parse_any` accepts identifiers that overlap with Rust
@@ -149,18 +288,37 @@ impl Parse for SubstrateTypeDecl {
     }
 }
 
-/// The shim's expansion — substrate `type` → Rust `pub struct` /
-/// `pub enum`. Pure function of the input TokenStream; deterministic
-/// (the OID functionality law).
+/// The shim's expansion — substrate `type` / `prism` declaration →
+/// Rust item. Pure function of the input TokenStream; deterministic
+/// (the OID functionality law). Dispatches per the substrate's
+/// `declaration_kind` (at `@code/metalogue`).
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
-    let decl = match syn::parse2::<SubstrateTypeDecl>(input) {
+    let decl = match syn::parse2::<SubstrateDecl>(input) {
         Ok(d) => d,
         Err(e) => return e.to_compile_error(),
     };
-    emit(&decl)
+    match decl {
+        SubstrateDecl::Type(t) => emit_type(&t),
+        SubstrateDecl::Prism(p) => emit_prism(&p),
+    }
 }
 
-fn emit(decl: &SubstrateTypeDecl) -> TokenStream {
+/// Emit a Rust unit struct with `#[derive(prism_core::DerivePrism)]`
+/// and `#[oid("@path")]` per spec §4.1.2. The five-op block at the
+/// substrate level becomes the Prism trait impl scaffolding via the
+/// existing `#[derive(Prism)]` proc-macro; this shim's job is to
+/// emit the unit struct shape that derive consumes.
+fn emit_prism(decl: &SubstratePrismDecl) -> TokenStream {
+    let struct_name = &decl.struct_name;
+    let oid_lit = LitStr::new(&decl.path, proc_macro2::Span::call_site());
+    quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid(#oid_lit)]
+        pub struct #struct_name;
+    }
+}
+
+fn emit_type(decl: &SubstrateTypeDecl) -> TokenStream {
     match decl {
         SubstrateTypeDecl::Record { name, fields } => {
             // Substrate's snake_case identifier → Rust's PascalCase
@@ -226,6 +384,63 @@ fn to_pascal_case(s: &str) -> String {
 mod tests {
     use super::*;
     use quote::quote;
+
+    // === T24 (prism) unit tests ===
+
+    #[test]
+    fn bare_prism_emits_unit_struct_with_derive_and_oid() {
+        let input = quote! { prism @parse };
+        let emitted = expand(input);
+        let parsed: syn::Result<syn::Item> = syn::parse2(emitted);
+        let item = parsed.expect("emission must be a valid Rust item");
+        let s = match item {
+            syn::Item::Struct(s) => s,
+            _ => panic!("prism-shaped substrate must emit a struct item"),
+        };
+        assert_eq!(s.ident.to_string(), "Parse");
+        assert!(matches!(s.fields, syn::Fields::Unit));
+
+        // The struct must carry #[derive(prism_core::DerivePrism)]
+        // and #[oid("@parse")].
+        let has_derive = s.attrs.iter().any(|a| a.path().is_ident("derive"));
+        let has_oid = s.attrs.iter().any(|a| a.path().is_ident("oid"));
+        assert!(has_derive, "emission must carry a #[derive(...)] attribute");
+        assert!(has_oid, "emission must carry a #[oid(\"@path\")] attribute");
+    }
+
+    #[test]
+    fn prism_with_five_op_block_emits_same_unit_struct() {
+        let input = quote! {
+            prism @kernel {
+                focus kernel
+                project kernel
+                split kernel
+                shift kernel
+                settle kernel
+            }
+        };
+        let emitted = expand(input);
+        let parsed: syn::Result<syn::Item> = syn::parse2(emitted);
+        let item = parsed.expect("emission must be a valid Rust item");
+        let s = match item {
+            syn::Item::Struct(s) => s,
+            _ => panic!("prism-shaped substrate must emit a struct item"),
+        };
+        assert_eq!(s.ident.to_string(), "Kernel");
+        assert!(matches!(s.fields, syn::Fields::Unit));
+    }
+
+    #[test]
+    fn distinct_prism_paths_produce_distinct_emissions() {
+        let a = expand(quote! { prism @observer }).to_string();
+        let b = expand(quote! { prism @actor }).to_string();
+        assert_ne!(
+            a, b,
+            "distinct substrate paths must produce distinct emissions"
+        );
+        assert!(a.contains("\"@observer\""));
+        assert!(b.contains("\"@actor\""));
+    }
 
     /// The shim is a pure function of its input. Same substrate
     /// declaration → byte-identical Rust emission. This is the
