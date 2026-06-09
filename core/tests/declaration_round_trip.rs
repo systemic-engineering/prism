@@ -456,6 +456,31 @@ fn distinct_prism_paths_produce_distinct_oids() {
 // Cascade order per `shards/code/rust/macro.mirror` (now inheriting
 // from `@code/metalogue` ground at `7503a1a`):
 //   type (T23 ✓) → prism (T24 ✓) → action (T25, here) → grammar.
+//
+// === The `\` → `{}` translation at the Rust altitude ===
+//
+// Substrate-pull recognition surfaced during T25 GREEN (2026-06-09):
+// the substrate's `\` body token cannot appear in Rust source code
+// outside of string / char / byte literals — rustc's lexer rejects
+// it as "unknown start of token: \". The `\` IS the substrate's
+// question marker (`[[architecture-prism-as-trait-as-everything]]`'s
+// obligation block), and it survives lossily through every species
+// whose lexer admits free backslashes. Rust does not. The
+// Rust-altitude rendering of substrate `{ \ }` is the empty body
+// `{ }`: same semantic ("unresolved"), Rust-lexer-realisable shape.
+// The shim translates substrate `\`-body to Rust `todo!()`-body at
+// emission; the proc-macro accepts `{ }` (empty body) as the
+// substrate's `{ \ }` at the Rust call-site altitude.
+//
+// This IS a substrate-pull seam — the species' lexical surface
+// constrains the substrate's surface form. The `\` semantic
+// ("unresolved body") survives; the `\` glyph does not. Per
+// `[[architecture-glass-wall-substrate-types]]`, the seam is
+// where the typed semantic crosses the species-lexer boundary;
+// the substrate-side `.mirror` declarations keep their `\`, the
+// Rust-side proc-macro call sites use `{ }`. The translation is
+// the shim's responsibility (it is on the Rust altitude side of
+// the glass wall).
 // ---------------------------------------------------------------------------
 
 /// Single-argument substrate action with `\` body emits a Rust
@@ -463,11 +488,14 @@ fn distinct_prism_paths_produce_distinct_oids() {
 /// round-trip OID identity at the canonical-form altitude
 /// (spec §5 law 2 + §6).
 ///
-/// Substrate input:
+/// Substrate input (at the `.mirror` altitude):
 ///
 /// ```ignore
 /// action increment(x: u32) -> u32 { \ }
 /// ```
+///
+/// Rust-altitude rendering (the proc-macro call site, per the
+/// substrate-pull seam doc'd above): empty body `{ }`.
 ///
 /// Expected Rust emission:
 ///
@@ -477,11 +505,13 @@ fn distinct_prism_paths_produce_distinct_oids() {
 #[test]
 fn single_arg_action_emits_pub_fn_with_todo_body() {
     // Step 1: invoke the proc-macro on a substrate action with `\`
-    // body. The emission must define `pub fn increment(x: u32) -> u32`
-    // with a `todo!()` body — the function is well-typed but unreachable
+    // body — rendered at the Rust altitude as empty `{ }` per the
+    // substrate-pull seam doc'd at the section header above. The
+    // emission must define `pub fn increment(x: u32) -> u32` with
+    // a `todo!()` body — the function is well-typed but unreachable
     // at runtime, which is the substrate-pull-correct shape for an
     // unresolved `\` body.
-    declaration! { action increment(x: u32) -> u32 { \ } }
+    declaration! { action increment(x: u32) -> u32 { } }
 
     // Step 2: hand-constructed canonical-form witness.
     let expected: syn::Item = syn::parse_quote! {
@@ -515,11 +545,14 @@ fn single_arg_action_emits_pub_fn_with_todo_body() {
 /// zero-arg / unit-return shape (the substrate's null morphism
 /// at the action altitude).
 ///
-/// Substrate input:
+/// Substrate input (at the `.mirror` altitude):
 ///
 /// ```ignore
 /// action effect() -> () { \ }
 /// ```
+///
+/// Rust-altitude rendering (per the substrate-pull seam doc'd at
+/// the section header above): empty body `{ }`.
 ///
 /// Expected Rust emission:
 ///
@@ -528,7 +561,7 @@ fn single_arg_action_emits_pub_fn_with_todo_body() {
 /// ```
 #[test]
 fn nullary_action_emits_pub_fn_with_unit_signature() {
-    declaration! { action effect() -> () { \ } }
+    declaration! { action effect() -> () { } }
 
     let expected: syn::Item = syn::parse_quote! {
         pub fn effect() -> () { todo!() }
@@ -554,20 +587,23 @@ fn nullary_action_emits_pub_fn_with_unit_signature() {
 /// different signature → different OID. The address discriminates on
 /// the typed surface.
 ///
-/// Two distinct action declarations:
+/// Two distinct action declarations (substrate altitude):
 ///
 /// ```ignore
 /// action add(x: u32, y: u32) -> u32 { \ }
 /// action sub(x: u32, y: u32) -> u32 { \ }
 /// ```
 ///
+/// Rust-altitude rendering (per the substrate-pull seam doc'd at
+/// the section header above): empty bodies `{ }`.
+///
 /// must produce different canonical-form OIDs (different fn names).
 /// And a signature change (different arity) must produce a different
 /// OID too.
 #[test]
 fn distinct_action_signatures_produce_distinct_oids() {
-    declaration! { action add(x: u32, y: u32) -> u32 { \ } }
-    declaration! { action sub(x: u32, y: u32) -> u32 { \ } }
+    declaration! { action add(x: u32, y: u32) -> u32 { } }
+    declaration! { action sub(x: u32, y: u32) -> u32 { } }
 
     let add_expected: syn::Item = syn::parse_quote! {
         pub fn add(x: u32, y: u32) -> u32 { todo!() }

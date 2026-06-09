@@ -40,6 +40,21 @@
 //!     shift kernel
 //!     settle kernel
 //! }
+//!
+//! // T25 — `action` declarations.
+//! //
+//! // Substrate `action name(args) -> ret { \ }` — emits a Rust
+//! // `pub fn` matching the signature, with `todo!()` body. The
+//! // body resolution is forward-promised to T25.5+ (consumer-pull).
+//! //
+//! // The substrate-pull seam: rustc's lexer rejects free `\`, so
+//! // the Rust-altitude call site uses empty body `{ }` as the
+//! // realisation of substrate `{ \ }`. The semantic is unchanged
+//! // ("unresolved body"); the glyph crosses the glass wall as `{}`.
+//! // Substrate `.mirror` declarations keep their `\`; Rust
+//! // proc-macro call sites use `{ }`. The shim emits `todo!()`.
+//! action increment(x: u32) -> u32 { }
+//! action effect() -> () { }
 //! ```
 //!
 //! # The dispatch
@@ -54,51 +69,59 @@
 //!    | prism(@path, five_op_block) ->
 //!         emit Rust unit struct + #[derive(prism_core::DerivePrism)]
 //!         + #[oid("@path")] per §4.1.2
-//!    | action(...) -> unimplemented!()  -- T25 cascade tick
+//!    | action(name, args, ret, \ body) ->
+//!         emit Rust `pub fn name(args) -> ret { todo!() }` per
+//!         §4.1.3 (T25). The three classify sub-cases (substrate /
+//!         boundary / partial) all share this floor; body fill-in
+//!         is forward-promised to T25.5+ (consumer-pull).
 //!    | grammar(...) -> unimplemented!()  -- T26 cascade tick
 //! ```
 //!
 //! # The four laws witnessed
 //!
 //! 1. **Type-soundness** — substrate `u32` → Rust `u32` (verbatim);
-//!    record fields preserve names; sum variants preserve names.
+//!    record fields preserve names; sum variants preserve names;
+//!    action signatures preserve arg patterns / types / return type
+//!    verbatim via syn's `FnArg` + `Type` carriers.
 //! 2. **Round-trip identity** — the emitted TokenStream re-parses
-//!    through `syn::parse2::<syn::DeriveInput>`. The substrate's
-//!    type declaration ≡ the Rust declaration's structural shape.
+//!    through `syn::parse2::<syn::Item>`. The substrate's declaration
+//!    ≡ the Rust declaration's structural shape.
 //! 3. **OID functionality** — `expand` is a pure function of its
 //!    input token tree (deterministic, no env/clock/IO). Same input
 //!    → byte-identical TokenStream → same OID.
 //! 4. **Substrate-pull preservation** — emission uses only `pub
-//!    struct`, `pub enum`, primitive integer types, and snake_case
-//!    field/variant names. No `@io` reach-through.
+//!    struct`, `pub enum`, `pub fn`, primitive integer types,
+//!    `todo!()` for unresolved bodies, and snake_case field/variant
+//!    names. No `@io` reach-through.
 //!
-//! Per the brief and spec §12: this tick supports ONLY `type`
-//! declarations. The other three kinds (`prism`, `action`,
-//! `grammar`) panic with `unimplemented!()` and a clear message
-//! pointing at the next cascade tick.
+//! Per the brief and spec §12: this module supports `type` (T23),
+//! `prism` (T24), and `action` (T25) declarations. The last cascade
+//! kind (`grammar`) surfaces a compile-time error pointing at T26.
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
-use syn::{braced, parenthesized, Ident, LitStr, Result, Token};
+use syn::punctuated::Punctuated;
+use syn::{braced, parenthesized, FnArg, Ident, LitStr, Result, Token, Type};
 
 /// The substrate declaration carrier — the outer dispatch over the
 /// four declaration kinds per `@code/metalogue`'s `declaration_kind`
-/// enum. T23 lands `Type`; T24 lands `Prism`; T25/T26 forward-promise
-/// `Action` and `Grammar`.
+/// enum. T23 lands `Type`; T24 lands `Prism`; T25 lands `Action`;
+/// T26 forward-promises `Grammar`.
 enum SubstrateDecl {
     Type(SubstrateTypeDecl),
     Prism(SubstratePrismDecl),
+    Action(SubstrateActionDecl),
 }
 
 impl Parse for SubstrateDecl {
     fn parse(input: ParseStream) -> Result<Self> {
         // Dispatch on the leading keyword. Rust's `type` is a
         // reserved keyword (Token![type]); the substrate's `prism`
-        // is not (it's a substrate-level keyword that surfaces as a
-        // plain `Ident` in the Rust token stream). Peek for `type`
-        // first; otherwise look for the `prism` identifier.
+        // and `action` are not (substrate-level keywords that surface
+        // as plain `Ident` in the Rust token stream). Peek for `type`
+        // first; otherwise look for the `prism` / `action` identifier.
         if input.peek(Token![type]) {
             Ok(SubstrateDecl::Type(input.parse()?))
         } else if input.peek(Ident::peek_any) {
@@ -107,14 +130,10 @@ impl Parse for SubstrateDecl {
             let ident: Ident = fork.call(Ident::parse_any)?;
             match ident.to_string().as_str() {
                 "prism" => Ok(SubstrateDecl::Prism(input.parse()?)),
-                // Forward-promised kinds — the cascade continues at
-                // T25 (`action`) and T26 (`grammar`). For now, surface
-                // a clear compile-time error rather than panicking.
-                "action" => Err(syn::Error::new(
-                    ident.span(),
-                    "`action` declarations not yet supported — T25 cascade tick. See \
-                     mirror/docs/specs/code-metalogue-surface.md §4.1 + §12.",
-                )),
+                "action" => Ok(SubstrateDecl::Action(input.parse()?)),
+                // Forward-promised kind — the cascade continues at
+                // T26 (`grammar`). For now, surface a clear
+                // compile-time error rather than panicking.
                 "grammar" => Err(syn::Error::new(
                     ident.span(),
                     "`grammar` declarations not yet supported — T26 cascade tick. See \
@@ -133,6 +152,73 @@ impl Parse for SubstrateDecl {
             Err(input
                 .error("expected a substrate declaration: `type`, `prism`, `action`, or `grammar`"))
         }
+    }
+}
+
+/// The substrate-`action` declaration carrier — what the macro parses
+/// from its input token stream when the leading keyword is `action`.
+///
+/// Per spec §4.1.3: `action name(args) -> ret { \ }` emits a Rust
+/// `pub fn name(args) -> ret { todo!() }`. The body is the shim's
+/// responsibility per the realisation discriminator's three sub-cases
+/// (substrate / boundary / partial); the T25 floor lands the typed
+/// signature with `todo!()` body for all three.
+///
+/// === The `\` → `{}` substrate-pull seam (T25 recognition) ===
+///
+/// Substrate `.mirror` declarations use `{ \ }` as the unresolved-body
+/// marker (the `\` IS the substrate's question per
+/// `[[architecture-prism-as-trait-as-everything]]`'s obligation block).
+/// Rust's lexer rejects free `\` as "unknown start of token", so the
+/// Rust-altitude call-site form is `{ }` (empty body). The semantic
+/// is preserved ("unresolved"); only the glyph is species-local.
+/// The shim translates either to `todo!()` body at emission.
+struct SubstrateActionDecl {
+    /// The action's name — stays lowercase (Rust fn names, not types).
+    name: Ident,
+    /// The argument list: `Punctuated<FnArg, Comma>` parsed as a Rust
+    /// function signature would. Each `FnArg::Typed` carries a pat +
+    /// type (e.g. `x: u32`).
+    args: Punctuated<FnArg, Token![,]>,
+    /// The return type: `syn::Type`. Covers `u32`, `()`, paths,
+    /// references, tuples — anything syn parses as a type.
+    ret: Type,
+}
+
+impl Parse for SubstrateActionDecl {
+    fn parse(input: ParseStream) -> Result<Self> {
+        // Consume the `action` keyword (an Ident at the Rust token
+        // altitude).
+        let _action_kw: Ident = input.call(Ident::parse_any)?;
+
+        // The fn name. `parse_any` to admit substrate identifiers
+        // that may overlap Rust keywords (the substrate's `action ref`,
+        // `action type`, etc.).
+        let name: Ident = input.call(Ident::parse_any)?;
+
+        // Parse args: `(x: u32, y: u32)` or `()`. Use syn's `FnArg`
+        // parser, which handles `pat: type` natively.
+        let args_content;
+        parenthesized!(args_content in input);
+        let args = Punctuated::<FnArg, Token![,]>::parse_terminated(&args_content)?;
+
+        // Parse return: `-> ret`.
+        input.parse::<Token![->]>()?;
+        let ret: Type = input.parse()?;
+
+        // Parse the body block. Per the substrate-pull seam doc'd at
+        // the type doc above, the Rust-altitude form is `{ }` (empty);
+        // we accept any block content and discard it (the realisation
+        // discriminator's substrate / boundary / partial dispatch is
+        // forward-promised to T25.5+; the T25 floor emits `todo!()`
+        // regardless).
+        let body_content;
+        braced!(body_content in input);
+        while !body_content.is_empty() {
+            let _tok: proc_macro2::TokenTree = body_content.parse()?;
+        }
+
+        Ok(SubstrateActionDecl { name, args, ret })
     }
 }
 
@@ -288,10 +374,10 @@ impl Parse for SubstrateTypeDecl {
     }
 }
 
-/// The shim's expansion — substrate `type` / `prism` declaration →
-/// Rust item. Pure function of the input TokenStream; deterministic
-/// (the OID functionality law). Dispatches per the substrate's
-/// `declaration_kind` (at `@code/metalogue`).
+/// The shim's expansion — substrate `type` / `prism` / `action`
+/// declaration → Rust item. Pure function of the input TokenStream;
+/// deterministic (the OID functionality law). Dispatches per the
+/// substrate's `declaration_kind` (at `@code/metalogue`).
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let decl = match syn::parse2::<SubstrateDecl>(input) {
         Ok(d) => d,
@@ -300,6 +386,32 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     match decl {
         SubstrateDecl::Type(t) => emit_type(&t),
         SubstrateDecl::Prism(p) => emit_prism(&p),
+        SubstrateDecl::Action(a) => emit_action(&a),
+    }
+}
+
+/// Emit a Rust `pub fn name(args) -> ret { todo!() }` per spec §4.1.3.
+/// The three classify sub-cases (substrate / boundary / partial) all
+/// share this floor at T25; per-case body fill-in is forward-promised
+/// to T25.5+ (consumer-pull). The typed signature is the load-bearing
+/// claim of T25 — the shim is signature-preserving, the OID law
+/// discriminates on signatures.
+///
+/// The `#[allow(unused_variables)]` attribute on the emitted fn is
+/// substrate-pull-correct: the `\` body's unresolved nature MEANS
+/// the args are not yet bound to any computation (the realisation
+/// discriminator's per-case body fill-in is what will bind them at
+/// T25.5+). Without the allow, every emitted fn surfaces an
+/// `unused_variables` warning at the call site, polluting downstream
+/// build output. The semantic is: "args are typed-but-not-yet-used,
+/// pending consumer-pull."
+fn emit_action(decl: &SubstrateActionDecl) -> TokenStream {
+    let name = &decl.name;
+    let args = &decl.args;
+    let ret = &decl.ret;
+    quote! {
+        #[allow(unused_variables)]
+        pub fn #name(#args) -> #ret { todo!() }
     }
 }
 
