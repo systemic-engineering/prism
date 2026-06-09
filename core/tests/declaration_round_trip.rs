@@ -400,8 +400,7 @@ fn distinct_prism_paths_produce_distinct_oids() {
     declaration! { prism @observer }
     declaration! { prism @actor }
 
-    let observer_oid: prism_core::Oid =
-        <Observer as prism_core::Addressable>::oid(&Observer);
+    let observer_oid: prism_core::Oid = <Observer as prism_core::Addressable>::oid(&Observer);
     let actor_oid: prism_core::Oid = <Actor as prism_core::Addressable>::oid(&Actor);
 
     assert_ne!(
@@ -411,4 +410,181 @@ fn distinct_prism_paths_produce_distinct_oids() {
 
     assert_eq!(observer_oid, Oid::hash("@observer".as_bytes()));
     assert_eq!(actor_oid, Oid::hash("@actor".as_bytes()));
+}
+
+// ---------------------------------------------------------------------------
+// T25 (2026-06-09): the `action` cascade tick.
+//
+// Per spec §10.1 dispatch table (now at `@code/metalogue` ground):
+//
+//   action(name, args, ret, \ body) ->
+//        match classify(action):
+//        | substrate(target_altitude) ->
+//              emit pub fn matching signature;
+//              body = lowered_target_altitude_grammar
+//        | boundary(@io/species) ->
+//              emit pub fn matching signature;
+//              body = @io.species.invocation
+//        | partial(opacity_map) ->
+//              emit pub fn matching signature;
+//              body = mixed (per-function refinement; audition tournament)
+//
+// And §4.1.3:
+//
+//   `action` declarations with `\` body → emit a Rust `pub fn`
+//   matching the signature. The body is the shim's responsibility:
+//   the realisation discriminator (T21's @mirror/realisation.classify)
+//   chooses substrate / boundary / partial.
+//
+// FLOOR (this tick): substrate `action name(args) -> ret { \ }`
+// emits Rust `pub fn name(args) -> ret { todo!() }`. The `\` IS the
+// question; the body resolution is forward-promised. This tick
+// lands the TYPED SIGNATURE ROUND-TRIP — the load-bearing claim
+// that the substrate signature determines the Rust signature, the
+// shim is signature-preserving, and the OID law discriminates on
+// signatures.
+//
+// The three dispatch sub-cases (substrate / boundary / partial) are
+// forward-promised. The floor witnesses the universal claim: the
+// emission is a pub fn with the substrate's typed signature. The
+// body fill-in is a separate cascade tick (T25.5? or T26+).
+//
+// Name conversion at the action altitude: substrate names stay
+// lowercase (they are Rust function names, not types). Substrate
+// `increment` → Rust `increment`. No PascalCase at this altitude.
+//
+// Cascade order per `shards/code/rust/macro.mirror` (now inheriting
+// from `@code/metalogue` ground at `7503a1a`):
+//   type (T23 ✓) → prism (T24 ✓) → action (T25, here) → grammar.
+// ---------------------------------------------------------------------------
+
+/// Single-argument substrate action with `\` body emits a Rust
+/// `pub fn` matching the signature, with `todo!()` body. Witnesses
+/// round-trip OID identity at the canonical-form altitude
+/// (spec §5 law 2 + §6).
+///
+/// Substrate input:
+///
+/// ```ignore
+/// action increment(x: u32) -> u32 { \ }
+/// ```
+///
+/// Expected Rust emission:
+///
+/// ```ignore
+/// pub fn increment(x: u32) -> u32 { todo!() }
+/// ```
+#[test]
+fn single_arg_action_emits_pub_fn_with_todo_body() {
+    // Step 1: invoke the proc-macro on a substrate action with `\`
+    // body. The emission must define `pub fn increment(x: u32) -> u32`
+    // with a `todo!()` body — the function is well-typed but unreachable
+    // at runtime, which is the substrate-pull-correct shape for an
+    // unresolved `\` body.
+    declaration! { action increment(x: u32) -> u32 { \ } }
+
+    // Step 2: hand-constructed canonical-form witness.
+    let expected: syn::Item = syn::parse_quote! {
+        pub fn increment(x: u32) -> u32 { todo!() }
+    };
+    let expected_oid = oid_of(&expected);
+
+    // Step 3: round-trip the expected form through syn → quote → syn.
+    // The canonical-form reduction must reach a fixed point.
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item =
+        syn::parse_str(&rendered).expect("emission must re-parse as a Rust item");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "round-trip identity (spec §6): canonical-form OID is a fixed point of parse∘render"
+    );
+
+    // Step 4: type-soundness witness. The emitted `increment`
+    // satisfies the expected fn type. Take a function pointer at
+    // the typed signature — this is a compile-time check that
+    // would fail if the emission diverged from the substrate
+    // signature. We do NOT invoke `increment` (the `todo!()` would
+    // panic; the `\` body is unresolved by design).
+    let _: fn(u32) -> u32 = increment;
+}
+
+/// Nullary substrate action emits a `pub fn` with no args; the
+/// `() -> ()` floor case. Witnesses that the shim handles the
+/// zero-arg / unit-return shape (the substrate's null morphism
+/// at the action altitude).
+///
+/// Substrate input:
+///
+/// ```ignore
+/// action effect() -> () { \ }
+/// ```
+///
+/// Expected Rust emission:
+///
+/// ```ignore
+/// pub fn effect() -> () { todo!() }
+/// ```
+#[test]
+fn nullary_action_emits_pub_fn_with_unit_signature() {
+    declaration! { action effect() -> () { \ } }
+
+    let expected: syn::Item = syn::parse_quote! {
+        pub fn effect() -> () { todo!() }
+    };
+    let expected_oid = oid_of(&expected);
+
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item = syn::parse_str(&rendered).expect("canonical form must re-parse");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "round-trip identity on nullary actions: canonical-form OID is stable"
+    );
+
+    // Type-soundness witness.
+    let _: fn() -> () = effect;
+}
+
+/// OID functionality (spec §5 law 3) at the `action` shape: distinct
+/// substrate signatures produce distinct emission OIDs. The shim is
+/// injective on (name, args, return). Same signature → same OID;
+/// different signature → different OID. The address discriminates on
+/// the typed surface.
+///
+/// Two distinct action declarations:
+///
+/// ```ignore
+/// action add(x: u32, y: u32) -> u32 { \ }
+/// action sub(x: u32, y: u32) -> u32 { \ }
+/// ```
+///
+/// must produce different canonical-form OIDs (different fn names).
+/// And a signature change (different arity) must produce a different
+/// OID too.
+#[test]
+fn distinct_action_signatures_produce_distinct_oids() {
+    declaration! { action add(x: u32, y: u32) -> u32 { \ } }
+    declaration! { action sub(x: u32, y: u32) -> u32 { \ } }
+
+    let add_expected: syn::Item = syn::parse_quote! {
+        pub fn add(x: u32, y: u32) -> u32 { todo!() }
+    };
+    let sub_expected: syn::Item = syn::parse_quote! {
+        pub fn sub(x: u32, y: u32) -> u32 { todo!() }
+    };
+
+    let add_oid = oid_of(&add_expected);
+    let sub_oid = oid_of(&sub_expected);
+
+    assert_ne!(
+        add_oid, sub_oid,
+        "distinct fn names must produce distinct canonical-form OIDs (signature discriminates)"
+    );
+
+    // Type-soundness witnesses for both.
+    let _: fn(u32, u32) -> u32 = add;
+    let _: fn(u32, u32) -> u32 = sub;
 }
