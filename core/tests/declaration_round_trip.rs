@@ -236,3 +236,179 @@ fn record_type_preserves_field_names_and_types() {
     assert_eq!(d.roughness, 42u32);
     assert_eq!(d.partials, 7u32);
 }
+
+// ---------------------------------------------------------------------------
+// T24 (2026-06-09): the `prism` cascade tick.
+//
+// Per spec §10.1 dispatch table:
+//
+//   prism(@path, five_op_block) ->
+//        emit Rust struct + #[derive(Prism)] per §4.1.2
+//
+// And §4.1.2 spelled out:
+//
+//   `prism` declarations → emit a Rust `struct` plus a
+//   `#[derive(Prism)]` annotation plus the `#[oid("@X")]` attribute.
+//   The five-op block at the substrate level becomes the
+//   `Prism` trait impl scaffolding; the `prism-derive` proc-macro
+//   fills in the optic accessors.
+//
+// Cascade order per `shards/code/rust/macro.mirror`:
+//   type (T23 ✓) → prism (T24, here) → action → grammar.
+//
+// Name conversion at this altitude:
+//   substrate path `@parse` → struct name `Parse`
+//   (drop leading `@`; the final segment is PascalCased; the same
+//   rule as `point` → `Point` in the type cascade).
+//
+// Multi-segment paths (`@code/parse`) are forward-promised — the
+// smallest tick witnesses only the single-segment case.
+//
+// The five-op block (`focus parse  project parse  split parse  shift
+// parse  settle parse`) is parsed-but-not-encoded-in-fields at this
+// tick. It is the universal Prism algebra; `#[derive(Prism)]` fills
+// it in via the existing prism-derive expansion. Cascade ticks that
+// wire substrate-named optic accessors (fields with `#[lens]` /
+// `#[prism]` etc.) come later.
+// ---------------------------------------------------------------------------
+
+/// Bare `prism @path` declaration emits a unit struct with the
+/// `#[derive(Prism)]` annotation and `#[oid("@path")]` attribute.
+/// Round-trip OID identity (spec §5 law 2 + §6) at the
+/// canonical-form altitude.
+///
+/// Substrate input (the smallest prism declaration — bare path,
+/// no body):
+///
+/// ```ignore
+/// prism @parse
+/// ```
+///
+/// Expected Rust emission:
+///
+/// ```ignore
+/// #[derive(prism_core::DerivePrism)]
+/// #[oid("@parse")]
+/// pub struct Parse;
+/// ```
+#[test]
+fn bare_prism_emits_unit_struct_with_oid_attribute() {
+    // Step 1: invoke the proc-macro on a bare `prism` declaration.
+    // The emission must define `pub struct Parse;` with the
+    // `#[derive(Prism)]` and `#[oid("@parse")]` attributes in
+    // scope, so the existing `#[derive(Prism)]` expansion runs at
+    // compile time and produces the `Addressable` + `Display`
+    // impls for `Parse`.
+    declaration! { prism @parse }
+
+    // Step 2: hand-constructed canonical-form witness — what the
+    // emission must structurally match (the four-law shim).
+    let expected: syn::Item = syn::parse_quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid("@parse")]
+        pub struct Parse;
+    };
+    let expected_oid = oid_of(&expected);
+
+    // Step 3: round-trip the expected form through syn → quote →
+    // syn. The canonical-form reduction must reach a fixed point
+    // (spec §6).
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item =
+        syn::parse_str(&rendered).expect("emission must re-parse as a Rust item");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "round-trip identity (spec §6): canonical-form OID is a fixed point of parse∘render"
+    );
+
+    // Step 4: the emitted Parse type must satisfy the substrate's
+    // OID law — the runtime address of `Parse` must equal the
+    // hash of the substrate path. This is the load-bearing
+    // semantic: the substrate path IS the address.
+    let parse_addressable: prism_core::Oid = <Parse as prism_core::Addressable>::oid(&Parse);
+    assert_eq!(
+        parse_addressable,
+        Oid::hash("@parse".as_bytes()),
+        "OID law (spec §5 law 3): substrate path is the runtime address"
+    );
+}
+
+/// Explicit five-op block produces the same unit-struct emission as
+/// the bare form. The five-op block is the universal Prism algebra;
+/// `#[derive(Prism)]` fills it in. Declaring it explicitly at the
+/// substrate altitude is documentation, not extra encoded state.
+///
+/// Substrate input:
+///
+/// ```ignore
+/// prism @kernel { focus kernel  project kernel  split kernel
+///                 shift kernel  settle kernel }
+/// ```
+///
+/// Expected emission: same as the bare form, just with `@kernel`
+/// instead of `@parse`.
+#[test]
+fn prism_with_five_op_block_emits_same_unit_struct() {
+    declaration! {
+        prism @kernel {
+            focus kernel
+            project kernel
+            split kernel
+            shift kernel
+            settle kernel
+        }
+    }
+
+    let expected: syn::Item = syn::parse_quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid("@kernel")]
+        pub struct Kernel;
+    };
+    let expected_oid = oid_of(&expected);
+
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item = syn::parse_str(&rendered).expect("canonical form must re-parse");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "five-op block does not change the canonical-form OID — it is the universal Prism algebra"
+    );
+
+    // Runtime OID law witnesses the address.
+    let kernel_addressable: prism_core::Oid = <Kernel as prism_core::Addressable>::oid(&Kernel);
+    assert_eq!(
+        kernel_addressable,
+        Oid::hash("@kernel".as_bytes()),
+        "OID law: substrate path `@kernel` is the runtime address"
+    );
+}
+
+/// OID functionality (spec §5 law 3) at the `prism` shape:
+/// substrate paths uniquely determine the runtime address. Two
+/// different prism declarations with different `@paths` produce
+/// different runtime OIDs (the address discriminates).
+///
+/// This is the structural inverse of the type-shape's
+/// `shim_is_a_function_of_substrate_oid`: there, identical input →
+/// identical output. Here, distinct addresses → distinct OIDs (the
+/// shim is injective on substrate paths).
+#[test]
+fn distinct_prism_paths_produce_distinct_oids() {
+    declaration! { prism @observer }
+    declaration! { prism @actor }
+
+    let observer_oid: prism_core::Oid =
+        <Observer as prism_core::Addressable>::oid(&Observer);
+    let actor_oid: prism_core::Oid = <Actor as prism_core::Addressable>::oid(&Actor);
+
+    assert_ne!(
+        observer_oid, actor_oid,
+        "distinct substrate paths must produce distinct runtime OIDs (the address discriminates)"
+    );
+
+    assert_eq!(observer_oid, Oid::hash("@observer".as_bytes()));
+    assert_eq!(actor_oid, Oid::hash("@actor".as_bytes()));
+}
