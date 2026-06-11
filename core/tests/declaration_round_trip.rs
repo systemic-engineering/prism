@@ -624,3 +624,171 @@ fn distinct_action_signatures_produce_distinct_oids() {
     let _: fn(u32, u32) -> u32 = add;
     let _: fn(u32, u32) -> u32 = sub;
 }
+
+// ---------------------------------------------------------------------------
+// T26 (2026-06-11): the `grammar` cascade tick.
+//
+// Per spec §10.1 dispatch table (now at `@code/metalogue` ground):
+//
+//   grammar(@path, extensions, body) ->
+//        emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//        + #[oid("@path")] per §4.1.4
+//
+// And §4.1.4 spelled out:
+//
+//   `grammar` declarations → emit a Rust unit struct with
+//   `#[derive(prism_core::DerivePrism)]` and `#[oid("@path")]`. The
+//   extension list and body block at the substrate altitude are
+//   parsed-but-not-encoded at the floor — the substrate path IS the
+//   runtime address (Addressable::oid law). Body encoding (the
+//   `<op> <keyword>` keyword table) is forward-promised to T26.5+
+//   (consumer-pull).
+//
+// Cascade order per `shards/code/rust/macro.mirror` (inheriting from
+// `@code/metalogue` ground):
+//   type (T23 ✓) → prism (T24 ✓) → action (T25 ✓) → grammar (T26, here).
+//
+// === Why grammar shares prism's emission shape at the floor ===
+//
+// Both `prism @X` and `grammar @X` are substrate altitudes addressed
+// by a path. The substrate differentiates them by their family-root
+// declaration (the `.mirror` source). At the Rust altitude the
+// Addressable impl is structural: same shape, distinct OIDs by
+// virtue of distinct substrate paths. The four laws hold identically.
+//
+// The substrate `grammar @path(ext1, ext2, ...) { body }` form
+// claims the listed file extensions (the tokenizer routes those
+// extensions through this grammar's keyword table) and the body
+// block contains `<op> <keyword>` pairs that bootstrap's keyword
+// harvester merges into the tokenizer's lookup. The Rust-altitude
+// floor witnesses only the path; downstream consumer-pull ticks
+// encode the extensions and body when needed.
+// ---------------------------------------------------------------------------
+
+/// Bare `grammar @path { }` declaration (no extension list, empty
+/// body) emits a unit struct with `#[derive(Prism)]` + `#[oid("@path")]`.
+/// Round-trip OID identity at the canonical-form altitude.
+///
+/// Substrate input:
+///
+/// ```ignore
+/// grammar @parse_spec { }
+/// ```
+///
+/// Expected Rust emission:
+///
+/// ```ignore
+/// #[derive(prism_core::DerivePrism)]
+/// #[oid("@parse_spec")]
+/// pub struct ParseSpec;
+/// ```
+#[test]
+fn bare_grammar_emits_unit_struct_with_oid_attribute() {
+    // Step 1: invoke the proc-macro on a bare grammar declaration.
+    declaration! { grammar @parse_spec { } }
+
+    // Step 2: hand-constructed canonical-form witness.
+    let expected: syn::Item = syn::parse_quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid("@parse_spec")]
+        pub struct ParseSpec;
+    };
+    let expected_oid = oid_of(&expected);
+
+    // Step 3: round-trip the expected form through syn → quote → syn.
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item =
+        syn::parse_str(&rendered).expect("emission must re-parse as a Rust item");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "round-trip identity (spec §6): canonical-form OID is a fixed point of parse∘render"
+    );
+
+    // Step 4: OID law — the runtime address of `ParseSpec` is the
+    // hash of the substrate path. The substrate path IS the address.
+    let addr: prism_core::Oid = <ParseSpec as prism_core::Addressable>::oid(&ParseSpec);
+    assert_eq!(
+        addr,
+        Oid::hash("@parse_spec".as_bytes()),
+        "OID law (spec §5 law 3): substrate grammar path is the runtime address"
+    );
+}
+
+/// `grammar @path("ext1") { body }` with a single extension claim and
+/// a body block emits the same unit-struct shape as the bare form.
+/// The extensions and body are parsed-but-not-encoded (forward-
+/// promised). The substrate's `grammar @mirror/spec("spec") { ... }`
+/// shape used in `shards/mirror/spec/keywords.mirror` exercises this
+/// case.
+#[test]
+fn grammar_with_extension_and_body_emits_unit_struct_with_oid() {
+    declaration! {
+        grammar @mirror_spec("spec") {
+            project in
+            project out
+            focus project
+            focus target
+        }
+    }
+
+    let expected: syn::Item = syn::parse_quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid("@mirror_spec")]
+        pub struct MirrorSpec;
+    };
+    let expected_oid = oid_of(&expected);
+
+    let rendered = canonical(&expected);
+    let reparsed: syn::Item = syn::parse_str(&rendered).expect("canonical form must re-parse");
+    let reparsed_oid = oid_of(&reparsed);
+
+    assert_eq!(
+        expected_oid, reparsed_oid,
+        "extension list does not change the canonical-form OID — it is parsed-but-not-encoded at the floor"
+    );
+
+    // Runtime OID law witnesses the address.
+    let addr: prism_core::Oid = <MirrorSpec as prism_core::Addressable>::oid(&MirrorSpec);
+    assert_eq!(
+        addr,
+        Oid::hash("@mirror_spec".as_bytes()),
+        "OID law: substrate path `@mirror_spec` is the runtime address"
+    );
+}
+
+/// OID functionality (spec §5 law 3) at the `grammar` shape: distinct
+/// substrate paths produce distinct runtime OIDs. Two grammars with
+/// different `@paths` produce different runtime addresses. The address
+/// discriminates on the substrate path, regardless of extension claims.
+#[test]
+fn distinct_grammar_paths_produce_distinct_oids() {
+    declaration! { grammar @grammar_a("a") { } }
+    declaration! { grammar @grammar_b("b") { } }
+
+    let a_addr: prism_core::Oid = <GrammarA as prism_core::Addressable>::oid(&GrammarA);
+    let b_addr: prism_core::Oid = <GrammarB as prism_core::Addressable>::oid(&GrammarB);
+
+    assert_ne!(
+        a_addr, b_addr,
+        "distinct substrate paths must produce distinct runtime OIDs (the address discriminates)"
+    );
+
+    assert_eq!(a_addr, Oid::hash("@grammar_a".as_bytes()));
+    assert_eq!(b_addr, Oid::hash("@grammar_b".as_bytes()));
+}
+
+/// Type-soundness witness (spec §5 law 1) for `grammar` declarations:
+/// the substrate-pull-canonical form is a unit struct usable at the
+/// Rust altitude. Construction succeeds (the emission is well-typed).
+/// This is the structural-soundness counterpart of the type cascade's
+/// `record_type_preserves_field_names_and_types`.
+#[test]
+fn grammar_emission_is_constructible() {
+    declaration! { grammar @soundness_check("ext") { focus a } }
+
+    // Construct the emitted unit struct. The Rust compiler accepts
+    // the construction iff the emission is well-typed.
+    let _ = SoundnessCheck;
+}

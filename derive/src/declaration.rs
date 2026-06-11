@@ -55,6 +55,24 @@
 //! // proc-macro call sites use `{ }`. The shim emits `todo!()`.
 //! action increment(x: u32) -> u32 { }
 //! action effect() -> () { }
+//!
+//! // T26 — `grammar` declarations.
+//! //
+//! // Substrate `grammar @path(ext1, ext2, ...) { body }` — emits a
+//! // Rust unit struct with #[derive(prism_core::DerivePrism)] +
+//! // #[oid("@path")]. The extension list (`("spec")` /
+//! // `("mirror", "shard")`) is parsed-but-not-encoded at the floor;
+//! // same precedent as the prism five-op block — the substrate
+//! // surface declaration is structural, and the Rust-altitude floor
+//! // witnesses the path as the runtime address. Body encoding (the
+//! // inner `<op> <keyword>` pairs) is forward-promised to T26.5+
+//! // (consumer-pull) when a downstream tick needs the keyword table
+//! // at the Rust altitude.
+//! //
+//! // The extensions list is OPTIONAL — bare `grammar @path { ... }`
+//! // is admitted (some substrate grammars carry no extension claim).
+//! grammar @parse_spec("spec") { }
+//! grammar @mirror_grammar("mirror", "shard") { focus prism }
 //! ```
 //!
 //! # The dispatch
@@ -74,7 +92,11 @@
 //!         §4.1.3 (T25). The three classify sub-cases (substrate /
 //!         boundary / partial) all share this floor; body fill-in
 //!         is forward-promised to T25.5+ (consumer-pull).
-//!    | grammar(...) -> unimplemented!()  -- T26 cascade tick
+//!    | grammar(@path, extensions, body) ->
+//!         emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//!         + #[oid("@path")] per §4.1.4 (T26). Same shape as `prism`
+//!         at the floor — the extension list and body block are
+//!         parsed-but-not-encoded; the path IS the runtime address.
 //! ```
 //!
 //! # The four laws witnessed
@@ -95,8 +117,8 @@
 //!    names. No `@io` reach-through.
 //!
 //! Per the brief and spec §12: this module supports `type` (T23),
-//! `prism` (T24), and `action` (T25) declarations. The last cascade
-//! kind (`grammar`) surfaces a compile-time error pointing at T26.
+//! `prism` (T24), `action` (T25), and `grammar` (T26) declarations.
+//! T26 closes the four-shim cascade at the Rust altitude.
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -108,20 +130,23 @@ use syn::{braced, parenthesized, FnArg, Ident, LitStr, Result, Token, Type};
 /// The substrate declaration carrier — the outer dispatch over the
 /// four declaration kinds per `@code/metalogue`'s `declaration_kind`
 /// enum. T23 lands `Type`; T24 lands `Prism`; T25 lands `Action`;
-/// T26 forward-promises `Grammar`.
+/// T26 lands `Grammar` — the four-shim cascade is now total at the
+/// Rust altitude.
 enum SubstrateDecl {
     Type(SubstrateTypeDecl),
     Prism(SubstratePrismDecl),
     Action(SubstrateActionDecl),
+    Grammar(SubstrateGrammarDecl),
 }
 
 impl Parse for SubstrateDecl {
     fn parse(input: ParseStream) -> Result<Self> {
         // Dispatch on the leading keyword. Rust's `type` is a
-        // reserved keyword (Token![type]); the substrate's `prism`
-        // and `action` are not (substrate-level keywords that surface
-        // as plain `Ident` in the Rust token stream). Peek for `type`
-        // first; otherwise look for the `prism` / `action` identifier.
+        // reserved keyword (Token![type]); the substrate's `prism`,
+        // `action`, and `grammar` are not (substrate-level keywords
+        // that surface as plain `Ident` in the Rust token stream).
+        // Peek for `type` first; otherwise look for the substrate
+        // identifier and match its text.
         if input.peek(Token![type]) {
             Ok(SubstrateDecl::Type(input.parse()?))
         } else if input.peek(Ident::peek_any) {
@@ -131,14 +156,7 @@ impl Parse for SubstrateDecl {
             match ident.to_string().as_str() {
                 "prism" => Ok(SubstrateDecl::Prism(input.parse()?)),
                 "action" => Ok(SubstrateDecl::Action(input.parse()?)),
-                // Forward-promised kind — the cascade continues at
-                // T26 (`grammar`). For now, surface a clear
-                // compile-time error rather than panicking.
-                "grammar" => Err(syn::Error::new(
-                    ident.span(),
-                    "`grammar` declarations not yet supported — T26 cascade tick. See \
-                     mirror/docs/specs/code-metalogue-surface.md §4.1 + §12.",
-                )),
+                "grammar" => Ok(SubstrateDecl::Grammar(input.parse()?)),
                 other => Err(syn::Error::new(
                     ident.span(),
                     format!(
@@ -289,6 +307,118 @@ impl Parse for SubstratePrismDecl {
     }
 }
 
+/// The substrate-`grammar` declaration carrier — what the macro parses
+/// from its input token stream when the leading keyword is `grammar`.
+///
+/// Per spec §4.1.4 (the four-shim contract at `@code/metalogue`):
+/// `grammar @path(ext1, ext2, ...) { body }` declares a grammar
+/// extension at the altitude named by `@path`, claiming the file
+/// extensions listed in parens and binding the `<op> <keyword>`
+/// pairs in the body block. The Rust-altitude floor follows the
+/// `prism` shape: emit a unit struct with
+/// `#[derive(prism_core::DerivePrism)]` + `#[oid("@path")]`. The
+/// path IS the runtime address (Addressable::oid law).
+///
+/// The extensions list and body block are parsed-but-not-encoded at
+/// the floor (same precedent as `prism`'s five-op block). Encoding
+/// the extensions as a runtime `&[&str]` or the body as a keyword
+/// table is forward-promised to T26.5+ (consumer-pull) when a
+/// downstream Rust-altitude consumer needs them. The smallest tick
+/// witnesses the path as the runtime address; that's the load-bearing
+/// claim.
+///
+/// === Why `grammar` shares `prism`'s emission shape ===
+///
+/// Both are substrate altitudes addressed by a path. Both surface as
+/// Rust unit structs whose `Addressable::oid` is the substrate path
+/// hash. The substrate differentiates them by their family-root
+/// declaration (`prism @X` vs `grammar @X`); the Rust altitude's
+/// `Addressable` impl is structural — same shape, distinct OIDs by
+/// virtue of distinct substrate paths. The four laws hold identically.
+///
+/// Examples (from the substrate):
+/// - `grammar @mirror/spec("spec") { ... }` → `pub struct Spec;` with
+///   `#[oid("@mirror/spec")]`.
+/// - `grammar @code/mirror/grammar("mirror", "spec", "meta", "glass",
+///   "shard", "shatter") { ... }` → `pub struct Grammar;` with
+///   `#[oid("@code/mirror/grammar")]`.
+struct SubstrateGrammarDecl {
+    /// The substrate path, with the leading `@` (e.g. `"@mirror/spec"`).
+    /// Carried verbatim because it IS the OID hash input — the
+    /// substrate-pull discipline names the path as the content-address.
+    path: String,
+    /// The PascalCased final segment of the path — the Rust struct
+    /// name. `"@mirror/spec"` → `Spec`; `"@code/mirror/grammar"` →
+    /// `Grammar`. Same convention as the `prism` shape.
+    struct_name: Ident,
+    /// The extension claim (e.g. `["spec"]`, `["mirror", "shard"]`).
+    /// Parsed but not encoded at the floor; carried on the struct so
+    /// forward-promised consumer-pull ticks can emit them without
+    /// re-parsing. Empty when the substrate declaration has no
+    /// parenthesised extension list (bare `grammar @path { ... }`).
+    #[allow(dead_code)]
+    extensions: Vec<String>,
+}
+
+impl Parse for SubstrateGrammarDecl {
+    fn parse(input: ParseStream) -> Result<Self> {
+        // Consume the `grammar` keyword (an Ident at the Rust token
+        // altitude). We've already peeked at it in the outer
+        // dispatch; consume it here as the per-decl parser.
+        let _grammar_kw: Ident = input.call(Ident::parse_any)?;
+
+        // Parse the substrate path — `@` then a slash-separated
+        // identifier chain. Same shape as the prism path parser.
+        input.parse::<Token![@]>()?;
+        let mut segments: Vec<String> = Vec::new();
+        loop {
+            let seg: Ident = input.call(Ident::parse_any)?;
+            segments.push(seg.to_string());
+            if input.peek(Token![/]) {
+                input.parse::<Token![/]>()?;
+                continue;
+            }
+            break;
+        }
+        let path = format!("@{}", segments.join("/"));
+        let final_seg = segments.last().expect("path has at least one segment");
+        let struct_name = format_ident!("{}", to_pascal_case(final_seg));
+
+        // Optional parenthesised extension list — `("spec")`,
+        // `("mirror", "shard")`, or absent. The substrate's grammar
+        // form admits both `grammar @path { ... }` (no extension
+        // claim) and `grammar @path("ext1", "ext2") { ... }`
+        // (claiming the listed file extensions). Parse the list as a
+        // comma-separated `LitStr` punctuation if present.
+        let mut extensions: Vec<String> = Vec::new();
+        if input.peek(syn::token::Paren) {
+            let content;
+            parenthesized!(content in input);
+            let lits =
+                Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?;
+            extensions = lits.iter().map(|l| l.value()).collect();
+        }
+
+        // Optional body block. Consume-but-don't-encode: the body's
+        // `<op> <keyword>` pairs are the substrate's keyword table at
+        // the substrate altitude; the Rust-altitude floor witnesses
+        // the path as address. Body encoding is forward-promised.
+        if input.peek(syn::token::Brace) {
+            let content;
+            braced!(content in input);
+            while !content.is_empty() {
+                let _tok: proc_macro2::TokenTree = content.parse()?;
+            }
+        }
+
+        Ok(SubstrateGrammarDecl {
+            path,
+            struct_name,
+            extensions,
+        })
+    }
+}
+
 /// The substrate-`type` declaration carrier — what the macro parses
 /// from its input token stream when the leading keyword is `type`.
 enum SubstrateTypeDecl {
@@ -387,6 +517,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         SubstrateDecl::Type(t) => emit_type(&t),
         SubstrateDecl::Prism(p) => emit_prism(&p),
         SubstrateDecl::Action(a) => emit_action(&a),
+        SubstrateDecl::Grammar(g) => emit_grammar(&g),
     }
 }
 
@@ -421,6 +552,30 @@ fn emit_action(decl: &SubstrateActionDecl) -> TokenStream {
 /// existing `#[derive(Prism)]` proc-macro; this shim's job is to
 /// emit the unit struct shape that derive consumes.
 fn emit_prism(decl: &SubstratePrismDecl) -> TokenStream {
+    let struct_name = &decl.struct_name;
+    let oid_lit = LitStr::new(&decl.path, proc_macro2::Span::call_site());
+    quote! {
+        #[derive(prism_core::DerivePrism)]
+        #[oid(#oid_lit)]
+        pub struct #struct_name;
+    }
+}
+
+/// Emit a Rust unit struct with `#[derive(prism_core::DerivePrism)]`
+/// and `#[oid("@path")]` per spec §4.1.4 (T26 cascade tick). The
+/// extension list and body block at the substrate level are
+/// parsed-but-not-encoded at the floor (same precedent as
+/// `prism`'s five-op block): the substrate path IS the runtime
+/// address, and the four laws hold structurally on the same shape
+/// as `prism`.
+///
+/// The substrate differentiates `grammar @X` from `prism @X` by its
+/// family-root declaration (the `.mirror` source); the Rust
+/// altitude's `Addressable::oid` is structural (path-hashed).
+/// Forward-promised consumer-pull ticks (T26.5+) can extend the
+/// emission to carry the extensions list and the keyword table
+/// when a downstream Rust-altitude consumer needs them.
+fn emit_grammar(decl: &SubstrateGrammarDecl) -> TokenStream {
     let struct_name = &decl.struct_name;
     let oid_lit = LitStr::new(&decl.path, proc_macro2::Span::call_site());
     quote! {
@@ -640,5 +795,105 @@ mod tests {
         assert_eq!(to_pascal_case("point"), "Point");
         assert_eq!(to_pascal_case("circle_of_fifths"), "CircleOfFifths");
         assert_eq!(to_pascal_case("imperfect"), "Imperfect");
+    }
+
+    // === T26 (grammar) unit tests ===
+
+    /// Bare `grammar @path { }` (no extension list, empty body) emits
+    /// a unit struct with the substrate-pull-canonical shape:
+    /// `#[derive(prism_core::DerivePrism)]` + `#[oid("@path")]` +
+    /// `pub struct Path;`. Same floor as `prism`.
+    #[test]
+    fn bare_grammar_emits_unit_struct_with_derive_and_oid() {
+        let input = quote! { grammar @parse_spec { } };
+        let emitted = expand(input);
+        let parsed: syn::Result<syn::Item> = syn::parse2(emitted);
+        let item = parsed.expect("emission must be a valid Rust item");
+        let s = match item {
+            syn::Item::Struct(s) => s,
+            _ => panic!("grammar-shaped substrate must emit a struct item"),
+        };
+        assert_eq!(s.ident.to_string(), "ParseSpec");
+        assert!(matches!(s.fields, syn::Fields::Unit));
+
+        // The struct must carry #[derive(prism_core::DerivePrism)]
+        // and #[oid("@parse_spec")].
+        let has_derive = s.attrs.iter().any(|a| a.path().is_ident("derive"));
+        let has_oid = s.attrs.iter().any(|a| a.path().is_ident("oid"));
+        assert!(has_derive, "emission must carry a #[derive(...)] attribute");
+        assert!(has_oid, "emission must carry a #[oid(\"@path\")] attribute");
+    }
+
+    /// `grammar @path("ext1") { ... }` with a single extension claim
+    /// and a body block emits the same unit struct as the bare form.
+    /// The extensions and body are parsed-but-not-encoded (forward-
+    /// promised per `[[feedback-craft-not-deliver]]`).
+    #[test]
+    fn grammar_with_single_extension_emits_same_unit_struct() {
+        let input = quote! {
+            grammar @mirror_spec("spec") {
+                project in
+                project out
+            }
+        };
+        let emitted = expand(input);
+        let parsed: syn::Result<syn::Item> = syn::parse2(emitted);
+        let item = parsed.expect("emission must be a valid Rust item");
+        let s = match item {
+            syn::Item::Struct(s) => s,
+            _ => panic!("grammar-shaped substrate must emit a struct item"),
+        };
+        assert_eq!(s.ident.to_string(), "MirrorSpec");
+        assert!(matches!(s.fields, syn::Fields::Unit));
+    }
+
+    /// `grammar @path("ext1", "ext2", ...) { ... }` with multiple
+    /// extension claims parses cleanly; the multi-extension form is
+    /// the one used by substrate's `@code/mirror/grammar` (six
+    /// extensions: mirror, spec, meta, glass, shard, shatter).
+    #[test]
+    fn grammar_with_multi_extension_emits_same_unit_struct() {
+        let input = quote! {
+            grammar @mirror_grammar("mirror", "spec", "meta") {
+                focus prism
+                focus grammar
+            }
+        };
+        let emitted = expand(input);
+        let parsed: syn::Result<syn::Item> = syn::parse2(emitted);
+        let item = parsed.expect("emission must be a valid Rust item");
+        let s = match item {
+            syn::Item::Struct(s) => s,
+            _ => panic!("grammar-shaped substrate must emit a struct item"),
+        };
+        assert_eq!(s.ident.to_string(), "MirrorGrammar");
+        assert!(matches!(s.fields, syn::Fields::Unit));
+    }
+
+    /// Distinct substrate paths produce distinct emissions. The OID
+    /// functionality law (spec §5 law 3) discriminates grammars on
+    /// the substrate path, same shape as `distinct_prism_paths`.
+    #[test]
+    fn distinct_grammar_paths_produce_distinct_emissions() {
+        let a = expand(quote! { grammar @first("a") { } }).to_string();
+        let b = expand(quote! { grammar @second("b") { } }).to_string();
+        assert_ne!(
+            a, b,
+            "distinct substrate paths must produce distinct emissions"
+        );
+        assert!(a.contains("\"@first\""));
+        assert!(b.contains("\"@second\""));
+    }
+
+    /// The shim is a pure function of its input. Same substrate
+    /// grammar declaration → byte-identical Rust emission. This
+    /// witnesses the `oid_function(shim_grammar)` law at the
+    /// TokenStream-string altitude.
+    #[test]
+    fn grammar_emission_is_deterministic() {
+        let input = quote! { grammar @repeat("x") { focus a } };
+        let a = expand(input.clone());
+        let b = expand(input);
+        assert_eq!(a.to_string(), b.to_string());
     }
 }

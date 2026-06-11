@@ -40,7 +40,7 @@ mod declaration;
 /// a substrate declaration (passed as token-tree input) and emits
 /// the Rust item that realises it.
 ///
-/// # Input grammar (T23 + T24)
+/// # Input grammar (T23 + T24 + T25 + T26)
 ///
 /// ```ignore
 /// // T23 — `type` declarations.
@@ -61,6 +61,19 @@ mod declaration;
 ///         shift kernel  settle kernel
 ///     }
 /// }
+///
+/// // T25 — `action` declarations.
+/// // Substrate `action name(args) -> ret { \ }` — emits `pub fn`.
+/// // Rust-altitude call site: `{ }` (empty body) per the
+/// // substrate-pull seam; the shim emits `todo!()`.
+/// declaration!{ action increment(x: u32) -> u32 { } }
+///
+/// // T26 — `grammar` declarations.
+/// // Substrate `grammar @path(ext1, ext2, ...) { body }` — emits a
+/// // Rust unit struct with #[derive(prism_core::DerivePrism)] +
+/// // #[oid("@path")]. Same floor as `prism`; the path IS the
+/// // runtime address. Extension list and body parsed-but-not-encoded.
+/// declaration!{ grammar @mirror_spec("spec") { focus project } }
 /// ```
 ///
 /// # Four laws (per spec §5)
@@ -79,8 +92,8 @@ mod declaration;
 ///    `#[derive(prism_core::DerivePrism)]`, primitive integer
 ///    types).
 ///
-/// `action` (T25) and `grammar` (T26) declarations surface a
-/// compile-time error pointing at the next cascade tick.
+/// `action` (T25) and `grammar` (T26) declarations are supported;
+/// the four-shim cascade is now total at the Rust altitude.
 #[proc_macro]
 pub fn declaration(input: TokenStream) -> TokenStream {
     declaration::expand(input.into()).into()
