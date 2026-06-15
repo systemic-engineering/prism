@@ -4,7 +4,7 @@
 //! unions plus supporting types describe every shape that crosses the
 //! pq wire: `Target` (focus), `Filter` (project), `Output` (settle).
 //!
-//! The types are gated by the `pq` feature so prism_core's core API
+//! The types are gated by the `pq` feature so prismqueer's core API
 //! stays serde-free for consumers that don't need wire shapes.
 
 mod filter;

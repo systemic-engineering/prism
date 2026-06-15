@@ -10,8 +10,8 @@
 //! ## Hoisting from mirror
 //!
 //! `Ref` previously lived in `mirror::bootstrap::crystallize` and was
-//! mirror-specific. It moved to `prism_core` per the
-//! `[substrate-pull:realize]` discipline: every consumer of `prism_core`
+//! mirror-specific. It moved to `prismqueer` per the
+//! `[substrate-pull:realize]` discipline: every consumer of `prismqueer`
 //! (mirror, cosmos-mirror, spectral-db, future engines) needs the same
 //! `@`-prefixed substrate reference. The validating constructor stays
 //! verbatim — non-empty, `@`-prefixed, no whitespace.

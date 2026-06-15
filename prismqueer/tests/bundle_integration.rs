@@ -12,7 +12,7 @@
 
 #![cfg(feature = "bundle")]
 
-use prism_core::{
+use prismqueer::{
     Bundle, Closure, Connection, Cyclic, Fiber, Gauge, GroupStructure, IdentityPrism,
     LawvereFixedPoint, Prism, ScalarLoss, StableFiber, Transport,
 };
@@ -91,7 +91,7 @@ fn make_spectral(strategy_shift: u8, kernel: bool) -> Spectral {
 fn traverse_tower<B: Bundle>(b: &B) -> bool
 where
     B::Optic: Prism,
-    <<B::Optic as Prism>::Input as prism_core::Beam>::In: Sized,
+    <<B::Optic as Prism>::Input as prismqueer::Beam>::In: Sized,
     B::State: Default,
     B::Holonomy: std::fmt::Debug,
 {

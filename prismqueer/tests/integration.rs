@@ -1,5 +1,5 @@
-use prism_core::ScalarLoss;
-use prism_core::{Beam, Focus, Optic, Prism, Project, Settle};
+use prismqueer::ScalarLoss;
+use prismqueer::{Beam, Focus, Optic, Prism, Project, Settle};
 use std::convert::Infallible;
 use terni::Imperfect;
 
@@ -47,7 +47,7 @@ fn full_pipeline_dsl() {
 
 #[test]
 fn full_pipeline_apply_fn() {
-    let result = prism_core::apply(&TokenPrism, Optic::ok((), "a b c d".to_string()));
+    let result = prismqueer::apply(&TokenPrism, Optic::ok((), "a b c d".to_string()));
     assert_eq!(result.result().ok(), Some(&"4 tokens".to_string()));
 }
 

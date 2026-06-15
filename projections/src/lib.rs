@@ -70,7 +70,7 @@ mod declaration;
 ///
 /// // T26 — `grammar` declarations.
 /// // Substrate `grammar @path(ext1, ext2, ...) { body }` — emits a
-/// // Rust unit struct with #[derive(prism_core::DerivePrism)] +
+/// // Rust unit struct with #[derive(prismqueer::DerivePrism)] +
 /// // #[oid("@path")]. Same floor as `prism`; the path IS the
 /// // runtime address. Extension list and body parsed-but-not-encoded.
 /// declaration!{ grammar @mirror_spec("spec") { focus project } }
@@ -89,7 +89,7 @@ mod declaration;
 /// 4. Substrate-pull preservation: emission references only
 ///    primitive Rust types and constructs already at the
 ///    `@code/rust` altitude (`pub struct`, `pub enum`,
-///    `#[derive(prism_core::DerivePrism)]`, primitive integer
+///    `#[derive(prismqueer::DerivePrism)]`, primitive integer
 ///    types).
 ///
 /// `action` (T25) and `grammar` (T26) declarations are supported;
@@ -166,9 +166,9 @@ pub fn derive_prism(input: TokenStream) -> TokenStream {
         generate_optic_fields(name, &annotated, &impl_generics, &ty_generics, where_clause);
 
     let expanded = quote! {
-        impl #impl_generics prism_core::Addressable for #name #ty_generics #where_clause {
-            fn oid(&self) -> prism_core::Oid {
-                prism_core::Oid::hash(#oid_name.as_bytes())
+        impl #impl_generics prismqueer::Addressable for #name #ty_generics #where_clause {
+            fn oid(&self) -> prismqueer::Oid {
+                prismqueer::Oid::hash(#oid_name.as_bytes())
             }
         }
 
@@ -215,9 +215,9 @@ pub fn derive_lambda(input: TokenStream) -> TokenStream {
     let oid_name = extract_oid_name(&input, "Lambda");
 
     let expanded = quote! {
-        impl #impl_generics prism_core::Addressable for #name #ty_generics #where_clause {
-            fn oid(&self) -> prism_core::Oid {
-                prism_core::Oid::hash(#oid_name.as_bytes())
+        impl #impl_generics prismqueer::Addressable for #name #ty_generics #where_clause {
+            fn oid(&self) -> prismqueer::Oid {
+                prismqueer::Oid::hash(#oid_name.as_bytes())
             }
         }
 
@@ -227,14 +227,14 @@ pub fn derive_lambda(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<__LambdaT: Clone + PartialEq> ::std::convert::From<#name> for prism_core::lambda::Lambda<__LambdaT> {
-            fn from(_: #name) -> prism_core::lambda::Lambda<__LambdaT> {
-                let oid = prism_core::Oid::hash(#oid_name.as_bytes());
-                prism_core::lambda::Lambda::abs(oid.clone(), prism_core::lambda::Lambda::bind(oid))
+        impl<__LambdaT: Clone + PartialEq> ::std::convert::From<#name> for prismqueer::lambda::Lambda<__LambdaT> {
+            fn from(_: #name) -> prismqueer::lambda::Lambda<__LambdaT> {
+                let oid = prismqueer::Oid::hash(#oid_name.as_bytes());
+                prismqueer::lambda::Lambda::abs(oid.clone(), prismqueer::lambda::Lambda::bind(oid))
             }
         }
 
-        impl<__LambdaT: Clone + PartialEq> prism_core::lambda::Composable<__LambdaT> for #name #ty_generics #where_clause {}
+        impl<__LambdaT: Clone + PartialEq> prismqueer::lambda::Composable<__LambdaT> for #name #ty_generics #where_clause {}
     };
 
     TokenStream::from(expanded)
@@ -415,10 +415,10 @@ fn generate_accessors(
                         }
                     }
 
-                    impl prism_core::Named<#accessor_name> {
+                    impl prismqueer::Named<#accessor_name> {
                         /// Create a named lens for this field.
-                        pub fn lens() -> prism_core::Named<#accessor_name> {
-                            prism_core::Named(#field_name, #accessor_name)
+                        pub fn lens() -> prismqueer::Named<#accessor_name> {
+                            prismqueer::Named(#field_name, #accessor_name)
                         }
                     }
                 });
@@ -445,10 +445,10 @@ fn generate_accessors(
                                 }
                             }
 
-                            impl prism_core::Named<#accessor_name> {
+                            impl prismqueer::Named<#accessor_name> {
                                 /// Create a named prism for this field.
-                                pub fn prism() -> prism_core::Named<#accessor_name> {
-                                    prism_core::Named(#field_name, #accessor_name)
+                                pub fn prism() -> prismqueer::Named<#accessor_name> {
+                                    prismqueer::Named(#field_name, #accessor_name)
                                 }
                             }
                         });
@@ -512,10 +512,10 @@ fn generate_accessors(
                                 }
                             }
 
-                            impl prism_core::Named<#accessor_name> {
+                            impl prismqueer::Named<#accessor_name> {
                                 /// Create a named traversal for this field.
-                                pub fn traversal() -> prism_core::Named<#accessor_name> {
-                                    prism_core::Named(#field_name, #accessor_name)
+                                pub fn traversal() -> prismqueer::Named<#accessor_name> {
+                                    prismqueer::Named(#field_name, #accessor_name)
                                 }
                             }
                         });
@@ -580,13 +580,13 @@ fn generate_optic_fields(
         .map(|f| {
             let field_name = f.ident.to_string();
             let kind = match f.kind {
-                FieldKind::Iso => quote! { prism_core::OpticKind::Iso },
-                FieldKind::Lens => quote! { prism_core::OpticKind::Lens },
-                FieldKind::Prism => quote! { prism_core::OpticKind::Prism },
-                FieldKind::Traversal => quote! { prism_core::OpticKind::Traversal },
+                FieldKind::Iso => quote! { prismqueer::OpticKind::Iso },
+                FieldKind::Lens => quote! { prismqueer::OpticKind::Lens },
+                FieldKind::Prism => quote! { prismqueer::OpticKind::Prism },
+                FieldKind::Traversal => quote! { prismqueer::OpticKind::Traversal },
             };
             quote! {
-                prism_core::FieldOptic {
+                prismqueer::FieldOptic {
                     name: #field_name,
                     kind: #kind,
                 }
@@ -599,8 +599,8 @@ fn generate_optic_fields(
     quote! {
         impl #impl_generics #struct_name #ty_generics #where_clause {
             /// Returns metadata about all optic-annotated fields.
-            pub fn optic_fields() -> &'static [prism_core::FieldOptic] {
-                static FIELDS: [prism_core::FieldOptic; #count] = [
+            pub fn optic_fields() -> &'static [prismqueer::FieldOptic] {
+                static FIELDS: [prismqueer::FieldOptic; #count] = [
                     #(#entries),*
                 ];
                 &FIELDS

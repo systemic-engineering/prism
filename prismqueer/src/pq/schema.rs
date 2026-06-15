@@ -16,7 +16,7 @@
 //! faithful to the type contract, we hand-roll the schema here, one
 //! variant at a time, mirroring the Rust types.
 //!
-//! Hand-rolling also keeps `prism_core` deps-free per the kernel
+//! Hand-rolling also keeps `prismqueer` deps-free per the kernel
 //! discipline (pq spec §12.1: "Zero new deps").
 //!
 //! ## Drift protection

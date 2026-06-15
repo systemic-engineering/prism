@@ -59,7 +59,7 @@
 //! // T26 — `grammar` declarations.
 //! //
 //! // Substrate `grammar @path(ext1, ext2, ...) { body }` — emits a
-//! // Rust unit struct with #[derive(prism_core::DerivePrism)] +
+//! // Rust unit struct with #[derive(prismqueer::DerivePrism)] +
 //! // #[oid("@path")]. The extension list (`("spec")` /
 //! // `("mirror", "shard")`) is parsed-but-not-encoded at the floor;
 //! // same precedent as the prism five-op block — the substrate
@@ -85,7 +85,7 @@
 //!    | type(name, params, variants) ->
 //!         emit Rust struct/enum per §4.1.1
 //!    | prism(@path, five_op_block) ->
-//!         emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//!         emit Rust unit struct + #[derive(prismqueer::DerivePrism)]
 //!         + #[oid("@path")] per §4.1.2
 //!    | action(name, args, ret, \ body) ->
 //!         emit Rust `pub fn name(args) -> ret { todo!() }` per
@@ -93,7 +93,7 @@
 //!         boundary / partial) all share this floor; body fill-in
 //!         is forward-promised to T25.5+ (consumer-pull).
 //!    | grammar(@path, extensions, body) ->
-//!         emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//!         emit Rust unit struct + #[derive(prismqueer::DerivePrism)]
 //!         + #[oid("@path")] per §4.1.4 (T26). Same shape as `prism`
 //!         at the floor — the extension list and body block are
 //!         parsed-but-not-encoded; the path IS the runtime address.
@@ -244,7 +244,7 @@ impl Parse for SubstrateActionDecl {
 /// from its input token stream when the leading keyword is `prism`.
 ///
 /// Per spec §4.1.2: `prism @path { five_op_block }` emits a Rust
-/// unit struct with `#[derive(prism_core::DerivePrism)]` and
+/// unit struct with `#[derive(prismqueer::DerivePrism)]` and
 /// `#[oid("@path")]`. The five-op block is the universal Prism
 /// algebra; `#[derive(Prism)]` fills it in. This tick supports the
 /// single-segment path case (`@parse`); multi-segment paths
@@ -316,7 +316,7 @@ impl Parse for SubstratePrismDecl {
 /// extensions listed in parens and binding the `<op> <keyword>`
 /// pairs in the body block. The Rust-altitude floor follows the
 /// `prism` shape: emit a unit struct with
-/// `#[derive(prism_core::DerivePrism)]` + `#[oid("@path")]`. The
+/// `#[derive(prismqueer::DerivePrism)]` + `#[oid("@path")]`. The
 /// path IS the runtime address (Addressable::oid law).
 ///
 /// The extensions list and body block are parsed-but-not-encoded at
@@ -545,7 +545,7 @@ fn emit_action(decl: &SubstrateActionDecl) -> TokenStream {
     }
 }
 
-/// Emit a Rust unit struct with `#[derive(prism_core::DerivePrism)]`
+/// Emit a Rust unit struct with `#[derive(prismqueer::DerivePrism)]`
 /// and `#[oid("@path")]` per spec §4.1.2. The five-op block at the
 /// substrate level becomes the Prism trait impl scaffolding via the
 /// existing `#[derive(Prism)]` proc-macro; this shim's job is to
@@ -554,13 +554,13 @@ fn emit_prism(decl: &SubstratePrismDecl) -> TokenStream {
     let struct_name = &decl.struct_name;
     let oid_lit = LitStr::new(&decl.path, proc_macro2::Span::call_site());
     quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid(#oid_lit)]
         pub struct #struct_name;
     }
 }
 
-/// Emit a Rust unit struct with `#[derive(prism_core::DerivePrism)]`
+/// Emit a Rust unit struct with `#[derive(prismqueer::DerivePrism)]`
 /// and `#[oid("@path")]` per spec §4.1.4 (T26 cascade tick). The
 /// extension list and body block at the substrate level are
 /// parsed-but-not-encoded at the floor (same precedent as
@@ -578,7 +578,7 @@ fn emit_grammar(decl: &SubstrateGrammarDecl) -> TokenStream {
     let struct_name = &decl.struct_name;
     let oid_lit = LitStr::new(&decl.path, proc_macro2::Span::call_site());
     quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid(#oid_lit)]
         pub struct #struct_name;
     }
@@ -666,7 +666,7 @@ mod tests {
         assert_eq!(s.ident.to_string(), "Parse");
         assert!(matches!(s.fields, syn::Fields::Unit));
 
-        // The struct must carry #[derive(prism_core::DerivePrism)]
+        // The struct must carry #[derive(prismqueer::DerivePrism)]
         // and #[oid("@parse")].
         let has_derive = s.attrs.iter().any(|a| a.path().is_ident("derive"));
         let has_oid = s.attrs.iter().any(|a| a.path().is_ident("oid"));
@@ -800,7 +800,7 @@ mod tests {
 
     /// Bare `grammar @path { }` (no extension list, empty body) emits
     /// a unit struct with the substrate-pull-canonical shape:
-    /// `#[derive(prism_core::DerivePrism)]` + `#[oid("@path")]` +
+    /// `#[derive(prismqueer::DerivePrism)]` + `#[oid("@path")]` +
     /// `pub struct Path;`. Same floor as `prism`.
     #[test]
     fn bare_grammar_emits_unit_struct_with_derive_and_oid() {
@@ -815,7 +815,7 @@ mod tests {
         assert_eq!(s.ident.to_string(), "ParseSpec");
         assert!(matches!(s.fields, syn::Fields::Unit));
 
-        // The struct must carry #[derive(prism_core::DerivePrism)]
+        // The struct must carry #[derive(prismqueer::DerivePrism)]
         // and #[oid("@parse_spec")].
         let has_derive = s.attrs.iter().any(|a| a.path().is_ident("derive"));
         let has_oid = s.attrs.iter().any(|a| a.path().is_ident("oid"));

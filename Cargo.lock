@@ -776,14 +776,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "prism-core"
+name = "prismqueer"
 version = "0.1.0"
 dependencies = [
  "cc",
  "criterion",
  "hex",
  "jsonschema",
- "prism-derive",
+ "prismqueer-projections",
  "quote",
  "serde",
  "serde_json",
@@ -793,7 +793,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "prism-derive"
+name = "prismqueer-projections"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "terni"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "criterion",
  "serde",
@@ -1047,7 +1047,7 @@ dependencies = [
 
 [[package]]
 name = "terni-macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",

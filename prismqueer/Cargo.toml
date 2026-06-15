@@ -1,8 +1,14 @@
 [package]
-name = "prism-core"
+name = "prismqueer"
 version = "0.1.0"
 edition = "2021"
-description = "Beam (semifunctor) + Prism (monoid). Three dimensions: focus, project, refract."
+license = "Apache-2.0"
+description = "The spectral-triple substrate — five operations (focus, project, split, shift, settle), the Prism trait, zero deps. The foundation."
+repository = "https://github.com/systemic-engineering/prism"
+homepage = "https://github.com/systemic-engineering/prism"
+readme = "README.md"
+keywords = ["prism", "spectral", "substrate", "algebra", "optics"]
+categories = ["rust-patterns", "no-std"]
 
 [features]
 default = []
@@ -13,8 +19,8 @@ lapack = ["dep:cc"]
 pq = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
-terni = { path = "../imperfect" }
-prism-derive = { path = "../derive" }
+terni = { version = "0.7", path = "../imperfect" }
+prismqueer-projections = { version = "0.1", path = "../projections" }
 sha2 = "0.10"
 hex = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }

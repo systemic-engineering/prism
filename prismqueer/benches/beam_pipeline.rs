@@ -4,8 +4,8 @@
 //! propagation of the fixpoint through the pipeline.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use prism_core::beam::{Beam, Optic};
-use prism_core::ScalarLoss;
+use prismqueer::beam::{Beam, Optic};
+use prismqueer::ScalarLoss;
 use terni::Imperfect;
 
 /// Light pipeline: 10-step smap chain, all Success.

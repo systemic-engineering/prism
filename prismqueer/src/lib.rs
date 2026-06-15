@@ -25,9 +25,9 @@
 //! type-safe by construction — the compiler enforces that each stage's output
 //! type matches the next stage's input type.
 
-// Allow prism-derive proc macros to reference `prism_core::` paths
+// Allow prism-derive proc macros to reference `prismqueer::` paths
 // when used within this crate.
-extern crate self as prism_core;
+extern crate self as prismqueer;
 
 pub mod beam;
 pub mod coincidence;
@@ -82,17 +82,17 @@ pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
 /// `mirror/docs/specs/code-macro-surface.md`). Reads a substrate
 /// `type` declaration as input tokens and emits the Rust
 /// struct/enum that realises it.
-pub use prism_derive::declaration;
+pub use prismqueer_projections::declaration;
 /// Re-export `#[derive(Lambda)]` for named lambda phases.
 #[cfg(feature = "lambda")]
-pub use prism_derive::Lambda as DeriveLambda;
+pub use prismqueer_projections::Lambda as DeriveLambda;
 /// Re-export the `#[derive(Prism)]` proc macro.
 ///
 /// The derive macro and the `Prism` trait live in different namespaces:
 /// `#[derive(Prism)]` invokes the proc macro. `impl Prism for X` uses the trait.
 /// Rust resolves these without collision. The `DerivePrism` alias is provided
 /// for explicit disambiguation when needed.
-pub use prism_derive::Prism as DerivePrism;
+pub use prismqueer_projections::Prism as DerivePrism;
 pub use scalar_loss::ScalarLoss;
 pub use substrate_ref::Ref;
 pub use terni::{Diagnostic, Imperfect, Loss, Metric, PropertyVerdict, Transparency};

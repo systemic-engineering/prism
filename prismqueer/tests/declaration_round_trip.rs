@@ -30,7 +30,7 @@
 //! type point { x: u32, y: u32 }
 //! ```
 //!
-//! The proc-macro `prism_core::declaration!{...}` emits Rust:
+//! The proc-macro `prismqueer::declaration!{...}` emits Rust:
 //!
 //! ```ignore
 //! pub struct Point { pub x: u32, pub y: u32 }
@@ -64,7 +64,7 @@
 //! the witness that the shim emission is a fixed point of the
 //! Rust-altitude parse cycle.
 
-use prism_core::{declaration, Oid};
+use prismqueer::{declaration, Oid};
 use quote::ToTokens;
 
 /// The canonical form of a Rust item: parse through syn, render
@@ -287,7 +287,7 @@ fn record_type_preserves_field_names_and_types() {
 /// Expected Rust emission:
 ///
 /// ```ignore
-/// #[derive(prism_core::DerivePrism)]
+/// #[derive(prismqueer::DerivePrism)]
 /// #[oid("@parse")]
 /// pub struct Parse;
 /// ```
@@ -304,7 +304,7 @@ fn bare_prism_emits_unit_struct_with_oid_attribute() {
     // Step 2: hand-constructed canonical-form witness — what the
     // emission must structurally match (the four-law shim).
     let expected: syn::Item = syn::parse_quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid("@parse")]
         pub struct Parse;
     };
@@ -327,7 +327,7 @@ fn bare_prism_emits_unit_struct_with_oid_attribute() {
     // OID law — the runtime address of `Parse` must equal the
     // hash of the substrate path. This is the load-bearing
     // semantic: the substrate path IS the address.
-    let parse_addressable: prism_core::Oid = <Parse as prism_core::Addressable>::oid(&Parse);
+    let parse_addressable: prismqueer::Oid = <Parse as prismqueer::Addressable>::oid(&Parse);
     assert_eq!(
         parse_addressable,
         Oid::hash("@parse".as_bytes()),
@@ -362,7 +362,7 @@ fn prism_with_five_op_block_emits_same_unit_struct() {
     }
 
     let expected: syn::Item = syn::parse_quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid("@kernel")]
         pub struct Kernel;
     };
@@ -378,7 +378,7 @@ fn prism_with_five_op_block_emits_same_unit_struct() {
     );
 
     // Runtime OID law witnesses the address.
-    let kernel_addressable: prism_core::Oid = <Kernel as prism_core::Addressable>::oid(&Kernel);
+    let kernel_addressable: prismqueer::Oid = <Kernel as prismqueer::Addressable>::oid(&Kernel);
     assert_eq!(
         kernel_addressable,
         Oid::hash("@kernel".as_bytes()),
@@ -400,8 +400,8 @@ fn distinct_prism_paths_produce_distinct_oids() {
     declaration! { prism @observer }
     declaration! { prism @actor }
 
-    let observer_oid: prism_core::Oid = <Observer as prism_core::Addressable>::oid(&Observer);
-    let actor_oid: prism_core::Oid = <Actor as prism_core::Addressable>::oid(&Actor);
+    let observer_oid: prismqueer::Oid = <Observer as prismqueer::Addressable>::oid(&Observer);
+    let actor_oid: prismqueer::Oid = <Actor as prismqueer::Addressable>::oid(&Actor);
 
     assert_ne!(
         observer_oid, actor_oid,
@@ -631,13 +631,13 @@ fn distinct_action_signatures_produce_distinct_oids() {
 // Per spec §10.1 dispatch table (now at `@code/metalogue` ground):
 //
 //   grammar(@path, extensions, body) ->
-//        emit Rust unit struct + #[derive(prism_core::DerivePrism)]
+//        emit Rust unit struct + #[derive(prismqueer::DerivePrism)]
 //        + #[oid("@path")] per §4.1.4
 //
 // And §4.1.4 spelled out:
 //
 //   `grammar` declarations → emit a Rust unit struct with
-//   `#[derive(prism_core::DerivePrism)]` and `#[oid("@path")]`. The
+//   `#[derive(prismqueer::DerivePrism)]` and `#[oid("@path")]`. The
 //   extension list and body block at the substrate altitude are
 //   parsed-but-not-encoded at the floor — the substrate path IS the
 //   runtime address (Addressable::oid law). Body encoding (the
@@ -678,7 +678,7 @@ fn distinct_action_signatures_produce_distinct_oids() {
 /// Expected Rust emission:
 ///
 /// ```ignore
-/// #[derive(prism_core::DerivePrism)]
+/// #[derive(prismqueer::DerivePrism)]
 /// #[oid("@parse_spec")]
 /// pub struct ParseSpec;
 /// ```
@@ -689,7 +689,7 @@ fn bare_grammar_emits_unit_struct_with_oid_attribute() {
 
     // Step 2: hand-constructed canonical-form witness.
     let expected: syn::Item = syn::parse_quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid("@parse_spec")]
         pub struct ParseSpec;
     };
@@ -708,7 +708,7 @@ fn bare_grammar_emits_unit_struct_with_oid_attribute() {
 
     // Step 4: OID law — the runtime address of `ParseSpec` is the
     // hash of the substrate path. The substrate path IS the address.
-    let addr: prism_core::Oid = <ParseSpec as prism_core::Addressable>::oid(&ParseSpec);
+    let addr: prismqueer::Oid = <ParseSpec as prismqueer::Addressable>::oid(&ParseSpec);
     assert_eq!(
         addr,
         Oid::hash("@parse_spec".as_bytes()),
@@ -734,7 +734,7 @@ fn grammar_with_extension_and_body_emits_unit_struct_with_oid() {
     }
 
     let expected: syn::Item = syn::parse_quote! {
-        #[derive(prism_core::DerivePrism)]
+        #[derive(prismqueer::DerivePrism)]
         #[oid("@mirror_spec")]
         pub struct MirrorSpec;
     };
@@ -750,7 +750,7 @@ fn grammar_with_extension_and_body_emits_unit_struct_with_oid() {
     );
 
     // Runtime OID law witnesses the address.
-    let addr: prism_core::Oid = <MirrorSpec as prism_core::Addressable>::oid(&MirrorSpec);
+    let addr: prismqueer::Oid = <MirrorSpec as prismqueer::Addressable>::oid(&MirrorSpec);
     assert_eq!(
         addr,
         Oid::hash("@mirror_spec".as_bytes()),
@@ -767,8 +767,8 @@ fn distinct_grammar_paths_produce_distinct_oids() {
     declaration! { grammar @grammar_a("a") { } }
     declaration! { grammar @grammar_b("b") { } }
 
-    let a_addr: prism_core::Oid = <GrammarA as prism_core::Addressable>::oid(&GrammarA);
-    let b_addr: prism_core::Oid = <GrammarB as prism_core::Addressable>::oid(&GrammarB);
+    let a_addr: prismqueer::Oid = <GrammarA as prismqueer::Addressable>::oid(&GrammarA);
+    let b_addr: prismqueer::Oid = <GrammarB as prismqueer::Addressable>::oid(&GrammarB);
 
     assert_ne!(
         a_addr, b_addr,

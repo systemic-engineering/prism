@@ -1,10 +1,10 @@
-//! Tests for `prism_core::Ref` — substrate-reference primitive (the
+//! Tests for `prismqueer::Ref` — substrate-reference primitive (the
 //! `@`-prefixed nav-ref hoisted from mirror's crystallize.rs). Tick:
 //! prism/transparency 🔴.
 
 use std::collections::BTreeMap;
 
-use prism_core::Ref;
+use prismqueer::Ref;
 use terni::{Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------

@@ -106,7 +106,7 @@ pub trait Fiber {
 ///
 /// The connection IS an element of the optic algebra `A`: the supertrait
 /// constraint `Optic: Prism` forces it to compose under Tambara module
-/// composition (carried by `prism_core::Prism` via the
+/// composition (carried by `prismqueer::Prism` via the
 /// focus/project/settle chain). The `Input: Beam<In = Self::State>`
 /// bound enforces that the connection acts on the fiber's state.
 /// (Gap 1 of `docs/specs/spectral-triple-grammar.md`.)

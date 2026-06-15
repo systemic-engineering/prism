@@ -26,7 +26,7 @@
 //!
 //! # Substrate-pull
 //!
-//! `[substrate-pull:realize]` — prism_core stays deps-free. The
+//! `[substrate-pull:realize]` — prismqueer stays deps-free. The
 //! BLAKE3 computation lives in fragmentation; this crate takes the
 //! hash bytes as an opaque `&[u8; 32]` parameter. Quantization of
 //! `SpectralCoordinate<5>` into 48 bits lives at fragmentation's
@@ -177,7 +177,7 @@ impl fmt::Display for SpectralUuid {
     /// Standard UUID hyphenated form (lowercase hex, 8-4-4-4-12).
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // The standard UUID positions split the 16 bytes as 4-2-2-2-6.
-        // Hand-write the hex to keep prism_core deps-free.
+        // Hand-write the hex to keep prismqueer deps-free.
         let b = &self.0;
         write!(
             f,

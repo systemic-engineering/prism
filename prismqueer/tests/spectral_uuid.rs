@@ -22,13 +22,13 @@
 //! 7. Two `SpectralUuid`s built from the same content hash share
 //!    their dark portion (the identity property).
 //!
-//! Substrate-pull: `[substrate-pull:realize]` — prism_core stays
+//! Substrate-pull: `[substrate-pull:realize]` — prismqueer stays
 //! deps-free. The BLAKE3 computation lives in fragmentation; this
 //! crate takes the hash bytes as an opaque parameter. The 48-bit
 //! quantization of `SpectralCoordinate<5>` lives at fragmentation's
 //! boundary; this crate takes a pre-quantized `u64` (lower 48 bits).
 
-use prism_core::SpectralUuid;
+use prismqueer::SpectralUuid;
 
 // ---------------------------------------------------------------------------
 // EMPTY — the bottom of the semilattice.

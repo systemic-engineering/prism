@@ -1,4 +1,4 @@
-//! RED: prism_core::pq::schema doesn't exist yet.
+//! RED: prismqueer::pq::schema doesn't exist yet.
 //!
 //! T12.1 — JSON Schema derivation from the pq typed DSL. Three public
 //! emitters (`target_schema`, `filter_schema`, `output_schema`) produce
@@ -16,12 +16,12 @@
 #![cfg(feature = "pq")]
 
 use jsonschema::Validator;
-use prism_core::pq::{
+use prismqueer::pq::{
     schema::{filter_schema, output_schema, target_schema},
     CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection, WhereClause,
     WhereOp,
 };
-use prism_core::Oid;
+use prismqueer::Oid;
 use serde_json::{json, Value};
 
 // ── helpers ─────────────────────────────────────────────────────────────────────

@@ -6,16 +6,16 @@
 
 #![cfg(feature = "optics")]
 
-use prism_core::optics::fold::Fold;
-use prism_core::optics::gather::{AddGather, ConcatGather, Gather};
-use prism_core::optics::iso::Iso;
-use prism_core::optics::lens::Lens;
-use prism_core::optics::monoid::PrismMonoid;
-use prism_core::optics::optic_prism::OpticPrism;
-use prism_core::optics::setter::Setter;
-use prism_core::optics::traversal::Traversal;
-use prism_core::{Beam, Optic, Prism};
-use prism_core::{Loss, ScalarLoss};
+use prismqueer::optics::fold::Fold;
+use prismqueer::optics::gather::{AddGather, ConcatGather, Gather};
+use prismqueer::optics::iso::Iso;
+use prismqueer::optics::lens::Lens;
+use prismqueer::optics::monoid::PrismMonoid;
+use prismqueer::optics::optic_prism::OpticPrism;
+use prismqueer::optics::setter::Setter;
+use prismqueer::optics::traversal::Traversal;
+use prismqueer::{Beam, Optic, Prism};
+use prismqueer::{Loss, ScalarLoss};
 use std::convert::Infallible;
 
 fn seed<T: Clone>(v: T) -> Optic<(), T, Infallible, ScalarLoss> {
@@ -175,7 +175,7 @@ fn concat_gather_collapses_strings() {
 
 #[test]
 fn monoid_laws_hold() {
-    use prism_core::optics::monoid::CountMonoid;
+    use prismqueer::optics::monoid::CountMonoid;
     let a = CountMonoid::new(1);
     let b = CountMonoid::new(2);
     let c = CountMonoid::new(3);
@@ -263,7 +263,7 @@ fn lens_set_covers_setter_fn() {
 
 #[test]
 fn count_monoid_identity_in_integration() {
-    use prism_core::optics::monoid::{CountMonoid, PrismMonoid};
+    use prismqueer::optics::monoid::{CountMonoid, PrismMonoid};
     let id = CountMonoid::identity();
     let a = CountMonoid::new(3);
     assert_eq!(id.compose(a.clone()).count(), a.count());

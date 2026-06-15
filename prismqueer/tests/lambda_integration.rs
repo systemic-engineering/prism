@@ -2,12 +2,12 @@
 
 #[cfg(feature = "lambda")]
 mod tests {
-    extern crate prism_core;
+    extern crate prismqueer;
 
-    use prism_core::lambda::{Composable, Lambda};
-    use prism_core::oid::Addressable;
-    use prism_core::DeriveLambda;
-    use prism_core::Oid;
+    use prismqueer::lambda::{Composable, Lambda};
+    use prismqueer::oid::Addressable;
+    use prismqueer::DeriveLambda;
+    use prismqueer::Oid;
 
     #[derive(DeriveLambda)]
     #[oid("@parse")]

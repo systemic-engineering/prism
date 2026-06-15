@@ -1,5 +1,5 @@
 [workspace]
-members = ["imperfect", "core", "derive"]
+members = ["imperfect", "prismqueer", "projections"]
 resolver = "2"
 
 # Per Taut's profiling survey (mirror #286 Win 1, mirrored here on

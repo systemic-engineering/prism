@@ -1,4 +1,4 @@
-//! RED: prism_core::pq doesn't exist yet.
+//! RED: prismqueer::pq doesn't exist yet.
 //!
 //! T11.1 — typed DSL for pq's wire alphabet. Three discriminated unions
 //! (Target / Filter / Output) plus supporting types. Each variant
@@ -13,11 +13,11 @@
 
 #![cfg(feature = "pq")]
 
-use prism_core::pq::{
+use prismqueer::pq::{
     CasUpdate, Direction, Filter, OrderSpec, Output, Reference, Target, WalkDirection, WhereClause,
     WhereOp,
 };
-use prism_core::Oid;
+use prismqueer::Oid;
 use serde_json::json;
 
 // ── Target round-trips ──────────────────────────────────────────────────────────

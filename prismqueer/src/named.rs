@@ -75,7 +75,7 @@ mod tests {
 
     // --- #[derive(Prism)] tests ---
 
-    #[derive(prism_derive::Prism)]
+    #[derive(prismqueer_projections::Prism)]
     #[oid("@test")]
     struct TestNamed {
         _value: u32,
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(a.oid(), b.oid());
     }
 
-    #[derive(prism_derive::Prism)]
+    #[derive(prismqueer_projections::Prism)]
     #[oid("@wrapper")]
     struct TestWrapper {
         #[prism(inner)]
@@ -130,11 +130,11 @@ mod tests {
 
     // --- Cascade tests: three-level derive(Prism) ---
 
-    #[derive(prism_derive::Prism)]
+    #[derive(prismqueer_projections::Prism)]
     #[oid("@test/simple")]
     struct Simple;
 
-    #[derive(Clone, prism_derive::Prism)]
+    #[derive(Clone, prismqueer_projections::Prism)]
     #[oid("@test/with-inner")]
     struct WithInner {
         #[prism(inner)]
@@ -142,7 +142,7 @@ mod tests {
         _extra: String,
     }
 
-    #[derive(prism_derive::Prism)]
+    #[derive(prismqueer_projections::Prism)]
     #[oid("@test/nested")]
     struct Nested {
         #[prism(inner)]
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn lens_on_plain_field() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/lens")]
         struct Foo {
             #[lens]
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn prism_on_option_field() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/prism")]
         struct Bar {
             #[prism]
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn traversal_on_vec_field() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/traversal")]
         struct Baz {
             #[traversal]
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn traversal_mut_access() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/traversal-mut")]
         struct Quux {
             #[traversal]
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn iso_on_field() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/iso")]
         struct IsoTest {
             #[iso]
@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn optic_fields_metadata() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@multi")]
         struct Multi {
             #[lens]
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn mixed_annotated_and_unannotated() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/mixed")]
         struct Mixed {
             #[lens]
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn prism_inner_still_works() {
         // #[prism(inner)] should still be accepted without generating optic accessors
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/inner")]
         struct WithInner {
             #[prism(inner)]
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn lens_view_returns_reference() {
-        #[derive(prism_derive::Prism)]
+        #[derive(prismqueer_projections::Prism)]
         #[oid("@test/ref")]
         struct RefTest {
             #[lens]

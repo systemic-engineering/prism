@@ -1,0 +1,19 @@
+[package]
+name = "prismqueer-projections"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Projection layer of prismqueer's algebra — proc-macros for #[derive(Prism)] and the declaration! family."
+repository = "https://github.com/systemic-engineering/prism"
+homepage = "https://github.com/systemic-engineering/prism"
+readme = "README.md"
+keywords = ["prism", "prismqueer", "derive", "macros", "substrate"]
+categories = ["rust-patterns", "development-tools::procedural-macro-helpers"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
