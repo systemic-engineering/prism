@@ -19,14 +19,22 @@ fn build_fortran() {
 
     restore_c_flags(saved);
 
+    let lib_name = if cfg!(target_os = "macos") {
+        "libgfortran.dylib"
+    } else {
+        "libgfortran.so"
+    };
     let output = Command::new("gfortran")
-        .args(["-print-file-name=libgfortran.dylib"])
+        .args([format!("-print-file-name={}", lib_name)])
         .output()
         .expect("gfortran must be in PATH");
     let lib_path = String::from_utf8(output.stdout).unwrap();
     let lib_path = lib_path.trim();
     if let Some(dir) = std::path::Path::new(lib_path).parent() {
-        println!("cargo:rustc-link-search=native={}", dir.display());
+        let d = dir.display().to_string();
+        if !d.is_empty() {
+            println!("cargo:rustc-link-search=native={}", d);
+        }
     }
     println!("cargo:rustc-link-lib=gfortran");
 
