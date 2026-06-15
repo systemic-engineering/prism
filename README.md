@@ -9,27 +9,34 @@ Focus | project | settle. A typed transformation pipeline in Rust.
 
 ## Crates
 
-### `imperfect`
+### [`terni`](https://crates.io/crates/terni)
 
-`Result` extended with partial success. Three states: Success, Partial (value + measured loss), Failure. The `Loss` trait measures what didn't survive a transformation. Standalone crate, no dependencies on prism.
+`Result` extended with partial success. Three states: Success, Partial (value + measured loss), Failure. The `Loss` trait measures what didn't survive a transformation. Standalone crate, no dependencies on prism. Source: [`imperfect/`](./imperfect/).
 
-### `prism-core`
+### [`prismqueer`](https://crates.io/crates/prismqueer)
 
-Beam (semifunctor) + Prism (monoid). A `Beam` carries a value, the input that produced it, and accumulated loss through a pipeline. A `Prism` defines three operations over beams: focus (select), project (transform), settle (produce output). The three operations compose into type-safe pipelines enforced at compile time.
+Beam (semifunctor) + Prism (monoid). A `Beam` carries a value, the input that produced it, and accumulated loss through a pipeline. A `Prism` defines five operations over beams: focus, project, split, shift, settle. They compose into type-safe pipelines enforced at compile time. Source: [`prismqueer/`](./prismqueer/).
+
+### [`prismqueer-projections`](https://crates.io/crates/prismqueer-projections)
+
+Proc-macros for `prismqueer`: `#[derive(Prism)]`, `#[oid]`, `declaration!`. Source: [`projections/`](./projections/).
 
 ## Dependency relationship
 
 ```
-imperfect          (standalone, zero dependencies)
+terni                       (standalone, zero deps)
     ^
     |
-prism-core         (depends on imperfect, zero external dependencies)
+prismqueer-projections       (proc-macros, depend on prismqueer types at expansion)
+    ^
+    |
+prismqueer                   (depends on terni, zero external deps)
 ```
 
 ## Example
 
 ```rust
-use prism_core::{Beam, Prism, Optic, Focus, Project, Settle};
+use prismqueer::{Beam, Prism, Optic, Focus, Project, Settle};
 use terni::Imperfect;
 
 // Seed a beam and run it through a prism
