@@ -284,8 +284,5 @@ fn loss_propagation_through_optic_pipeline() {
         "loss must propagate through project"
     );
     let refracted = iso.settle(projected);
-    assert!(
-        refracted.is_partial(),
-        "loss must propagate through settle"
-    );
+    assert!(refracted.is_partial(), "loss must propagate through settle");
 }

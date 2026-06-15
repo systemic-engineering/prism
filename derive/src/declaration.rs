@@ -394,8 +394,7 @@ impl Parse for SubstrateGrammarDecl {
         if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
-            let lits =
-                Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?;
+            let lits = Punctuated::<LitStr, Token![,]>::parse_terminated(&content)?;
             extensions = lits.iter().map(|l| l.value()).collect();
         }
 

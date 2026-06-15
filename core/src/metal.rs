@@ -173,7 +173,7 @@ mod tests {
         let program = vec![
             Instruction::Focus(2),    // read 2 bytes → cells 0,1; dp=2
             Instruction::Zoom(0, 10), // add 10 to cell at dp+0 = cell 2
-            Instruction::Settle,     // output cell at dp (cell 2) = 10
+            Instruction::Settle,      // output cell at dp (cell 2) = 10
         ];
         let output = execute(&program, &[5, 7]);
         assert_eq!(output, vec![10]);
@@ -185,7 +185,7 @@ mod tests {
         let program = vec![
             Instruction::Focus(5), // read 5 bytes, dp=5
             Instruction::Split(5), // scan 5 cells from dp=5, all zero, dp stays at 5
-            Instruction::Settle,  // output cell at dp
+            Instruction::Settle,   // output cell at dp
         ];
         // Input: cells 0-4 have values, cells 5+ are zero
         let output = execute(&program, &[0, 0, 10, 0, 20]);
@@ -221,7 +221,7 @@ mod tests {
             Instruction::Focus(22),  // 1 instruction
             Instruction::Zoom(0, 0), // feature contribution (placeholder)
             Instruction::Split(5),   // argmax
-            Instruction::Settle,    // output
+            Instruction::Settle,     // output
         ];
         assert_eq!(program.len(), 4); // The entire decision in 4 instructions
     }
@@ -230,7 +230,7 @@ mod tests {
     fn refract_outputs_current_cell() {
         let program = vec![
             Instruction::Focus(1), // read 1 byte into cell 0, dp=1
-            Instruction::Settle,  // output cell at dp=1 (which is 0)
+            Instruction::Settle,   // output cell at dp=1 (which is 0)
         ];
         let output = execute(&program, &[42]);
         assert_eq!(output, vec![0]); // dp=1 after focus, cell 1 is 0
@@ -310,7 +310,7 @@ mod tests {
             Instruction::Zoom(2, 3),
             Instruction::Project(10), // zero out < 10: cells 0,2 become 0
             Instruction::Split(3),    // last nonzero = cell 1
-            Instruction::Settle,     // output cell at dp=1 = 20
+            Instruction::Settle,      // output cell at dp=1 = 20
         ];
         let output = execute(&program, &[]);
         assert_eq!(output, vec![20]);
