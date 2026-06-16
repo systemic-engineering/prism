@@ -30,11 +30,14 @@ pub enum Instruction {
 /// The tape. The state that Metal operates on.
 #[derive(Clone, Debug)]
 pub struct Tape {
+    /// The 256-cell tape.
     pub cells: [u8; 256],
+    /// The data pointer (cursor index within `cells`).
     pub dp: usize,
 }
 
 impl Tape {
+    /// Construct a fresh tape: all cells zero, `dp = 0`.
     pub fn new() -> Self {
         Tape {
             cells: [0u8; 256],
@@ -42,25 +45,25 @@ impl Tape {
         }
     }
 
-    /// Read a cell at dp + offset, bounds-checked.
+    /// Read a cell at `dp + offset`, bounds-checked.
     pub fn read(&self, offset: usize) -> u8 {
         let idx = (self.dp + offset).min(255);
         self.cells[idx]
     }
 
-    /// Write a cell at dp + offset, bounds-checked.
+    /// Write `value` to the cell at `dp + offset`, bounds-checked.
     pub fn write(&mut self, offset: usize, value: u8) {
         let idx = (self.dp + offset).min(255);
         self.cells[idx] = value;
     }
 
-    /// Add to a cell at dp + offset, wrapping.
+    /// Add `value` to the cell at `dp + offset`, wrapping on overflow.
     pub fn add(&mut self, offset: usize, value: u8) {
         let idx = (self.dp + offset).min(255);
         self.cells[idx] = self.cells[idx].wrapping_add(value);
     }
 
-    /// Advance dp by n, clamped.
+    /// Advance `dp` by `n`, clamped to the tape's last index.
     pub fn advance(&mut self, n: usize) {
         self.dp = (self.dp + n).min(255);
     }
@@ -79,15 +82,17 @@ pub struct MetalPrism {
 }
 
 impl MetalPrism {
+    /// Wrap a sequence of [`Instruction`]s as a Metal program.
     pub fn new(program: Vec<Instruction>) -> Self {
         MetalPrism { program }
     }
 
+    /// Borrow the program's instruction stream.
     pub fn program(&self) -> &[Instruction] {
         &self.program
     }
 
-    /// Execute the Metal program on input bytes.
+    /// Execute the Metal program on `input` bytes; return the output bytes.
     pub fn execute(&self, input: &[u8]) -> Vec<u8> {
         execute(&self.program, input)
     }

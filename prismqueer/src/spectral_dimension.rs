@@ -37,10 +37,12 @@ use crate::ffi;
 pub struct Sigma(f64);
 
 impl Sigma {
+    /// Construct a `σ` value.
     pub fn new(v: f64) -> Self {
         Sigma(v)
     }
 
+    /// Extract the raw `f64`.
     pub fn as_f64(&self) -> f64 {
         self.0
     }
@@ -64,10 +66,12 @@ impl std::fmt::Display for Sigma {
 pub struct SpectralDimension(f64);
 
 impl SpectralDimension {
+    /// Wrap a raw `d_s` value.
     pub fn new(v: f64) -> Self {
         SpectralDimension(v)
     }
 
+    /// Extract the raw `f64`.
     pub fn as_f64(&self) -> f64 {
         self.0
     }

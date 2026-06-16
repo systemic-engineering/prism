@@ -12,8 +12,11 @@ use terni::{Imperfect, Loss};
 /// A self-contained pipeline operation. Wraps a prism (and closure for
 /// user-space operations). The beam arrives via `apply`.
 pub trait Operation<B: Beam> {
+    /// The beam type produced by this operation.
     type Output: Beam;
+    /// Which pipeline stage this operation represents.
     fn op(&self) -> Op;
+    /// Run the operation on `beam`.
     fn apply(self, beam: B) -> Self::Output;
 }
 
@@ -30,9 +33,13 @@ pub trait Operation<B: Beam> {
 /// **Contract:** `tick`, `smap`, and `next` propagate dark beams (Failure is a fixpoint).
 /// `input()` panics on dark propagated beams. Call `is_ok()` first.
 pub trait Beam: Sized {
+    /// The value type that entered this step.
     type In;
+    /// The value type that leaves this step.
     type Out;
+    /// The error type carried when the beam is Failure.
     type Error;
+    /// The loss type accumulated through the pipeline.
     type Loss: Loss;
 
     /// Advance: new Out and Error types. Loss type preserved.

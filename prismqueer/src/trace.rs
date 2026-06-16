@@ -13,13 +13,18 @@ use crate::ScalarLoss;
 /// Which pipeline operation produced a step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
+    /// The `focus` stage: select what matters from the input.
     Focus,
+    /// The `project` stage: the lossy transformation.
     Project,
+    /// The `settle` stage: produce the output.
     Settle,
 }
 
 /// Any value that is `Debug + Any + Send + Sync` can be stored in a `Trace`.
+/// The blanket impl below covers every qualifying type.
 pub trait Traced: Any + fmt::Debug + Send + Sync {
+    /// Reify as `&dyn Any` for downcasting.
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -31,16 +36,23 @@ impl<T: Any + fmt::Debug + Send + Sync> Traced for T {
 
 /// The output side of a traced step.
 pub enum StepOutput {
+    /// The step produced a value.
     Value(Box<dyn Traced>),
+    /// The step produced an error.
     Error(Box<dyn Traced>),
 }
 
 /// A single traced step through the pipeline.
 pub struct Step {
+    /// Static label for the prism that produced this step.
     pub prism: &'static str,
+    /// Which of the three pipeline stages was running.
     pub op: Op,
+    /// Loss accumulated during this step.
     pub loss: ScalarLoss,
+    /// The input value that entered this step.
     pub input: Box<dyn Traced>,
+    /// The output (or error) that left this step.
     pub output: StepOutput,
 }
 
@@ -51,27 +63,34 @@ pub struct Trace {
 }
 
 impl Trace {
+    /// Empty trace.
     pub fn new() -> Self {
         Trace { steps: Vec::new() }
     }
 
+    /// Append a step.
     pub fn push(&mut self, step: Step) {
         self.steps.push(step);
     }
 
+    /// All recorded steps in order.
     pub fn steps(&self) -> &[Step] {
         &self.steps
     }
 
+    /// Number of recorded steps.
     pub fn len(&self) -> usize {
         self.steps.len()
     }
 
+    /// Whether no steps have been recorded.
     pub fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
 
-    /// Recover the input at step `i` as concrete type `T`.
+    /// Recover the input at step `i` as concrete type `T`. Returns
+    /// `None` if `i` is out of range or the recorded type does not
+    /// match `T`.
     pub fn reenter_at<T: 'static>(&self, i: usize) -> Option<&T> {
         let input: &dyn Traced = self.steps.get(i)?.input.as_ref();
         input.as_any().downcast_ref::<T>()

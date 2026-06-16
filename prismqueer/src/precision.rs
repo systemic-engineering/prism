@@ -10,10 +10,14 @@
 pub struct Precision(f64);
 
 impl Precision {
+    /// Construct a precision value. Caller is responsible for keeping
+    /// the magnitude in a sensible range — typical use is small
+    /// positive values close to zero.
     pub fn new(v: f64) -> Self {
         Precision(v)
     }
 
+    /// Extract the raw `f64`.
     pub fn as_f64(&self) -> f64 {
         self.0
     }
@@ -38,14 +42,18 @@ impl From<f64> for Precision {
 pub struct Pressure(f64);
 
 impl Pressure {
+    /// Construct a pressure value, clamped to `[0.0, 1.0]`.
     pub fn new(v: f64) -> Self {
         Pressure(v.clamp(0.0, 1.0))
     }
 
+    /// The occupancy ratio in `[0.0, 1.0]`.
     pub fn ratio(&self) -> f64 {
         self.0
     }
 
+    /// Whether the ratio is at or above the critical threshold
+    /// (`0.9`).
     pub fn is_critical(&self) -> bool {
         self.0 >= 0.9
     }

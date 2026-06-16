@@ -30,9 +30,11 @@ pub struct CountMonoid {
 }
 
 impl CountMonoid {
+    /// Construct with the given count.
     pub fn new(count: u64) -> Self {
         CountMonoid { count }
     }
+    /// Read the carried count.
     pub fn count(&self) -> u64 {
         self.count
     }

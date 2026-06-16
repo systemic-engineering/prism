@@ -28,33 +28,48 @@ pub enum Lambda<T: Clone + PartialEq> {
     Case(CaseLambda<T>),
 }
 
+/// A bound variable reference — the leaf of a lambda term.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BindLambda {
+    /// The Oid identifying which binding this reference points to.
     pub name: Oid,
 }
 
+/// Lambda abstraction — `λ param. body`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AbsLambda<T: Clone + PartialEq> {
+    /// The parameter's content-address.
     pub param: Oid,
+    /// The body the parameter is bound into.
     pub body: Box<Lambda<T>>,
 }
 
+/// Function application — `function argument`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApplyLambda<T: Clone + PartialEq> {
+    /// The function being applied.
     pub function: Box<Lambda<T>>,
+    /// The argument being passed.
     pub argument: Box<Lambda<T>>,
 }
 
+/// Pattern-match — a scrutinee + ordered arms.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CaseLambda<T: Clone + PartialEq> {
+    /// The expression being matched on.
     pub scrutinee: Box<Lambda<T>>,
+    /// The ordered arms; first matching pattern wins.
     pub arms: Vec<(Pattern<T>, Lambda<T>)>,
 }
 
+/// A pattern used inside a `Case` arm.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Pattern<T: Clone + PartialEq> {
+    /// Match an exact value of `T`.
     Exact(T),
+    /// Bind the matched value to this Oid for use inside the arm body.
     Bind(Oid),
+    /// Wildcard — match anything.
     Any,
 }
 
@@ -63,10 +78,12 @@ pub enum Pattern<T: Clone + PartialEq> {
 // ---------------------------------------------------------------------------
 
 impl<T: Clone + PartialEq> Lambda<T> {
+    /// Construct a variable reference.
     pub fn bind(name: Oid) -> Self {
         Lambda::Bind(BindLambda { name })
     }
 
+    /// Construct an abstraction `λ param. body`.
     pub fn abs(param: Oid, body: Lambda<T>) -> Self {
         Lambda::Abs(AbsLambda {
             param,
@@ -74,6 +91,7 @@ impl<T: Clone + PartialEq> Lambda<T> {
         })
     }
 
+    /// Construct an application `function argument`.
     pub fn apply(function: Lambda<T>, argument: Lambda<T>) -> Self {
         Lambda::Apply(ApplyLambda {
             function: Box::new(function),
@@ -81,6 +99,7 @@ impl<T: Clone + PartialEq> Lambda<T> {
         })
     }
 
+    /// Construct a pattern-match.
     pub fn case(scrutinee: Lambda<T>, arms: Vec<(Pattern<T>, Lambda<T>)>) -> Self {
         Lambda::Case(CaseLambda {
             scrutinee: Box::new(scrutinee),
@@ -179,12 +198,17 @@ pub trait Composable<T: Clone + PartialEq>: Into<Lambda<T>> + Sized {
 // MerkleTree — Lambda is recursive via Box, children() returns empty
 // ---------------------------------------------------------------------------
 
-/// Tag type for Lambda's MerkleTree::Data. Identifies the variant without recursion.
+/// Tag type for Lambda's `MerkleTree::Data`. Identifies the variant
+/// without recursion.
 #[derive(Clone, Debug, PartialEq)]
 pub enum LambdaTag {
+    /// A variable reference with the carried binding Oid.
     Bind(Oid),
+    /// An abstraction with the carried parameter Oid.
     Abs(Oid),
+    /// An application (children carry the function and argument).
     Apply,
+    /// A pattern-match.
     Case,
 }
 

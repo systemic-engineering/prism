@@ -17,7 +17,12 @@ use sha2::{Digest, Sha256};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoincidenceError {
     /// Vector spaces don't match.
-    SpaceMismatch { expected: String, got: String },
+    SpaceMismatch {
+        /// The space the operand was expected to live in.
+        expected: String,
+        /// The space the operand actually carried.
+        got: String,
+    },
     /// Zero vector where a non-zero vector was required.
     ZeroVector,
 }
@@ -419,7 +424,9 @@ impl DetectionResult {
 /// into a fixed-size fingerprint. The projection is total (always succeeds).
 /// The inverse is impossible (hashes are one-way). That's a Prism, not an Iso.
 pub trait HashPrism {
+    /// The pre-image side. `?Sized` so byte slices can be used directly.
     type Input: ?Sized;
+    /// The fingerprint side.
     type Output;
 
     /// Hash/project/review — always succeeds.

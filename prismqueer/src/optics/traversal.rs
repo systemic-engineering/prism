@@ -1,15 +1,16 @@
 //! Traversal — the multi-focus optic.
 //!
 //! A Traversal lifts a per-element function over a container.
-//! Given a mapping fn(A) -> B and a Vec<A>, produces Vec<B>.
+//! Given a mapping `fn(A) -> B` and a `Vec<A>`, produces `Vec<B>`.
 //!
-//! As a Prism: focus maps elements (Vec<A> → Vec<B>), project is identity,
+//! As a Prism: focus maps elements (`Vec<A> → Vec<B>`), project is identity,
 //! settle returns the mapped collection.
 
 use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
 
+/// The multi-focus optic: map a per-element function across a `Vec`.
 #[derive(Clone, Copy)]
 pub struct Traversal<A, B> {
     map_fn: fn(A) -> B,
@@ -25,6 +26,7 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
         Traversal { map_fn: map }
     }
 
+    /// Apply the per-element function across `input`.
     pub fn traverse(&self, input: Vec<A>) -> Vec<B> {
         input.into_iter().map(|a| (self.map_fn)(a)).collect()
     }
@@ -33,9 +35,9 @@ impl<A: 'static, B: 'static> Traversal<A, B> {
 /// Traversal implements Prism with Optic.
 ///
 /// Pipeline flow:
-/// - focus: map each element (Vec<A> → Vec<B>)
-/// - project: identity (Vec<B> → Vec<B>)
-/// - settle: identity (Vec<B> → Vec<B>)
+/// - focus: map each element (`Vec<A> → Vec<B>`)
+/// - project: identity (`Vec<B> → Vec<B>`)
+/// - settle: identity (`Vec<B> → Vec<B>`)
 impl<A: Clone + 'static, B: Clone + 'static> Prism for Traversal<A, B> {
     type Input = Optic<(), Vec<A>, Infallible, ScalarLoss>;
     type Focused = Optic<Vec<A>, Vec<B>, Infallible, ScalarLoss>;

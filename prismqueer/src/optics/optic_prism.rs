@@ -12,6 +12,8 @@ use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
 use terni::Imperfect;
 
+/// The sum-case bidirectional optic: a witnessed projection from a
+/// whole `S` to one variant `A`, with a reverse that always succeeds.
 #[derive(Clone, Copy)]
 pub struct OpticPrism<S, A> {
     match_fn: fn(&S) -> bool,
@@ -48,6 +50,8 @@ impl<S: 'static, A: 'static> OpticPrism<S, A> {
         }
     }
 
+    /// Reconstruct an `S` from an `A`. Always succeeds (the law
+    /// `matches(review(a))` is the caller's obligation).
     pub fn review(&self, a: A) -> S {
         (self.review_fn)(a)
     }

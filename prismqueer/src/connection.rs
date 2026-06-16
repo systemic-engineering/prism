@@ -18,9 +18,11 @@ use terni::Loss;
 /// - Associativity: `(a.compose(b)).compose(c) == a.compose(b.compose(c))`
 /// - Norm: `identity().norm()` is zero loss
 pub trait Carrier: Clone + Default {
-    /// Compose: self followed by other. Non-abelian in general.
+    /// Compose: `self` followed by `other`. Non-abelian in general.
     fn compose(self, other: Self) -> Self;
-    /// The scalar projection — how much information this connection consumed.
+
+    /// The scalar projection — how much information this connection
+    /// consumed.
     fn norm(&self) -> ScalarLoss;
 }
 
@@ -28,15 +30,20 @@ pub trait Carrier: Clone + Default {
 /// compose = add losses, norm = the loss itself.
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct ScalarConnection {
+    /// The accumulated scalar loss carried by this connection.
     pub loss: ScalarLoss,
 }
 
 impl ScalarConnection {
+    /// The zero connection — no loss accumulated.
     pub fn zero() -> Self {
         ScalarConnection {
             loss: ScalarLoss::zero(),
         }
     }
+
+    /// Construct from a raw loss value (in bits). Panics if `loss` is
+    /// negative (per [`ScalarLoss::new`]).
     pub fn new(loss: f64) -> Self {
         ScalarConnection {
             loss: ScalarLoss::new(loss),

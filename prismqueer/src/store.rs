@@ -16,7 +16,9 @@ use terni::{Imperfect, Loss};
 pub trait Store {
     /// The tree type this store persists.
     type Tree: MerkleTree;
+    /// The error type returned by store operations.
     type Error;
+    /// The loss type accumulated by store operations.
     type L: Loss;
 
     /// Retrieve a tree by address. Partial if some dimensions are dark.

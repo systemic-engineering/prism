@@ -10,6 +10,8 @@ use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
 
+/// The write-only optic: apply a function to the focus without ever
+/// observing it directly.
 #[derive(Clone, Copy)]
 pub struct Setter<S, A> {
     modify_fn: fn(S, &dyn Fn(A) -> A) -> S,
@@ -25,6 +27,7 @@ impl<S: 'static, A: 'static> Setter<S, A> {
         Setter { modify_fn: modify }
     }
 
+    /// Apply `f` to the focused `A` inside `s`.
     pub fn modify<F>(&self, s: S, f: F) -> S
     where
         F: Fn(A) -> A + 'static,

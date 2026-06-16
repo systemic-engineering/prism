@@ -12,18 +12,24 @@ use crate::oid::{Addressable, Oid};
 pub struct Crystal<P>(pub P, pub Luminosity);
 
 impl<P> Crystal<P> {
+    /// Borrow the carried prism.
     pub fn prism(&self) -> &P {
         &self.0
     }
 
+    /// Borrow the holonomy state.
     pub fn luminosity(&self) -> &Luminosity {
         &self.1
     }
 
+    /// Consume the crystal and return the carried prism, dropping the
+    /// luminosity.
     pub fn into_prism(self) -> P {
         self.0
     }
 
+    /// Whether the crystal is settled — the luminosity is `Light`
+    /// (full signal, zero holonomy).
     pub fn is_settled(&self) -> bool {
         self.1.is_light()
     }

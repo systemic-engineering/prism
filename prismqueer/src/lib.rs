@@ -124,13 +124,20 @@ pub use store::Store;
 /// constraints — each stage's `In` must equal the previous stage's `Out`.
 /// This makes type mismatches between pipeline stages a compile error.
 pub trait Prism {
+    /// The seed beam type — what enters [`Self::focus`].
     type Input: Beam;
+    /// The post-focus beam type. Its `In` must equal `Input::Out`.
     type Focused: Beam<In = <Self::Input as Beam>::Out>;
+    /// The post-project beam type. Its `In` must equal `Focused::Out`.
     type Projected: Beam<In = <Self::Focused as Beam>::Out>;
+    /// The final, post-settle beam type. Its `In` must equal `Projected::Out`.
     type Refracted: Beam<In = <Self::Projected as Beam>::Out>;
 
+    /// `focus` — select what matters from the input.
     fn focus(&self, beam: Self::Input) -> Self::Focused;
+    /// `project` — the lossy transformation. Information may not survive.
     fn project(&self, beam: Self::Focused) -> Self::Projected;
+    /// `settle` — produce the output from what survived `project`.
     fn settle(&self, beam: Self::Projected) -> Self::Refracted;
 }
 

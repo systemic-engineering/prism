@@ -6,6 +6,7 @@
 
 /// A strategy for collapsing `Vec<T>` into a single `T`.
 pub trait Gather<T> {
+    /// Collapse `items` to a single `T`.
     fn gather(&self, items: Vec<T>) -> T;
 }
 

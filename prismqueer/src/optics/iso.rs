@@ -36,10 +36,12 @@ impl<A: 'static, B: 'static> Iso<A, B> {
         }
     }
 
+    /// Apply the forward function: `A → B`.
     pub fn forward(&self, a: A) -> B {
         (self.forward_fn)(a)
     }
 
+    /// Apply the backward function: `B → A`.
     pub fn backward(&self, b: B) -> A {
         (self.backward_fn)(b)
     }

@@ -35,6 +35,7 @@ impl Reference {
         Ok(Reference(s))
     }
 
+    /// Borrow the underlying string form.
     pub fn as_str(&self) -> &str {
         &self.0
     }

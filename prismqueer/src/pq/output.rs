@@ -13,7 +13,9 @@ use crate::Oid;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CasUpdate {
+    /// The currently-observed Oid (the CAS guard).
     pub old: Oid,
+    /// The Oid to write if the guard matches.
     pub new: Oid,
 }
 
@@ -24,21 +26,36 @@ pub enum Output {
     /// `{"to_path": "...", "message"?: "..."}` — commit to a path.
     /// `message` is omitted on the wire when `None`.
     ToPath {
+        /// The path to commit to.
         to_path: String,
+        /// An optional commit message.
         #[serde(skip_serializing_if = "Option::is_none", default)]
         message: Option<String>,
     },
     /// `{"ref": "..."}` — advance a ref (branch creation / update).
     Ref {
+        /// The ref to advance.
         #[serde(rename = "ref")]
         ref_: Reference,
     },
     /// `{"cas": {"old": "...", "new": "..."}}` — CAS-safe ref update.
-    Cas { cas: CasUpdate },
+    Cas {
+        /// The compare-and-set payload.
+        cas: CasUpdate,
+    },
     /// `{"to_ref": "..."}` — write merged result to a ref.
-    ToRef { to_ref: Reference },
+    ToRef {
+        /// The ref to write to.
+        to_ref: Reference,
+    },
     /// `{"snapshot": true}` — crystallize without committing.
-    Snapshot { snapshot: bool },
+    Snapshot {
+        /// Always `true` on the wire — the variant tag IS the action.
+        snapshot: bool,
+    },
     /// `{"flush": true}` — shard flush to disk.
-    Flush { flush: bool },
+    Flush {
+        /// Always `true` on the wire — the variant tag IS the action.
+        flush: bool,
+    },
 }

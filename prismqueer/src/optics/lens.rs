@@ -13,6 +13,8 @@ use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
 
+/// A total bidirectional single-focus optic: get an `A` out of an `S`,
+/// put an `A` back into an `S`.
 #[derive(Clone, Copy)]
 pub struct Lens<S, A> {
     view_fn: fn(&S) -> A,
@@ -33,14 +35,17 @@ impl<S: 'static, A: 'static> Lens<S, A> {
         }
     }
 
+    /// Read the focus out of `s`.
     pub fn view(&self, s: &S) -> A {
         (self.view_fn)(s)
     }
 
+    /// Replace the focus inside `s` with `a`.
     pub fn set(&self, s: S, a: A) -> S {
         (self.set_fn)(s, a)
     }
 
+    /// View, apply `f`, set back. Equivalent to `set(s, f(view(s)))`.
     pub fn modify<F>(&self, s: S, f: F) -> S
     where
         F: Fn(A) -> A,

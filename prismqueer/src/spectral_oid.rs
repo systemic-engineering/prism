@@ -1,5 +1,5 @@
-//! Spectral object identity. A [`SpectralOid`] is an [`Oid`](crate::oid::Oid)
-//! viewed at a specific [`Precision`](crate::precision::Precision). Truncating
+//! Spectral object identity. A [`SpectralOid`] is an [`Oid`] viewed at a
+//! specific [`Precision`]. Truncating
 //! the raw content address to fewer characters makes coarser identities —
 //! distinct values become "equal" when their truncated representations match.
 //! This is how the project operation controls resolution: lower precision
@@ -30,6 +30,9 @@ pub struct SpectralOid {
 }
 
 impl SpectralOid {
+    /// Construct a `SpectralOid` from a raw content address and the
+    /// precision at which to view it. The truncated form is computed
+    /// eagerly; equality is on the truncated form.
     pub fn new(raw: impl Into<String>, precision: Precision) -> Self {
         let raw = raw.into();
         let len = truncation_len(raw.chars().count(), &precision);
@@ -41,10 +44,12 @@ impl SpectralOid {
         }
     }
 
+    /// The full underlying content address (untruncated).
     pub fn raw(&self) -> &str {
         &self.raw
     }
 
+    /// The precision at which this Oid is being viewed.
     pub fn precision(&self) -> &Precision {
         &self.precision
     }

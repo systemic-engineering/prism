@@ -1,14 +1,15 @@
 //! Fold — the multi read-only optic.
 //!
-//! A Fold<S, A> extracts zero or more As from an S. No modification side.
+//! A `Fold<S, A>` extracts zero or more `A`s from an `S`. No modification side.
 //! Think of it as a Traversal without the put-back direction.
 //!
-//! As a Prism: focus extracts (S → Vec<A>), project and settle pass through.
+//! As a Prism: focus extracts (`S → Vec<A>`), project and settle pass through.
 
 use crate::ScalarLoss;
 use crate::{Beam, Optic, Prism};
 use std::convert::Infallible;
 
+/// The read-only multi-focus optic.
 #[derive(Clone, Copy)]
 pub struct Fold<S, A> {
     fold_fn: fn(&S) -> Vec<A>,
@@ -24,6 +25,7 @@ impl<S: 'static, A: 'static> Fold<S, A> {
         Fold { fold_fn: fold }
     }
 
+    /// Run the fold on `s` and return the extracted items.
     pub fn to_list(&self, s: &S) -> Vec<A> {
         (self.fold_fn)(s)
     }
@@ -41,9 +43,9 @@ impl<S: 'static, A: 'static> crate::Addressable for Fold<S, A> {
 /// Fold implements Prism with Optic.
 ///
 /// Pipeline flow:
-/// - focus: extract all elements (S → Vec<A>)
-/// - project: identity (Vec<A> → Vec<A>)
-/// - settle: identity (Vec<A> → Vec<A>)
+/// - focus: extract all elements (`S → Vec<A>`)
+/// - project: identity (`Vec<A> → Vec<A>`)
+/// - settle: identity (`Vec<A> → Vec<A>`)
 impl<S: Clone + 'static, A: Clone + 'static> Prism for Fold<S, A> {
     type Input = Optic<(), S, Infallible, ScalarLoss>;
     type Focused = Optic<S, Vec<A>, Infallible, ScalarLoss>;

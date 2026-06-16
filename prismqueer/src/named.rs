@@ -10,14 +10,17 @@ use crate::oid::{Addressable, Oid};
 pub struct Named<P>(pub &'static str, pub P);
 
 impl<P> Named<P> {
+    /// The human-readable name.
     pub fn name(&self) -> &'static str {
         self.0
     }
 
+    /// Borrow the inner value.
     pub fn inner(&self) -> &P {
         &self.1
     }
 
+    /// Consume the wrapper and return the inner value.
     pub fn into_inner(self) -> P {
         self.1
     }

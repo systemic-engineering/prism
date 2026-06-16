@@ -14,12 +14,16 @@ use super::Lambda;
 // ReductionError
 // ---------------------------------------------------------------------------
 
+/// Reasons reduction can fail.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReductionError {
     /// Variable not bound in any enclosing scope.
     UnboundVariable(Oid),
     /// Step budget exhausted before reaching normal form.
-    BudgetExhausted { steps_taken: usize },
+    BudgetExhausted {
+        /// How many steps were consumed before the budget ran out.
+        steps_taken: usize,
+    },
     /// No arm matched in a Case expression.
     NoMatchingArm,
 }
@@ -28,9 +32,13 @@ pub enum ReductionError {
 // ReductionLoss
 // ---------------------------------------------------------------------------
 
+/// The [`Loss`] type emitted by [`reduce_bounded`]. Records the work
+/// done and the budget left over.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ReductionLoss {
+    /// How many beta-reduction steps were taken.
     pub steps: usize,
+    /// How much of the budget remained when reduction finished.
     pub budget_remaining: usize,
 }
 

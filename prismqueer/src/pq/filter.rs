@@ -10,7 +10,9 @@ use serde_json::Value;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WalkDirection {
+    /// Walk toward the past (parents).
     Back,
+    /// Walk toward the future (children).
     Forward,
 }
 
@@ -18,7 +20,9 @@ pub enum WalkDirection {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Direction {
+    /// Ascending order.
     Asc,
+    /// Descending order.
     Desc,
 }
 
@@ -27,13 +31,21 @@ pub enum Direction {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WhereOp {
+    /// `==`
     Eq,
+    /// `!=`
     Neq,
+    /// `>`
     Gt,
+    /// `<`
     Lt,
+    /// `>=`
     Gte,
+    /// `<=`
     Lte,
+    /// Substring / element containment.
     Contains,
+    /// Pattern match (regex/glob — the consumer decides the dialect).
     Matches,
 }
 
@@ -41,7 +53,9 @@ pub enum WhereOp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OrderSpec {
+    /// The field name to order by.
     pub field: String,
+    /// The sort direction.
     pub direction: Direction,
 }
 
@@ -49,8 +63,11 @@ pub struct OrderSpec {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WhereClause {
+    /// The field name to test.
     pub field: String,
+    /// The comparison operator.
     pub op: WhereOp,
+    /// The RHS value, free-form JSON.
     pub value: Value,
 }
 
@@ -59,25 +76,46 @@ pub struct WhereClause {
 #[serde(untagged)]
 pub enum Filter {
     /// `{"prefix": "..."}` — string-prefix narrowing.
-    Prefix { prefix: String },
+    Prefix {
+        /// The string prefix to narrow by.
+        prefix: String,
+    },
     /// `{"match": "..."}` — pattern/substring narrowing. `match` is
-    /// a Rust keyword.
+    /// a Rust keyword, hence the trailing-underscore field name.
     Match {
+        /// The pattern (substring or regex — the consumer decides).
         #[serde(rename = "match")]
         match_: String,
     },
     /// `{"walk": "back"|"forward"}` — DAG walk direction.
-    Walk { walk: WalkDirection },
+    Walk {
+        /// Which direction to walk the DAG.
+        walk: WalkDirection,
+    },
     /// `{"compare": true}` — structural diff of a focused pair.
-    Compare { compare: bool },
+    Compare {
+        /// Always `true` on the wire — the variant tag IS the action.
+        compare: bool,
+    },
     /// `{"kintsugi": true}` — tournament merge of a focused pair.
-    Kintsugi { kintsugi: bool },
+    Kintsugi {
+        /// Always `true` on the wire — the variant tag IS the action.
+        kintsugi: bool,
+    },
     /// `{"order": [...]}` — ordering.
-    Order { order: Vec<OrderSpec> },
+    Order {
+        /// The ordering specs, applied lexicographically.
+        order: Vec<OrderSpec>,
+    },
     /// `{"limit": N}` — bounded results.
-    Limit { limit: u32 },
-    /// `{"where": [...]}` — typed predicate. `where` is a Rust keyword.
+    Limit {
+        /// Maximum number of results.
+        limit: u32,
+    },
+    /// `{"where": [...]}` — typed predicate. `where` is a Rust keyword,
+    /// hence the trailing-underscore field name.
     Where {
+        /// The conjunction of predicates that must hold.
         #[serde(rename = "where")]
         where_: Vec<WhereClause>,
     },

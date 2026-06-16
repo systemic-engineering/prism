@@ -11,6 +11,8 @@
 pub struct Oid(String);
 
 impl Oid {
+    /// Wrap an existing string as an `Oid` without hashing. Use
+    /// [`Self::hash`] to produce an Oid from raw bytes.
     pub fn new(s: impl Into<String>) -> Self {
         Oid(s.into())
     }
@@ -33,6 +35,7 @@ impl Oid {
         Oid("0".repeat(64))
     }
 
+    /// Borrow the underlying string form.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -77,8 +80,9 @@ impl From<String> for Oid {
     }
 }
 
-/// The thing has an address. That's all.
+/// The thing has a content address. That's all.
 pub trait Addressable {
+    /// Return the content address — the [`Oid`] derived from this value.
     fn oid(&self) -> Oid;
 }
 

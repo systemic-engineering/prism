@@ -171,7 +171,7 @@ where
 }
 
 /// Level 4: autopoietic closure. The Lawvere fixed point.
-/// Fate. selectors[4] = self-reference.
+/// Fate. `selectors\[4\]` = self-reference.
 ///
 /// The fixed-point witness must implement [`LawvereFixedPoint`] (idempotence
 /// + kernel projection). This links `Closure::Fixed` to the Lawvere fixed

@@ -13,16 +13,21 @@ pub enum Luminosity {
 }
 
 impl Luminosity {
+    /// Full signal — the `Light` variant.
     pub fn is_light(&self) -> bool {
         matches!(self, Luminosity::Light)
     }
+    /// Partial signal — the `Dimmed(_)` variant.
     pub fn is_dimmed(&self) -> bool {
         matches!(self, Luminosity::Dimmed(_))
     }
+    /// No signal — the `Dark` variant.
     pub fn is_dark(&self) -> bool {
         matches!(self, Luminosity::Dark)
     }
 
+    /// The holonomy as a scalar: `Some(0.0)` for `Light`, `Some(h)` for
+    /// `Dimmed(h)`, `None` for `Dark` (darkness has no measure).
     pub fn holonomy(&self) -> Option<f64> {
         match self {
             Luminosity::Light => Some(0.0),
@@ -31,6 +36,8 @@ impl Luminosity {
         }
     }
 
+    /// Classify a holonomy scalar. Zero is `Light`; any finite non-zero
+    /// is `Dimmed(h)`; non-finite (infinite, NaN) is `Dark`.
     pub fn from_holonomy(h: f64) -> Self {
         if h == 0.0 {
             Luminosity::Light

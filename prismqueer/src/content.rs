@@ -1,6 +1,7 @@
 //! Content addressing. A value's identity is derived from its content,
 //! not from where it lives or when it was created. Types that implement
-//! [`ContentAddressed`] produce an [`Oid`] that is their content-derived identity.
+//! [`ContentAddressed`] produce an [`Oid`](crate::Oid) that is their
+//! content-derived identity.
 
 /// A type that has a content address.
 /// Alias for [`Addressable`](crate::oid::Addressable) — same trait, legacy name.
