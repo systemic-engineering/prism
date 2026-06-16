@@ -1,4 +1,4 @@
-# prism
+# prismqueer
 
 [![CI](https://github.com/systemic-engineering/prism/actions/workflows/ci.yml/badge.svg)](https://github.com/systemic-engineering/prism/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-99.89%25-brightgreen)](https://github.com/systemic-engineering/prism)
