@@ -325,27 +325,66 @@ impl<S: Clone + PartialEq> LawvereFixedPoint for StableFiber<S> {
     }
 }
 
-#[cfg(test)]
-mod tests {
+// ---------------------------------------------------------------------------
+// pub mod examples — reference bundle carriers for property tests.
+// ---------------------------------------------------------------------------
+
+/// Reference Bundle implementations for property-based testing.
+///
+/// Always-public, always-compiled (not `#[cfg(test)]`-gated) so that
+/// downstream crates — mirror, spectral, any consumer of
+/// `prismqueer::liquid` — can compose property tests over concrete Bundle
+/// carriers without redeclaring the tower.
+///
+/// # Types
+///
+/// - [`TestFiber`] — minimal `Fiber` with `State = [f64; 4]`.
+/// - [`TestConnection`] — `Fiber + Connection` with identity optic.
+/// - [`TestBundle`] — full tower (Fiber+Connection+Gauge+Transport+Closure)
+///   with `Cyclic<4>` gauge and *state-dependent* transport loss
+///   (`|state[2]| + |state[3]|`). Commutators over `TestBundle` pairs
+///   *vanish* whenever both bundles produce the same holonomy at the same
+///   state — which they always do here (transport loss depends only on
+///   state, not on which bundle transports it). This is the correct,
+///   substrate-honest behavior for **abelian** gauge groups.
+/// - [`LiquidTestBundle`] — full tower where transport loss depends on
+///   the *bundle's* strategy value rather than the state. Commutators
+///   over pairs of `LiquidTestBundle`s with different strategies are
+///   *non-vanishing*, which is what property tests for Pillar II
+///   (algedonic threshold) and Pillar III (viability persistence)
+///   require.
+pub mod examples {
     use super::*;
     use crate::ScalarLoss;
+    use std::convert::Infallible;
 
-    struct TestFiber;
+    /// Minimal `Fiber` carrier with a 4-vector state.
+    pub struct TestFiber;
 
     impl Fiber for TestFiber {
         type State = [f64; 4];
     }
 
-    #[test]
-    fn fiber_has_state() {
-        let _f = TestFiber;
-        let _: <TestFiber as Fiber>::State = [1.0, 2.0, 3.0, 4.0];
+    /// A trivial `Connection` carrier: it holds an `IdentityPrism` over
+    /// the fiber's state space. Adequate for tests that only need to
+    /// witness the `Connection` supertrait relationship, not a full
+    /// bundle tower.
+    pub struct TestConnection {
+        pub optic: IdentityPrism<[f64; 4]>,
     }
 
-    /// A trivial "Connection" carrier: it holds an `IdentityPrism` over the
-    /// fiber's state space.
-    struct TestConnection {
-        optic: IdentityPrism<[f64; 4]>,
+    impl TestConnection {
+        pub fn new() -> Self {
+            Self {
+                optic: IdentityPrism::new(),
+            }
+        }
+    }
+
+    impl Default for TestConnection {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl Fiber for TestConnection {
@@ -359,11 +398,193 @@ mod tests {
         }
     }
 
+    /// Full bundle carrier: cyclic gauge, state-dependent transport loss.
+    ///
+    /// Loss is `|state[2]| + |state[3]|`. For `state = [0.0; 4]`
+    /// (Default), loss is zero — the commutator vanishes over Default
+    /// state. Since `Cyclic<4>` is abelian, `A·B·state == B·A·state` for
+    /// all strategies, so commutators over `TestBundle` always vanish
+    /// (correct for abelian gauges).
+    pub struct TestBundle {
+        pub optic: IdentityPrism<[f64; 4]>,
+        pub strategy: Cyclic<4>,
+        pub fixed: StableFiber<[f64; 4]>,
+    }
+
+    impl TestBundle {
+        /// Construct a new bundle with a gauge strategy and kernel-certified flag.
+        pub fn new(strategy_shift: u8, kernel: bool) -> Self {
+            Self {
+                optic: IdentityPrism::new(),
+                strategy: Cyclic::<4>::new(strategy_shift),
+                fixed: StableFiber {
+                    state: [1.0, 2.0, 0.0, 0.0],
+                    kernel,
+                },
+            }
+        }
+
+        /// Construct with default (in-kernel) fixed point.
+        pub fn with_strategy(strategy_shift: u8) -> Self {
+            Self::new(strategy_shift, true)
+        }
+    }
+
+    impl Default for TestBundle {
+        fn default() -> Self {
+            Self::with_strategy(0)
+        }
+    }
+
+    impl Fiber for TestBundle {
+        type State = [f64; 4];
+    }
+
+    impl Connection for TestBundle {
+        type Optic = IdentityPrism<[f64; 4]>;
+        fn connection(&self) -> &IdentityPrism<[f64; 4]> {
+            &self.optic
+        }
+    }
+
+    impl Gauge for TestBundle {
+        type Group = Cyclic<4>;
+        fn gauge(&self) -> &Cyclic<4> {
+            &self.strategy
+        }
+        fn act_on(&self, state: &[f64; 4]) -> [f64; 4] {
+            let k = self.strategy.value() as usize % 4;
+            let mut out = [0.0; 4];
+            for i in 0..4 {
+                out[i] = state[(i + k) % 4];
+            }
+            out
+        }
+    }
+
+    impl Transport for TestBundle {
+        type Holonomy = ScalarLoss;
+        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], Infallible, ScalarLoss> {
+            let compressed = [state[0], state[1], 0.0, 0.0];
+            let loss = state[2].abs() + state[3].abs();
+            if loss == 0.0 {
+                Imperfect::success(compressed)
+            } else {
+                Imperfect::partial(compressed, ScalarLoss::new(loss))
+            }
+        }
+    }
+
+    impl Closure for TestBundle {
+        type Fixed = StableFiber<[f64; 4]>;
+        fn close(&self) -> &StableFiber<[f64; 4]> {
+            &self.fixed
+        }
+    }
+
+    /// Full bundle carrier where transport loss depends on the *bundle's*
+    /// strategy value rather than the state.
+    ///
+    /// Loss on `transport(state)` = `strategy.value() as f64`, regardless
+    /// of state. This makes commutators over pairs of `LiquidTestBundle`
+    /// non-vanishing whenever their strategies differ — exactly what
+    /// property tests for Pillar II (algedonic threshold) and Pillar III
+    /// (viability persistence) require.
+    pub struct LiquidTestBundle {
+        pub optic: IdentityPrism<[f64; 4]>,
+        pub strategy: Cyclic<4>,
+        pub fixed: StableFiber<[f64; 4]>,
+    }
+
+    impl LiquidTestBundle {
+        pub fn new(strategy_shift: u8, kernel: bool) -> Self {
+            Self {
+                optic: IdentityPrism::new(),
+                strategy: Cyclic::<4>::new(strategy_shift),
+                fixed: StableFiber {
+                    state: [1.0, 2.0, 0.0, 0.0],
+                    kernel,
+                },
+            }
+        }
+
+        pub fn with_strategy(strategy_shift: u8) -> Self {
+            Self::new(strategy_shift, true)
+        }
+    }
+
+    impl Default for LiquidTestBundle {
+        fn default() -> Self {
+            Self::with_strategy(0)
+        }
+    }
+
+    impl Fiber for LiquidTestBundle {
+        type State = [f64; 4];
+    }
+
+    impl Connection for LiquidTestBundle {
+        type Optic = IdentityPrism<[f64; 4]>;
+        fn connection(&self) -> &IdentityPrism<[f64; 4]> {
+            &self.optic
+        }
+    }
+
+    impl Gauge for LiquidTestBundle {
+        type Group = Cyclic<4>;
+        fn gauge(&self) -> &Cyclic<4> {
+            &self.strategy
+        }
+        fn act_on(&self, state: &[f64; 4]) -> [f64; 4] {
+            let k = self.strategy.value() as usize % 4;
+            let mut out = [0.0; 4];
+            for i in 0..4 {
+                out[i] = state[(i + k) % 4];
+            }
+            out
+        }
+    }
+
+    impl Transport for LiquidTestBundle {
+        type Holonomy = ScalarLoss;
+        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], Infallible, ScalarLoss> {
+            let strategy_loss = self.strategy.value() as f64;
+            if strategy_loss == 0.0 {
+                Imperfect::success(*state)
+            } else {
+                Imperfect::partial(*state, ScalarLoss::new(strategy_loss))
+            }
+        }
+    }
+
+    impl Closure for LiquidTestBundle {
+        type Fixed = StableFiber<[f64; 4]>;
+        fn close(&self) -> &StableFiber<[f64; 4]> {
+            &self.fixed
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::examples::*;
+    use super::*;
+    use crate::ScalarLoss;
+
+    // Local wrapper so existing tests keep their call-sites unchanged.
+    fn make_bundle(strategy_shift: u8, kernel: bool) -> TestBundle {
+        TestBundle::new(strategy_shift, kernel)
+    }
+
+    #[test]
+    fn fiber_has_state() {
+        let _f = TestFiber;
+        let _: <TestFiber as Fiber>::State = [1.0, 2.0, 3.0, 4.0];
+    }
+
     #[test]
     fn connection_requires_fiber() {
-        let c = TestConnection {
-            optic: IdentityPrism::new(),
-        };
+        let c = TestConnection::new();
         // Witnessed by being able to ask for the connection at all.
         let _ = c.connection();
     }
@@ -418,73 +639,7 @@ mod tests {
         }
     }
 
-    // --- The full bundle test carrier ---
-
-    struct TestBundle {
-        optic: IdentityPrism<[f64; 4]>,
-        // The gauge: an element of Z/4Z, rotating the four-vector by a
-        // cyclic shift of `strategy` positions.
-        strategy: Cyclic<4>,
-        fixed: StableFiber<[f64; 4]>,
-    }
-
-    impl Fiber for TestBundle {
-        type State = [f64; 4];
-    }
-
-    impl Connection for TestBundle {
-        type Optic = IdentityPrism<[f64; 4]>;
-        fn connection(&self) -> &IdentityPrism<[f64; 4]> {
-            &self.optic
-        }
-    }
-
-    impl Gauge for TestBundle {
-        type Group = Cyclic<4>;
-        fn gauge(&self) -> &Cyclic<4> {
-            &self.strategy
-        }
-        fn act_on(&self, state: &[f64; 4]) -> [f64; 4] {
-            // Cyclic shift of the state by `strategy.value()` positions.
-            let k = self.strategy.0 as usize % 4;
-            let mut out = [0.0; 4];
-            for i in 0..4 {
-                out[i] = state[(i + k) % 4];
-            }
-            out
-        }
-    }
-
-    impl Transport for TestBundle {
-        type Holonomy = ScalarLoss;
-        fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], Infallible, ScalarLoss> {
-            let compressed = [state[0], state[1], 0.0, 0.0];
-            let loss = state[2].abs() + state[3].abs();
-            if loss == 0.0 {
-                Imperfect::success(compressed)
-            } else {
-                Imperfect::partial(compressed, ScalarLoss::new(loss))
-            }
-        }
-    }
-
-    impl Closure for TestBundle {
-        type Fixed = StableFiber<[f64; 4]>;
-        fn close(&self) -> &StableFiber<[f64; 4]> {
-            &self.fixed
-        }
-    }
-
-    fn make_bundle(strategy_shift: u8, kernel: bool) -> TestBundle {
-        TestBundle {
-            optic: IdentityPrism::new(),
-            strategy: Cyclic::<4>::new(strategy_shift),
-            fixed: StableFiber {
-                state: [1.0, 2.0, 0.0, 0.0],
-                kernel,
-            },
-        }
-    }
+    // --- The full bundle test carrier (imported from examples) ---
 
     #[test]
     fn gauge_requires_connection() {

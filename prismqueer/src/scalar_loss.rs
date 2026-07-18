@@ -7,7 +7,7 @@ use terni::{Loss, Metric};
 /// This is core's own Loss implementation, replacing the former
 /// terni::ShannonLoss that was removed upstream. It wraps an f64
 /// and implements the Loss monoid.
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Default)]
 pub struct ScalarLoss(pub f64);
 
 impl ScalarLoss {
