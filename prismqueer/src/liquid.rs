@@ -50,6 +50,9 @@
 // `Transport` is a supertrait of `Gauge`, so importing `Transport` alone
 // is sufficient for the trait-solver to reach `act_on` via the supertrait chain.
 use crate::bundle::Transport;
+use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use terni::{Diagnostic, Loss, Metric, PropertyVerdict};
 
 // ──────────────────────────────────────────────────────────────────
@@ -455,6 +458,265 @@ pub mod pillar {
                 "viability persistence below threshold over window",
             ))
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Arc 2A — Sample + Arbitrary + forall (property-based-testing surface).
+    //
+    // Per Mara witnessed-property-inference spec (mirror repo)
+    // §7.1 + §7.3 + §9.2, Hypothesis-style choice-sequence buffer
+    // with deterministic replay + on-demand SplitMix64 extension.
+    //
+    // The buffer IS the trace of decisions; two samples with the
+    // same buffer produce byte-identical draws — this is what makes
+    // shrinking + content-addressed verdict cache work.
+    //
+    // Alex 2026-07-18 direction: "the full statespace covered liquid
+    // floor boards." This is the first board — the surface Void's
+    // default @peer stands on when running rust/ altitude property
+    // tests. All state paths are admitted by pillar::forall verdicts.
+    // ─────────────────────────────────────────────────────────────────
+
+    static SAMPLE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// SplitMix64 — deterministic 64-bit PRNG for on-demand buffer
+    /// extension. Zero-deps; standard splitmix64 constants from
+    /// Steele-Lea-Flood 2014 "Fast Splittable Pseudorandom Number
+    /// Generators" (OOPSLA).
+    fn splitmix64(mut z: u64) -> u64 {
+        z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let z1 = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        let z2 = (z1 ^ (z1 >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z2 ^ (z2 >> 31)
+    }
+
+    /// Hypothesis-style choice-sequence buffer with deterministic
+    /// replay + on-demand extension.
+    ///
+    /// The buffer IS the trace of decisions the property test made.
+    /// `Sample::from_bytes(bytes)` replays those decisions byte-for-
+    /// byte; `Sample::new()` seeds fresh from time+counter for random
+    /// exploration; both extend the buffer via SplitMix64 when a draw
+    /// exceeds the current buffer.
+    ///
+    /// Two Samples with byte-equal buffers produce byte-equal draws
+    /// — this is what makes shrinking work (mutate buffer bytes,
+    /// replay to observe verdict-delta) AND what makes content-
+    /// addressed verdict caches work (`sha256(spec_oid || target_oid
+    /// || buffer_oid)` uniquely keys a verdict).
+    pub struct Sample {
+        buffer: Vec<u8>,
+        position: usize,
+        /// Seed for SplitMix64 extension when position exceeds buffer.
+        /// Derived from initial buffer hash (`from_bytes`) or from
+        /// time+counter (`new`). Persists across draws so extension
+        /// is deterministic-per-Sample.
+        seed: u64,
+        /// Optional Fate bias distribution (composition seam for
+        /// mirror-side @kintsugi/butterfly + roomba walkers).
+        /// Reserved for Arc 5; not read yet at Arc 2A.
+        #[allow(dead_code)]
+        bias: Option<[f64; 5]>,
+    }
+
+    impl Sample {
+        /// Fresh Sample seeded from time+counter. Non-deterministic
+        /// across process runs (by design — random exploration). Use
+        /// [`Sample::from_bytes`] for deterministic replay.
+        pub fn new() -> Self {
+            let counter = SAMPLE_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0);
+            let seed = splitmix64(
+                time.wrapping_add(counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+            );
+            Self {
+                buffer: Vec::new(),
+                position: 0,
+                seed,
+                bias: None,
+            }
+        }
+
+        /// Sample seeded from an explicit byte-buffer. Two Samples
+        /// with the same buffer produce byte-identical draws
+        /// (deterministic replay). Extension when the buffer is
+        /// exhausted uses SplitMix64 seeded from the buffer's SHA-256.
+        pub fn from_bytes(buffer: Vec<u8>) -> Self {
+            let seed = if buffer.is_empty() {
+                0
+            } else {
+                let mut hasher = Sha256::new();
+                hasher.update(&buffer);
+                let hash = hasher.finalize();
+                u64::from_le_bytes(hash[0..8].try_into().unwrap())
+            };
+            Self {
+                buffer,
+                position: 0,
+                seed,
+                bias: None,
+            }
+        }
+
+        /// Current read position in the buffer. Advances by one per
+        /// [`draw_bool`]; by 8 per [`draw_integer`] or 8-byte draws;
+        /// by 4 per `i32`/`u32` draws.
+        pub fn depth(&self) -> usize {
+            self.position
+        }
+
+        /// Content-address the buffer via SHA-256. Two Samples with
+        /// the same buffer bytes have the same `buffer_oid`; this is
+        /// the key material for the `@mirror/store/liquid` verdict
+        /// cache per witnessed-property-inference spec §5.2.
+        pub fn buffer_oid(&self) -> [u8; 32] {
+            let mut hasher = Sha256::new();
+            hasher.update(&self.buffer);
+            hasher.finalize().into()
+        }
+
+        /// Set Fate bias distribution. Reserved seam for Arc 5
+        /// (Roomba stigmergy) + @kintsugi/butterfly walker composition
+        /// per mirror spec §7.5.
+        #[allow(dead_code)]
+        pub fn set_bias(&mut self, bias: &[f64; 5]) {
+            self.bias = Some(*bias);
+        }
+
+        /// Read next byte; extend buffer via SplitMix64 if exhausted.
+        fn read_u8(&mut self) -> u8 {
+            if self.position >= self.buffer.len() {
+                self.seed = splitmix64(self.seed);
+                self.buffer.extend_from_slice(&self.seed.to_le_bytes());
+            }
+            let byte = self.buffer[self.position];
+            self.position += 1;
+            byte
+        }
+
+        /// Read next N bytes; extends buffer as needed.
+        fn read_bytes(&mut self, n: usize) -> Vec<u8> {
+            (0..n).map(|_| self.read_u8()).collect()
+        }
+
+        /// Draw an integer uniformly in `[min, max]` (inclusive both
+        /// sides). Consumes 8 bytes from the buffer.
+        ///
+        /// If `max < min`, returns `min` (defensive; caller should
+        /// pass a valid range).
+        pub fn draw_integer(&mut self, min: i64, max: i64) -> i64 {
+            if max <= min {
+                return min;
+            }
+            let bytes: [u8; 8] = self.read_bytes(8).try_into().unwrap();
+            let raw = u64::from_le_bytes(bytes);
+            let range = (max - min + 1) as u64;
+            min + (raw % range) as i64
+        }
+
+        /// Draw a bool with p=0.5. Consumes 1 byte from the buffer.
+        pub fn draw_bool(&mut self) -> bool {
+            (self.read_u8() & 1) == 1
+        }
+
+        /// Draw an element uniformly from a slice of choices.
+        /// Consumes 8 bytes (via [`draw_integer`]).
+        ///
+        /// Panics if `choices` is empty.
+        pub fn draw_from<T: Copy>(&mut self, choices: &[T]) -> T {
+            assert!(!choices.is_empty(), "draw_from requires non-empty choices");
+            let idx = self.draw_integer(0, (choices.len() - 1) as i64) as usize;
+            choices[idx]
+        }
+    }
+
+    impl Default for Sample {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// Trait for types that can be sampled from a [`Sample`].
+    ///
+    /// Implement this for domain types to enable [`forall`] over them.
+    /// Impls provided for `i32`, `i64`, `u32`, `u64`, and `bool`.
+    pub trait Arbitrary {
+        fn arbitrary(sample: &mut Sample) -> Self;
+    }
+
+    impl Arbitrary for bool {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            sample.draw_bool()
+        }
+    }
+
+    impl Arbitrary for i32 {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            let bytes: [u8; 4] = sample.read_bytes(4).try_into().unwrap();
+            i32::from_le_bytes(bytes)
+        }
+    }
+
+    impl Arbitrary for i64 {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            let bytes: [u8; 8] = sample.read_bytes(8).try_into().unwrap();
+            i64::from_le_bytes(bytes)
+        }
+    }
+
+    impl Arbitrary for u32 {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            let bytes: [u8; 4] = sample.read_bytes(4).try_into().unwrap();
+            u32::from_le_bytes(bytes)
+        }
+    }
+
+    impl Arbitrary for u64 {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            let bytes: [u8; 8] = sample.read_bytes(8).try_into().unwrap();
+            u64::from_le_bytes(bytes)
+        }
+    }
+
+    /// The property-based-testing runner.
+    ///
+    /// Draws `n` independent samples of `T`, applies `f` to each, and
+    /// folds the resulting verdicts via [`PropertyVerdict::merge_with`]
+    /// starting from `Pass`.
+    ///
+    /// Semantics (inherited from `merge_with`):
+    /// - `Fail` dominates: any counterexample → unified `Fail`
+    /// - `Pass` is the neutral element
+    /// - Two `Partial`s take min confidence + union diagnostics
+    ///
+    /// Composes cleanly with all other pillar primitives: the
+    /// per-iteration verdict `f(value)` can invoke
+    /// [`algedonic`](super::pillar::algedonic),
+    /// [`viability`](super::pillar::viability),
+    /// [`algedonic_of_magnitude`](super::pillar::algedonic_of_magnitude),
+    /// [`viability_of_magnitudes`](super::pillar::viability_of_magnitudes),
+    /// [`dispatch_ambiguity`](super::pillar::dispatch_ambiguity), or
+    /// return a `PropertyVerdict` directly — the fold contract holds.
+    ///
+    /// Per Mara witnessed-property-inference spec (mirror repo)
+    /// §7.3 + §9.2 Arc 2. First liquid floor board for Void's default
+    /// @peer to stand on at rust/ altitude.
+    pub fn forall<T, F>(n: usize, mut f: F) -> PropertyVerdict
+    where
+        T: Arbitrary,
+        F: FnMut(T) -> PropertyVerdict,
+    {
+        let mut unified = PropertyVerdict::Pass;
+        for _ in 0..n {
+            let mut sample = Sample::new();
+            let value = T::arbitrary(&mut sample);
+            let verdict = f(value);
+            unified.merge_with(&verdict);
+        }
+        unified
     }
 }
 
