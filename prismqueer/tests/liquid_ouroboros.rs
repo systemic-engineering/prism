@@ -29,7 +29,8 @@
 
 #![cfg(feature = "bundle")]
 
-use prismqueer::bundle::examples::{LiquidTestBundle, TestBundle};
+use prismqueer::bundle::examples::{LiquidTestBundle, Perm3, PermBundle, TestBundle};
+use prismqueer::bundle::GroupStructure;
 use prismqueer::liquid::prelude::*;
 use prismqueer::{Loss, Metric, ScalarLoss};
 
@@ -388,4 +389,160 @@ fn prelude_reexports_delightful_surface() {
         let _p: PropertyVerdict = PropertyVerdict::Pass;
     }
     _uses_prelude();
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 12. Perm3 group laws — the substrate-honest S3 witness.
+// ──────────────────────────────────────────────────────────────────
+
+#[test]
+/// Identity law: `id ∘ x = x = x ∘ id` for every element of S3.
+fn perm3_identity_law() {
+    let id = Perm3::identity();
+    for &x in Perm3::ALL.iter() {
+        assert_eq!(id.compose(&x), x, "left identity failed for {x:?}");
+        assert_eq!(x.compose(&id), x, "right identity failed for {x:?}");
+    }
+}
+
+#[test]
+/// Inverse law: `x ∘ x⁻¹ = id = x⁻¹ ∘ x` for every element of S3.
+fn perm3_inverse_law() {
+    let id = Perm3::identity();
+    for &x in Perm3::ALL.iter() {
+        assert_eq!(x.compose(&x.inverse()), id, "right inverse failed for {x:?}");
+        assert_eq!(x.inverse().compose(&x), id, "left inverse failed for {x:?}");
+    }
+}
+
+#[test]
+/// Associativity: `(a ∘ b) ∘ c = a ∘ (b ∘ c)` across all 216 triples.
+fn perm3_associativity() {
+    for &a in Perm3::ALL.iter() {
+        for &b in Perm3::ALL.iter() {
+            for &c in Perm3::ALL.iter() {
+                let lhs = a.compose(&b).compose(&c);
+                let rhs = a.compose(&b.compose(&c));
+                assert_eq!(lhs, rhs, "associativity failed: ({a:?} ∘ {b:?}) ∘ {c:?}");
+            }
+        }
+    }
+}
+
+#[test]
+/// S3 is non-abelian: witnessed at the smallest instance —
+/// `(0 1) ∘ (1 2) ≠ (1 2) ∘ (0 1)`.
+fn perm3_is_non_abelian_witnessed() {
+    let ab = Perm3::SWAP_01.compose(&Perm3::SWAP_12);
+    let ba = Perm3::SWAP_12.compose(&Perm3::SWAP_01);
+    assert_ne!(ab, ba, "S3 non-abelian witness failed: ab={ab:?} ba={ba:?}");
+    // Specifically: swap01 ∘ swap12 should be the 3-cycle CYCLE_012.
+    assert_eq!(ab, Perm3::CYCLE_012, "swap01 ∘ swap12 = CYCLE_012");
+    assert_eq!(ba, Perm3::CYCLE_021, "swap12 ∘ swap01 = CYCLE_021");
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 13. PermBundle commutator — non-abelian witness has real work.
+// ──────────────────────────────────────────────────────────────────
+
+#[test]
+/// Non-commuting permutations MUST produce non-vanishing commutator.
+/// This is the substrate-honest deepening: iter 1 witnessed the
+/// machinery on `Cyclic<N>` where all commutators trivially vanish;
+/// iter 2 witnesses the machinery on `S3` where the commutator has
+/// genuine mathematical work to do.
+fn perm_bundle_commutator_nonzero_for_non_commuting_permutations() {
+    let a = PermBundle::from_perm(Perm3::SWAP_01);
+    let b = PermBundle::from_perm(Perm3::SWAP_12);
+    let state = [10, 20, 30];
+    let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+    assert!(
+        !m.is_zero(),
+        "non-commuting perms MUST produce non-vanishing commutator; got {m:?}",
+    );
+}
+
+#[test]
+/// Identity commutes with every element; commutator must vanish.
+fn perm_bundle_commutator_vanishes_when_one_gauge_is_identity() {
+    let id = PermBundle::from_perm(Perm3::IDENTITY);
+    let state = [10, 20, 30];
+    for &x in Perm3::ALL.iter() {
+        let bx = PermBundle::from_perm(x);
+        let m1 = LiquidConnection::commutator_magnitude(&id, &bx, &state);
+        let m2 = LiquidConnection::commutator_magnitude(&bx, &id, &state);
+        assert!(m1.is_zero(), "[id, {x:?}] must vanish; got {m1:?}");
+        assert!(m2.is_zero(), "[{x:?}, id] must vanish; got {m2:?}");
+    }
+}
+
+#[test]
+/// Same permutation trivially commutes with itself.
+fn perm_bundle_commutator_self_annihilates_across_s3() {
+    let state = [10, 20, 30];
+    for &x in Perm3::ALL.iter() {
+        let a = PermBundle::from_perm(x);
+        let b = PermBundle::from_perm(x);
+        let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+        assert!(m.is_zero(), "self-annihilation failed for {x:?}: {m:?}");
+    }
+}
+
+#[test]
+/// Antisymmetry `‖[A, B]‖ == ‖[B, A]‖` holds across all 36 S3×S3 pairs.
+fn perm_bundle_commutator_antisymmetric_across_full_s3_grid() {
+    let state = [10, 20, 30];
+    for &pa in Perm3::ALL.iter() {
+        for &pb in Perm3::ALL.iter() {
+            let a = PermBundle::from_perm(pa);
+            let b = PermBundle::from_perm(pb);
+            let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
+            let ba = LiquidConnection::commutator_magnitude(&b, &a, &state);
+            assert_eq!(
+                ab, ba,
+                "antisymmetry failed for {pa:?}/{pb:?}: |[A,B]|={ab:?} vs |[B,A]|={ba:?}",
+            );
+        }
+    }
+}
+
+#[test]
+/// Pillar II algedonic verdict Pass when non-abelian commutator
+/// magnitude exceeds theta — the machinery detects the signal.
+fn perm_bundle_pillar_algedonic_pass_on_non_commuting_pair() {
+    let a = PermBundle::from_perm(Perm3::SWAP_01);
+    let b = PermBundle::from_perm(Perm3::SWAP_12);
+    let state = [10, 20, 30];
+    let c = commutator(&a, &b, &state);
+    // magnitude is non-zero (verified above); with theta = 0 the
+    // Pass gate opens on any positive signal.
+    let theta = ScalarLoss::new(0.0);
+    let verdict = pillar::algedonic(&c, &theta);
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
+/// PermBundle commutator inherits `Metric::triangle` across triples.
+/// Property inherited from Metric — witnessed for the non-abelian
+/// carrier, closing the four core properties (antisymmetric,
+/// self-annihilating, non-negative, triangle) for the substrate-
+/// honest S3 witness.
+fn perm_bundle_commutator_triangle_inequality_holds() {
+    let state = [10, 20, 30];
+    for &pa in Perm3::ALL.iter() {
+        for &pb in Perm3::ALL.iter() {
+            for &pc in Perm3::ALL.iter() {
+                let a = PermBundle::from_perm(pa);
+                let b = PermBundle::from_perm(pb);
+                let cc = PermBundle::from_perm(pc);
+                let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
+                let bc = LiquidConnection::commutator_magnitude(&b, &cc, &state);
+                let ac = LiquidConnection::commutator_magnitude(&a, &cc, &state);
+                assert!(
+                    ab.triangle(&bc, &ac),
+                    "triangle failed for {pa:?}/{pb:?}/{pc:?}: ab={ab:?} bc={bc:?} ac={ac:?}",
+                );
+            }
+        }
+    }
 }

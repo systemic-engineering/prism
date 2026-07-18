@@ -563,6 +563,161 @@ pub mod examples {
             &self.fixed
         }
     }
+
+    // ───────────────────────────────────────────────────────────────
+    // Perm3 — the smallest non-abelian group, and PermBundle carrier.
+    // ───────────────────────────────────────────────────────────────
+
+    /// The symmetric group `S3` — permutations of three elements.
+    /// The smallest non-abelian group. Six elements: identity + three
+    /// transpositions + two 3-cycles.
+    ///
+    /// Represented as the image array `[image[0], image[1], image[2]]`
+    /// where `image[i]` is where index `i` maps to. E.g., `[1, 0, 2]`
+    /// is the transposition swapping 0 and 1.
+    ///
+    /// Non-abelian gauge groups — unlike `Cyclic<N>` — have
+    /// non-vanishing commutators. This carrier is what
+    /// `LiquidConnection::commutator_magnitude` needs to have genuine
+    /// work to do: for `a = (1 2)` and `b = (2 3)`, `a∘b = (1 2 3)` but
+    /// `b∘a = (1 3 2)`, so the commutator holonomies at any
+    /// position-sensitive state must differ.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Perm3(pub [u8; 3]);
+
+    impl Perm3 {
+        /// The identity permutation `[0, 1, 2]`.
+        pub const IDENTITY: Perm3 = Perm3([0, 1, 2]);
+        /// Transposition `(0 1)` — swaps 0 and 1.
+        pub const SWAP_01: Perm3 = Perm3([1, 0, 2]);
+        /// Transposition `(1 2)` — swaps 1 and 2.
+        pub const SWAP_12: Perm3 = Perm3([0, 2, 1]);
+        /// Transposition `(0 2)` — swaps 0 and 2.
+        pub const SWAP_02: Perm3 = Perm3([2, 1, 0]);
+        /// 3-cycle `(0 1 2)` — 0→1, 1→2, 2→0.
+        pub const CYCLE_012: Perm3 = Perm3([1, 2, 0]);
+        /// 3-cycle `(0 2 1)` — 0→2, 1→0, 2→1.
+        pub const CYCLE_021: Perm3 = Perm3([2, 0, 1]);
+
+        /// All six elements of S3, in a fixed enumeration order.
+        pub const ALL: [Perm3; 6] = [
+            Perm3::IDENTITY,
+            Perm3::SWAP_01,
+            Perm3::SWAP_12,
+            Perm3::SWAP_02,
+            Perm3::CYCLE_012,
+            Perm3::CYCLE_021,
+        ];
+    }
+
+    impl GroupStructure for Perm3 {
+        fn identity() -> Self {
+            Perm3::IDENTITY
+        }
+
+        fn inverse(&self) -> Self {
+            // Inverse permutation: if self.0[i] = j, then inverse[j] = i.
+            let mut inv = [0u8; 3];
+            for i in 0..3 {
+                inv[self.0[i] as usize] = i as u8;
+            }
+            Perm3(inv)
+        }
+
+        fn compose(&self, other: &Self) -> Self {
+            // (self ∘ other)(i) = self(other(i))
+            let mut out = [0u8; 3];
+            for i in 0..3 {
+                out[i] = self.0[other.0[i] as usize];
+            }
+            Perm3(out)
+        }
+    }
+
+    /// Full bundle carrier over `S3` — the non-abelian witness.
+    ///
+    /// Fiber state is `[i32; 3]`. Gauge is `Perm3` (S3). Transport
+    /// holonomy is `state[0].abs() as f64` — permutation-sensitive by
+    /// construction: whichever value ends up in position 0 after the
+    /// gauge action determines the loss.
+    pub struct PermBundle {
+        pub optic: IdentityPrism<[i32; 3]>,
+        pub perm: Perm3,
+        pub fixed: StableFiber<[i32; 3]>,
+    }
+
+    impl PermBundle {
+        pub fn new(perm: Perm3, kernel: bool) -> Self {
+            Self {
+                optic: IdentityPrism::new(),
+                perm,
+                fixed: StableFiber {
+                    state: [0, 0, 0],
+                    kernel,
+                },
+            }
+        }
+
+        pub fn from_perm(perm: Perm3) -> Self {
+            Self::new(perm, true)
+        }
+    }
+
+    impl Default for PermBundle {
+        fn default() -> Self {
+            Self::from_perm(Perm3::IDENTITY)
+        }
+    }
+
+    impl Fiber for PermBundle {
+        type State = [i32; 3];
+    }
+
+    impl Connection for PermBundle {
+        type Optic = IdentityPrism<[i32; 3]>;
+        fn connection(&self) -> &IdentityPrism<[i32; 3]> {
+            &self.optic
+        }
+    }
+
+    impl Gauge for PermBundle {
+        type Group = Perm3;
+        fn gauge(&self) -> &Perm3 {
+            &self.perm
+        }
+        fn act_on(&self, state: &[i32; 3]) -> [i32; 3] {
+            // Permute state entries: value at index i goes to index perm.0[i].
+            let mut out = [0i32; 3];
+            for i in 0..3 {
+                out[self.perm.0[i] as usize] = state[i];
+            }
+            out
+        }
+    }
+
+    impl Transport for PermBundle {
+        type Holonomy = ScalarLoss;
+        fn transport(&self, state: &[i32; 3]) -> Imperfect<[i32; 3], Infallible, ScalarLoss> {
+            // Loss = |state[0]| as f64. Permutation-sensitive by
+            // construction: whichever value ended up in position 0
+            // determines the loss. This makes commutator non-vanishing
+            // when non-commuting permutations move different values
+            // into position 0.
+            let loss = state[0].abs() as f64;
+            if loss == 0.0 {
+                Imperfect::success(*state)
+            } else {
+                Imperfect::partial(*state, ScalarLoss::new(loss))
+            }
+        }
+    }
+
+    impl Closure for PermBundle {
+        type Fixed = StableFiber<[i32; 3]>;
+        fn close(&self) -> &StableFiber<[i32; 3]> {
+            &self.fixed
+        }
+    }
 }
 
 #[cfg(test)]
