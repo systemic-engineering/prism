@@ -220,6 +220,46 @@ pub mod pillar {
         PropertyVerdict::Pass
     }
 
+    /// **Pillar V (fate composition) — `HolonomyHealth` verdict marshaling.**
+    ///
+    /// Convert fate's `HolonomyHealth` classification into a
+    /// `PropertyVerdict`. The mapping:
+    ///
+    /// - `Healthy` → `Pass`
+    /// - `TooShallow` → `Partial { confidence: 0.5, .. }` — step barely
+    ///   moved the manifold; signal present but not decisive
+    /// - `OverCutting` → `Fail` — geometric distortion; loss > 10×
+    ///   `BERRY_PHASE` (`= 0.847`, the fiber-bundle constant per
+    ///   `crate::fate::feature`)
+    ///
+    /// **Substrate-honest divergence from spec §7.2:** Mara's spec
+    /// proposed a `theta_pass` parameter, but `HolonomyHealth` (per
+    /// `crate::fate::feature::holonomy_health`) is already a three-way
+    /// classification against `BERRY_PHASE`. The threshold is baked
+    /// into the fate carrier; a pillar-side theta would be redundant.
+    /// Reed adjudication: match on the enum directly; report the
+    /// divergence in the spec's next REED-INLINE cascade.
+    ///
+    /// Behind `fate` feature.
+    #[cfg(feature = "fate")]
+    pub fn of_health(
+        health: &crate::fate::feature::HolonomyHealth,
+    ) -> PropertyVerdict {
+        use crate::fate::feature::HolonomyHealth;
+        match health {
+            HolonomyHealth::Healthy => PropertyVerdict::Pass,
+            HolonomyHealth::TooShallow => PropertyVerdict::Partial {
+                confidence: 0.5,
+                diagnostics: vec![Diagnostic::new(
+                    "holonomy too shallow: step barely moved the manifold",
+                )],
+            },
+            HolonomyHealth::OverCutting => PropertyVerdict::Fail(Diagnostic::new(
+                "holonomy over-cutting: geometric distortion (loss > 10× BERRY_PHASE)",
+            )),
+        }
+    }
+
     /// **Fold a sequence of verdicts into a single unified verdict.**
     ///
     /// Uses `PropertyVerdict::merge_with` starting from `Pass`.
