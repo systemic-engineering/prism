@@ -521,6 +521,73 @@ fn perm_bundle_pillar_algedonic_pass_on_non_commuting_pair() {
     assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
 }
 
+// ──────────────────────────────────────────────────────────────────
+// 14. Pillar III generalized — viability_of_magnitudes over raw Loss.
+// ──────────────────────────────────────────────────────────────────
+
+#[test]
+/// viability_of_magnitudes Pass when accumulated exceeds theta.
+fn viability_of_magnitudes_pass_above_threshold() {
+    let history = vec![
+        ScalarLoss::new(3.0),
+        ScalarLoss::new(3.0),
+        ScalarLoss::new(3.0),
+    ];
+    // accumulated = 9.0 (ScalarLoss::combine is addition), theta = 5.0 → Pass
+    let theta = ScalarLoss::new(5.0);
+    let verdict = pillar::viability_of_magnitudes(&history, &theta, 3);
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
+/// viability_of_magnitudes Fail when accumulated below threshold.
+fn viability_of_magnitudes_fail_below_threshold() {
+    let history = vec![
+        ScalarLoss::new(1.0),
+        ScalarLoss::new(1.0),
+        ScalarLoss::new(1.0),
+    ];
+    // accumulated = 3.0, theta = 10.0 → Fail
+    let theta = ScalarLoss::new(10.0);
+    let verdict = pillar::viability_of_magnitudes(&history, &theta, 3);
+    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+}
+
+#[test]
+/// viability_of_magnitudes Partial when history shorter than window.
+fn viability_of_magnitudes_partial_when_short() {
+    let history = vec![ScalarLoss::new(3.0), ScalarLoss::new(3.0)];
+    let theta = ScalarLoss::new(1.0);
+    // history.len() = 2 < omega = 5 → Partial with confidence 2/5.
+    let verdict = pillar::viability_of_magnitudes(&history, &theta, 5);
+    match verdict {
+        PropertyVerdict::Partial { confidence, .. } => {
+            assert!((confidence - 0.4).abs() < 1e-9, "confidence = {confidence}");
+        }
+        other => panic!("expected Partial, got {other:?}"),
+    }
+}
+
+#[test]
+/// viability_of_magnitudes windows properly — only the last omega
+/// entries contribute to the accumulated magnitude.
+fn viability_of_magnitudes_uses_last_omega_entries() {
+    // Early tail is huge, but window is small — recent entries decide.
+    let history = vec![
+        ScalarLoss::new(100.0), // dropped (outside window)
+        ScalarLoss::new(100.0), // dropped
+        ScalarLoss::new(1.0),   // window[0]
+        ScalarLoss::new(1.0),   // window[1]
+    ];
+    // omega = 2, window = [1.0, 1.0], accumulated = 2.0, theta = 5.0 → Fail
+    let theta = ScalarLoss::new(5.0);
+    let verdict = pillar::viability_of_magnitudes(&history, &theta, 2);
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "windowing failed — got {verdict:?}",
+    );
+}
+
 #[test]
 /// PermBundle commutator inherits `Metric::triangle` across triples.
 /// Property inherited from Metric — witnessed for the non-abelian

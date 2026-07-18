@@ -260,6 +260,57 @@ pub mod pillar {
         }
     }
 
+    /// **Pillar III — viability persistence, generalized.**
+    ///
+    /// Accumulate raw `Loss` magnitudes over a temporal window
+    /// `omega` via `Loss::combine`. Pass iff the accumulated `Loss`
+    /// exceeds `theta`.
+    ///
+    /// This is the shape of Pillar III when the magnitudes come from
+    /// *substrate-specific* measurements — e.g. byte-shrinkage per
+    /// compilation tick from `mirror/rust/src/collapse.rs`, or
+    /// `rust_loc_non_increasing` deltas from
+    /// `@epistemologic/property/ouroboros_monotone` — rather than
+    /// commutator computations. See [`viability`] for the
+    /// commutator-flavored variant that takes
+    /// `&[Commutator<'a, C>]`.
+    ///
+    /// - Pass when accumulated `> theta`.
+    /// - Partial when `history.len() < omega`
+    ///   (`confidence = history.len() / omega`).
+    /// - Fail when the window is full but accumulated `<= theta`.
+    pub fn viability_of_magnitudes<L>(
+        history: &[L],
+        theta: &L,
+        omega: usize,
+    ) -> PropertyVerdict
+    where
+        L: Loss + PartialOrd,
+    {
+        if history.len() < omega {
+            return PropertyVerdict::Partial {
+                confidence: history.len() as f64 / omega.max(1) as f64,
+                diagnostics: vec![Diagnostic::new(
+                    "history shorter than viability window",
+                )],
+            };
+        }
+
+        let window = &history[history.len() - omega..];
+        let mut accumulated = L::zero();
+        for m in window {
+            accumulated = accumulated.combine(m.clone());
+        }
+
+        if &accumulated > theta {
+            PropertyVerdict::Pass
+        } else {
+            PropertyVerdict::Fail(Diagnostic::new(
+                "viability persistence below threshold over window",
+            ))
+        }
+    }
+
     /// **Pillar III — viability persistence.**
     ///
     /// Per Mara `3cd9a42` §5: sum the commutator magnitudes across a
