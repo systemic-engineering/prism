@@ -17,6 +17,14 @@ bundle = ["optics"]
 lambda = []
 lapack = ["dep:cc"]
 pq = ["dep:serde", "dep:serde_json"]
+# Fate — the 5-model inference selector, sibling-of-mind of prismqueer.
+# Source-mirrored from `/Users/alexwolf/dev/projects/fate/` per Alex
+# 2026-07-18 directive: "Let's pull fate into prismqueer::fate." fate/
+# crate stays intact per Q7 (leave-fate); prismqueer/src/fate/ is a
+# source-mirror. Divergence risk documented as forward-promise.
+fate = ["bundle"]
+fate-metal = ["fate", "dep:metal", "dep:objc"]
+fate-training = ["fate", "dep:serde", "dep:serde_json"]
 
 [dependencies]
 terni = { version = "0.7", path = "../imperfect" }
@@ -25,6 +33,9 @@ sha2 = "0.10"
 hex = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
+# Fate GPU Metal-runtime deps (feature-gated per `fate-metal`).
+metal = { version = "0.29", optional = true }
+objc = { version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

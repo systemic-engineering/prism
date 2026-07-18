@@ -71,6 +71,13 @@ pub mod ffi;
 #[cfg(feature = "lapack")]
 pub mod spectral_dimension;
 
+// Fate — the 5-model inference selector, source-mirrored from
+// `/Users/alexwolf/dev/projects/fate/` per Alex 2026-07-18 directive.
+// See `prismqueer/src/fate/mod.rs` module docblock for provenance +
+// divergence-risk forward-promise.
+#[cfg(feature = "fate")]
+pub mod fate;
+
 #[cfg(feature = "bundle")]
 pub use bundle::{
     Bundle, Closure, Connection, Cyclic, Fiber, Gauge, GroupStructure, IdentityPrism,
