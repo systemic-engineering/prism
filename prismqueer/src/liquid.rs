@@ -220,6 +220,29 @@ pub mod pillar {
         PropertyVerdict::Pass
     }
 
+    /// **Fold a sequence of verdicts into a single unified verdict.**
+    ///
+    /// Uses `PropertyVerdict::merge_with` starting from `Pass`.
+    /// Semantics: `Fail` dominates (any `Fail` in the sequence →
+    /// unified `Fail`); `Pass` is the neutral element; two
+    /// `Partial`s take min confidence + union diagnostics.
+    ///
+    /// Empty input → `Pass` (the neutral element).
+    ///
+    /// Substrate-honest formalization of the fold pattern that
+    /// mirror-side property tests (e.g. `rust/src/collapse.rs::
+    /// prop_tests::merged_algedonic_verdicts_pass_when_all_ticks_
+    /// positive`) previously did manually. Parallel to
+    /// [`viability_of_magnitudes`] + [`algedonic_of_magnitude`] —
+    /// completes the pillar composition surface.
+    pub fn fold(verdicts: &[PropertyVerdict]) -> PropertyVerdict {
+        let mut unified = PropertyVerdict::Pass;
+        for v in verdicts {
+            unified.merge_with(v);
+        }
+        unified
+    }
+
     /// **Pillar II — algedonic threshold, generalized.**
     ///
     /// Same Pass/Partial/Fail semantics as [`algedonic`] but on a

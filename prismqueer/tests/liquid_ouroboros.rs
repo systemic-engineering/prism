@@ -569,6 +569,69 @@ fn viability_of_magnitudes_partial_when_short() {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// 14b. pillar::fold verdict-fold helper (iter 9).
+// ──────────────────────────────────────────────────────────────────
+
+#[test]
+/// Empty input to fold → Pass (the neutral element).
+fn fold_empty_is_pass() {
+    let verdict = pillar::fold(&[]);
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
+/// All-Pass fold → Pass.
+fn fold_all_pass_is_pass() {
+    let verdict = pillar::fold(&[
+        PropertyVerdict::Pass,
+        PropertyVerdict::Pass,
+        PropertyVerdict::Pass,
+    ]);
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
+/// Any Fail in the sequence → unified Fail (Fail dominates).
+fn fold_with_any_fail_is_fail() {
+    let verdict = pillar::fold(&[
+        PropertyVerdict::Pass,
+        PropertyVerdict::Fail(Diagnostic::new("stalled")),
+        PropertyVerdict::Pass,
+    ]);
+    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+}
+
+#[test]
+/// All-Partial fold → Partial with min confidence + union
+/// diagnostics per merge_with semantics.
+fn fold_all_partial_takes_min_confidence() {
+    let verdict = pillar::fold(&[
+        PropertyVerdict::Partial {
+            confidence: 0.9,
+            diagnostics: vec![Diagnostic::new("a")],
+        },
+        PropertyVerdict::Partial {
+            confidence: 0.4,
+            diagnostics: vec![Diagnostic::new("b")],
+        },
+        PropertyVerdict::Partial {
+            confidence: 0.6,
+            diagnostics: vec![Diagnostic::new("c")],
+        },
+    ]);
+    match verdict {
+        PropertyVerdict::Partial { confidence, diagnostics } => {
+            assert!(
+                (confidence - 0.4).abs() < 1e-9,
+                "min confidence 0.4, got {confidence}",
+            );
+            assert_eq!(diagnostics.len(), 3, "expected 3 diagnostics");
+        }
+        other => panic!("expected Partial, got {other:?}"),
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // 15. Pillar II generalized — algedonic_of_magnitude over raw Loss.
 // ──────────────────────────────────────────────────────────────────
 
