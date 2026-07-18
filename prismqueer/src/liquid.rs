@@ -220,6 +220,43 @@ pub mod pillar {
         PropertyVerdict::Pass
     }
 
+    /// **Pillar II — algedonic threshold, generalized.**
+    ///
+    /// Same Pass/Partial/Fail semantics as [`algedonic`] but on a
+    /// raw `Loss` magnitude instead of a `Commutator` wrapper. Use
+    /// this when the magnitude comes from substrate-specific
+    /// measurements — e.g. a single collapse tick's byte-shrinkage
+    /// from `mirror/rust/src/collapse.rs`, or any measured `Loss`
+    /// that does not originate from a commutator computation.
+    ///
+    /// Parallel to [`viability_of_magnitudes`] (iter 4) — completes
+    /// the symmetric generalization of Pillar II + Pillar III to
+    /// domain-specific `Loss` values.
+    ///
+    /// - Pass when `magnitude > theta`.
+    /// - Fail when `magnitude.is_zero()` (no signal to detect).
+    /// - Partial when `0 < magnitude <= theta`
+    ///   (`confidence = 0.5` Rice-safe midpoint).
+    pub fn algedonic_of_magnitude<L>(magnitude: &L, theta: &L) -> PropertyVerdict
+    where
+        L: Loss + PartialOrd,
+    {
+        if magnitude > theta {
+            PropertyVerdict::Pass
+        } else if magnitude.is_zero() {
+            PropertyVerdict::Fail(Diagnostic::new(
+                "magnitude vanished; no algedonic signal",
+            ))
+        } else {
+            PropertyVerdict::Partial {
+                confidence: 0.5,
+                diagnostics: vec![Diagnostic::new(
+                    "algedonic signal present but below threshold",
+                )],
+            }
+        }
+    }
+
     /// **Pillar II — algedonic threshold.**
     ///
     /// Per Mara `3cd9a42` §4:

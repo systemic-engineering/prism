@@ -568,6 +568,46 @@ fn viability_of_magnitudes_partial_when_short() {
     }
 }
 
+// ──────────────────────────────────────────────────────────────────
+// 15. Pillar II generalized — algedonic_of_magnitude over raw Loss.
+// ──────────────────────────────────────────────────────────────────
+
+#[test]
+/// algedonic_of_magnitude Pass when magnitude > theta.
+fn algedonic_of_magnitude_pass_above_threshold() {
+    let magnitude = ScalarLoss::new(5.0);
+    let theta = ScalarLoss::new(1.0);
+    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
+/// algedonic_of_magnitude Fail when magnitude vanishes.
+fn algedonic_of_magnitude_fail_when_zero() {
+    let magnitude = ScalarLoss::zero();
+    let theta = ScalarLoss::new(1.0);
+    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
+    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+}
+
+#[test]
+/// algedonic_of_magnitude Partial when signal below threshold.
+fn algedonic_of_magnitude_partial_below_threshold_but_nonzero() {
+    let magnitude = ScalarLoss::new(0.3);
+    let theta = ScalarLoss::new(1.0);
+    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
+    match verdict {
+        PropertyVerdict::Partial { confidence, .. } => {
+            assert!((confidence - 0.5).abs() < 1e-9, "confidence = {confidence}");
+        }
+        other => panic!("expected Partial, got {other:?}"),
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 16. viability_of_magnitudes windowing (moved from 14 for locality).
+// ──────────────────────────────────────────────────────────────────
+
 #[test]
 /// viability_of_magnitudes windows properly — only the last omega
 /// entries contribute to the accumulated magnitude.
