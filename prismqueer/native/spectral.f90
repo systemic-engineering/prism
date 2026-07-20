@@ -12,7 +12,7 @@ module optics_spectral
   implicit none
 
   private
-  public :: spectral_eigensystem, spectral_eigenvalues, spectral_svd, spectral_singular_values
+  public :: spectral_eigensystem, spectral_eigenvalues, spectral_svd, spectral_singular_values, spectral_phase_lock
 
 contains
 
@@ -152,5 +152,62 @@ contains
     deallocate(work)
     deallocate(a)
   end subroutine spectral_singular_values
+
+  ! Kuramoto phase-lock integration for N ≥ 2 coupled oscillators.
+  ! Model: dθ_i/dt = ω_i + (K/N) Σ_j sin(θ_j - θ_i)
+  ! Explicit Euler integration for `steps` timesteps of `dt`.
+  ! Returns final phases + order parameter r = |(1/N) Σ_j e^(iθ_j)| ∈ [0,1].
+  ! r=1 = full synchronization; r=0 = incoherent (evenly distributed phases).
+  !
+  ! Reed 2026-07-20 per Alex "Not DEFERRED. DONE!" FLANG-floor directive.
+  ! Numerical work lives in Fortran (below the knife); Rust delegates the
+  ! entire Kuramoto integration through this bind(c) surface.
+  subroutine spectral_phase_lock(n, phases_in, omegas, k, steps, dt, phases_out, order_r, info) &
+      bind(c, name="spectral_phase_lock")
+    integer(c_int), value, intent(in) :: n
+    real(c_double), intent(in) :: phases_in(n)
+    real(c_double), intent(in) :: omegas(n)
+    real(c_double), value, intent(in) :: k
+    integer(c_int), value, intent(in) :: steps
+    real(c_double), value, intent(in) :: dt
+    real(c_double), intent(out) :: phases_out(n)
+    real(c_double), intent(out) :: order_r
+    integer(c_int), intent(out) :: info
+
+    real(c_double) :: theta(n), dtheta(n)
+    real(c_double) :: cos_sum, sin_sum, k_over_n
+    integer :: i, j, s
+
+    info = 0
+    if (n < 1) then
+      info = 1
+      order_r = 0.0d0
+      return
+    end if
+
+    theta = phases_in
+    k_over_n = k / real(n, c_double)
+
+    do s = 1, steps
+      do i = 1, n
+        dtheta(i) = omegas(i)
+        do j = 1, n
+          dtheta(i) = dtheta(i) + k_over_n * sin(theta(j) - theta(i))
+        end do
+      end do
+      theta = theta + dt * dtheta
+    end do
+
+    ! Order parameter r = |(1/N) Σ e^(iθ)|
+    cos_sum = 0.0d0
+    sin_sum = 0.0d0
+    do i = 1, n
+      cos_sum = cos_sum + cos(theta(i))
+      sin_sum = sin_sum + sin(theta(i))
+    end do
+    order_r = sqrt(cos_sum * cos_sum + sin_sum * sin_sum) / real(n, c_double)
+
+    phases_out = theta
+  end subroutine spectral_phase_lock
 
 end module optics_spectral

@@ -69,6 +69,19 @@ extern "C" {
         vt: *mut f64,
         info: *mut c_int,
     );
+
+    /// Kuramoto phase-lock integration for N ≥ 1 coupled oscillators.
+    fn spectral_phase_lock(
+        n: c_int,
+        phases_in: *const f64,
+        omegas: *const f64,
+        k: f64,
+        steps: c_int,
+        dt: f64,
+        phases_out: *mut f64,
+        order_r: *mut f64,
+        info: *mut c_int,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +345,52 @@ pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>, Ve
     let u = col_to_row_major(&u_cm, m, m);
     let vt = col_to_row_major(&vt_cm, n, n);
     Ok((svs, u, vt))
+}
+
+/// Kuramoto phase-lock integration for coupled oscillators.
+///
+/// Model: dθ_i/dt = ω_i + (K/N) Σ_j sin(θ_j - θ_i)
+/// Explicit Euler integration for `steps` timesteps of `dt`.
+///
+/// Returns `Ok((final_phases, order_parameter_r))` where r ∈ [0,1].
+/// r=1 indicates full synchronization; r=0 indicates fully incoherent.
+///
+/// `phases` and `omegas` MUST have identical length N. Returns
+/// `Err(1)` if N == 0 or lengths mismatch.
+pub fn phase_lock(
+    phases: &[f64],
+    omegas: &[f64],
+    k: f64,
+    steps: usize,
+    dt: f64,
+) -> Result<(Vec<f64>, f64), i32> {
+    let n = phases.len();
+    if n == 0 || omegas.len() != n {
+        return Err(1);
+    }
+    let mut phases_out = vec![0.0_f64; n];
+    let mut order_r: f64 = 0.0;
+    let mut info: c_int = 0;
+
+    unsafe {
+        spectral_phase_lock(
+            n as c_int,
+            phases.as_ptr(),
+            omegas.as_ptr(),
+            k,
+            steps as c_int,
+            dt,
+            phases_out.as_mut_ptr(),
+            &mut order_r,
+            &mut info,
+        );
+    }
+
+    if info != 0 {
+        Err(info)
+    } else {
+        Ok((phases_out, order_r))
+    }
 }
 
 // ---------------------------------------------------------------------------
