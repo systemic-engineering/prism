@@ -388,4 +388,125 @@ fn main() {
 
     // Also rerun if the brainfuck directory itself changes
     println!("cargo:rerun-if-changed=src/fate/brainfuck/");
+
+    // ---------------------------------------------------------------
+    // LAPACK feature branch (Reed 2026-07-20 per Alex FLANG-floor
+    // directive: "This is literally the FLOOR, Reed. We don't
+    // forward promise the FLOOR.").
+    //
+    // Under `--features lapack`: compile native/spectral.f90 + native/
+    // prism.f90 with flang, archive into libspectral_native.a, and
+    // emit link directives for LAPACK + BLAS + flang-rt runtime.
+    //
+    // Env vars supplied by mirror/flake.nix devShell (verified 2026-07-20):
+    //   FLANG        = ${flang}/bin/flang
+    //   FLANG_RT_DIR = ${flang-rt}/lib/clang/21/lib/darwin (darwin only)
+    //   LAPACK_DIR   = ${pkgs.lapack}
+    //   BLAS_DIR     = ${pkgs.blas}
+    //   RUSTFLAGS    = -L $FLANG_RT_DIR -L $LAPACK_DIR/lib -L $BLAS_DIR/lib ...
+    //
+    // Fallback: `flang` / `ar` on PATH; LAPACK+BLAS via -L in RUSTFLAGS
+    // (mirror-devshell already provides this).
+    // ---------------------------------------------------------------
+    if env::var_os("CARGO_FEATURE_LAPACK").is_some() {
+        use std::process::Command;
+
+        let flang = env::var("FLANG").unwrap_or_else(|_| "flang".to_string());
+        let native_dir = Path::new("native");
+
+        // Sanity check: native/ dir must exist with the two Fortran sources.
+        assert!(
+            native_dir.exists(),
+            "prismqueer/native/ not found; expected spectral.f90 + prism.f90 \
+             at {}. LAPACK feature requires the Fortran source tree.",
+            native_dir.display()
+        );
+
+        let out = Path::new(&out_dir);
+        let mut objs: Vec<std::path::PathBuf> = Vec::new();
+
+        for src in &["spectral.f90", "prism.f90"] {
+            let src_path = native_dir.join(src);
+            assert!(
+                src_path.exists(),
+                "prismqueer/native/{} not found",
+                src
+            );
+            let stem = src_path.file_stem().unwrap().to_str().unwrap();
+            let obj_path = out.join(format!("{}.o", stem));
+
+            let status = Command::new(&flang)
+                .arg("-c")
+                .arg("-fPIC")
+                .arg("-O2")
+                .arg(&src_path)
+                .arg("-o")
+                .arg(&obj_path)
+                .status()
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "failed to invoke flang `{}` on {}: {}",
+                        flang,
+                        src_path.display(),
+                        e
+                    )
+                });
+            assert!(
+                status.success(),
+                "flang failed on {} (compiler: {})",
+                src_path.display(),
+                flang
+            );
+
+            objs.push(obj_path);
+            println!("cargo:rerun-if-changed={}", src_path.display());
+        }
+
+        // Archive .o files into libspectral_native.a via `ar`.
+        // Nix devshell provides AR env var; fallback to system `ar`.
+        let ar = env::var("AR").unwrap_or_else(|_| "ar".to_string());
+        let lib_path = out.join("libspectral_native.a");
+        let _ = fs::remove_file(&lib_path);
+        let mut ar_cmd = Command::new(&ar);
+        ar_cmd.arg("rcs").arg(&lib_path);
+        for o in &objs {
+            ar_cmd.arg(o);
+        }
+        let status = ar_cmd
+            .status()
+            .unwrap_or_else(|e| panic!("failed to invoke ar `{}`: {}", ar, e));
+        assert!(status.success(), "ar failed archiving {}", lib_path.display());
+
+        // Link the Fortran static lib + LAPACK/BLAS/flang-rt.
+        println!("cargo:rustc-link-search=native={}", out.display());
+        println!("cargo:rustc-link-lib=static=spectral_native");
+
+        // LAPACK + BLAS shared libs (nix-store paths via env vars).
+        if let Ok(lapack_dir) = env::var("LAPACK_DIR") {
+            println!("cargo:rustc-link-search=native={}/lib", lapack_dir);
+        }
+        if let Ok(blas_dir) = env::var("BLAS_DIR") {
+            println!("cargo:rustc-link-search=native={}/lib", blas_dir);
+        }
+        println!("cargo:rustc-link-lib=lapack");
+        println!("cargo:rustc-link-lib=blas");
+
+        // flang-rt runtime static lib (darwin: libflang_rt.runtime.a).
+        // Both -L (search path) and -l (link name) are needed for cargo to
+        // resolve the archive; RUSTFLAGS from nix-devshell provides the
+        // search path but we emit it here too for robustness across
+        // invocation contexts.
+        if let Ok(rt_dir) = env::var("FLANG_RT_DIR") {
+            println!("cargo:rustc-link-search=native={}", rt_dir);
+        }
+        println!("cargo:rustc-link-lib=static=flang_rt.runtime");
+
+        // Rebuild triggers.
+        println!("cargo:rerun-if-env-changed=FLANG");
+        println!("cargo:rerun-if-env-changed=FLANG_RT_DIR");
+        println!("cargo:rerun-if-env-changed=LAPACK_DIR");
+        println!("cargo:rerun-if-env-changed=BLAS_DIR");
+        println!("cargo:rerun-if-env-changed=AR");
+        println!("cargo:rerun-if-changed=native/");
+    }
 }
