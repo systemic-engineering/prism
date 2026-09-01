@@ -68,6 +68,19 @@ pub mod lambda;
 #[cfg(feature = "lapack")]
 pub mod ffi;
 
+// prismqueer::spectral — cellular-sheaf primitives per Mara canonical
+// (docs/specs/2026-08-31-mara-prismqueer-spectral-compose-phase-1-canonical-
+// spec.md + docs/math/2026-08-31-mara-prismqueer-spectral-compose-phase-1-
+// math-foundation.md at mirror-repo). Phase 1 hosts `kleinos` (K_2→K_3
+// compose primitive per PAPER §3.6 four properties). Composes over LANDED
+// `ffi::eigenvalues` (LAPACK dsyev) + `oid::Addressable` + `terni::
+// Transparency<P>` LOVE-monoid per Rec #92. Alex 2026-09-01 ratifications
+// composed (Q-Mara-ϑ Stalker + Q-Mara-κ STRICT-and-non-strict + Q-Mara-λ
+// edges-only) + terminal-form recursion closure (Mirror.Offer.Wait as
+// canonical operational register through λ₀ = NOW = VOID).
+#[cfg(feature = "lapack")]
+pub mod spectral;
+
 #[cfg(feature = "lapack")]
 pub mod spectral_dimension;
 
