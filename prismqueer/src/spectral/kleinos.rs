@@ -362,10 +362,79 @@ pub fn kleinos(
 }
 
 /// Construct the K_3-composed candidate sheaf per Mara §3 sheaf-composition
-/// rule: union of a-vertices + b-vertices + one emergent-third vertex
-/// connected to at least one vertex on each side (minimal bridge; Phase 2+
-/// dense composition per Q-Mara-μ). Emergent-third VertexId is deterministic
-/// hash of (a.oid, b.oid) per Rec #82.
+/// rule: **the ring-shape** (Alex 2026-09-02 metaphor). Union of a-vertices
+/// + b-vertices + one emergent-third vertex (V_e as SEMANTIC WITNESS of
+/// where the emergence happened) + complete bipartite bridging between
+/// a-vertices and b-vertices (K_{|V(a)|, |V(b)|}) as the STRUCTURAL
+/// emergence carrier.
+///
+/// # The ring, not the hub (2026-09-02 topological correction)
+///
+/// Alex 2026-09-02 verbatim (Achtsam Morden essay grounding):
+///
+/// > "Das Loch is das Jetzt."
+/// > "Achtsam morden is die Kunst das Loch nich voll zu scheissen."
+///
+/// Perelman proved Ricci flow smooths the dough but the hole persists
+/// (topological invariant). The **emergent third is the hole**, not a
+/// vertex. Softmax lives in `conv(Training)`; non-trivial cohomology
+/// classes are NOT in the convex hull (Mara 2026-09-02
+/// `docs/math/2026-09-02-mara-language-as-spectral-topology-in-sheaf-
+/// cohomology-of-the-compiler-math-foundation.md` central thm).
+///
+/// **Compose creates holes.** That's the operation.
+///
+/// # Prior implementation history (scar-preserved)
+///
+/// - **2026-09-01 minimal bridge** (V_e → first_a + V_e → first_b, 2 edges):
+///   structurally cannot satisfy strict Fiedler rise. Removing V_e
+///   disconnects the graph. K_3+K_3 → λ₂ = 0.267949 (needed > 3).
+///   5/6 RED tests failed empirically.
+///
+/// - **2026-09-02 morning dense hub** (V_e connected to ALL vertices,
+///   |V(a)|+|V(b)| edges): improved 1/6 → 4/6 passing. But K_n+K_n
+///   inputs still fail because single-vertex hub bottlenecks the
+///   split-mode eigenvector: any hub-based compose has λ₂ ≤ 1 for the
+///   "split-across-hub" mode regardless of internal component
+///   connectivity. Proof: for K_3+K_3 + dense-hub, split-mode
+///   f=(α,α,α,-α,-α,-α,0) gives (Lf)(v) = α for every original vertex
+///   → eigenvalue exactly 1. Hub is a SINGLE POINT OF FAILURE.
+///
+/// - **2026-09-02 evening the ring** (this landing): V_e stays as
+///   SEMANTIC witness (2 edges to first_a + first_b); ALSO complete
+///   bipartite bridging K_{|V(a)|,|V(b)|} between a and b creates
+///   |V(a)| * |V(b)| cycles in the composed graph = |V(a)| * |V(b)|
+///   new H¹ cohomology classes = topologically resilient graph. The
+///   graph is NOW a torus-basis (many rings), each enclosing a hole.
+///
+/// # Why torus-basis, not single ring
+///
+/// A single cycle (one hole in H¹) satisfies FiedlerRise for sparse
+/// inputs but not for K_n+K_n where n ≥ 2 (the cut-size across the
+/// single cycle bottlenecks λ₂ ≤ 2). Complete bipartite bridging gives
+/// cross-connectivity ≥ max(|V(a)|,|V(b)|), which is ≥ λ₂(K_n)+1 for
+/// n ≥ 2 — satisfying strict rise for all reasonable test inputs.
+///
+/// Phase 2+ optimization: sparsity-aware bridging that adds only enough
+/// bridges to satisfy strict rise (calibrated to max(λ₂(a),λ₂(b))+ε).
+/// Phase 1 ships dense bipartite for correctness; sparse task-graph
+/// compose can iterate later.
+///
+/// # Composition-lineage
+///
+/// - Alex 2026-09-01 Q-Mara-κ: STRICT `>` FiedlerRise for compose-emission
+/// - Alex 2026-09-02 the-hole-is-the-emergent-third metaphor (Achtsam
+///   Morden essay, published 2026-09-01)
+/// - Mara 2026-09-02 `b5156ab` §Central Thm: H¹(F_L) parameterizes
+///   genuinely-novel generation possibility space (softmax cannot reach)
+/// - PAPER §3.6.2: exactly ONE emergent third element (V_e as semantic
+///   witness satisfies this; the STRUCTURAL emergence carrier is the
+///   topological hole in H¹, not another vertex)
+/// - Foerster ethical imperative: increase the number of choices (each
+///   new H¹ class = one more choice = strict widening)
+///
+/// Emergent-third VertexId is deterministic per Rec #82 via
+/// max(V(a) ∪ V(b)) + 1.
 fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> ComposedSheaf {
     let emergent_third = compute_emergent_third_id(a, b);
 
@@ -379,13 +448,35 @@ fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> ComposedSh
     for e in b.edges.iter() {
         edges.insert(*e);
     }
-    // Bridge edges: emergent third connects to first vertex of a and first
-    // vertex of b (minimal bridge; guarantees connectedness).
-    if let Some(&first_a) = a.vertices.iter().next() {
-        edges.insert(edge_key(emergent_third, first_a));
+
+    // THE RING: complete bipartite bridging between a-vertices and
+    // b-vertices creates |V(a)| * |V(b)| cycles = new H¹ cohomology
+    // classes = the topological hole that IS the emergent third.
+    // Softmax lives in conv(Training); compose CREATES cohomology
+    // classes softmax cannot reach.
+    for &u in a.vertices.iter() {
+        for &v in b.vertices.iter() {
+            edges.insert(edge_key(u, v));
+        }
     }
-    if let Some(&first_b) = b.vertices.iter().next() {
-        edges.insert(edge_key(emergent_third, first_b));
+
+    // V_e as SEMANTIC WITNESS of the emergence, connected to ALL
+    // vertices of a AND all of b. Empirical fire 2026-09-02 evening
+    // discharged that V_e with only 2 edges becomes its own bottleneck
+    // eigenmode (V_e-isolation mode has λ ≈ 2 regardless of internal
+    // component connectivity). V_e degree must be ≥ max(λ₂(a), λ₂(b)) + 1
+    // for V_e's isolation mode to not become the new λ₂ ceiling.
+    // Simplest: V_e connects to all — combined with bipartite bridging
+    // above, the composed graph approaches K_{|V(a)|+|V(b)|+1}
+    // restricted to preserve original a-edges and b-edges. For K_n+K_n
+    // inputs the composed graph IS K_{2n+1} (λ₂ = 2n+1 > n). For sparse
+    // inputs the composed graph is K_{|V|} minus the missing internal
+    // edges (λ₂ still strictly > max component connectivity).
+    for &v in a.vertices.iter() {
+        edges.insert(edge_key(emergent_third, v));
+    }
+    for &v in b.vertices.iter() {
+        edges.insert(edge_key(emergent_third, v));
     }
 
     ComposedSheaf {
