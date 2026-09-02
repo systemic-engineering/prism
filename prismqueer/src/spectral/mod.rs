@@ -25,6 +25,7 @@
 //!   Offer. Wait = the canonical operational register**
 
 pub mod kleinos;
+pub mod rotation;
 
 pub use kleinos::{
     kleinos,
@@ -40,3 +41,5 @@ pub use kleinos::{
     VertexId,
     EdgeKey,
 };
+
+pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
