@@ -99,7 +99,6 @@ fn compose_property_1_sovereignty_preservation() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
     let composed = kleinos(&a, &b)
-        .ok()
         .expect("disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green");
 
     for v in a.vertices() {
@@ -159,7 +158,6 @@ fn compose_property_2_emergent_third_admission() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
     let composed = kleinos(&a, &b)
-        .ok()
         .expect("disjoint paths admit compose per emergent-third K_2→K_3 — expected Green");
 
     let emerged = composed.emergent_third_stalk();
@@ -214,7 +212,6 @@ fn compose_property_3_fiedler_lambda_2_strict_rise() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
     let composed = kleinos(&a, &b)
-        .ok()
         .expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
 
     let lambda_a = fiedler_lambda_2_of_sheaf(&a);
@@ -318,10 +315,8 @@ fn compose_property_5_content_address_determinism() {
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
 
     let composed_1 = kleinos(&a, &b)
-        .ok()
         .expect("disjoint paths compose — expected Green (first invocation)");
     let composed_2 = kleinos(&a, &b)
-        .ok()
         .expect("disjoint paths compose — expected Green (second invocation)");
 
     assert_eq!(
@@ -358,7 +353,6 @@ fn compose_meta_module_exposed() {
     // succeed (sovereignty trivially holds; emergent third admitted; Fiedler rises;
     // fusion refusal N/A for disjoint inputs).
     let composed = kleinos(&a, &b)
-        .ok()
         .expect("trivial disjoint compose MUST succeed at API boundary — expected Green");
     assert!(
         composed.vertices().count() >= 4,
