@@ -66,8 +66,9 @@
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
     fiedler_lambda_2_of_sheaf, kleinos, sheaf_of_complete_graph_of_order,
-    sheaf_of_shard_graph_from_edges, RedGaugeWitness,
+    sheaf_of_shard_graph_from_edges, Red,
 };
+use terni::Imperfect;
 
 /// # RED Property 1 — Sovereignty preservation
 ///
@@ -98,7 +99,8 @@ fn compose_property_1_sovereignty_preservation() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
     let composed = kleinos(&a, &b)
-        .expect("disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation");
+        .ok()
+        .expect("disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green");
 
     for v in a.vertices() {
         assert!(
@@ -156,8 +158,9 @@ fn compose_property_1_sovereignty_preservation() {
 fn compose_property_2_emergent_third_admission() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
-    let composed =
-        kleinos(&a, &b).expect("disjoint paths admit compose per emergent-third K_2→K_3");
+    let composed = kleinos(&a, &b)
+        .ok()
+        .expect("disjoint paths admit compose per emergent-third K_2→K_3 — expected Green");
 
     let emerged = composed.emergent_third_stalk();
     assert!(
@@ -210,7 +213,9 @@ fn compose_property_2_emergent_third_admission() {
 fn compose_property_3_fiedler_lambda_2_strict_rise() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
-    let composed = kleinos(&a, &b).expect("K_3 pair composes per Fiedler λ₂ strict rise");
+    let composed = kleinos(&a, &b)
+        .ok()
+        .expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
 
     let lambda_a = fiedler_lambda_2_of_sheaf(&a);
     let lambda_b = fiedler_lambda_2_of_sheaf(&b);
@@ -265,21 +270,26 @@ fn compose_property_4_fusion_refusal() {
     let b = a.clone(); // identical inputs — compose would fuse, not compose
     let result = kleinos(&a, &b);
 
-    assert!(
-        result.is_err(),
-        "PAPER §3.6.4 fusion refusal: identical inputs MUST return Err(RedGaugeWitness); \
-         got {:?}",
-        result.as_ref().map(|c| c.emergent_third_stalk())
-    );
-
-    let witness: RedGaugeWitness = result.unwrap_err();
-    // RedGaugeWitness = terni::Transparency<Property>; Fail-dominates per Rec #92.
-    // Phase 1 assertion: witness is Opaque (carries violation) not Clear (would mean pass).
-    assert!(
-        !matches!(witness, terni::Transparency::Clear),
-        "fusion refusal witness MUST be Opaque (Fail-dominates); got Clear which would \
-         signal composition passed — violates PAPER §3.6.4 K_2 refusal condition"
-    );
+    // Ternary Red/Green/Yellow per Alex 2026-09-02: Red = Imperfect::Failure.
+    match result {
+        Imperfect::Failure(red, _loss) => {
+            // Red = terni::Transparency<Property>; Fail-dominates per Rec #92.
+            // Phase 1 assertion: red is Opaque (carries violation) not Clear.
+            assert!(
+                !matches!(red, terni::Transparency::Clear),
+                "fusion refusal Red MUST be Opaque (Fail-dominates); got Clear which would \
+                 signal composition passed — violates PAPER §3.6.4 K_2 refusal condition"
+            );
+        }
+        Imperfect::Success(composed) | Imperfect::Partial(composed, _) => {
+            panic!(
+                "PAPER §3.6.4 fusion refusal: identical inputs MUST return Red \
+                 (Imperfect::Failure); got Green/Yellow with composed sheaf \
+                 emergent_third_stalk={}",
+                composed.emergent_third_stalk()
+            );
+        }
+    }
 }
 
 /// # RED Property 5 — Content-address determinism
@@ -307,8 +317,12 @@ fn compose_property_5_content_address_determinism() {
     let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
     let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
 
-    let composed_1 = kleinos(&a, &b).expect("disjoint paths compose");
-    let composed_2 = kleinos(&a, &b).expect("disjoint paths compose (second invocation)");
+    let composed_1 = kleinos(&a, &b)
+        .ok()
+        .expect("disjoint paths compose — expected Green (first invocation)");
+    let composed_2 = kleinos(&a, &b)
+        .ok()
+        .expect("disjoint paths compose — expected Green (second invocation)");
 
     assert_eq!(
         composed_1.oid(),
@@ -343,7 +357,9 @@ fn compose_meta_module_exposed() {
     // Runtime discharge: invoking kleinos on trivially-disjoint two-vertex sheafs must
     // succeed (sovereignty trivially holds; emergent third admitted; Fiedler rises;
     // fusion refusal N/A for disjoint inputs).
-    let composed = kleinos(&a, &b).expect("trivial disjoint compose MUST succeed at API boundary");
+    let composed = kleinos(&a, &b)
+        .ok()
+        .expect("trivial disjoint compose MUST succeed at API boundary — expected Green");
     assert!(
         composed.vertices().count() >= 4,
         "composed sheaf must contain all input vertices (2 from a + 2 from b, plus emergent \

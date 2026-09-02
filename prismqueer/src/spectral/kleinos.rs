@@ -48,7 +48,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::oid::{Addressable, Oid};
-use terni::{Diagnostic, Loss, PropertyVerdict, Transparency};
+use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------
 // Types per Mara canonical spec §2.2
@@ -89,10 +89,36 @@ pub enum WhichSide {
     Both,
 }
 
-/// The RedGaugeWitness IS a `Transparency<Property>` LOVE-monoid per Rec #92
+/// The `Red` state carrier IS a `Transparency<Property>` LOVE-monoid per Rec #92
 /// (Mara 2026-08-22). Composes over LANDED `terni::Transparency<P>`.
 /// Fail-dominates: any property violation absorbs the verdict.
-pub type RedGaugeWitness = Transparency<Property>;
+///
+/// # Naming per Alex 2026-09-02 ratification
+///
+/// Alex 2026-09-02 verbatim: "let's call RedGaugeWitness just `Red`. Then we
+/// can have `Red`, `Green` and `Yellow` literally as outputs. Color coded repo
+/// state." Maps to `Imperfect<T, E, L>` ternary functor:
+///
+///   - **Green** = `Imperfect::Success(ComposedSheaf)` — all 4 PAPER §3.6
+///     properties Pass; compose emitted cleanly.
+///   - **Yellow** = `Imperfect::Partial(ComposedSheaf, ConvergenceLoss)` —
+///     compose emitted but with measured loss (e.g., Fiedler climb marginal
+///     below some threshold, refactor-needed diagnostic). Reserved for Phase 2+.
+///   - **Red** = `Imperfect::Failure(Red, ConvergenceLoss)` — compose refused;
+///     `Red` value = `Transparency<Property>` carrying the Fail-dominated
+///     property-violation map.
+///
+/// Retires prior `RedGaugeWitness` naming + `Result<ComposedSheaf, ...>` binary
+/// return per Alex 2026-09-02 "Result is binary wearing a trenchcoat. We're
+/// doing ternary here, Reed. All the way up. All the way down." Substrate is
+/// ternary at every altitude (PropertyVerdict::{Pass, Partial, Fail} + Transparency
+/// {Clear, Opaque} + this Imperfect return); binary Result violates the
+/// substrate-scale-invariance per Rec #92.
+pub type Red = Transparency<Property>;
+
+/// The `Green` state carrier — the successful K_3-composed sheaf.
+/// Alias for `ComposedSheaf` for color-coded API clarity per Alex 2026-09-02.
+pub type Green = ComposedSheaf;
 
 /// The sheaf-of-shard-graph carrier — cellular sheaf per Curry 2014.
 ///
@@ -308,7 +334,7 @@ pub fn fiedler_lambda_2_of_sheaf(sheaf: &SheafOfShardGraph) -> f64 {
 /// composed sheaf verifying the four PAPER §3.6 properties as ONE sheaf-
 /// morphism check per Hansen-Ghrist 2019 sheaf Laplacian L_F discipline.
 /// Property verification composes as coordinates of `Transparency<Property>`
-/// LOVE-monoid per Rec #92 (Fail-dominates absorbs into `Err(RedGaugeWitness)`).
+/// LOVE-monoid per Rec #92 (Fail-dominates absorbs into `Imperfect::Failure(Red, loss)`).
 ///
 /// # Body composition invariant
 ///
@@ -340,7 +366,7 @@ pub fn fiedler_lambda_2_of_sheaf(sheaf: &SheafOfShardGraph) -> f64 {
 pub fn kleinos(
     sheaf_a: &SheafOfShardGraph,
     sheaf_b: &SheafOfShardGraph,
-) -> Result<ComposedSheaf, RedGaugeWitness> {
+) -> Imperfect<Green, Red, ConvergenceLoss> {
     // Verify all four properties simultaneously per LOVE-monoid coordinate-
     // decomposition. NO if-else on Property verbs.
     let candidate = compose_candidate(sheaf_a, sheaf_b);
@@ -357,8 +383,9 @@ pub fn kleinos(
         lambda_composed,
     );
 
-    // LOVE-monoid Fail-dominates absorbs into Err. Clear → Ok(composed).
-    into_result(candidate, lambda_composed, verdict)
+    // LOVE-monoid Fail-dominates absorbs into Imperfect::Failure(Red, loss).
+    // Transparency::Clear → Imperfect::Success(Green). Ternary all the way.
+    into_imperfect(candidate, lambda_composed, verdict)
 }
 
 /// Construct the K_3-composed candidate sheaf per Mara §3 sheaf-composition
@@ -622,19 +649,24 @@ fn verify_fusion_refusal(
     }
 }
 
-/// Final result construction: LOVE-monoid Clear → Ok(composed with cached
-/// Fiedler); Opaque map → Err(RedGaugeWitness).
-fn into_result(
+/// Final result construction: LOVE-monoid Clear → Green (Imperfect::Success
+/// with cached Fiedler); Opaque map → Red (Imperfect::Failure with zero
+/// ConvergenceLoss for atomic compose). Ternary per Alex 2026-09-02.
+///
+/// Yellow (Imperfect::Partial) reserved for Phase 2+ when compose emits with
+/// measured loss (e.g., Fiedler climb marginal below some threshold triggers
+/// refactor-needed diagnostic without full refusal).
+fn into_imperfect(
     mut candidate: ComposedSheaf,
     lambda_composed: f64,
     verdict: Transparency<Property>,
-) -> Result<ComposedSheaf, RedGaugeWitness> {
+) -> Imperfect<Green, Red, ConvergenceLoss> {
     match &verdict {
         Transparency::Clear => {
             candidate.fiedler_lambda_2_cached = lambda_composed;
-            Ok(candidate)
+            Imperfect::Success(candidate)
         }
-        Transparency::Opaque(_) => Err(verdict),
+        Transparency::Opaque(_) => Imperfect::Failure(verdict, ConvergenceLoss::zero()),
     }
 }
 
@@ -668,7 +700,7 @@ mod tests {
         let sheaf_a = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
         let sheaf_b = sheaf_a.clone();
         let result = kleinos(&sheaf_a, &sheaf_b);
-        assert!(result.is_err(), "identical inputs must refuse fusion per PAPER §3.6.4");
+        assert!(result.is_err(), "identical inputs must refuse fusion per PAPER §3.6.4 — Red state");
     }
 
     #[test]
