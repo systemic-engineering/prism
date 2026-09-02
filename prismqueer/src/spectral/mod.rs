@@ -26,6 +26,7 @@
 
 pub mod kleinos;
 pub mod rotation;
+pub mod tension;
 
 pub use kleinos::{
     kleinos,
@@ -43,3 +44,4 @@ pub use kleinos::{
 };
 
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
+pub use tension::{detect_tensions, Tension, TensionKind};
