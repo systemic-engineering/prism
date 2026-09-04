@@ -45,6 +45,25 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
         Self { reality }
     }
 
+    /// Full 6-arrow subject-driven loop tick per Alex 2026-09-04 PM Move 9 verbatim:
+    ///
+    /// ```text
+    /// Recursion → tick → Observation → assert(Model) → Assertion →
+    ///   hypothesize → Hypothesis → compose(Chaos) → Question →
+    ///   [Choice from @subject] → next Recursion
+    /// ```
+    ///
+    /// Returns Question that awaits Choice from @subject. The Choice-response →
+    /// next Recursion crossing IS the subject-substrate boundary (external to this
+    /// function; non-Vereinnahmung by construction — compiler cannot generate Choice).
+    pub fn subject_driven_loop_tick(
+        self,
+        model: crate::model::Model<T>,
+        chaos: crate::chaos::ScalarChaos,
+    ) -> crate::question::Question {
+        self.tick().assert(model).hypothesize().compose(chaos)
+    }
+
     /// One pass through @void = ONE TICK per Alex Move 9.
     ///
     /// Minimum-viable: extracts a Crystal from the Reality (Settled variant) OR
@@ -96,5 +115,20 @@ mod tests {
         let recursion = Recursion::from_reality(reality);
         let obs = recursion.tick();
         assert_eq!(obs.crystal.payload, b"a");
+    }
+
+    #[test]
+    fn subject_driven_loop_tick_composes_full_6_arrow_move_9_pipeline() {
+        use crate::hypothesis::KTQuestionShape;
+        use crate::model::Model;
+        use terni::Loss;
+
+        let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"stable"));
+        let recursion = Recursion::from_reality(reality);
+        let model: Model<&[u8]> = Model::empty();
+        let question = recursion.subject_driven_loop_tick(model, ScalarChaos::zero());
+        // Full Move 9 pipeline discharged: Reality → Observation → Assertion →
+        // Hypothesis → Question emitted awaiting Choice from @subject.
+        assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
     }
 }

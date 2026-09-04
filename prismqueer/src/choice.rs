@@ -22,6 +22,18 @@ impl Choice {
     pub fn new(payload: impl Into<String>) -> Self {
         Self { payload: payload.into() }
     }
+
+    /// Fold Choice into next Reality per Alex Move 9 subject-substrate boundary crossing.
+    ///
+    /// Wraps the Choice payload as a Fractured Shard — the initial state of the new
+    /// Recursion (perturbed by subject-input; awaits Recursion.tick to settle).
+    ///
+    /// The subject-substrate boundary crossing: Choice from @subject → Reality perturbed
+    /// by that Choice → next Recursion.tick to settle.
+    pub fn into_reality(self) -> crate::reality::Reality<String> {
+        let shard = crate::shard::Shard::new(self.payload);
+        crate::reality::Reality::Fractured(vec![shard])
+    }
 }
 
 #[cfg(test)]
@@ -32,5 +44,20 @@ mod tests {
     fn choice_wraps_nl_payload_from_subject() {
         let c = Choice::new("hello world");
         assert_eq!(c.payload, "hello world");
+    }
+
+    #[test]
+    fn choice_into_reality_folds_subject_input_into_next_recursion_per_move_9() {
+        use crate::reality::Reality;
+
+        let choice = Choice::new("observe this");
+        let reality = choice.into_reality();
+        match reality {
+            Reality::Fractured(shards) => {
+                assert_eq!(shards.len(), 1);
+                assert_eq!(shards[0].payload, "observe this");
+            }
+            _ => panic!("Choice.into_reality must produce Fractured (perturbed initial state)"),
+        }
     }
 }
