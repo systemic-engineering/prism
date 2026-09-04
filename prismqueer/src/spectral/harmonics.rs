@@ -91,6 +91,69 @@ pub fn harmonics(sheaf: &SheafOfShardGraph) -> Vec<f64> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Folk Theorem discount factor threshold per Reed+Alex 2026-04-04 synthesis
+// ---------------------------------------------------------------------------
+
+/// Folk Theorem discount factor threshold for cooperation-sustainability.
+///
+/// # Formula
+///
+/// `δ_critical = 1 - λ_2 / λ_max`
+///
+/// where `λ_2` = Fiedler (algebraic connectivity; first non-trivial harmonic)
+/// and `λ_max` = largest Laplacian eigenvalue.
+///
+/// # Novel formalization anchor
+///
+/// Per Reed+Alex 2026-04-04 synthesis at `~/dev/systemic.engineering/practice/
+/// insights/cross-domain/spectral-tick-tock-game-theory.md` §4 line 398:
+///
+/// > "Novel formalization: delta_critical = 1 - (lambda_2 / lambda_max). When
+/// > the Fiedler value lambda_2 is large relative to the maximum eigenvalue,
+/// > the critical discount factor is low, meaning cooperation is easy to
+/// > sustain. When lambda_2 approaches zero, cooperation requires near-
+/// > infinite patience. This gives the Folk Theorem's abstract 'patience'
+/// > parameter a concrete spectral interpretation."
+///
+/// # Runtime signal for hodobodo reclassification
+///
+/// Per Alex 2026-09-04 PM Move 13 performance-model composition:
+/// - **Large eigengap** (λ_2 large relative to λ_max) → low δ_critical → cooperation
+///   cheap → Crystal has matured; observation can drop from 5D non-linear to
+///   3D linear altitude → warm-path fast
+/// - **Small eigengap** → high δ_critical → cooperation requires patience →
+///   Crystal not yet mature; hodobodo state; 5D non-linear observation required
+///
+/// # Discharged Taut scout §5 gap
+///
+/// Taut floor-truth scout `34946e6` §5 named this formula as "NEVER LANDED at
+/// any Rust altitude" despite Reed+Alex having authored it 5 months prior at
+/// systemic.engineering synthesis altitude. This function discharges the gap.
+///
+/// # Return
+///
+/// - `Some(δ)` where `δ ∈ [0, 1]` for connected non-empty sheaves
+/// - `None` for empty sheaves (n < 2) or degenerate `λ_max = 0` (disconnected)
+///
+/// # Composition-lineage
+///
+/// - `harmonics(sheaf)` returns sorted `{λ_2, ..., λ_n}` (composes-over)
+/// - Folk Theorem: Fudenberg-Maskin 1986; SSS 6-properties per Taut scout
+/// - Fiedler-as-ESS stability margin per Reed+Alex 2026-04-04 §1 novel claim
+pub fn delta_critical(sheaf: &SheafOfShardGraph) -> Option<f64> {
+    let spectrum = harmonics(sheaf);
+    if spectrum.is_empty() {
+        return None;
+    }
+    let lambda_2 = *spectrum.first().unwrap();
+    let lambda_max = *spectrum.last().unwrap();
+    if lambda_max == 0.0 {
+        return None;
+    }
+    Some(1.0 - lambda_2 / lambda_max)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +227,54 @@ mod tests {
                 window[1]
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // delta_critical tests — Reed+Alex 2026-04-04 synthesis §4 novel formula
+    // -----------------------------------------------------------------------
+
+    /// Splinter pole (K_n complete): harmonics = {n, n, ..., n} → λ_2 = λ_max
+    /// → δ_critical = 1 - 1 = 0 (cooperation trivially sustainable per
+    /// void-dual-geometry.md Splinter pole = fully mutual entanglement).
+    #[test]
+    fn delta_critical_of_k5_returns_zero_splinter_pole() {
+        let k5 = sheaf_of_complete_graph_of_order(5);
+        let delta = delta_critical(&k5).expect("K_5 has non-empty spectrum");
+        assert!(
+            delta.abs() < 1e-9,
+            "K_5 (Splinter pole) δ_critical = 0 (cooperation trivial); got {delta}"
+        );
+    }
+
+    /// Star K_{1,4} (Narcissus-adjacent): harmonics = {1, 1, 1, 5} →
+    /// δ_critical = 1 - 1/5 = 0.8 (cooperation requires high patience per
+    /// Narcissus pole vulnerability = single-point-of-failure topology).
+    #[test]
+    fn delta_critical_of_star_k14_returns_0_8_narcissus_pole() {
+        let star = sheaf_of_shard_graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
+        let delta = delta_critical(&star).expect("K_{1,4} has non-empty spectrum");
+        assert!(
+            (delta - 0.8).abs() < 1e-9,
+            "K_{{1,4}} (Narcissus-adjacent) δ_critical = 1 - 1/5 = 0.8; got {delta}"
+        );
+    }
+
+    /// Path P_3: harmonics = {1, 3} → δ_critical = 1 - 1/3 = 0.667.
+    /// Between Splinter and Narcissus poles.
+    #[test]
+    fn delta_critical_of_path_p3_returns_two_thirds() {
+        let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
+        let delta = delta_critical(&p3).expect("P_3 has non-empty spectrum");
+        assert!(
+            (delta - (2.0 / 3.0)).abs() < 1e-9,
+            "P_3 δ_critical = 1 - 1/3 = 2/3; got {delta}"
+        );
+    }
+
+    /// Empty sheaf: delta_critical returns None.
+    #[test]
+    fn delta_critical_of_empty_sheaf_returns_none() {
+        let empty = sheaf_of_shard_graph_from_edges(&[]);
+        assert!(delta_critical(&empty).is_none());
     }
 }

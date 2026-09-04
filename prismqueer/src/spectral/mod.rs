@@ -44,6 +44,6 @@ pub use kleinos::{
     EdgeKey,
 };
 
-pub use harmonics::harmonics;
+pub use harmonics::{delta_critical, harmonics};
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
 pub use tension::{detect_tensions, Tension, TensionKind};
