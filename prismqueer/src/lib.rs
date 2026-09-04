@@ -91,6 +91,33 @@ pub mod observer;
 pub mod chaos;
 
 #[cfg(feature = "lapack")]
+pub mod crystal_shard;
+
+#[cfg(feature = "lapack")]
+pub mod observation;
+
+#[cfg(feature = "lapack")]
+pub mod model;
+
+#[cfg(feature = "lapack")]
+pub mod assertion;
+
+#[cfg(feature = "lapack")]
+pub mod reality;
+
+#[cfg(feature = "lapack")]
+pub mod hypothesis;
+
+#[cfg(feature = "lapack")]
+pub mod question;
+
+#[cfg(feature = "lapack")]
+pub mod choice;
+
+#[cfg(feature = "lapack")]
+pub mod recursion;
+
+#[cfg(feature = "lapack")]
 pub mod spectral_dimension;
 
 // Fate — the 5-model inference selector, source-mirrored from
