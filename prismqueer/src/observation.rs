@@ -37,11 +37,23 @@ impl<T> Observation<T> {
     pub fn new(crystal: Crystal<T>, chaos: ScalarChaos) -> Self {
         Self { crystal, chaos }
     }
+
+    /// Compose Observation with Model → Assertion per Alex Move 2 pipeline.
+    ///
+    /// > "from an Observation you can form an Assertion (combining the observer's
+    /// > `Model` of reality, or any `Model`, with the Observation)"
+    ///
+    /// Hawking model-dependent-reality EXPLICIT: Assertion carries BOTH observation
+    /// AND model through which the observation was made.
+    pub fn assert(self, model: crate::model::Model<T>) -> crate::assertion::Assertion<T> {
+        crate::assertion::Assertion::new(self, model)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::Model;
     use terni::Loss;
 
     #[test]
@@ -50,5 +62,13 @@ mod tests {
         let chaos = ScalarChaos::zero();
         let obs = Observation::new(crystal, chaos);
         assert_eq!(obs.crystal.iteration_index, 0);
+    }
+
+    #[test]
+    fn observation_assert_model_composes_to_assertion_per_alex_move_2() {
+        let obs: Observation<&[u8]> = Observation::new(Crystal::new(b"c"), ScalarChaos::zero());
+        let model: Model<&[u8]> = Model::empty();
+        let assertion = obs.assert(model);
+        assert_eq!(assertion.model.shards.len(), 0);
     }
 }

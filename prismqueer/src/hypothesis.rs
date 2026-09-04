@@ -35,15 +35,34 @@ impl Hypothesis {
     pub fn new(shape: KTQuestionShape) -> Self {
         Self { shape }
     }
+
+    /// Compose Hypothesis + Chaos → Question per Alex Move 3 pipeline.
+    ///
+    /// > "the `Chaos` + `Hypothesis` is what we can turn into a `Question`"
+    ///
+    /// Concrete K-T question prioritized by Chaos-residual per Move 3+9. Question is
+    /// what the substrate emits; @subject inputs Choice in response.
+    pub fn compose(self, chaos: crate::chaos::ScalarChaos) -> crate::question::Question {
+        crate::question::Question::new(self, chaos)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chaos::ScalarChaos;
+    use terni::Loss;
 
     #[test]
     fn hypothesis_composes_k_t_shape() {
         let h = Hypothesis::new(KTQuestionShape::Reflexive);
         assert_eq!(h.shape, KTQuestionShape::Reflexive);
+    }
+
+    #[test]
+    fn hypothesis_compose_chaos_produces_question_per_alex_move_3() {
+        let h = Hypothesis::new(KTQuestionShape::Reflexive);
+        let question = h.compose(ScalarChaos::zero());
+        assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
     }
 }

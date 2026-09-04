@@ -112,6 +112,25 @@ impl<const N: usize> Observer<N> {
     {
         Shard::new(payload)
     }
+
+    /// The elegant closure per Alex Move 8 verbatim:
+    ///
+    /// > "Observer<N>::observe(self, Reality) -> Observation"
+    ///
+    /// Two-line implementation composing all LANDED prismqueer floor primitives:
+    ///
+    /// ```text
+    /// Observer::observe(reality) = Recursion::from_reality(reality).tick()
+    /// ```
+    ///
+    /// Full bundle-tower + Anna Wolf ψ + Fiedler λ_2 climb composition happens INSIDE
+    /// Recursion.tick() per Move 8+9 pipeline; this method is the outer entry point.
+    pub fn observe<T>(self, reality: crate::reality::Reality<T>) -> crate::observation::Observation<T>
+    where
+        T: AsRef<[u8]> + Clone,
+    {
+        crate::recursion::Recursion::from_reality(reality).tick()
+    }
 }
 
 impl<const N: usize> Default for Observer<N> {
@@ -221,5 +240,40 @@ mod tests {
     fn observer_default_composes() {
         let _observer: PeerObserver = Default::default();
         let _observer: VoidObserver = Default::default();
+    }
+
+    #[test]
+    fn observer_observe_reality_settled_full_pipeline_composes_per_alex_move_8() {
+        use crate::crystal_shard::Crystal;
+        use crate::model::Model;
+        use crate::reality::Reality;
+        use crate::hypothesis::KTQuestionShape;
+        use crate::chaos::ScalarChaos;
+        use terni::Loss;
+
+        // Full Move 8+9 fluent pipeline:
+        //   Observer.observe(Reality) → Observation .assert(Model) → Assertion .hypothesize()
+        //   → Hypothesis .compose(Chaos) → Question
+        let observer: PeerObserver = Observer::new();
+        let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"reality"));
+        let model: Model<&[u8]> = Model::empty();
+        let question = observer
+            .observe(reality)
+            .assert(model)
+            .hypothesize()
+            .compose(ScalarChaos::zero());
+        assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
+    }
+
+    #[test]
+    fn observer_observe_reality_fractured_extracts_first_shard_per_move_8_recursion_tick() {
+        use crate::reality::Reality;
+        use crate::shard::Shard;
+
+        let observer: VoidObserver = Observer::new();
+        let shards: Vec<Shard<&[u8]>> = vec![Shard::new(b"first"), Shard::new(b"second")];
+        let reality: Reality<&[u8]> = Reality::Fractured(shards);
+        let observation = observer.observe(reality);
+        assert_eq!(observation.crystal.payload, b"first");
     }
 }
