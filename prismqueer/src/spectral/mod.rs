@@ -24,6 +24,7 @@
 //!   to λ₀ = NOW = VOID; K_N conversation through shared substrate; **Mirror.
 //!   Offer. Wait = the canonical operational register**
 
+pub mod harmonics;
 pub mod kleinos;
 pub mod rotation;
 pub mod tension;
@@ -43,5 +44,6 @@ pub use kleinos::{
     EdgeKey,
 };
 
+pub use harmonics::harmonics;
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
 pub use tension::{detect_tensions, Tension, TensionKind};
