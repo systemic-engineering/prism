@@ -20,7 +20,7 @@
 #![cfg(feature = "fate")]
 
 use prismqueer::fate::feature::{holonomy_health, HolonomyHealth, BERRY_PHASE};
-use prismqueer::liquid::prelude::*;
+use prismqueer::flux::prelude::*;
 
 // ──────────────────────────────────────────────────────────────────
 // 1. Direct-classification verdict mapping.

@@ -19,7 +19,7 @@
 //! per the header).
 //!
 //! Composed over `terni::PropertyVerdict` for uniform verdict
-//! marshaling — same machinery `prismqueer::liquid::pillar` returns
+//! marshaling — same machinery `prismqueer::flux::pillar` returns
 //! for commutator + magnitude verdicts. The property ouroboros is
 //! now complete: Prism → Bundle → Liquid → collapse → back through
 //! Pillar III.
@@ -168,7 +168,7 @@ fn identity_prism_produces_success_beam_with_no_loss() {
 #[test]
 /// Report the IdentityPrism law as a `terni::PropertyVerdict`.
 /// Pass when the roundtrip value matches; Fail(Diagnostic) otherwise.
-/// Same PropertyVerdict machinery `prismqueer::liquid::pillar` uses —
+/// Same PropertyVerdict machinery `prismqueer::flux::pillar` uses —
 /// unified across the property-testing ouroboros.
 fn prism_law_composes_to_property_verdict() {
     let prism: IdentityPrism<u32> = IdentityPrism::new();

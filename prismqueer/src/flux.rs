@@ -56,7 +56,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use terni::{Diagnostic, Loss, Metric, PropertyVerdict};
 
 // ──────────────────────────────────────────────────────────────────
-// LiquidConnection
+// FluxThread
 // ──────────────────────────────────────────────────────────────────
 
 /// A Bundle whose commutator can be computed at Rust altitude via the
@@ -65,8 +65,8 @@ use terni::{Diagnostic, Loss, Metric, PropertyVerdict};
 /// Blanket-implemented for any type that satisfies `Transport` (whose
 /// supertraits `Fiber`, `Connection`, `Gauge` are automatically
 /// satisfied). Users do NOT implement this trait directly — implementing
-/// `Transport` grants LiquidConnection for free.
-pub trait LiquidConnection: Transport
+/// `Transport` grants FluxThread for free.
+pub trait FluxThread: Transport
 where
     Self::Optic: crate::Prism,
     <<Self::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -79,7 +79,7 @@ where
     fn commutator_magnitude(a: &Self, b: &Self, state: &Self::State) -> Self::Holonomy;
 }
 
-impl<T> LiquidConnection for T
+impl<T> FluxThread for T
 where
     T: Transport,
     T::Optic: crate::Prism,
@@ -113,8 +113,8 @@ where
 /// The commutator `[A, B]` at a state as a deferred value.
 ///
 /// Holds references to the two connections and the state. Computes the
-/// magnitude via `LiquidConnection::commutator_magnitude` on demand.
-pub struct Commutator<'a, C: LiquidConnection>
+/// magnitude via `FluxThread::commutator_magnitude` on demand.
+pub struct Commutator<'a, C: FluxThread>
 where
     C::Optic: crate::Prism,
     <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -124,7 +124,7 @@ where
     state: &'a C::State,
 }
 
-impl<'a, C: LiquidConnection> Commutator<'a, C>
+impl<'a, C: FluxThread> Commutator<'a, C>
 where
     C::Optic: crate::Prism,
     <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -136,7 +136,7 @@ where
 }
 
 /// Construct a commutator of two connections at a specified state.
-pub fn commutator<'a, C: LiquidConnection>(
+pub fn commutator<'a, C: FluxThread>(
     a: &'a C,
     b: &'a C,
     state: &'a C::State,
@@ -153,10 +153,10 @@ where
 /// Convenience for tests where the caller doesn't need to control the
 /// state. Requires `C::State: Default` because we synthesize a canonical
 /// state. For non-Default states, use `commutator(...)` with an explicit
-/// state, or call `LiquidConnection::commutator_magnitude` directly.
+/// state, or call `FluxThread::commutator_magnitude` directly.
 pub fn commutator_norm<C>(a: &C, b: &C) -> C::Holonomy
 where
-    C: LiquidConnection,
+    C: FluxThread,
     C::State: Default,
     C::Optic: crate::Prism,
     <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -338,7 +338,7 @@ pub mod pillar {
         theta: &C::Holonomy,
     ) -> PropertyVerdict
     where
-        C: LiquidConnection,
+        C: FluxThread,
         C::Holonomy: PartialOrd,
         C::Optic: crate::Prism,
         <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -431,7 +431,7 @@ pub mod pillar {
         omega: usize,
     ) -> PropertyVerdict
     where
-        C: LiquidConnection,
+        C: FluxThread,
         C::Holonomy: PartialOrd,
         C::Optic: crate::Prism,
         <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -724,11 +724,11 @@ pub mod pillar {
 // Prelude — the delightful use-line.
 // ──────────────────────────────────────────────────────────────────
 
-/// `use prismqueer::liquid::prelude::*;` — imports the surface consumers
+/// `use prismqueer::flux::prelude::*;` — imports the surface consumers
 /// need most often: commutator constructors, the `pillar` module, and
 /// terni's verdict types.
 pub mod prelude {
     pub use super::pillar;
-    pub use super::{commutator, commutator_norm, Commutator, LiquidConnection};
+    pub use super::{commutator, commutator_norm, Commutator, FluxThread};
     pub use terni::{Diagnostic, PropertyVerdict};
 }

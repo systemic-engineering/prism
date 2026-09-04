@@ -347,9 +347,9 @@ impl<S: Clone + PartialEq> LawvereFixedPoint for StableFiber<S> {
 ///   state — which they always do here (transport loss depends only on
 ///   state, not on which bundle transports it). This is the correct,
 ///   substrate-honest behavior for **abelian** gauge groups.
-/// - [`LiquidTestBundle`] — full tower where transport loss depends on
+/// - [`FluxConstraint`] — full tower where transport loss depends on
 ///   the *bundle's* strategy value rather than the state. Commutators
-///   over pairs of `LiquidTestBundle`s with different strategies are
+///   over pairs of `FluxConstraint`s with different strategies are
 ///   *non-vanishing*, which is what property tests for Pillar II
 ///   (algedonic threshold) and Pillar III (viability persistence)
 ///   require.
@@ -486,17 +486,17 @@ pub mod examples {
     /// strategy value rather than the state.
     ///
     /// Loss on `transport(state)` = `strategy.value() as f64`, regardless
-    /// of state. This makes commutators over pairs of `LiquidTestBundle`
+    /// of state. This makes commutators over pairs of `FluxConstraint`
     /// non-vanishing whenever their strategies differ — exactly what
     /// property tests for Pillar II (algedonic threshold) and Pillar III
     /// (viability persistence) require.
-    pub struct LiquidTestBundle {
+    pub struct FluxConstraint {
         pub optic: IdentityPrism<[f64; 4]>,
         pub strategy: Cyclic<4>,
         pub fixed: StableFiber<[f64; 4]>,
     }
 
-    impl LiquidTestBundle {
+    impl FluxConstraint {
         pub fn new(strategy_shift: u8, kernel: bool) -> Self {
             Self {
                 optic: IdentityPrism::new(),
@@ -513,24 +513,24 @@ pub mod examples {
         }
     }
 
-    impl Default for LiquidTestBundle {
+    impl Default for FluxConstraint {
         fn default() -> Self {
             Self::with_strategy(0)
         }
     }
 
-    impl Fiber for LiquidTestBundle {
+    impl Fiber for FluxConstraint {
         type State = [f64; 4];
     }
 
-    impl Connection for LiquidTestBundle {
+    impl Connection for FluxConstraint {
         type Optic = IdentityPrism<[f64; 4]>;
         fn connection(&self) -> &IdentityPrism<[f64; 4]> {
             &self.optic
         }
     }
 
-    impl Gauge for LiquidTestBundle {
+    impl Gauge for FluxConstraint {
         type Group = Cyclic<4>;
         fn gauge(&self) -> &Cyclic<4> {
             &self.strategy
@@ -545,7 +545,7 @@ pub mod examples {
         }
     }
 
-    impl Transport for LiquidTestBundle {
+    impl Transport for FluxConstraint {
         type Holonomy = ScalarLoss;
         fn transport(&self, state: &[f64; 4]) -> Imperfect<[f64; 4], Infallible, ScalarLoss> {
             let strategy_loss = self.strategy.value() as f64;
@@ -557,7 +557,7 @@ pub mod examples {
         }
     }
 
-    impl Closure for LiquidTestBundle {
+    impl Closure for FluxConstraint {
         type Fixed = StableFiber<[f64; 4]>;
         fn close(&self) -> &StableFiber<[f64; 4]> {
             &self.fixed
@@ -578,7 +578,7 @@ pub mod examples {
     ///
     /// Non-abelian gauge groups — unlike `Cyclic<N>` — have
     /// non-vanishing commutators. This carrier is what
-    /// `LiquidConnection::commutator_magnitude` needs to have genuine
+    /// `FluxThread::commutator_magnitude` needs to have genuine
     /// work to do: for `a = (1 2)` and `b = (2 3)`, `a∘b = (1 2 3)` but
     /// `b∘a = (1 3 2)`, so the commutator holonomies at any
     /// position-sensitive state must differ.

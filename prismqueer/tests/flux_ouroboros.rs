@@ -4,7 +4,7 @@
 //! This is the deep substrate work. `prismqueer::liquid` composes over
 //! prismqueer's Bundle tower + terni's verdict machinery to produce
 //! spectral-commutator property verdicts. Here, we witness that the
-//! `LiquidConnection::commutator_magnitude` blanket impl satisfies:
+//! `FluxThread::commutator_magnitude` blanket impl satisfies:
 //!
 //! 1. Antisymmetry — `‖[A, B]‖ == ‖[B, A]‖` for any pair.
 //! 2. Self-annihilation — `‖[A, A]‖ == 0` for any single connection.
@@ -29,9 +29,9 @@
 
 #![cfg(feature = "bundle")]
 
-use prismqueer::bundle::examples::{LiquidTestBundle, Perm3, PermBundle, TestBundle};
+use prismqueer::bundle::examples::{FluxConstraint, Perm3, PermBundle, TestBundle};
 use prismqueer::bundle::GroupStructure;
-use prismqueer::liquid::prelude::*;
+use prismqueer::flux::prelude::*;
 use prismqueer::{Loss, Metric, ScalarLoss};
 
 // ──────────────────────────────────────────────────────────────────
@@ -48,8 +48,8 @@ fn commutator_antisymmetric_over_test_bundle_all_strategy_pairs() {
         for j in 0..4u8 {
             let a = TestBundle::with_strategy(i);
             let b = TestBundle::with_strategy(j);
-            let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
-            let ba = LiquidConnection::commutator_magnitude(&b, &a, &state);
+            let ab = FluxThread::commutator_magnitude(&a, &b, &state);
+            let ba = FluxThread::commutator_magnitude(&b, &a, &state);
             assert_eq!(
                 ab, ba,
                 "antisymmetry failed for TestBundle strategies i={i} j={j}: \
@@ -60,20 +60,20 @@ fn commutator_antisymmetric_over_test_bundle_all_strategy_pairs() {
 }
 
 #[test]
-/// The commutator is symmetric under argument swap for LiquidTestBundle
+/// The commutator is symmetric under argument swap for FluxConstraint
 /// (bundle-dependent loss). For different strategies, magnitudes are
 /// non-zero but still equal in the two orderings.
 fn commutator_antisymmetric_over_liquid_bundle_all_strategy_pairs() {
     let state = [1.0, 2.0, 3.0, 4.0];
     for i in 0..4u8 {
         for j in 0..4u8 {
-            let a = LiquidTestBundle::with_strategy(i);
-            let b = LiquidTestBundle::with_strategy(j);
-            let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
-            let ba = LiquidConnection::commutator_magnitude(&b, &a, &state);
+            let a = FluxConstraint::with_strategy(i);
+            let b = FluxConstraint::with_strategy(j);
+            let ab = FluxThread::commutator_magnitude(&a, &b, &state);
+            let ba = FluxThread::commutator_magnitude(&b, &a, &state);
             assert_eq!(
                 ab, ba,
-                "antisymmetry failed for LiquidTestBundle strategies i={i} j={j}: \
+                "antisymmetry failed for FluxConstraint strategies i={i} j={j}: \
                 |[A,B]|={ab:?} vs |[B,A]|={ba:?}",
             );
         }
@@ -86,13 +86,13 @@ fn commutator_antisymmetric_over_liquid_bundle_all_strategy_pairs() {
 
 #[test]
 /// `commutator_magnitude(a, a, state)` returns `Loss::zero()` for any
-/// strategy — for both TestBundle and LiquidTestBundle. Because the two
+/// strategy — for both TestBundle and FluxConstraint. Because the two
 /// holonomies are identical, their Metric distance is zero.
 fn commutator_self_annihilates_over_test_bundle() {
     let state = [1.0, 2.0, 3.0, 4.0];
     for i in 0..4u8 {
         let a = TestBundle::with_strategy(i);
-        let magnitude = LiquidConnection::commutator_magnitude(&a, &a, &state);
+        let magnitude = FluxThread::commutator_magnitude(&a, &a, &state);
         assert!(
             magnitude.is_zero(),
             "self-annihilation failed for TestBundle strategy {i}: \
@@ -105,11 +105,11 @@ fn commutator_self_annihilates_over_test_bundle() {
 fn commutator_self_annihilates_over_liquid_bundle() {
     let state = [1.0, 2.0, 3.0, 4.0];
     for i in 0..4u8 {
-        let a = LiquidTestBundle::with_strategy(i);
-        let magnitude = LiquidConnection::commutator_magnitude(&a, &a, &state);
+        let a = FluxConstraint::with_strategy(i);
+        let magnitude = FluxThread::commutator_magnitude(&a, &a, &state);
         assert!(
             magnitude.is_zero(),
-            "self-annihilation failed for LiquidTestBundle strategy {i}: \
+            "self-annihilation failed for FluxConstraint strategy {i}: \
             |[A,A]| = {magnitude:?}, expected Loss::zero()",
         );
     }
@@ -126,9 +126,9 @@ fn commutator_magnitude_is_non_negative() {
     let state = [1.0, 2.0, 3.0, 4.0];
     for i in 0..4u8 {
         for j in 0..4u8 {
-            let a = LiquidTestBundle::with_strategy(i);
-            let b = LiquidTestBundle::with_strategy(j);
-            let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+            let a = FluxConstraint::with_strategy(i);
+            let b = FluxConstraint::with_strategy(j);
+            let m = FluxThread::commutator_magnitude(&a, &b, &state);
             assert!(
                 m.is_non_negative(),
                 "non-negativity failed for strategies i={i} j={j}: {m:?}",
@@ -143,18 +143,18 @@ fn commutator_magnitude_is_non_negative() {
 
 #[test]
 /// Direct triangle inequality on the three commutator magnitudes
-/// `d(a,b), d(b,c), d(a,c)` for LiquidTestBundle triples.
+/// `d(a,b), d(b,c), d(a,c)` for FluxConstraint triples.
 fn commutator_magnitude_satisfies_triangle_inequality() {
     let state = [1.0, 2.0, 3.0, 4.0];
     for i in 0..4u8 {
         for j in 0..4u8 {
             for k in 0..4u8 {
-                let a = LiquidTestBundle::with_strategy(i);
-                let b = LiquidTestBundle::with_strategy(j);
-                let c = LiquidTestBundle::with_strategy(k);
-                let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
-                let bc = LiquidConnection::commutator_magnitude(&b, &c, &state);
-                let ac = LiquidConnection::commutator_magnitude(&a, &c, &state);
+                let a = FluxConstraint::with_strategy(i);
+                let b = FluxConstraint::with_strategy(j);
+                let c = FluxConstraint::with_strategy(k);
+                let ab = FluxThread::commutator_magnitude(&a, &b, &state);
+                let bc = FluxThread::commutator_magnitude(&b, &c, &state);
+                let ac = FluxThread::commutator_magnitude(&a, &c, &state);
                 assert!(
                     ab.triangle(&bc, &ac),
                     "triangle failed for i={i} j={j} k={k}: \
@@ -179,7 +179,7 @@ fn commutator_vanishes_for_abelian_gauge_test_bundle() {
         for j in 0..4u8 {
             let a = TestBundle::with_strategy(i);
             let b = TestBundle::with_strategy(j);
-            let magnitude = LiquidConnection::commutator_magnitude(&a, &b, &state);
+            let magnitude = FluxThread::commutator_magnitude(&a, &b, &state);
             assert!(
                 magnitude.is_zero(),
                 "abelian-vanishing failed for TestBundle i={i} j={j}: {magnitude:?}",
@@ -201,20 +201,20 @@ fn commutator_norm_zero_over_default_state_for_test_bundle() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 6. LiquidTestBundle actually produces non-vanishing commutators.
+// 6. FluxConstraint actually produces non-vanishing commutators.
 // ──────────────────────────────────────────────────────────────────
 
 #[test]
-/// Sanity: LiquidTestBundle with strategies 2 and 5 produces magnitude
+/// Sanity: FluxConstraint with strategies 2 and 5 produces magnitude
 /// exactly `|2 - 5| = 3` (bundle-dependent loss).
 ///
 /// Note `Cyclic<4>::new(5) == Cyclic(5 % 4) == Cyclic(1)`, so
 /// `|2 - 1| = 1`. Adjust expectation to match constructor reduction.
 fn liquid_bundle_commutator_matches_scalar_loss_computation() {
-    let a = LiquidTestBundle::with_strategy(2);
-    let b = LiquidTestBundle::with_strategy(5); // reduces to 1
+    let a = FluxConstraint::with_strategy(2);
+    let b = FluxConstraint::with_strategy(5); // reduces to 1
     let state = [1.0, 2.0, 3.0, 4.0];
-    let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+    let m = FluxThread::commutator_magnitude(&a, &b, &state);
     let expected = ScalarLoss::new(2.0).distance_to(&ScalarLoss::new(1.0));
     assert_eq!(m, expected, "got {m:?}, expected {expected:?}");
     assert!(!m.is_zero(), "expected non-vanishing commutator; got {m:?}");
@@ -226,14 +226,14 @@ fn liquid_bundle_commutator_matches_scalar_loss_computation() {
 
 #[test]
 fn commutator_struct_computes_magnitude_lazily() {
-    let a = LiquidTestBundle::with_strategy(1);
-    let b = LiquidTestBundle::with_strategy(3);
+    let a = FluxConstraint::with_strategy(1);
+    let b = FluxConstraint::with_strategy(3);
     let state = [1.0, 2.0, 3.0, 4.0];
     let c = commutator(&a, &b, &state);
     let m1 = c.magnitude();
     let m2 = c.magnitude();
     assert_eq!(m1, m2, "repeated .magnitude() must be deterministic");
-    let direct = LiquidConnection::commutator_magnitude(&a, &b, &state);
+    let direct = FluxThread::commutator_magnitude(&a, &b, &state);
     assert_eq!(m1, direct, "Commutator::magnitude must equal direct call");
 }
 
@@ -277,8 +277,8 @@ fn pillar_dispatch_ambiguity_fail_when_pivot_song_missing() {
 
 #[test]
 fn pillar_algedonic_pass_above_threshold() {
-    let a = LiquidTestBundle::with_strategy(0);
-    let b = LiquidTestBundle::with_strategy(3);
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
     // magnitude = |0 - 3| = 3.0, theta = 1.0 → Pass
@@ -289,8 +289,8 @@ fn pillar_algedonic_pass_above_threshold() {
 
 #[test]
 fn pillar_algedonic_partial_below_threshold_but_nonzero() {
-    let a = LiquidTestBundle::with_strategy(0);
-    let b = LiquidTestBundle::with_strategy(1);
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(1);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
     // magnitude = 1.0, theta = 5.0 → Partial
@@ -307,8 +307,8 @@ fn pillar_algedonic_partial_below_threshold_but_nonzero() {
 #[test]
 fn pillar_algedonic_fail_when_commutator_vanishes() {
     // Same strategy → magnitude 0 → Fail
-    let a = LiquidTestBundle::with_strategy(2);
-    let b = LiquidTestBundle::with_strategy(2);
+    let a = FluxConstraint::with_strategy(2);
+    let b = FluxConstraint::with_strategy(2);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
     let theta = ScalarLoss::new(0.5);
@@ -322,8 +322,8 @@ fn pillar_algedonic_fail_when_commutator_vanishes() {
 
 #[test]
 fn pillar_viability_pass_when_accumulated_exceeds_threshold() {
-    let a = LiquidTestBundle::with_strategy(0);
-    let b = LiquidTestBundle::with_strategy(3);
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
     // Each commutator has magnitude 3.0; three of them combine
     // (ScalarLoss.combine = a+b) to 9.0. Threshold 5.0 → Pass.
@@ -338,8 +338,8 @@ fn pillar_viability_pass_when_accumulated_exceeds_threshold() {
 
 #[test]
 fn pillar_viability_fail_when_accumulated_below_threshold() {
-    let a = LiquidTestBundle::with_strategy(0);
-    let b = LiquidTestBundle::with_strategy(1);
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(1);
     let state = [1.0; 4];
     // Each commutator magnitude 1.0; three → 3.0. Threshold 10.0 → Fail.
     let c1 = commutator(&a, &b, &state);
@@ -353,8 +353,8 @@ fn pillar_viability_fail_when_accumulated_below_threshold() {
 
 #[test]
 fn pillar_viability_partial_when_history_shorter_than_window() {
-    let a = LiquidTestBundle::with_strategy(0);
-    let b = LiquidTestBundle::with_strategy(3);
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
     let c1 = commutator(&a, &b, &state);
     let history = vec![c1];
@@ -375,12 +375,12 @@ fn pillar_viability_partial_when_history_shorter_than_window() {
 
 #[test]
 /// If this compiles, the prelude re-exports the intended surface:
-/// `commutator`, `commutator_norm`, `Commutator`, `LiquidConnection`,
+/// `commutator`, `commutator_norm`, `Commutator`, `FluxThread`,
 /// `pillar`, `Diagnostic`, `PropertyVerdict`.
 fn prelude_reexports_delightful_surface() {
     fn _uses_prelude() {
-        let _a = LiquidTestBundle::with_strategy(0);
-        let _b = LiquidTestBundle::with_strategy(1);
+        let _a = FluxConstraint::with_strategy(0);
+        let _b = FluxConstraint::with_strategy(1);
         let state = [1.0; 4];
         let c = commutator(&_a, &_b, &state);
         let _m = c.magnitude();
@@ -455,7 +455,7 @@ fn perm_bundle_commutator_nonzero_for_non_commuting_permutations() {
     let a = PermBundle::from_perm(Perm3::SWAP_01);
     let b = PermBundle::from_perm(Perm3::SWAP_12);
     let state = [10, 20, 30];
-    let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+    let m = FluxThread::commutator_magnitude(&a, &b, &state);
     assert!(
         !m.is_zero(),
         "non-commuting perms MUST produce non-vanishing commutator; got {m:?}",
@@ -469,8 +469,8 @@ fn perm_bundle_commutator_vanishes_when_one_gauge_is_identity() {
     let state = [10, 20, 30];
     for &x in Perm3::ALL.iter() {
         let bx = PermBundle::from_perm(x);
-        let m1 = LiquidConnection::commutator_magnitude(&id, &bx, &state);
-        let m2 = LiquidConnection::commutator_magnitude(&bx, &id, &state);
+        let m1 = FluxThread::commutator_magnitude(&id, &bx, &state);
+        let m2 = FluxThread::commutator_magnitude(&bx, &id, &state);
         assert!(m1.is_zero(), "[id, {x:?}] must vanish; got {m1:?}");
         assert!(m2.is_zero(), "[{x:?}, id] must vanish; got {m2:?}");
     }
@@ -483,7 +483,7 @@ fn perm_bundle_commutator_self_annihilates_across_s3() {
     for &x in Perm3::ALL.iter() {
         let a = PermBundle::from_perm(x);
         let b = PermBundle::from_perm(x);
-        let m = LiquidConnection::commutator_magnitude(&a, &b, &state);
+        let m = FluxThread::commutator_magnitude(&a, &b, &state);
         assert!(m.is_zero(), "self-annihilation failed for {x:?}: {m:?}");
     }
 }
@@ -496,8 +496,8 @@ fn perm_bundle_commutator_antisymmetric_across_full_s3_grid() {
         for &pb in Perm3::ALL.iter() {
             let a = PermBundle::from_perm(pa);
             let b = PermBundle::from_perm(pb);
-            let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
-            let ba = LiquidConnection::commutator_magnitude(&b, &a, &state);
+            let ab = FluxThread::commutator_magnitude(&a, &b, &state);
+            let ba = FluxThread::commutator_magnitude(&b, &a, &state);
             assert_eq!(
                 ab, ba,
                 "antisymmetry failed for {pa:?}/{pb:?}: |[A,B]|={ab:?} vs |[B,A]|={ba:?}",
@@ -705,9 +705,9 @@ fn perm_bundle_commutator_triangle_inequality_holds() {
                 let a = PermBundle::from_perm(pa);
                 let b = PermBundle::from_perm(pb);
                 let cc = PermBundle::from_perm(pc);
-                let ab = LiquidConnection::commutator_magnitude(&a, &b, &state);
-                let bc = LiquidConnection::commutator_magnitude(&b, &cc, &state);
-                let ac = LiquidConnection::commutator_magnitude(&a, &cc, &state);
+                let ab = FluxThread::commutator_magnitude(&a, &b, &state);
+                let bc = FluxThread::commutator_magnitude(&b, &cc, &state);
+                let ac = FluxThread::commutator_magnitude(&a, &cc, &state);
                 assert!(
                     ab.triangle(&bc, &ac),
                     "triangle failed for {pa:?}/{pb:?}/{pc:?}: ab={ab:?} bc={bc:?} ac={ac:?}",

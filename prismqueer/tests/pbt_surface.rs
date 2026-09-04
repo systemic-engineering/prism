@@ -11,7 +11,7 @@
 
 #![cfg(feature = "bundle")]
 
-use prismqueer::liquid::pillar::{self, forall, Arbitrary, Sample};
+use prismqueer::flux::pillar::{self, forall, Arbitrary, Sample};
 use terni::PropertyVerdict;
 
 // ──────────────────────────────────────────────────────────────────

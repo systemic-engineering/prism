@@ -63,7 +63,7 @@
 
 #![cfg(feature = "bundle")]
 
-use prismqueer::liquid::pillar::{forall, Arbitrary, Sample};
+use prismqueer::flux::pillar::{forall, Arbitrary, Sample};
 use terni::{Diagnostic, PropertyVerdict};
 
 // =====================================================================

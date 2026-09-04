@@ -60,7 +60,7 @@ pub mod pq;
 pub mod bundle;
 
 #[cfg(feature = "bundle")]
-pub mod liquid;
+pub mod flux;
 
 #[cfg(feature = "lambda")]
 pub mod lambda;
