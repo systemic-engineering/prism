@@ -66,7 +66,7 @@
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
     fiedler_lambda_2_of_sheaf, kleinos, sheaf_of_complete_graph_of_order,
-    sheaf_of_shard_graph_from_edges, Red,
+    sheaf_of_shard_graph_from_edges,
 };
 use terni::Imperfect;
 
@@ -278,10 +278,18 @@ fn compose_property_4_fusion_refusal() {
                  signal composition passed — violates PAPER §3.6.4 K_2 refusal condition"
             );
         }
-        Imperfect::Success(composed) | Imperfect::Partial(composed, _) => {
+        Imperfect::Success(composed) => {
             panic!(
                 "PAPER §3.6.4 fusion refusal: identical inputs MUST return Red \
-                 (Imperfect::Failure); got Green/Yellow with composed sheaf \
+                 (Imperfect::Failure); got Green with composed sheaf \
+                 emergent_third_stalk={}",
+                composed.emergent_third_stalk()
+            );
+        }
+        Imperfect::Partial(composed, _) => {
+            panic!(
+                "PAPER §3.6.4 fusion refusal: identical inputs MUST return Red \
+                 (Imperfect::Failure); got Yellow with composed sheaf \
                  emergent_third_stalk={}",
                 composed.emergent_third_stalk()
             );
