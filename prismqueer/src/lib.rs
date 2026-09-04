@@ -85,6 +85,9 @@ pub mod spectral;
 pub mod shard;
 
 #[cfg(feature = "lapack")]
+pub mod observer;
+
+#[cfg(feature = "lapack")]
 pub mod spectral_dimension;
 
 // Fate — the 5-model inference selector, source-mirrored from
