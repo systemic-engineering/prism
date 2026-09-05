@@ -48,46 +48,56 @@ use std::collections::BTreeMap;
 
 use crate::spectral::kleinos::{SheafOfShardGraph, VertexId};
 
-/// Full non-trivial harmonic spectrum of the sheaf Laplacian.
+/// Full non-trivial harmonic spectrum of the sheaf Laplacian carried as
+/// substrate-noun per Alex 2026-09-05 "Simple made Easy" naming directive.
 ///
-/// Returns `{λ_2, λ_3, ..., λ_n}` sorted ascending (skips trivial λ_0 = 0 for
+/// Holds `{λ_2, λ_3, ..., λ_n}` sorted ascending (skips trivial λ_0 = 0 for
 /// connected sheaves; also skips first zero for disconnected sheaves).
 ///
-/// Returns empty `Vec` for empty or single-vertex sheaves (no non-trivial
+/// Empty `spectrum` for empty or single-vertex sheaves (no non-trivial
 /// eigenvalues exist).
-pub fn harmonics(sheaf: &SheafOfShardGraph) -> Vec<f64> {
-    let n = sheaf.vertex_count();
-    if n < 2 {
-        return Vec::new();
-    }
+#[derive(Clone, Debug)]
+pub struct Harmonics {
+    pub spectrum: Vec<f64>,
+}
 
-    // Map VertexId → matrix index (canonical order per BTreeSet).
-    let vertex_index: BTreeMap<VertexId, usize> = sheaf
-        .vertices()
-        .enumerate()
-        .map(|(i, v)| (v, i))
-        .collect();
+impl Harmonics {
+    /// Read the full non-trivial harmonic spectrum of `sheaf`.
+    ///
+    /// Composes over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via
+    /// FLANG-compiled `native/spectral.f90`).
+    pub fn of(sheaf: &SheafOfShardGraph) -> Self {
+        let n = sheaf.vertex_count();
+        if n < 2 {
+            return Self { spectrum: Vec::new() };
+        }
 
-    // Build graph Laplacian L = D - A (row-major flat matrix; symmetric).
-    // Matches `fiedler_lambda_2_of_sheaf` construction at
-    // `prismqueer/src/spectral/kleinos.rs`; REFACTOR to shared helper deferred.
-    let mut laplacian = vec![0.0_f64; n * n];
-    for (u, v) in sheaf.edges() {
-        let i = vertex_index[&u];
-        let j = vertex_index[&v];
-        // Off-diagonal: -1 per edge (symmetric)
-        laplacian[i * n + j] -= 1.0;
-        laplacian[j * n + i] -= 1.0;
-        // Diagonal: degree (accumulate)
-        laplacian[i * n + i] += 1.0;
-        laplacian[j * n + j] += 1.0;
-    }
+        // Map VertexId → matrix index (canonical order per BTreeSet).
+        let vertex_index: BTreeMap<VertexId, usize> = sheaf
+            .vertices()
+            .enumerate()
+            .map(|(i, v)| (v, i))
+            .collect();
 
-    // Compose over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via
-    // FLANG-compiled native/spectral.f90). Returns sorted eigenvalues.
-    match crate::ffi::eigenvalues(n, &laplacian) {
-        Ok(evals) if evals.len() >= 2 => evals[1..].to_vec(),
-        _ => Vec::new(),
+        // Build graph Laplacian L = D - A (row-major flat matrix; symmetric).
+        // Matches `fiedler_lambda_2_of_sheaf` construction at
+        // `prismqueer/src/spectral/kleinos.rs`; REFACTOR to shared helper deferred.
+        let mut laplacian = vec![0.0_f64; n * n];
+        for (u, v) in sheaf.edges() {
+            let i = vertex_index[&u];
+            let j = vertex_index[&v];
+            laplacian[i * n + j] -= 1.0;
+            laplacian[j * n + i] -= 1.0;
+            laplacian[i * n + i] += 1.0;
+            laplacian[j * n + j] += 1.0;
+        }
+
+        let spectrum = match crate::ffi::eigenvalues(n, &laplacian) {
+            Ok(evals) if evals.len() >= 2 => evals[1..].to_vec(),
+            _ => Vec::new(),
+        };
+
+        Self { spectrum }
     }
 }
 
@@ -138,20 +148,30 @@ pub fn harmonics(sheaf: &SheafOfShardGraph) -> Vec<f64> {
 ///
 /// # Composition-lineage
 ///
-/// - `harmonics(sheaf)` returns sorted `{λ_2, ..., λ_n}` (composes-over)
+/// - `Harmonics::of(sheaf).spectrum` returns sorted `{λ_2, ..., λ_n}` (composes-over)
 /// - Folk Theorem: Fudenberg-Maskin 1986; SSS 6-properties per Taut scout
 /// - Fiedler-as-ESS stability margin per Reed+Alex 2026-04-04 §1 novel claim
-pub fn delta_critical(sheaf: &SheafOfShardGraph) -> Option<f64> {
-    let spectrum = harmonics(sheaf);
-    if spectrum.is_empty() {
-        return None;
+#[derive(Clone, Debug)]
+pub struct DeltaCritical {
+    /// `Some(δ)` where `δ ∈ [0, 1]` for connected non-empty sheaves;
+    /// `None` for empty (n < 2) or degenerate `λ_max = 0` (disconnected).
+    pub value: Option<f64>,
+}
+
+impl DeltaCritical {
+    /// Read the Folk Theorem discount factor of `sheaf`.
+    pub fn of(sheaf: &SheafOfShardGraph) -> Self {
+        let spectrum = Harmonics::of(sheaf).spectrum;
+        if spectrum.is_empty() {
+            return Self { value: None };
+        }
+        let lambda_2 = *spectrum.first().unwrap();
+        let lambda_max = *spectrum.last().unwrap();
+        if lambda_max == 0.0 {
+            return Self { value: None };
+        }
+        Self { value: Some(1.0 - lambda_2 / lambda_max) }
     }
-    let lambda_2 = *spectrum.first().unwrap();
-    let lambda_max = *spectrum.last().unwrap();
-    if lambda_max == 0.0 {
-        return None;
-    }
-    Some(1.0 - lambda_2 / lambda_max)
 }
 
 #[cfg(test)]
@@ -161,11 +181,11 @@ mod tests {
 
     /// K_n Laplacian spectrum per void-dual-geometry.md line 51-58:
     /// `{0, n, n, n, ..., n}` (λ_0 = 0; n-1 copies of n).
-    /// `harmonics(K_5) → {5, 5, 5, 5}` (4 values, all ≈ 5.0).
+    /// `Harmonics::of(K_5).spectrum → {5, 5, 5, 5}` (4 values, all ≈ 5.0).
     #[test]
     fn harmonics_of_k5_returns_four_nontrivial_eigenvalues_all_equal_to_five() {
         let k5 = sheaf_of_complete_graph_of_order(5);
-        let spectrum = harmonics(&k5);
+        let spectrum = Harmonics::of(&k5).spectrum;
         assert_eq!(spectrum.len(), 4, "K_5 has n-1 = 4 non-trivial eigenvalues");
         for (i, &lambda) in spectrum.iter().enumerate() {
             assert!(
@@ -175,11 +195,11 @@ mod tests {
         }
     }
 
-    /// K_3 Laplacian spectrum: {0, 3, 3}. harmonics returns {3, 3}.
+    /// K_3 Laplacian spectrum: {0, 3, 3}. `Harmonics::of(K_3).spectrum → {3, 3}`.
     #[test]
     fn harmonics_of_k3_returns_two_nontrivial_eigenvalues_all_equal_to_three() {
         let k3 = sheaf_of_complete_graph_of_order(3);
-        let spectrum = harmonics(&k3);
+        let spectrum = Harmonics::of(&k3).spectrum;
         assert_eq!(spectrum.len(), 2, "K_3 has n-1 = 2 non-trivial eigenvalues");
         for &lambda in &spectrum {
             assert!((lambda - 3.0).abs() < 1e-9, "K_3 eigenvalue should equal n = 3; got {lambda}");
@@ -187,12 +207,12 @@ mod tests {
     }
 
     /// Path graph P_3 (vertices {0,1,2}, edges {(0,1), (1,2)}) Laplacian spectrum:
-    /// {0, 1, 3}. harmonics returns {1, 3} (non-degenerate; distinct values).
+    /// {0, 1, 3}. `Harmonics::of(P_3).spectrum → {1, 3}` (non-degenerate; distinct values).
     /// Composition witness with `fiedler_lambda_2_of_sheaf` (which returns 1).
     #[test]
     fn harmonics_of_path_p3_returns_distinct_eigenvalues() {
         let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let spectrum = harmonics(&p3);
+        let spectrum = Harmonics::of(&p3).spectrum;
         assert_eq!(spectrum.len(), 2, "P_3 has n-1 = 2 non-trivial eigenvalues");
         assert!(
             (spectrum[0] - 1.0).abs() < 1e-9,
@@ -210,7 +230,7 @@ mod tests {
     #[test]
     fn harmonics_of_empty_sheaf_returns_empty() {
         let empty = sheaf_of_shard_graph_from_edges(&[]);
-        assert!(harmonics(&empty).is_empty());
+        assert!(Harmonics::of(&empty).spectrum.is_empty());
     }
 
     /// Sorted-ascending invariant: consecutive eigenvalues are non-decreasing.
@@ -218,7 +238,7 @@ mod tests {
     fn harmonics_is_sorted_ascending() {
         // Star K_{1,4} = vertex 0 hub connected to vertices 1..=4
         let star = sheaf_of_shard_graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
-        let spectrum = harmonics(&star);
+        let spectrum = Harmonics::of(&star).spectrum;
         for window in spectrum.windows(2) {
             assert!(
                 window[0] <= window[1] + 1e-12,
@@ -233,48 +253,48 @@ mod tests {
     // delta_critical tests — Reed+Alex 2026-04-04 synthesis §4 novel formula
     // -----------------------------------------------------------------------
 
-    /// Splinter pole (K_n complete): harmonics = {n, n, ..., n} → λ_2 = λ_max
+    /// Splinter pole (K_n complete): spectrum = {n, n, ..., n} → λ_2 = λ_max
     /// → δ_critical = 1 - 1 = 0 (cooperation trivially sustainable per
     /// void-dual-geometry.md Splinter pole = fully mutual entanglement).
     #[test]
     fn delta_critical_of_k5_returns_zero_splinter_pole() {
         let k5 = sheaf_of_complete_graph_of_order(5);
-        let delta = delta_critical(&k5).expect("K_5 has non-empty spectrum");
+        let delta = DeltaCritical::of(&k5).value.expect("K_5 has non-empty spectrum");
         assert!(
             delta.abs() < 1e-9,
             "K_5 (Splinter pole) δ_critical = 0 (cooperation trivial); got {delta}"
         );
     }
 
-    /// Star K_{1,4} (Narcissus-adjacent): harmonics = {1, 1, 1, 5} →
+    /// Star K_{1,4} (Narcissus-adjacent): spectrum = {1, 1, 1, 5} →
     /// δ_critical = 1 - 1/5 = 0.8 (cooperation requires high patience per
     /// Narcissus pole vulnerability = single-point-of-failure topology).
     #[test]
     fn delta_critical_of_star_k14_returns_0_8_narcissus_pole() {
         let star = sheaf_of_shard_graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
-        let delta = delta_critical(&star).expect("K_{1,4} has non-empty spectrum");
+        let delta = DeltaCritical::of(&star).value.expect("K_{1,4} has non-empty spectrum");
         assert!(
             (delta - 0.8).abs() < 1e-9,
             "K_{{1,4}} (Narcissus-adjacent) δ_critical = 1 - 1/5 = 0.8; got {delta}"
         );
     }
 
-    /// Path P_3: harmonics = {1, 3} → δ_critical = 1 - 1/3 = 0.667.
+    /// Path P_3: spectrum = {1, 3} → δ_critical = 1 - 1/3 = 0.667.
     /// Between Splinter and Narcissus poles.
     #[test]
     fn delta_critical_of_path_p3_returns_two_thirds() {
         let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let delta = delta_critical(&p3).expect("P_3 has non-empty spectrum");
+        let delta = DeltaCritical::of(&p3).value.expect("P_3 has non-empty spectrum");
         assert!(
             (delta - (2.0 / 3.0)).abs() < 1e-9,
             "P_3 δ_critical = 1 - 1/3 = 2/3; got {delta}"
         );
     }
 
-    /// Empty sheaf: delta_critical returns None.
+    /// Empty sheaf: DeltaCritical value is None.
     #[test]
     fn delta_critical_of_empty_sheaf_returns_none() {
         let empty = sheaf_of_shard_graph_from_edges(&[]);
-        assert!(delta_critical(&empty).is_none());
+        assert!(DeltaCritical::of(&empty).value.is_none());
     }
 }

@@ -74,19 +74,18 @@ mod tests {
         // Chaos::zero() invokes terni::Loss::zero() via type-alias.
         // ScalarChaos = ScalarLoss = numeric monoid impl.
         let zero: ScalarChaos = ScalarChaos::zero();
-        let five: ScalarChaos = ScalarChaos::new(5.0);
-        let composed = zero.combine(&five);
+        let composed = zero.combine(ScalarChaos::new(5.0));
         // Monoid identity: zero ◦ x = x
-        assert_eq!(composed, five, "Chaos::zero() is the monoid identity");
+        assert_eq!(composed, ScalarChaos::new(5.0), "Chaos::zero() is the monoid identity");
     }
 
     #[test]
     fn convergence_chaos_from_terni_convergence_loss_composes() {
         // ConvergenceChaos = ConvergenceLoss (iterative refinement impl).
         let residual: ConvergenceChaos = ConvergenceChaos::new(3);
-        let doubled = residual.combine(&residual);
+        let doubled = residual.combine(ConvergenceChaos::new(3));
         // Loss::combine is associative; monoid axiom preserved.
-        let _residual_squared = doubled.combine(&residual);
+        let _residual_squared = doubled.combine(ConvergenceChaos::new(3));
     }
 
     #[test]
