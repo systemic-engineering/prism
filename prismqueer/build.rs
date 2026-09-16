@@ -411,7 +411,11 @@ fn main() {
     if env::var_os("CARGO_FEATURE_LAPACK").is_some() {
         use std::process::Command;
 
-        let flang = env::var("FLANG").unwrap_or_else(|_| "flang".to_string());
+        // Fortran compiler discovery: prefer FC (portable convention),
+        // then legacy FLANG, then `gfortran` on PATH (nix devshell default).
+        let fc = env::var("FC")
+            .or_else(|_| env::var("FLANG"))
+            .unwrap_or_else(|_| "gfortran".to_string());
         let native_dir = Path::new("native");
 
         // Sanity check: native/ dir must exist with the two Fortran sources.
@@ -435,7 +439,7 @@ fn main() {
             let stem = src_path.file_stem().unwrap().to_str().unwrap();
             let obj_path = out.join(format!("{}.o", stem));
 
-            let status = Command::new(&flang)
+            let status = Command::new(&fc)
                 .arg("-c")
                 .arg("-fPIC")
                 .arg("-O2")
@@ -445,17 +449,17 @@ fn main() {
                 .status()
                 .unwrap_or_else(|e| {
                     panic!(
-                        "failed to invoke flang `{}` on {}: {}",
-                        flang,
+                        "failed to invoke Fortran compiler `{}` on {}: {}",
+                        fc,
                         src_path.display(),
                         e
                     )
                 });
             assert!(
                 status.success(),
-                "flang failed on {} (compiler: {})",
+                "Fortran compile failed on {} (compiler: {})",
                 src_path.display(),
-                flang
+                fc
             );
 
             objs.push(obj_path);
@@ -491,19 +495,25 @@ fn main() {
         println!("cargo:rustc-link-lib=lapack");
         println!("cargo:rustc-link-lib=blas");
 
-        // flang-rt runtime static lib (darwin: libflang_rt.runtime.a).
-        // Both -L (search path) and -l (link name) are needed for cargo to
-        // resolve the archive; RUSTFLAGS from nix-devshell provides the
-        // search path but we emit it here too for robustness across
-        // invocation contexts.
-        if let Ok(rt_dir) = env::var("FLANG_RT_DIR") {
-            println!("cargo:rustc-link-search=native={}", rt_dir);
+        // Fortran runtime: gfortran path (nix devshell). Discover the
+        // libgfortran directory via `gfortran -print-file-name=...`.
+        let ext = if cfg!(target_os = "macos") { "dylib" } else { "so" };
+        if let Ok(out) = Command::new(&fc)
+            .arg(format!("-print-file-name=libgfortran.{}", ext))
+            .output()
+        {
+            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if let Some(dir) = Path::new(&p).parent() {
+                if dir.is_absolute() {
+                    println!("cargo:rustc-link-search=native={}", dir.display());
+                }
+            }
         }
-        println!("cargo:rustc-link-lib=static=flang_rt.runtime");
+        println!("cargo:rustc-link-lib=gfortran");
 
         // Rebuild triggers.
+        println!("cargo:rerun-if-env-changed=FC");
         println!("cargo:rerun-if-env-changed=FLANG");
-        println!("cargo:rerun-if-env-changed=FLANG_RT_DIR");
         println!("cargo:rerun-if-env-changed=LAPACK_DIR");
         println!("cargo:rerun-if-env-changed=BLAS_DIR");
         println!("cargo:rerun-if-env-changed=AR");

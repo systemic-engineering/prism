@@ -20,12 +20,15 @@
             pkgs.git pkgs.just pkgs.jq
             pkgs.openssl pkgs.zlib
             pkgs.gfortran
+            pkgs.lapack pkgs.blas
           ] ++ rust.rustTools
             ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
             pkgs.libiconv
           ];
           shellHook = ''
             export LANG=en_US.UTF-8
+            export LAPACK_DIR=${pkgs.lapack}
+            export BLAS_DIR=${pkgs.blas}
           '' + rust.rustHook;
         };
       });
