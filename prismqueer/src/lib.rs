@@ -82,6 +82,9 @@ pub mod ffi;
 pub mod spectral;
 
 #[cfg(feature = "lapack")]
+pub mod nl;
+
+#[cfg(feature = "lapack")]
 pub mod shard;
 
 #[cfg(feature = "lapack")]

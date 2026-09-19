@@ -47,5 +47,5 @@ pub use kleinos::{
 
 pub use commutator::CommutatorSpectrum;
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
-pub use spectrum::{DeltaCritical, Project, Refract, Spectrum, Split};
+pub use spectrum::{DeltaCritical, Focus, Lift, Project, Refract, Spectrum, Split};
 pub use tension::{detect_tensions, Tension, TensionKind};

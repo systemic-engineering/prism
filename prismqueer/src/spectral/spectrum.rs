@@ -156,6 +156,28 @@ pub struct Refract(pub f64);
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct Project(pub f64);
 
+/// The `focus` axis reading — Ollivier-Ricci curvature.
+/// Compile-time-distinct from the other four void-duality axis newtypes.
+///
+/// Primitive computation (transport-metric on graph via LP-relaxation over
+/// transport plans per Ollivier 2009 J. Funct. Anal. 256:810-864) is
+/// forward-promised. Newtype lands here for illegal-state-unrepresentable
+/// discipline: `Focus(0.3)` cannot be conflated with `Split(0.3)` at
+/// callsite; the compiler enforces the semantic role at type level.
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub struct Focus(pub f64);
+
+/// The `lift` axis reading — Kramers-Wannier duality (basis-transformation
+/// between hot/cold phase / structure and dual-structure).
+/// Compile-time-distinct from the other four void-duality axis newtypes.
+///
+/// Primitive computation (partition-function + dual-basis-transformation
+/// per Kramers-Wannier 1941 Phys. Rev. 60:252) is forward-promised.
+/// Newtype lands here so `Lift(0.5)` cannot be conflated with `Refract(0.5)`
+/// at callsite; the compiler enforces the semantic role at type level.
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub struct Lift(pub f64);
+
 // ---------------------------------------------------------------------------
 // Folk Theorem discount factor threshold per Reed+Alex 2026-04-04 synthesis
 // ---------------------------------------------------------------------------
