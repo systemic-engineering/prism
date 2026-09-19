@@ -25,9 +25,9 @@
 //!   Offer. Wait = the canonical operational register**
 
 pub mod commutator;
-pub mod harmonics;
 pub mod kleinos;
 pub mod rotation;
+pub mod spectrum;
 pub mod tension;
 
 pub use kleinos::{
@@ -35,7 +35,7 @@ pub use kleinos::{
     sheaf_of_shard_graph_from_edges,
     sheaf_of_complete_graph_of_order,
     fiedler_lambda_2_of_sheaf,
-    ComposedSheaf,
+    Composition,
     SheafOfShardGraph,
     Green,
     Red,
@@ -46,6 +46,6 @@ pub use kleinos::{
 };
 
 pub use commutator::CommutatorSpectrum;
-pub use harmonics::{DeltaCritical, Harmonics};
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
+pub use spectrum::{DeltaCritical, Project, Refract, Spectrum, Split};
 pub use tension::{detect_tensions, Tension, TensionKind};

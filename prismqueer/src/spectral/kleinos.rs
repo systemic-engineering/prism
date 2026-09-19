@@ -99,16 +99,16 @@ pub enum WhichSide {
 /// can have `Red`, `Green` and `Yellow` literally as outputs. Color coded repo
 /// state." Maps to `Imperfect<T, E, L>` ternary functor:
 ///
-///   - **Green** = `Imperfect::Success(ComposedSheaf)` — all 4 PAPER §3.6
+///   - **Green** = `Imperfect::Success(Composition)` — all 4 PAPER §3.6
 ///     properties Pass; compose emitted cleanly.
-///   - **Yellow** = `Imperfect::Partial(ComposedSheaf, ConvergenceLoss)` —
+///   - **Yellow** = `Imperfect::Partial(Composition, ConvergenceLoss)` —
 ///     compose emitted but with measured loss (e.g., Fiedler climb marginal
 ///     below some threshold, refactor-needed diagnostic). Reserved for Phase 2+.
 ///   - **Red** = `Imperfect::Failure(Red, ConvergenceLoss)` — compose refused;
 ///     `Red` value = `Transparency<Property>` carrying the Fail-dominated
 ///     property-violation map.
 ///
-/// Retires prior `RedGaugeWitness` naming + `Result<ComposedSheaf, ...>` binary
+/// Retires prior `RedGaugeWitness` naming + `Result<Composition, ...>` binary
 /// return per Alex 2026-09-02 "Result is binary wearing a trenchcoat. We're
 /// doing ternary here, Reed. All the way up. All the way down." Substrate is
 /// ternary at every altitude (PropertyVerdict::{Pass, Partial, Fail} + Transparency
@@ -117,8 +117,8 @@ pub enum WhichSide {
 pub type Red = Transparency<Property>;
 
 /// The `Green` state carrier — the successful K_3-composed sheaf.
-/// Alias for `ComposedSheaf` for color-coded API clarity per Alex 2026-09-02.
-pub type Green = ComposedSheaf;
+/// Alias for `Composition` for color-coded API clarity per Alex 2026-09-02.
+pub type Green = Composition;
 
 /// The sheaf-of-shard-graph carrier — cellular sheaf per Curry 2014.
 ///
@@ -181,13 +181,13 @@ impl Addressable for SheafOfShardGraph {
 /// The composed sheaf carries the K_3-composed structure with accessor
 /// methods on the emergent-third stalk + content-address per Rec #82.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ComposedSheaf {
+pub struct Composition {
     underlying: SheafOfShardGraph,
     emergent_third: VertexId,
     fiedler_lambda_2_cached: f64,
 }
 
-impl ComposedSheaf {
+impl Composition {
     /// PAPER §3.6.2 emergent-third-stalk accessor. Returns the vertex whose
     /// stalk carries vectors orthogonal to both component restriction-map
     /// images.
@@ -221,7 +221,7 @@ impl ComposedSheaf {
     }
 }
 
-impl Addressable for ComposedSheaf {
+impl Addressable for Composition {
     fn oid(&self) -> Oid {
         // Content-address per Rec #82: underlying sheaf OID + emergent third
         // vertex + fiedler value bits for determinism per Q-Mara-κ both-
@@ -462,7 +462,7 @@ pub fn kleinos(
 ///
 /// Emergent-third VertexId is deterministic per Rec #82 via
 /// max(V(a) ∪ V(b)) + 1.
-fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> ComposedSheaf {
+fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> Composition {
     let emergent_third = compute_emergent_third_id(a, b);
 
     let mut vertices: BTreeSet<VertexId> = a.vertices.iter().copied().collect();
@@ -506,7 +506,7 @@ fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> ComposedSh
         edges.insert(edge_key(emergent_third, v));
     }
 
-    ComposedSheaf {
+    Composition {
         underlying: SheafOfShardGraph { vertices, edges },
         emergent_third,
         fiedler_lambda_2_cached: 0.0, // filled at into_result
@@ -537,7 +537,7 @@ fn compute_emergent_third_id(
 fn verify_all_four_properties(
     sheaf_a: &SheafOfShardGraph,
     sheaf_b: &SheafOfShardGraph,
-    candidate: &ComposedSheaf,
+    candidate: &Composition,
     lambda_a: f64,
     lambda_b: f64,
     lambda_composed: f64,
@@ -573,7 +573,7 @@ fn as_transparency(property: Property, verdict: PropertyVerdict) -> Transparency
 fn verify_sovereignty(
     sheaf_a: &SheafOfShardGraph,
     sheaf_b: &SheafOfShardGraph,
-    candidate: &ComposedSheaf,
+    candidate: &Composition,
 ) -> PropertyVerdict {
     let a_preserved = sheaf_a
         .vertices()
@@ -604,7 +604,7 @@ fn verify_sovereignty(
 fn verify_emergent_third(
     sheaf_a: &SheafOfShardGraph,
     sheaf_b: &SheafOfShardGraph,
-    candidate: &ComposedSheaf,
+    candidate: &Composition,
 ) -> PropertyVerdict {
     let emergent = candidate.emergent_third_stalk();
     let in_a = sheaf_a.contains_vertex(emergent);
@@ -657,7 +657,7 @@ fn verify_fusion_refusal(
 /// measured loss (e.g., Fiedler climb marginal below some threshold triggers
 /// refactor-needed diagnostic without full refusal).
 fn into_imperfect(
-    mut candidate: ComposedSheaf,
+    mut candidate: Composition,
     lambda_composed: f64,
     verdict: Transparency<Property>,
 ) -> Imperfect<Green, Red, ConvergenceLoss> {
