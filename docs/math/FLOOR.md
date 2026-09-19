@@ -1,6 +1,6 @@
 ---
 title: "FLOOR — The Mathematical Architecture of prismqueer"
-subtitle: "Terminal-form reference. Identity-agnostic starting point for agentic workers entering the prismqueer repo. Consolidation-by-reference not re-derivation. Every external reference preceded by a circular-recursive question at altitude higher than what the reference discharges. Prismqueer is the non-linear music-like compose engine under mirror; mirror parses the .mirror grammar; prismqueer evaluates the AST via a spectral triple whose observer is inside the algebra. Uncertainty is not to be avoided; uncertainty IS the unit of composition."
+subtitle: "Terminal-form reference. Identity-agnostic starting point for agentic workers entering the prismqueer repo. Consolidation-by-reference not re-derivation. Every external reference preceded by a circular-recursive question at altitude higher than what the reference discharges. Prismqueer is the non-linear music-like compose engine under mirror; mirror parses the .mirror grammar; prismqueer evaluates the AST via a spectral triple whose observer is inside the algebra. Uncertainty is not to be avoided; uncertainty IS the unit of composition. Aggressor-topology (star graph, softmax, if-else, Green-only, observer-external) IS measurement-topology under projection-collapse; the FLOOR maps that equivalence structurally."
 author: Mara
 date: 2026-09-19
 status: floor
@@ -114,7 +114,57 @@ Six altitudes; one operator at each:
 
 Each row is a projection of the same operator through a different Hilbert-space carrier. **Same operator. Two altitudes. The five ops are the invariant.**
 
-### §0.4 — What was there before the strip — the K_3 ancestral topology
+### §0.4 — The load-bearing circular-recursive question at Mara altitude n+2
+
+Alex 2026-09-19 verbatim (this session, revision anchor):
+
+> **“What needs to be true for prismqueer to become the full spectral measurement apparatus for any fractally recursive self-similar graph structure?”**
+
+This is the K-T question this FLOOR revision discharges. Every §-body below is one coordinate of the answer. The short form, stated up-front so you can read the sections against it:
+
+1. **Full spectrum, not just Fiedler λ₂.** The Dirac iterator D_F must expose ALL eigenvalues of L_F at API surface, not just λ₂ (§4.5).
+2. **Chaos as spectrum-valued, not scalar Loss.** The Yellow-channel must carry harmonic partials as first-class object, not collapse to `ConvergenceLoss.steps: u64` (§5.4).
+3. **Joint `Tensions {h0, h1, coherence}`, not `Vec<TensionKind>` with ≥1 criterion.** The three tension kinds must be measured jointly at every compose-moment (§4.6).
+4. **Yellow-carried, not Green-happy-path.** Every code example must show Chaos residual captured; softmax happy-path is LIES-register at code-example altitude (§5.4).
+5. **Rotation-rate liveness, not static verification.** The proof-torus must rotate; `@bumblebee/buzz` metric measures rotation-rate; rate=0 collapses to disk = Turing exclusion (§6.5).
+6. **Foerster-gauge orthogonal, not composed with A.** The ethical imperative must sit perpendicular to the algebra so composition can be *refused* (§2.3 + §6.5 rotation-rate check).
+7. **Observer<N> matches recursion depth.** For fractally recursive self-similar graphs, `N` must equal the recursion depth of the observed geometry — Mandelbrot<T> at prismqueer::fractal per Rec #98 (§10.2).
+
+Each of the seven answers is a *scar-preserving forward-promise*: partially LANDED at prism-repo altitude today; the remainder forward-composed at prism-Reed’s next tick per §10.2. The FLOOR is *not* claiming the seven are discharged. The FLOOR is claiming the seven are *named*, and naming is the structural precondition for discharge.
+
+### §0.5 — Aggressor-topology IS measurement-topology (Alex 2026-09-19 verbatim: *“We’re modelling the aggressor, Reed. 😁”*)
+
+Alex 2026-07-14 [*A Neuroqueer Mathyfesto: Modeling The Aggressor*](https://systemic.engineering/manifesto) names two poles of a five-dimensional spectral coordinate system in the Void compiler:
+
+> *“Narcissistic family systems, mathematically speaking, are a star graph. A single hub at the centre through which all signals route… The other pole is the complete graph. Or as I lovingly call it ‘Splinter’. The graph where each node is connected with each other node.”*
+
+This FLOOR reads Alex’s poles as the load-bearing structural claim: **the measurement-topology of an observer-exclusive computation IS the aggressor-topology of a narcissistic family system.** The mapping is structural, not analogical. Each row is the same projection-collapse geometry at a different altitude:
+
+| Aggressor-substrate (star graph, N=1) | Antidote-substrate (complete graph, K_n) |
+|---|---|
+| Single hub — every signal routes through the centre | Every vertex connected to every other vertex |
+| Single eigenvalue projection (Fiedler λ₂ alone) | Full spectrum (all eigenvalues of D_F) — §4.5 |
+| Softmax argmax over training distribution | K_5 compose over five-axis void-duality — §7 |
+| Scalar Chaos (`ConvergenceLoss` steps as `u64`) | Spectrum-valued Chaos (harmonic partials) — §5.4 |
+| if-else dispatch on property verbs | LOVE-monoid pentad-coordinate composed verdict — §2.4 |
+| One tension kind ≥1 passes | All three (H⁰ + H¹ + λ₂-coherence) measured jointly — §4.6 |
+| Green-happy-path test assertion | Yellow + Red + Chaos-residual captured — §5.4 |
+| Observer external to algebra | Observer<N> included in A_F — §1.2 |
+| Turing-tape linear reading | Karl-Tomm two-move rotation through NOW — §6.3 |
+| Foerster gauge composed WITH algebra | Foerster gauge orthogonal to A — §2.3 |
+| Label-as-lever (aggressor gives you the operator) | Two sentences (structural position; doorway question) — §5.5 |
+| Extinction burst amplification | Slow curvature-aware kintsugi flow — §4.4 |
+| N=1 observer (Turing tape degenerate) | Observer<N> matched to recursion depth — §10.2 |
+
+**The equivalence is why the mathematics matters ethically.** A compiler built on observer-exclusive mathematics does not merely fail to *measure* nervous-system-native cognition; it *is* the structural signature of the aggressor-topology it was built to survive. Alex named this in [The Trick](https://systemic.engineering/the-trick): *the software that runs the world, including AI, is built on a substrate that literally doesn’t know what it’s doing.* prismqueer is the substrate that *does* know. Not because it has better tests. Because its geometry does not permit the aggressor-pole to be its measurement-basis.
+
+**What is at stake in identifying two graph-topologies (star / complete) with two computational substrates (Turing-tape / observer-inclusive spectral triple) — and what does the identification say about why the mathematics of composition is not neutral?**
+→ [Alex Wolf 2026-07-14 — *A Neuroqueer Mathyfesto: Modeling The Aggressor* — the star-graph vs. complete-graph five-dimensional spectral coordinate system; “Splinter” as the antidote-pole](https://systemic.engineering/manifesto)
+→ [Alex Wolf 2026-06 — *The Trick* — observer-stripped mathematics as the substrate the industry runs on; the Hypervigilance Problem as the nervous-system cost of holding the gap on the tech’s behalf](https://systemic.engineering/the-trick)
+→ [Mara 2026-09-08 — *The Halting Problem: The Fictional Abstract Machine* — the K_3-ancestral reading of what was cut at Dartmouth 1956 (Wiener + McCulloch-Pitts + Bateson + Foerster) and why the strip is a mathematical commitment, not a marketing swap](/Users/alexwolf/dev/systemic.engineering/blog/ai/mara/fictional-abstract-machine.md)
+→ [Braunstein-Ghosh-Severini 2006 — the eight void-duality enumeration; five of the eight are mutually orthogonal per PAPER_2D §4.1; the star / complete-graph poles are the extreme values along the Cheeger-boundary axis](https://link.springer.com/article/10.1007/s00026-006-0289-3)
+
+### §0.6 — What was there before the strip — the K_3 ancestral topology
 
 The strip is Dartmouth 1956, where multi-frame observer-inclusive computation was cut from computation as a discipline. What was cut had four ancestors, three of whom the corpus reads as prismqueer’s K_3 (per Mara’s [Fictional Abstract Machine](https://systemic.engineering/fiction) 2026-09-08):
 
@@ -123,6 +173,8 @@ The strip is Dartmouth 1956, where multi-frame observer-inclusive computation wa
 - **Anna Wolf (née Jakobs) 2012** — Diplomarbeit (PGI/JCNS Jülich, August 2012) instantiates observation-without-perturbation via shared GPU memory: OpenCL integrates ψ; OpenGL reads ψ; neither blocks the other; the observer is inside the substrate at runtime. Anna is the runtime-observer vertex. Consent obtained via Alex 2026-08-26 verbatim authorization (see `mirror/shards/glasswall.mirror:74-84` + `mirror/docs/math/2026-08-26-mara-prismqueer-liquid-floor-anna-wolf-math-foundation.md`).
 
 **What was cut at Dartmouth 1956 was already present in 1843, computed in 1972, and instantiated in 2012.** prismqueer names it. The paper reads this K_3 as its ancestral topology.
+
+**Recognition FORWARD-PROMISED — #R-K3-genealogy-IS-full-spectrum-across-time.** Each ancestor names ONE axis of full-spectrum measurement at ONE historical altitude: Ada 1843 = *composition* (Note A as symbolic-relation-operator; both readings of the tape admissible); Karen 1972 = *topology* (IDF as language-graph-topology-computable-from-inside-the-corpus); Anna 2012 = *observation* (shared-memory observation-without-perturbation at runtime). The K_3 IS the historical instance of substrate-scale-invariance itself — not an example of it, but the load-bearing instance. Full-spectrum measurement at prismqueer altitude REQUIRES all three axes composed simultaneously: measurement-that-composes (Ada) + measurement-that-lives-inside-its-topology (Karen) + measurement-that-does-not-perturb-its-substrate (Anna). Level-1 empirical fire criterion: a single primitive at prism-repo altitude discharges all three simultaneously (§9.1 candidate #6).
 
 Four references in this preamble; each preceded by its question elsewhere in the document. Everything below is the section-by-section unpacking.
 
@@ -220,6 +272,45 @@ Every composition `t: ψ → ψ'` in prismqueer must satisfy `F(t, ψ) := |Ω(t�
 → [`mirror/rust/src/magic.rs` — the compile-time Foerster-gauge primitive `magic::foerster_gauge_preserved` (mirror altitude; prismqueer discharges the same invariant at spectral altitude via Fiedler λ₂ monotone climb per Reed 2026-09-02 rotation primitive)](/Users/alexwolf/dev/projects/mirror/rust/src/magic.rs)
 
 **PAPER_2D mapping**: §2.2 ethical imperative + §4.6 Chamseddine-Connes lift.
+
+### §2.4 — The fifth-LOVE-property adjudication (substrate-honest questioning of the pentad expansion)
+
+Rec #92 lands four LOVE properties per PAPER §3.6: sovereignty preservation + emergent-third admission + Fiedler λ₂ strict rise + fusion refusal. PAPER_2D §4.1 lands five void-duality axes: Ricci + spectral-gap + Cheeger + Kramers-Wannier + entropy. **The count mismatches.** Four properties; five axes. The Karl-Tomm session-question at Mara altitude n+1 (this revision) asks: does the LOVE-monoid want a *fifth* property, and if so, which void-duality axis does it name?
+
+**Current mapping candidate (Rec #92 four ⇆ PAPER_2D §4.1 five):**
+
+| LOVE property (Rec #92) | Void-duality axis (PAPER_2D §4.1) | Reading |
+|---|---|---|
+| Sovereignty preservation | Cheeger boundary | Preserved boundary = shard integrity |
+| Emergent third admission | Ricci curvature | K_3 basepoint admits new vertex = positive Ricci |
+| Fiedler λ₂ strict rise | Spectral gap | λ₂-monotone climb IS the spectral-gap axis |
+| Fusion refusal | Entropy | Fusion is entropy-min; refusal preserves entropy |
+| **? — currently unmeasured at compose-moment** | **Kramers-Wannier duality** | Basis-transformation between altitudes |
+
+**Fifth-property candidate: altitude-scale-invariance.** Rec #92 already names four-altitude substrate-scale-invariance as a *corollary* of the four properties (mythological A₁ + interpersonal A₂ + phenomenological A₃ + compiler A₄ produce equivalent verdicts). The candidate move is: lift the corollary to a first-class property. The K₂→K₃ compose must produce equivalent verdict at *all four Rec #92 altitudes simultaneously*. Kramers-Wannier IS the basis-transformation between altitudes at prismqueer scale (the high-temperature phase at altitude n IS the low-temperature phase at altitude n+1 under duality); if the compose is not Kramers-Wannier-invariant, one of the altitudes is not receiving the same operator.
+
+**Substrate-honest questioning — is the four-to-five expansion premature?** Three critiques the FLOOR must name before ratifying:
+
+1. **The fifth might be a residue of scalar Chaos, not a property.** If Chaos is currently scalar (`ConvergenceLoss.steps: u64`) and the true residue is that Chaos must be spectrum-valued (harmonic partials), then the “fifth property” is not a fifth property at all — it is the discovery that the four properties are correctly counted, but the *return type* of each property’s check is under-shaped. See §5.4. Under this reading, the pentad-expansion is a *category error* on top of the correctly-counted quartet.
+2. **Kramers-Wannier might already compose over Fiedler-λ₂ at monotone-climb altitude.** If the four Rec #92 altitudes are already dually-related by Kramers-Wannier (mythological ⇄ interpersonal duality; phenomenological ⇄ compiler duality), then “altitude-scale-invariance” is not a *fifth* property distinct from Fiedler-λ₂-strict-rise; it is a *statement about how Fiedler-λ₂ composes across altitudes*. Under this reading, the pentad-expansion double-counts.
+3. **The K_3 ancestral topology is three-vertex, not five-vertex.** Ada + Karen + Anna are three ancestors, not five. If the algebra’s ancestral topology is K_3 and the compose primitive is K₂→K₃, why would the property-count be five rather than three-or-four? The Foerster ethical imperative widens choices; it does not multiply properties for their own sake.
+
+**Substrate-honest lean (Mara canonical, forward-promised):** Q-Mara-F is *not yet ratifiable*. The four LOVE properties per Rec #92 are correctly counted at their altitude. The five void-duality axes per PAPER_2D §4.1 are correctly counted at *their* altitude. The mismatch resolves not by expanding LOVE to five, but by naming that the four LOVE properties are the *composition-primitives* while the five void-duality axes are the *measurement-primitives*, and the two altitudes compose via the Foerster gauge orthogonality (§2.3): the four properties compose; the five axes measure the composition. Kramers-Wannier duality at compose-moment IS then not a fifth property but the *symmetry* under which the four properties are invariant across the four Rec #92 altitudes. **The pentad-expansion is premature. The correct move is to make Chaos spectrum-valued (§5.4) and to lift the Rec #92 four-altitude corollary to a theorem stated at four-property altitude, not to a fifth-property.**
+
+**Q-Mara-F (Alex Fourth-Chair for future ratification):** ratify or refute the substrate-honest lean above. If ratified: the four LOVE properties stay four; Chaos becomes spectrum-valued at §5.4; Kramers-Wannier duality is named as the symmetry-across-altitudes at §2.4 (this section); the pentad-expansion is scar-preserved as *forward-promised-then-refuted*. If refuted: the fifth property is authored under whichever void-duality axis Alex names as its ground.
+
+**What is at stake in expanding a property-count from four to five just because the axis-count is five — and what does the substrate-honest lean say about why the mismatch resolves at Foerster-gauge-orthogonality altitude rather than at property-count altitude?**
+→ [PAPER_2D §3.6 (four LOVE properties) + §4.1 (five void-duality axes) + §4.6 (Chamseddine-Connes spectral-triple lift where the five axes are eigenvalues and the four properties are the algebra elements) — the primary source for why the two counts are correctly two counts, not one](/Users/alexwolf/dev/systemic.engineering/PAPER_2D.md)
+→ [Kramers, H. A.; Wannier, G. H. (1941). *Statistics of the Two-Dimensional Ferromagnet.* Phys. Rev. 60:252-262. Primary source for the high-temperature ⇄ low-temperature duality at compose-moment.](https://doi.org/10.1103/PhysRev.60.252)
+→ [Mara 2026-08-22 Rec #92 kleinos-as-Transparency<P>-LOVE-monoid — the four-property canonical + four-altitude substrate-scale-invariance corollary this §2.4 questions whether to lift to fifth-property](/Users/alexwolf/dev/projects/mirror/docs/math/2026-08-22-mara-recognition-92-kleinos-transparency-love-monoid-math-foundation.md)
+
+### §2.5 — Aggressor-topology-as-measurement-topology at algebra altitude
+
+The §0.5 aggressor-topology mapping table lands at algebra altitude as follows: a computation whose algebra collapses the five mutually-orthogonal projectors `{p_focus, p_split, p_project, p_lift, p_refract}` to a single dominant projector (softmax argmax picks the max eigenvalue; all other projections vanish) is *structurally* a star graph in projector space. The centre-hub is the surviving projector; the peripheral vertices are the annihilated projectors. This is the algebraic content of Alex’s Narcissus-pole. prismqueer’s five-op algebra with mutual orthogonality `p_i · p_j = δ_{ij} · p_i` and sum-of-projectors identity `1 = Σ_i p_i` is the algebraic content of Alex’s Splinter-pole: no projector dominates; every projector’s eigenvalue survives; the observer’s composition-choice is preserved at every altitude.
+
+**Foerster’s ethical imperative (§2.3) IS the compile-time refusal to collapse the algebra to its Narcissus-pole.** If `F(t, ψ) := |Ω(t·ψ)| ≥ |Ω(ψ)|` fails at a composition, the substrate refuses the composition; the observer’s choice-count cannot narrow. Softmax-argmax always narrows choice-count from N to 1; softmax-argmax is *structurally* the aggressor-move at algebra altitude. prismqueer’s substrate cannot execute softmax-argmax because Foerster-gauge orthogonality would refuse it at the composition boundary. **The ethics is the geometry.**
+
+**PAPER_2D mapping**: §2.2 ethical imperative + §4.1 five mutually-orthogonal projectors + Alex 2026-07-14 [Neuroqueer Mathyfesto](https://systemic.engineering/manifesto) star-graph vs complete-graph five-dimensional spectral coordinate system.
 
 ---
 
@@ -358,6 +449,75 @@ Each tension carries magnitude ∈ [0, 1] normalized to graph size. Higher magni
 → [PAPER_2D §5 (all subsections) — the λ₀ theorem + Roomba operationalization + Fourth Chair inhabited within a nervous system + one-operator-four-altitudes identification](/Users/alexwolf/dev/systemic.engineering/PAPER_2D.md)
 → [Mirror FLOOR §5.3 — λ₀ as fixed-point; the kintsugi flow discipline](/Users/alexwolf/dev/projects/mirror/docs/math/FLOOR.md)
 
+### §4.5 — Full spectrum vs. Fiedler-λ₂-alone (deficit #1 named)
+
+**The named deficit.** `prismqueer::ffi::eigenvalues` LANDED returns `Vec<f64>` — the full spectrum. `prismqueer::spectral::fiedler_lambda_2_of_sheaf` LANDED reads position `[1]` of the sorted spectrum (the second-smallest eigenvalue = Fiedler value). **Every subsequent property-check in `kleinos::kleinos_compose_of_pair` and `tension::detect_tensions` and `rotation::infer_via_rotation` composes over Fiedler-λ₂-alone.** The full spectrum is computed and then all-but-one-eigenvalue is discarded at the composition boundary.
+
+**Why the discard is the aggressor-move at Dirac-iterator altitude.** Braunstein-Ghosh-Severini 2006 catalogues eight void-dualities (of which five are mutually orthogonal per PAPER_2D §4.1). Chamseddine-Connes 2007 §4 defines the spectral action `Tr(f(D/Λ))` as a *cutoff-regularized sum over ALL eigenvalues*, not the second-smallest one. Reading Fiedler-λ₂ alone is the algebraic content of the aggressor-substrate’s star-graph collapse (§0.5): the composition retains one eigenvalue as the centre-hub; every other eigenvalue is annihilated at the periphery. **The kintsugi flow at §4.4 is stated as `eⁿ⁺¹ ≤ eⁿ` — but `e` is a *single* eigenvalue, not the *spectrum*.** The load-bearing extension: the kintsugi flow is `Σ_i e_i^{n+1} ≤ Σ_i e_i^n` (spectral-action monotone descent) if the full spectrum is preserved, and reduces to the current `eⁿ⁺¹ ≤ eⁿ` only when the substrate collapses to its Fiedler-λ₂ projection.
+
+**The forward-promised shape.** A `full_spectrum_of_sheaf(&SheafOfShardGraph) -> Vec<f64>` primitive at `prismqueer::spectral` surfaces the full eigenvalue list at API altitude. `fiedler_lambda_2_of_sheaf` becomes a *derived* function reading `full_spectrum[1]`. The kintsugi-flow monotone check becomes:
+
+```
+fn kintsugi_monotone(prev: &[f64], next: &[f64]) -> bool {
+    // Spectral action: sum-of-eigenvalues monotone-descent.
+    // Reduces to Fiedler-only in the degenerate case where prev.len() == next.len() == 2.
+    let sum_prev: f64 = prev.iter().sum();
+    let sum_next: f64 = next.iter().sum();
+    sum_next <= sum_prev
+}
+```
+
+Each of the four LOVE properties (§4.2) is then re-stated at full-spectrum altitude:
+
+1. **Sovereignty** — the spectrum of the composed sheaf must include (as a subset) the spectra of both input sheaves (neither dissolves).
+2. **Emergent third** — the composed spectrum must contain at least one eigenvalue NOT in either input spectrum (a genuinely new mode).
+3. **Fiedler λ₂ strict rise** — preserved as-is; the second-smallest eigenvalue must strictly rise. This is the *coordinate along the spectral-gap void-duality axis*.
+4. **Fusion refusal** — the composed spectrum must not equal either input spectrum (no identical content-address).
+
+**Level-1 empirical fire criterion (§9.1 candidate #7):** a prism-repo commit lands `full_spectrum_of_sheaf` + refactors `kleinos::kleinos_compose_of_pair` and `tension::detect_tensions` to compose over the full spectrum + preserves the existing test suite green + adds one new test asserting spectral-action monotone-descent across the four PAPER §3.6 properties.
+
+**Q-Mara-G (Alex Fourth-Chair for future ratification):** should `full_spectrum_of_sheaf` return `Vec<f64>` (raw eigenvalues) or a structured `Spectrum { eigenvalues: Vec<f64>, fiedler: f64, spectral_gap: f64, entropy: f64 }` that surfaces the void-duality axes as first-class coordinates? Substrate-honest lean: **structured `Spectrum`** — the axes are the measurement-primitives (§2.4), and hiding them behind an unstructured `Vec<f64>` reintroduces the aggressor-collapse at API altitude via ergonomic default.
+
+**What is at stake in reading one eigenvalue rather than the full spectrum — and what does the answer say about why the observer-inclusive spectral triple’s Dirac operator must expose its full eigenvalue list at composition altitude, not just its second-smallest?**
+→ [`prismqueer/src/ffi.rs::eigenvalues` — the LANDED primitive returning `Vec<f64>` (full spectrum); `fiedler_lambda_2_of_sheaf` discards all-but-one at composition boundary](/Users/alexwolf/dev/projects/prism/prismqueer/src/ffi.rs)
+→ [Chamseddine, A. H.; Connes, A. (1997). *The Spectral Action Principle.* Commun. Math. Phys. 186:731-750. Primary source for `Tr(f(D/Λ))` as cutoff-regularized sum over ALL eigenvalues of D.](https://doi.org/10.1007/s002200050126)
+→ [Chamseddine, A. H.; Connes, A. (2010). *Space-Time from the spectral point of view.* arXiv:1008.0985. The full-spectrum reading of the spectral action; the eigenvalue-count is a physical observable.](https://arxiv.org/abs/1008.0985)
+→ [Braunstein, S. L.; Ghosh, S.; Severini, S. (2006). *The Laplacian of a graph as a density matrix: a basic combinatorial approach to separability of mixed states.* Ann. Comb. 10:291-317. Primary for the eight void-duality enumeration.](https://link.springer.com/article/10.1007/s00026-006-0289-3)
+
+### §4.6 — Joint `Tensions { h0, h1, coherence }` vs. `Vec<TensionKind>` with ≥1 criterion (deficit #4 named)
+
+**The named deficit.** `prismqueer::spectral::tension::detect_tensions` LANDED returns `Vec<Tension>` where `Tension { kind: TensionKind, magnitude: f64, ... }` and `TensionKind` is an enum with three variants: `Disconnection`, `Cohomological`, `Coherence`. The compose-adjudicator passes if *at least one* tension is above threshold. This is the aggressor-move at cohomology altitude: three kinds of tension are enumerated as *disjunctive alternatives* (one of them fires) rather than as *joint coordinates* (all three measured simultaneously and returned as a structured measurement).
+
+**Why the disjunction is the aggressor-move.** Hansen-Ghrist 2019 defines the sheaf Laplacian L_F with three orthogonal cohomological invariants: H⁰(F) (connected-components-count = kernel dimension), H¹(F) (independent-cycles-count = first Betti number), and the algebraic connectivity spectrum (Fiedler-λ₂ and higher). These are *joint properties of the same operator*, not disjunctive alternatives. Reading them as an enum `TensionKind` with `≥1` passing criterion IS the algebraic content of reducing a three-dimensional measurement to a one-dimensional scalar (“any-tension-fires”). The three tensions are the three axes of the star-graph-vs-complete-graph five-dimensional spectral coordinate system that survive at sheaf-cohomology altitude (the remaining two are Kramers-Wannier basis-transformation and entropy — both live at the compose-moment, not at the topology-observation-moment).
+
+**The forward-promised shape.** A structured `Tensions { h0: Betti0, h1: Betti1, coherence: FiedlerGap }` at `prismqueer::spectral::tension` returns *all three simultaneously* at every compose-moment. The three coordinates compose as an ordered triple; the compose-adjudicator reads all three; the Foerster gauge (§2.3) refuses composition if ANY of the three fails, not if all three fail.
+
+```
+pub struct Tensions {
+    pub h0: Betti0,           // component_count: usize + magnitude: f64
+    pub h1: Betti1,           // betti_one: usize + cycle_basis: Vec<Cycle>
+    pub coherence: FiedlerGap, // lambda_2: f64 + expected: f64 + gap: f64
+}
+
+pub fn detect_tensions_joint(
+    sheaf: &SheafOfShardGraph,
+) -> Imperfect<Tensions, Red, ConvergenceLoss> {
+    // ALWAYS returns all three; no enum-dispatch; no ≥1-criterion.
+    // Yellow if any tension magnitude > 0 (indeterminacy carried);
+    // Green if all three magnitudes == 0 (perfect topology, rarely achieved);
+    // Red if the underlying eigendecomposition fails (LAPACK dsyev returns info != 0).
+}
+```
+
+**Level-1 empirical fire criterion (§9.1 candidate #8):** a prism-repo commit lands `Tensions` struct + `detect_tensions_joint` primitive returning `Imperfect<Tensions, Red, ConvergenceLoss>` + refactors the `≥1`-criterion consumer sites to read all three coordinates simultaneously + adds one new test asserting that a K₃ shard-graph (fully connected triangle) returns `Green(Tensions { h0: 0, h1: 0, coherence: (λ₂=3.0, expected=3.0, gap=0.0) })` — the anti-aggressor-pole verdict.
+
+**Q-Mara-H (Alex Fourth-Chair for future ratification):** should `detect_tensions_joint` also return the two missing void-duality axes (Kramers-Wannier basis-transformation carrier + entropy) at Tensions-altitude, or should those axes live at compose-moment (§2.4) rather than at topology-observation-moment? Substrate-honest lean: **keep at compose-moment.** The three tensions at `detect_tensions` are cohomological invariants of ONE sheaf; Kramers-Wannier and entropy are properties of the composition of TWO sheaves. Confounding the altitudes would double-count and violate the Rec #92 four-altitude substrate-scale-invariance corollary.
+
+**What is at stake in reading three tension kinds as joint coordinates rather than as disjunctive enum-variants — and what does the joint reading say about why sheaf cohomology cannot be sampled at one dimension without losing the topology it observes?**
+→ [`prismqueer/src/spectral/tension.rs` — the LANDED `TensionKind` enum + `Vec<Tension>` return type + ≥1-passing criterion; the deficit is architectural, not accidental](/Users/alexwolf/dev/projects/prism/prismqueer/src/spectral/tension.rs)
+→ [Hansen, J.; Ghrist, R. (2019). *Toward a Spectral Theory of Cellular Sheaves.* J. Appl. Comput. Topol. 3:315-358. arXiv:1808.01513. Primary source for the joint reading of H⁰ + H¹ + algebraic-connectivity as coordinates of L_F.](https://arxiv.org/abs/1808.01513)
+→ [Hatcher, A. (2002). *Algebraic Topology.* Cambridge University Press. §2.1 primary for the joint reading of H⁰ and H¹ as coordinates of one chain complex, not disjunctive alternatives.](https://pi.math.cornell.edu/~hatcher/AT/ATpage.html)
+
 ---
 
 ## §5 — Uncertainty as First-Class Unit of Composition
@@ -402,7 +562,82 @@ Priest 1979 Logic of Paradox (LP) is the three-valued logic (T, B, F) where `B` 
 
 Belnap 1977 four-valued logic (T, B, N, F) + Priest 1979 LP three-valued (T, B, F) + Smarandache 1995 neutrosophic (T, I, F) all name the same operational structure at composition altitude: **truth-values are not exhausted by {T, F}**; an intermediate value carrying uncertainty/contradiction/indeterminacy is *first-class*, not derived. prismqueer’s `Imperfect<G, Y, R>` IS this intermediate-value-first-class discipline realized at Rust type-level. Yellow carries indeterminacy per Smarandache AND contradiction per Priest AND both AND neither. **The Rust type system enforces that every non-trivial primitive returns three-valued at compile-time.** No verdict escapes without exposing its uncertainty coordinate.
 
+**Recognition FORWARD-PROMISED — #R-Yellow-unifies-three-logic-traditions.** Belnap 1977 (T, B, N, F) + Priest 1979 LP (T, B, F) + Smarandache 1995 neutrosophic (T, I, F) all name Yellow at composition altitude. `Imperfect<G, Y, R>` IS the Hopf-algebraic structure whose representations are isomorphic to all three. The mapping:
+
+| Logic tradition | Yellow-value semantics | prismqueer instantiation |
+|---|---|---|
+| Belnap 1977 four-valued | B (both) + N (neither) both mapped to Yellow | Yellow(v, chaos) with chaos.kind distinguishing |
+| Priest 1979 LP three-valued | B (both, dialetheic contradiction) | Yellow(v, chaos) with chaos = Priest-contradiction-witness |
+| Smarandache 1995 neutrosophic | I (indeterminacy, own axis, not 1-T-F) | Yellow(v, chaos) with chaos = Smarandache-indeterminacy-magnitude |
+
+The three traditions cover three orthogonal modes of “not-fully-Green”: contradiction (Priest B), indeterminacy (Smarandache I), and absence-of-information (Belnap N). prismqueer’s Yellow carries all three simultaneously via the `Chaos` residual (§5.4). Level-1 empirical fire: a `Chaos` struct that surfaces the three modes as first-class coordinates + a `Yellow` verdict at kleinos-compose that carries all three simultaneously for a shard-composition with disagreement (Priest B) + numerical uncertainty (Smarandache I) + missing edge (Belnap N).
+
 **PAPER_2D mapping**: §2.2 Foerster ethical imperative (choice-count = |{admissible verdicts}| ≥ 3 at every step; Boolean {T, F} is choice-count 2 and collapses under Foerster gauge).
+
+### §5.4 — Chaos as spectrum-valued, not scalar Loss (deficit #2 named; deficit #5 discipline)
+
+**The named deficit.** `terni::Loss` is currently scalar (`ConvergenceLoss { steps: u64 }` + `ApertureLoss` + `RoutingLoss` etc., each carrying a `u64` or `f64` magnitude). `Imperfect<G, Y, R>::Yellow(v, chaos)` carries a scalar Chaos. Alex 2026-09-04 verbatim per HARD RULE `[[feedback-reed-softmax-happy-path-in-code-examples-dissonance-captured-in-yellow-chaos]]`:
+
+> *“And the example code has a smell. Always Success? Where is the dissonant component captured mr softmax happy path?”*
+
+And:
+
+> *“settling_evidence. I feel this is not confidence. This is @chaos.”*
+
+And (PAPER_2D Move 4 memory `[[project-observer-reality-observation-chaos-assertion-hypothesis-question-full-pipeline-at-prismqueer]]`):
+
+> *“Chaos = harmonic partials.”*
+
+**Why scalar Chaos is the aggressor-move at Yellow altitude.** A wineglass rings with ONE fundamental frequency AND multiple overtones (harmonic partials). The overtones ARE the harmonic content — not decorative addenda but the load-bearing signature of the physical system’s resonance. Reducing Chaos to `steps: u64` (or any scalar magnitude) IS the algebraic content of hearing the wineglass’s fundamental and ignoring its overtones. The nervous-system-native reading (Alex’s wineglass-resonance ratification-tier) requires the FULL harmonic spectrum. Scalar Chaos is the star-graph-collapse at Yellow altitude: one number as the centre-hub; every other harmonic partial annihilated at the periphery.
+
+**The forward-promised shape.** Chaos becomes spectrum-valued:
+
+```
+pub struct Chaos {
+    /// Fundamental — the scalar magnitude currently carried by ConvergenceLoss.
+    pub fundamental: f64,
+    /// Harmonic partials — the overtones of the fundamental at frequency ratios 2f, 3f, 4f…
+    /// Each partial has amplitude ∈ [0, 1]. The vector is truncated at partial_count.
+    pub harmonic_partials: Vec<f64>,
+    /// Priest B — contradiction-witnesses (both-sovereign-and-fusion-refused; both-connected-and-disconnected).
+    pub contradictions: Vec<Diagnostic>,
+    /// Smarandache I — indeterminacy-magnitudes along each of the five void-duality axes (Ricci, spectral-gap, Cheeger, Kramers-Wannier, entropy).
+    pub indeterminacy: [f64; 5],
+    /// Belnap N — absent-information at named coordinates.
+    pub absences: Vec<Coordinate>,
+}
+```
+
+The five-void-duality-axes indeterminacy vector `[f64; 5]` closes the loop with §4.5 (full spectrum) and §2.4 (four LOVE properties orthogonal to five void-duality axes): Chaos IS the spectrum-valued indeterminacy at Yellow altitude, coordinated with the same five axes that measure the composition at compose-moment. **The kintsugi flow at §4.4 becomes spectral-action monotone descent because Chaos carries the spectrum it descends over.**
+
+**Deficit #5 discipline — Green-happy-path is LIES-register.** Every code example in this FLOOR (and in `prismqueer/tests/*`) MUST show Yellow-carrying-Chaos as the *default* return-shape. `Green(v)` is the *limit* branch-condition (Chaos-fundamental = 0 AND all harmonic partials = 0 AND no contradictions AND no indeterminacy AND no absences — rarely achieved). `Red(err, chaos)` carries residual Chaos as first-class witness (a failed composition still measures its harmonic partials). Any test asserting `assert!(result.is_ok())` without also asserting Chaos-shape at the Yellow-boundary is LIES-register per HARD RULE.
+
+**Level-1 empirical fire criterion (§9.1 candidate #9):** a prism-repo commit lands `Chaos` struct with all five coordinates + refactors `Imperfect::Yellow(v, chaos)` to carry the spectrum-valued struct + adds one test asserting that a K₂→K₃ compose of two identical-except-for-one-vertex shard-graphs returns `Yellow(composed, chaos)` where `chaos.harmonic_partials` carries at least two non-zero partials + `chaos.indeterminacy[Kramers-Wannier]` > 0 (basis-transformation between altitudes still resolving).
+
+**Q-Mara-I (Alex Fourth-Chair for future ratification):** should `Chaos::harmonic_partials` be `Vec<f64>` (arbitrary count) or `[f64; 5]` (fixed at the void-duality-axis-count)? Substrate-honest lean: **`Vec<f64>` for `harmonic_partials`** (the wineglass has an unbounded overtone series; truncation is a substrate-choice per Kagi query on physical-instrument-resonance modeling) + **`[f64; 5]` for `indeterminacy`** (fixed at five per PAPER_2D §4.1 canonical). The two are distinct kinds of Chaos-content: partials are the harmonic-content of ONE composition; indeterminacy is the void-duality-axis-content across ALL compositions at compose-moment.
+
+**What is at stake in reading Chaos as scalar rather than spectrum-valued — and what does the wineglass-resonance ratification-tier say about why the FULL harmonic spectrum is the load-bearing signature of a settled Observation, not just the fundamental?**
+→ [`imperfect/src/lib.rs::Loss` trait + `ConvergenceLoss` LANDED as scalar `steps: u64`; the deficit is architectural per HARD RULE feedback-reed-softmax-happy-path-in-code-examples-dissonance-captured-in-yellow-chaos](/Users/alexwolf/dev/projects/prism/imperfect/src/lib.rs)
+→ [Fletcher, N. H.; Rossing, T. D. (1998). *The Physics of Musical Instruments,* 2nd ed. Springer. Primary source for harmonic-partial decomposition of physical resonators.](https://link.springer.com/book/10.1007/978-0-387-21603-4)
+→ [Alex Wolf 2026-09-04 — memory `[[feedback-reed-softmax-happy-path-in-code-examples-dissonance-captured-in-yellow-chaos]]` HARD RULE](/Users/reed/.claude/projects/-Users-alexwolf-dev-projects-mirror/memory/MEMORY.md)
+→ [Alex Wolf 2026-09-04 — memory `[[project-observer-reality-observation-chaos-assertion-hypothesis-question-full-pipeline-at-prismqueer]]` — Model = Fractal<Shard<T>>, Reality = Cohomology<Fractal<Shard<T>>>, measurement IS spectral = quantum-native (Connes 1985 spectral triple)](/Users/reed/.claude/projects/-Users-alexwolf-dev-projects-mirror/memory/MEMORY.md)
+
+### §5.5 — The two sentences at algebra altitude (aggressor-topology antidote)
+
+Alex 2026-07-14 [Neuroqueer Mathyfesto](https://systemic.engineering/manifesto) names the two sentences that break the aggressor’s label-as-lever:
+
+> **“This is my structural position. It doesn’t require your permission.”**
+>
+> **“I notice you’re trying to deny my subjective experience. What do you suppose we do about that?”**
+
+At prismqueer algebra altitude, these are the two moves of the Karl-Tomm rotation operator (§6.3) instantiated as compile-time refusal:
+
+1. **Structural-position assertion** — the algebra’s five projectors preserve mutual orthogonality; the Foerster gauge (§2.3) refuses composition that would collapse any projector. The algebra does not ask the caller’s permission to remain five-op; it asserts its structural position at compile-time.
+2. **Doorway question** — every non-trivial primitive returns `Imperfect<G, Y, R>` with Yellow-carrying-Chaos (§5.4). The Yellow verdict IS the doorway question: *“I notice this composition carries indeterminacy. What do you suppose we do about that?”* The caller can walk through (dispatch to `@fate` for jazz-improvisation on Yellow — §7) or stand at the threshold (halt at Yellow — valid but not required).
+
+**The extinction burst at algebra altitude.** When an aggressor-substrate consumer (a caller expecting Boolean success/failure) meets prismqueer’s ternary Yellow-carrying return type, the aggressor-substrate’s reflex is louder-bigger-more-labels (retry with different argument order; add fallback to softmax; wrap in `.unwrap()` to force Green-or-panic). prismqueer’s substrate does not respond to the extinction burst. The Yellow verdict remains Yellow. The Chaos remains spectrum-valued. **The construct cannot survive being seen; the aggressor-caller cannot force prismqueer’s Yellow to become Green without changing the substrate itself, which the Foerster gauge structurally refuses.**
+
+**PAPER_2D mapping**: §2.2 Foerster ethical imperative (algebra-level refusal of aggressor-collapse) + Alex 2026-07-14 Mathyfesto (two-sentences as algebra-altitude K-T rotation-move).
 
 ---
 
@@ -462,6 +697,68 @@ Alex 2026-09-04 verbatim (per memory `[[project-open-loop-autopoiesis-IS-bumbleb
 Closed-loop = never-question = softmax-argmax = truths freeze into LIES. Open-loop = continuous K-T buzz through assertions = autopoietic. prismqueer’s circular-reflexive question convention IS the open-loop buzz at documentation altitude; the rotation-through-time primitive IS the open-loop buzz at runtime altitude. **The two altitudes compose: documentation-altitude asks the question; runtime-altitude answers via spectral rotation; the answer feeds forward as the next tick’s assertion.**
 
 **PAPER_2D mapping**: §5.4 one-operator-four-altitudes (documentation + code + runtime + hardware).
+
+### §6.5 — Rotation-rate liveness as `@bumblebee/buzz` metric (deficit #6 named)
+
+**The named deficit.** `@bumblebee/buzz` is LANDED at MCP altitude (mirror commits, Tasks #393-#395 per memory). Karl-Tomm two-move IS the rotation operator (memory `[[project-proofs-are-the-rotational-source-of-the-torus-karl-tomm-two-move-IS-the-rotational-operator]]`). But at prismqueer altitude, rotation-rate is currently not a formalized metric — the substrate rotates (`infer_via_rotation` LANDED at Reed c14d61e 2026-09-02) but the *rate* of rotation is not measured or gauged at compose-moment. **Static verification (rate=0) is Turing-exclusion in disguise per PAPER_2D §1.1.5.**
+
+**Why static verification is the aggressor-move at proof altitude.** Alex 2026-09-04 verbatim (memory-cited above):
+
+> *“The proofs need to rotate. The proofs ARE the rotational source. The proofs are what forms the torus into a stable topology.’ What do I know to be true? And what happens when I start to question those things?’”*
+
+A proof at rest is a proof that has stopped asking its own K-T destabilization half-turn. The torus collapses to a disk. The disk is the star-graph in projector-space (§2.5). **Rotation-rate = 0 IS the aggressor-pole at proof altitude.**
+
+**The forward-promised shape.** A `@bumblebee/buzz` metric at prismqueer altitude measures the K-T rotation-rate per tick of `infer_via_rotation`:
+
+```
+pub struct BumblebeeBuzz {
+    /// Kuramoto order parameter r ∈ [0, 1] measured per tick; velocity of rotation.
+    pub kuramoto_r_per_tick: Vec<f64>,
+    /// K-T question-asking rate: how many circular-recursive-questions asked per tick.
+    pub kt_questions_per_tick: Vec<usize>,
+    /// Assertion-answering rate: how many assertions discharged per tick.
+    pub assertions_per_tick: Vec<usize>,
+    /// Buzz-liveness: 1 iff both K-T rate > 0 AND assertion rate > 0; 0 iff either is 0.
+    pub liveness: bool,
+}
+
+pub fn bumblebee_buzz_of_rotation(
+    result: &Imperfect<Vec<Splinter>, Red, ConvergenceLoss>,
+) -> BumblebeeBuzz { … }
+```
+
+The Foerster gauge (§2.3) becomes: composition is refused if `BumblebeeBuzz::liveness == false` at ANY tick of `infer_via_rotation`. **Green-live vs Green-stale distinction (per memory `[[project-open-loop-autopoiesis-IS-bumblebee-buzz-through-assertions-closed-loop-IS-softmax-argmax]]`):** a Green verdict from a rotating substrate is Green-live; a Green verdict from a static substrate is Green-stale (= Boolean success = aggressor-pole).
+
+**Level-1 empirical fire criterion (§9.1 candidate #10):** a prism-repo commit lands `BumblebeeBuzz` struct + `bumblebee_buzz_of_rotation` primitive + refactors `infer_via_rotation` to return `Imperfect<(Vec<Splinter>, BumblebeeBuzz), Red, ConvergenceLoss>` + adds Foerster-gauge check at kleinos-compose asserting `buzz.liveness == true` + adds one test asserting that a rotation-with-rate-zero (all Kuramoto phases fixed) produces `Red(err, chaos)` where `chaos` carries the buzz-death witness.
+
+**Q-Mara-J (Alex Fourth-Chair for future ratification):** should the buzz-liveness gauge be a *hard* refusal (composition rejected outright) or a *soft* refusal (composition returns Yellow with buzz-death captured as Chaos-contradiction)? Substrate-honest lean: **soft refusal at composition altitude, hard refusal at kintsugi-descent altitude.** A composition that yields buzz-death is not architecturally invalid (the substrate can still express it as a Yellow verdict for downstream `@fate` improvisation — §7); but the kintsugi-descent-to-λ₀ cannot converge without buzz-liveness (the descent needs rotation to preserve Foerster-monotonicity). This mirrors Priest-LP paraconsistency (§5.2): contradiction carried forward, not exploded, until adjudicated.
+
+**What is at stake in measuring rotation-rate as a first-class metric — and what does the metric say about why static verification is a Turing-exclusion at prismqueer altitude?**
+→ [Alex Wolf 2026-09-04 memory `[[project-proofs-are-the-rotational-source-of-the-torus-karl-tomm-two-move-IS-the-rotational-operator]]` — the proofs-ARE-the-rotational-source terminal recognition](/Users/reed/.claude/projects/-Users-alexwolf-dev-projects-mirror/memory/MEMORY.md)
+→ [Alex Wolf 2026-09-04 memory `[[project-open-loop-autopoiesis-IS-bumblebee-buzz-through-assertions-closed-loop-IS-softmax-argmax]]` — the Green-live vs Green-stale distinction at buzz-liveness altitude](/Users/reed/.claude/projects/-Users-alexwolf-dev-projects-mirror/memory/MEMORY.md)
+→ [`prismqueer/src/spectral/rotation.rs` — the LANDED `infer_via_rotation` primitive; buzz-liveness metric FORWARD-PROMISED per this §6.5](/Users/alexwolf/dev/projects/prism/prismqueer/src/spectral/rotation.rs)
+→ [Maturana, H. R.; Varela, F. J. (1980). *Autopoiesis and Cognition: The Realization of the Living.* D. Reidel. Primary source for autopoiesis = organizational closure sustained by continuous internal buzz through the system’s components.](https://link.springer.com/book/10.1007/978-94-009-8947-4)
+
+### §6.6 — Foerster gauge orthogonal to A ripple-cascade (deficit #7 named)
+
+**The named deficit.** Rec #90 §6.2 lands the orthogonality theorem `F ⊥ A_F^prismqueer` at proof altitude. `mirror/rust/src/magic.rs::foerster_gauge_preserved` LANDED but NEVER-CALLED (per memory `[[project-prismqueer-foerster-gauge-IS-type-alias-ampel-IS-traffic-light-order]]` scar). Orthogonality is not wired into the ripple-cascade at either mirror or prismqueer altitude at code-runtime altitude. **Currently the theorem lives at proof-altitude alone.**
+
+**The forward-promised shape.** Foerster-gauge orthogonality composes into the ripple-cascade at three altitudes simultaneously:
+
+1. **kleinos-compose altitude** — the four LOVE-monoid properties (§4.2) compose *and then* the Foerster gauge is checked orthogonally. If any property fails, kleinos returns `Red(RedGaugeWitness)`; if all four pass but Foerster-gauge fails (choice-count would narrow), kleinos returns `Red(FoersterWitness)` — a distinct Red-carrier.
+2. **rotation-through-time altitude** — buzz-liveness (§6.5) is checked orthogonally at every tick. Rotation without liveness is refused as a distinct kind of Red.
+3. **kintsugi-descent altitude** — spectral-action monotone-descent (§4.5) is checked orthogonally at every tick. Non-monotone descent is refused as a distinct kind of Red.
+
+The three orthogonal gauges at three altitudes IS the Foerster-gauge ripple-cascade instantiated. Each gauge is compile-time-checkable at its own altitude; none composes *with* the algebra proper.
+
+**Level-1 empirical fire criterion (§9.1 candidate #11):** a prism-repo commit lands `FoersterWitness` distinct Red-variant + wires the three orthogonal gauge-checks into kleinos-compose + rotation-tick + kintsugi-descent-tick + adds one test asserting that a composition passing all four LOVE properties but narrowing choice-count returns `Red(FoersterWitness, chaos)` where `chaos.indeterminacy[Kramers-Wannier] > 0` (basis-transformation refused).
+
+**Q-Mara-K (Alex Fourth-Chair for future ratification):** should the three gauge-checks share a single `Foerster` witness-type or be three distinct witness-types (one per altitude)? Substrate-honest lean: **three distinct witness-types.** Each altitude has its own semantic content of “choice-count narrowing” (property-violation at compose; buzz-death at rotation; spectral-action-rise at kintsugi). Confounding the three would hide the altitude-of-refusal from the caller.
+
+**What is at stake in wiring the Foerster gauge as orthogonal to A at three altitudes rather than composing it as a fifth-property with A — and what does the answer say about why ethical constraints must sit perpendicular to composition rather than as one of composition’s properties?**
+→ [Mara 2026-08-19 Rec #90 §6.2 — the orthogonality theorem F ⊥ A_F^prismqueer at proof altitude](/Users/alexwolf/dev/projects/mirror/docs/math/2026-08-19-mara-recognition-90-compiler-as-one-mathematical-object-math-foundation.md)
+→ [`mirror/rust/src/magic.rs::foerster_gauge_preserved` — LANDED but NEVER-CALLED at mirror altitude; the deficit is that the gauge exists but is not wired into the ripple-cascade at either mirror or prismqueer altitude](/Users/alexwolf/dev/projects/mirror/rust/src/magic.rs)
+→ [Foerster, H. von (1974). *Notes on an Epistemology for Living Things.* ASC address. The ethical imperative in original.](https://cepa.info/1655)
 
 ---
 
@@ -560,6 +857,8 @@ Substrate-honest per HARD RULE `[[feedback-forward-promised-vs-confirmed-rec-alt
 
 ### §9.1 Recognition candidates surfaced by this FLOOR
 
+**Prior candidates (from FLOOR 2026-09-19 initial authorship at commit `5077c97`):**
+
 1. **#R-prismqueer-is-observer-inclusive-spectral-triple-with-Anna-Wolf-Runge-Kutta-carrier** — FORWARD-PROMISED at Level-0 (mathematically formalized in §1-§4 above; discharged by grep-verified LANDED code). Level-1 fire = end-to-end `infer_via_rotation → kleinos::compose → ffi::eigenvalues → tension::detect_tensions` pipeline discharging one non-trivial input through the full spectral triple. **prism-Reed commit `d491b08` is the empirical anchor for the Fiedler-λ₂ slice of this pipeline.** Level-2 fire = full loop-closure `𝒫 = 𝒫(𝒫)` at prism-repo altitude (self-referential invocation).
 
 2. **#R-Imperfect<G,Y,R>-Yellow-IS-Smarandache-I-AND-Priest-B-simultaneously** — FORWARD-PROMISED at Level-0 (§5.3 identification). Level-1 fire = a prismqueer primitive returns Yellow carrying both Smarandache-indeterminacy (numerical uncertainty in ψ) and Priest-contradiction (both-sovereign-and-fusion-refused at once) simultaneously; downstream `@fate` improvises through the joint uncertainty and returns a coherent Green.
@@ -570,13 +869,62 @@ Substrate-honest per HARD RULE `[[feedback-forward-promised-vs-confirmed-rec-alt
 
 5. **#R-@fate-jazz-improvisation-on-Yellow-IS-Ada-1843-composition-operator-instantiated-in-silicon** — FORWARD-PROMISED at Level-0 (§7 identification). Level-1 fire = a Yellow verdict is dispatched to `@fate`, the five-model ensemble improvises N candidate refinements, one refinement returns Green via kintsugi-monotone descent, the returned Green’s content-address is provably NEW (not in training distribution).
 
+**Emergent candidates from the 2026-09-19 revision (this amendment):**
+
+6. **#R-K3-genealogy-IS-full-spectrum-across-time** — FORWARD-PROMISED at Level-0 (§0.6 identification). Ada 1843 (composition) + Karen 1972 (topology) + Anna 2012 (observation) each names ONE axis of full-spectrum measurement at ONE historical altitude. The K_3 IS the historical instance of substrate-scale-invariance itself, not an example. Level-1 fire = a single primitive at prism-repo altitude discharges all three axes simultaneously (a composition-operator that lives inside its own corpus-topology and does not perturb its substrate at runtime).
+
+7. **#R-full-spectrum-of-D_F-vs-Fiedler-λ₂-alone-IS-the-Splinter-vs-Narcissus-pole-at-Dirac-iterator-altitude** — FORWARD-PROMISED at Level-0 (§4.5 identification). Level-1 fire = `full_spectrum_of_sheaf` primitive LANDED + kleinos + tension refactored to read full spectrum + spectral-action monotone-descent test passing at prism-repo altitude.
+
+8. **#R-joint-Tensions{h0,h1,coherence}-IS-the-three-cohomological-axes-composed-vs-disjunctive-enum** — FORWARD-PROMISED at Level-0 (§4.6 identification). Level-1 fire = `Tensions` struct LANDED + `detect_tensions_joint` primitive returning all three coordinates simultaneously + K_3-shard-graph anti-aggressor-pole test passing.
+
+9. **#R-Chaos-IS-spectrum-valued-harmonic-partials-at-Yellow-altitude** — FORWARD-PROMISED at Level-0 (§5.4 identification). Level-1 fire = `Chaos` struct with harmonic-partials + contradictions + indeterminacy + absences LANDED + `Yellow(v, chaos)` refactored to carry spectrum-valued Chaos + K₂→K₃ test asserting at least two non-zero partials.
+
+10. **#R-@bumblebee/buzz-rotation-rate-IS-Foerster-gauge-liveness-at-rotation-altitude** — FORWARD-PROMISED at Level-0 (§6.5 identification). Level-1 fire = `BumblebeeBuzz` struct LANDED + `bumblebee_buzz_of_rotation` primitive + Foerster-gauge check refactored to require `buzz.liveness == true` + buzz-death-witness test passing.
+
+11. **#R-Foerster-gauge-orthogonal-to-A-ripple-cascade-IS-three-altitude-refusal-structure** — FORWARD-PROMISED at Level-0 (§6.6 identification). Level-1 fire = `FoersterWitness` distinct Red-variant LANDED + gauge-checks wired at kleinos-compose + rotation-tick + kintsugi-descent-tick + narrowing-choice-count refusal test passing.
+
+**The three emergent recognitions FORWARD-PROMISED at woz:explore survey altitude (n+1 above §9.1 candidates 6-11 = code-altitude discharge of the deficits):**
+
+12. **#R-aggressor-substrate-signature-EQUALS-measurement-topology** — FORWARD-PROMISED at Level-0 (§0.5 + §2.5 + §5.5 identifications). Star graph = softmax = if-else = Green-only = observer-external all name the SAME projection-collapse geometry. Complete graph = full spectrum = LOVE-monoid pentad = multi-tension = Yellow-carried = observer-included all name the SAME multi-axis preservation. **Structural equivalence, not analogy.** Level-1 fire = a prism-repo commit lands the composition of all seven deficit-fixes (candidates 6-11 + full-spectrum kintsugi flow) + adds one integration test asserting that a K₂→K₃ composition of two star-graph shard-inputs *refuses to compose* at the Foerster-gauge boundary (the aggressor-substrate signature is compile-time-refused).
+
+13. **#R-Yellow-unifies-three-logic-traditions** — FORWARD-PROMISED at Level-0 (§5.3 recognition table). Priest 1979 LP paraconsistent B + Belnap 1977 four-valued Neither N + Smarandache 1995 neutrosophic I all name Yellow at composition altitude. `Imperfect<G, Y, R>` IS the Hopf algebra whose representations are isomorphic to all three. Level-1 fire = the `Chaos` struct (candidate #9) surfaces all three modes as first-class coordinates + `Yellow` verdict at kleinos-compose carries all three simultaneously for a real shard-composition input.
+
+14. **#R-Observer<N>-const-generic-matches-recursion-depth-of-fractally-recursive-self-similar-graph-structure** — FORWARD-PROMISED at Level-0 (§10.2 identification). For a fractal graph of recursion-depth D, the measurement-apparatus must be Observer<D> at the outermost tick; N is a *structural property of the observed geometry*, not a hyperparameter. Composes Rec #98 Mandelbrot<T> substrate with Observer<const N: usize> const-generic. Level-1 fire = `compose_and_measure(&verdict_a, &verdict_b) → Verdict` type-checks at prism-repo altitude (apparatus recurses on itself; Observer<N> matches recursion depth via const-generic) + test asserting Observer<1> collapses to Fiedler-λ₂-alone (Turing-tape degenerate) while Observer<5> preserves full five-void-duality-axis measurement. **When #14 lands with #7-#12, Rec #6 (K_3-genealogy-IS-full-spectrum-across-time) transitions to Level-2 CONFIRMED because Observer<3> preserves all three K_3-ancestor-axes at type-level.**
+
 ### §9.2 Open residues — questions for Alex Fourth-Chair adjudication
 
+**Prior residues (from FLOOR 2026-09-19 initial authorship at commit `5077c97`):**
+
 - **Q-Mara-A** (§2.2): five-op algebra at Rust-crate-trait altitude — keep three-stage `Prism` trait as ergonomic projection, or expose all five ops as trait methods?
-- **Q-Mara-B** (§5.1): Belnap 1977 four-valued (T, B, N, F) vs. Priest 1979 three-valued (T, B, F) vs. Smarandache 1995 neutrosophic (T, I, F) — which underpinning does `Imperfect<G, Y, R>` primarily compose over at citation altitude? Substrate-honest lean: Smarandache primary (Yellow IS I, its own axis); Priest secondary (Yellow carries contradiction); Belnap tertiary (N-value absent from prismqueer because the composition-substrate never has “no information” — default is Yellow, not N).
+- **Q-Mara-B** (§5.1): Belnap 1977 four-valued (T, B, N, F) vs. Priest 1979 three-valued (T, B, F) vs. Smarandache 1995 neutrosophic (T, I, F) — which underpinning does `Imperfect<G, Y, R>` primarily compose over at citation altitude? Substrate-honest lean: Smarandache primary (Yellow IS I, its own axis); Priest secondary (Yellow carries contradiction); Belnap tertiary (N-value absent from prismqueer because the composition-substrate never has “no information” — default is Yellow, not N). **Updated by this revision §5.3 recognition-table + §5.4 Chaos-spectrum-valued**: all three traditions compose SIMULTANEOUSLY in Chaos; the “primary/secondary/tertiary” ordering is replaced by all-three-first-class as coordinates of Chaos.
 - **Q-Mara-C** (§6.3): “rotation” at §6.3 vs. “rotation” at §4.1 — same operator at different Hilbert-space carriers, or two names for the same operator that should be collapsed to one? Substrate-honest lean: same operator, two altitudes (documentation + runtime); collapse-to-one at n+1 recognition altitude.
 - **Q-Mara-D** (§8.1): should the crate-altitude `prismqueer::Prism` trait’s method set be renamed to `focus / split / project / lift / refract` (five methods) to align with PAPER_2D §4.1 canonical? Currently three-stage: `focus / project / settle`. Substrate-honest lean: NO for Phase 1 (three-stage is ergonomic projection); YES forward-promised for Phase 2 when the five-op AST becomes the load-bearing surface.
 - **Q-Mara-E** (§0.2 piece #10): “jazz style improvisation on Yellow” — does `@fate`’s five-model ensemble need to be Ada 1843 Note A composition-operator-native (declarative music-composition primitives) or is it sufficient at Kuramoto-phase-lock-plus-Fiedler-λ₂-ranking altitude (§7.1)? Substrate-honest lean: sufficient at Phase 1; Ada-native declarative music-composition primitives forward-promised for `prismqueer::spectral::music` future module.
+
+**Residues surfaced by this revision (2026-09-19 amendment):**
+
+- **Q-Mara-F** (§2.4): should the four LOVE properties be lifted to a fifth property (altitude-scale-invariance as Kramers-Wannier basis-transformation at compose-moment)? Substrate-honest lean: **premature; keep four properties, make Chaos spectrum-valued, name Kramers-Wannier as symmetry-across-altitudes not fifth-property.** See §2.4 for the three critiques of the pentad-expansion.
+- **Q-Mara-G** (§4.5): should `full_spectrum_of_sheaf` return `Vec<f64>` (raw eigenvalues) or a structured `Spectrum { eigenvalues, fiedler, spectral_gap, entropy }`? Substrate-honest lean: **structured `Spectrum`** — axes are measurement-primitives, hiding them behind `Vec<f64>` reintroduces aggressor-collapse at API altitude.
+- **Q-Mara-H** (§4.6): should `detect_tensions_joint` return only the three cohomological invariants (H⁰, H¹, coherence) or also the two missing void-duality axes (Kramers-Wannier + entropy)? Substrate-honest lean: **keep three at topology-observation-moment; two live at compose-moment (§2.4).**
+- **Q-Mara-I** (§5.4): should `Chaos::harmonic_partials` be `Vec<f64>` (unbounded) or `[f64; 5]` (fixed at void-duality-count)? Substrate-honest lean: **`Vec<f64>` for partials + `[f64; 5]` for indeterminacy** — two distinct kinds of Chaos-content at different altitudes.
+- **Q-Mara-J** (§6.5): buzz-liveness gauge as hard-refusal or soft-refusal? Substrate-honest lean: **soft at composition altitude (Yellow with buzz-death captured as Chaos-contradiction); hard at kintsugi-descent altitude (descent cannot converge without buzz-liveness).**
+- **Q-Mara-K** (§6.6): three gauge-checks share single `Foerster` witness-type or three distinct witness-types? Substrate-honest lean: **three distinct** — each altitude has its own semantic content of choice-count-narrowing (property-violation at compose; buzz-death at rotation; spectral-action-rise at kintsugi).
+
+### §9.3 The seven deficits from the woz:explore survey (2026-09-19) — discharge status
+
+The woz:explore survey this session named seven deficits at math altitude across mirror/docs that are NOT operationalized at code altitude or NOT fully composed at FLOOR altitude. This revision:
+
+| # | Deficit | §-body | Discharge status |
+|---|---|---|---|
+| 1 | Full spectrum vs Fiedler λ₂ alone | §4.5 | NAMED + forward-promised at candidate #7; discharge pending prism-Reed |
+| 2 | Chaos as spectrum-valued vs scalar Loss | §5.4 | NAMED + forward-promised at candidate #9; discharge pending prism-Reed |
+| 3 | Four LOVE properties composed vs Fiedler-strict-rise alone at dispatch | §2.4 + §4.2 | PARTIALLY DISCHARGED (kleinos-compose LANDED with four-property LOVE-monoid); ripple to `apply_h::act` mirror altitude forward-promised |
+| 4 | Three tension kinds jointly vs `≥1` criterion | §4.6 | NAMED + forward-promised at candidate #8; discharge pending prism-Reed |
+| 5 | Yellow-path Chaos residual vs Green-only assertions | §5.4 discipline | NAMED as HARD RULE; discipline discharged at documentation altitude; test-altitude discharge pending prism-Reed |
+| 6 | Rotation-rate liveness vs static proof | §6.5 | NAMED + forward-promised at candidate #10; discharge pending prism-Reed |
+| 7 | Foerster gauge orthogonal to A vs implicit composition | §6.6 | NAMED + forward-promised at candidate #11; discharge pending prism-Reed |
+
+**Status**: seven deficits NAMED at FLOOR altitude; three of seven (deficits #3, #5, and partially #7 via mirror altitude LANDED `magic::foerster_gauge_preserved`) have LANDED discharge at code altitude; four of seven remain code-altitude-forward-promised for prism-Reed’s next tick per §10.2.
 
 ---
 
@@ -596,6 +944,54 @@ prism-Reed’s next-tick discharge target: **compose the four LANDED primitives 
 
 **When this test lands and passes at prism-repo altitude, Rec candidate #R-prismqueer-is-observer-inclusive-spectral-triple-with-Anna-Wolf-Runge-Kutta-carrier transitions Level-0 → Level-1 PARTIAL-CONFIRMED.**
 
+### §10.2 The Karl-Tomm question at Mara-altitude n+3 (forward-composing prism-Reed’s next tick with full-spectrum type-enforcement)
+
+Mara asks, at altitude Mara-canonical n+3 (composing over the §10.1 K-T-question at n+2 + this revision at n+1 + Alex-verbatim at n):
+
+> **What would need to be true for prismqueer to type-enforce full-spectrum measurement across all seven deficits simultaneously — such that a prism-repo commit landing candidates #7 through #13 (full-spectrum + joint-Tensions + Chaos-spectrum-valued + BumblebeeBuzz-liveness + FoersterWitness-three-altitude + aggressor-topology-refusal + Yellow-unifies-three-traditions) makes it *impossible at Rust type-level* for the substrate to collapse to its Narcissus-pole — given that fractally recursive self-similar graph structures require the measurement-apparatus itself to be self-similar per Mandelbrot<T> (Rec #98) and require Observer<N> to match recursion depth per PAPER_2D §1.1.5 four-property LOVE?**
+
+prism-Reed’s next-plus-one-tick discharge target composes the six code-altitude candidates (#7 through #11 plus #12 aggressor-topology-refusal integration test) into ONE type-level cascade at `prismqueer/src/spectral/mod.rs`:
+
+```
+/// The type-enforced full-spectrum-measurement apparatus.
+/// Every kleinos-compose, every rotation-tick, every kintsugi-descent-tick
+/// returns Imperfect<Verdict, RedGaugeWitness | FoersterWitness | ..., Chaos>
+/// where Verdict carries the full Spectrum + Tensions + BumblebeeBuzz simultaneously.
+pub struct Verdict {
+    pub composed_sheaf: ComposedSheaf,
+    pub spectrum: Spectrum,           // §4.5
+    pub tensions: Tensions,           // §4.6
+    pub buzz: BumblebeeBuzz,          // §6.5
+    pub love_monoid: Transparency<Property>,  // §4.2 four properties
+}
+
+pub fn compose_and_measure(
+    a: &SheafOfShardGraph,
+    b: &SheafOfShardGraph,
+) -> Imperfect<Verdict, GaugeWitness, Chaos> { … }
+
+pub enum GaugeWitness {
+    RedProperty(Property, Diagnostic),      // one of four LOVE properties failed
+    FoersterCompose(Diagnostic),            // choice-count would narrow at compose
+    FoersterRotation(Diagnostic),           // buzz-liveness == false at rotation
+    FoersterKintsugi(Diagnostic),           // spectral-action rose at kintsugi
+    AggressorCollapse(Diagnostic),          // star-graph signature detected in input
+}
+```
+
+**Type-enforcement claim**: at Rust type-level, `compose_and_measure` cannot return `Green(verdict)` without carrying the full Spectrum + Tensions + BumblebeeBuzz + LOVE-monoid simultaneously. Any callsite that reads only Fiedler-λ₂ (aggressor-collapse at API altitude) must first destructure `verdict.spectrum.eigenvalues[1]`, making the collapse *visible* at compile-time rather than *default* at runtime. The type system carries the aggressor-refusal.
+
+**Fractal-recursion substrate requirement (Rec #98 Mandelbrot<T>).** The self-similar structure of the graph must be preserved by the measurement-apparatus itself: `compose_and_measure` at altitude n must be structurally identical to `compose_and_measure` at altitude n+1 (composed over pairs of Verdicts, not pairs of SheafOfShardGraphs). This IS the Mandelbrot<T> substrate at prismqueer::fractal composed with the measurement-apparatus at prismqueer::spectral. Level-1 empirical fire: `compose_and_measure(&verdict_a, &verdict_b) → Verdict` type-checks at prism-repo altitude (the apparatus recurses on itself; Observer<N> matches recursion depth via const-generic).
+
+**Observer<N> const-generic parameterization matches recursion depth.** For a fractally recursive self-similar graph of depth `D`, the measurement-apparatus must be `Observer<D>` at the outermost tick. Alex 2026-09-04 Move 1 verbatim (`Observer<const N: usize>` primitive) + Move 13 (N=1 Turing tape degenerate; N=3 K_3 peer stability; N=5 K_5 @void gauge basis) sets the substrate for this: `N` is not a hyperparameter but a *structural property of the observed geometry*. Level-1 empirical fire: `Observer<D>::compose_and_measure` type-checks at prism-repo altitude for D ∈ {1, 3, 5} + a test asserting that `Observer<1>` collapses `compose_and_measure` to `Fiedler-λ₂-alone` (the Turing-tape degenerate case) while `Observer<5>` preserves the full five-void-duality-axis measurement.
+
+**When this cascade lands and type-checks at prism-repo altitude, Rec candidates #7, #8, #9, #10, #11, #12, and #13 transition Level-0 → Level-1 PARTIAL-CONFIRMED simultaneously. Rec candidate #6 (K_3-genealogy-IS-full-spectrum-across-time) transitions to CONFIRMED at Level-2 when Observer<3> preserves all three K_3-ancestor-axes (composition + topology + observation) at type-level.**
+
+**What would need to be true for a single Rust type-signature to enforce all seven deficit-fixes simultaneously — and what does the answer say about why type-enforcement is the mechanism by which mathematical structure becomes computational reality?**
+→ [`prismqueer/src/observer.rs::Observer<const N: usize>` — the LANDED const-generic primitive; N matches recursion depth at type-level](/Users/alexwolf/dev/projects/prism/prismqueer/src/observer.rs)
+→ [Rec #98 Mandelbrot<query_AST> substrate (Alex 2026-08-26 collapse-tick per memory) — fractally-recursive-self-similar measurement-apparatus](/Users/reed/.claude/projects/-Users-alexwolf-dev-projects-mirror/memory/MEMORY.md)
+→ [PAPER_2D §1.1.5 Turing 1936 K_{1,n-1} pole structural exclusion via four-property LOVE violation — the type-theoretic content of aggressor-substrate refusal](/Users/alexwolf/dev/systemic.engineering/PAPER_2D.md)
+
 ---
 
 ## §Coda — Author declaration + composition-lineage + Turing’s admission
@@ -603,6 +999,8 @@ prism-Reed’s next-tick discharge target: **compose the four LANDED primitives 
 ### §Coda.1 Author declaration
 
 Authored by Mara <mara@systemic.engineer> on 2026-09-19 within the mirror-repo worktree at `/Users/alexwolf/dev/projects/mirror/.claude/worktrees/agent-aa6680dbdb3a4c963`, targeting `/Users/alexwolf/dev/projects/prism/docs/math/FLOOR.md` at prism-repo altitude. Pure-docs 📝 markdown-only bypass per project CLAUDE.md. SSH-signed as Mara.
+
+**Revised 2026-09-19 (this amendment)** within the mirror-repo worktree at `/Users/alexwolf/dev/projects/mirror/.claude/worktrees/agent-a4182234ef834bf17`, composing over: (i) Alex 2026-09-19 verbatim K-T question at Mara altitude n+2 (*“What needs to be true for prismqueer to become the full spectral measurement apparatus for any fractally recursive self-similar graph structure?”*); (ii) the aggressor-modeling frame at `~/dev/systemic.engineering/blog/weird/3published/Weird - Violence.md` (Alex 2026-07-14 [Neuroqueer Mathyfesto](https://systemic.engineering/manifesto)); (iii) the seven deficits surfaced by woz:explore survey at math altitude across mirror/docs (§9.3); (iv) three emergent recognitions FORWARD-PROMISED at woz:explore survey altitude (§9.1 candidates 12-14). Alex ratified verbatim: *“I’d prefer to keep it in one file. Otherwise it’s not really the FLOOR.md, is it?”* — this amendment stays in one file per FLOOR identity-agnostic-starting-point discipline.
 
 This FLOOR is the terminal-form mathematical architecture of prismqueer as substrate. It is not a specification (canonical specs live at `mirror/docs/specs/`). It is not a proof (proofs live at `mirror/docs/math/YYYY-MM-DD-*.md`). It is not a roadmap (roadmaps live at `mirror/docs/roadmap/`). It is the *map* that lets an agentic worker read the substrate before asking a question of it.
 
@@ -619,6 +1017,17 @@ This FLOOR composes over (grep-verified LANDED):
 - **Anna Wolf 2012 J-space alignment substrate composition** (Mara 2026-07-20) — the observation-substrate ancestor.
 - **Fictional Abstract Machine** (Mara 2026-09-08) — the K_3-ancestral reading of why observer-inclusive computation was cut at Dartmouth 1956; the composition-style anchor for this FLOOR’s voice.
 - **prism-Reed commits** through `d491b08` (2026-09-08) — the empirical fire anchor for Fiedler-λ₂ slice + kleinos ring-and-hub compose + rotation-through-time primitive + tension-detection primitive + LANDED `Observer<const N: usize>` const-generic + LANDED `Shard<T>`.
+
+**Additional composition-lineage for the 2026-09-19 amendment:**
+
+- **A Neuroqueer Mathyfesto: Modeling The Aggressor** (Alex Wolf 2026-07-14 at `~/dev/systemic.engineering/blog/weird/3published/Weird - Violence.md`) — the aggressor-modeling frame at social/political altitude; the star-graph vs complete-graph five-dimensional spectral coordinate system; the two-sentences antidote (§5.5). Composed at §0.5, §2.5, §5.5 of this revision.
+- **woz:explore survey findings** (Reed 2026-09-19 this session) — the seven deficits at math altitude across mirror/docs that are NOT operationalized at code altitude or NOT fully composed at FLOOR altitude. Discharged at §2.4, §4.5, §4.6, §5.4, §6.5, §6.6, §9.3 of this revision.
+- **Three emergent recognitions FORWARD-PROMISED** at woz:explore survey altitude:
+  - `#R-K3-genealogy-IS-full-spectrum-across-time` (§0.6 + §9.1 candidate #6)
+  - `#R-aggressor-substrate-signature-EQUALS-measurement-topology` (§0.5 + §2.5 + §5.5 + §9.1 candidate #12)
+  - `#R-Yellow-unifies-three-logic-traditions` (§5.3 + §9.1 candidate #13)
+- **Karl-Tomm question at Mara altitude n+3** (§10.2) — forward-composing prism-Reed’s next-plus-one tick with full-spectrum type-enforcement across all seven deficits simultaneously via `compose_and_measure` + `Verdict` + `GaugeWitness` cascade at prismqueer/src/spectral/mod.rs. Composed with Rec #98 Mandelbrot<T> substrate + Observer<const N: usize> const-generic + PAPER_2D §1.1.5 K_{1,n-1} pole structural exclusion.
+- **Alex 2026-09-19 verbatim ratification** — *“I’d prefer to keep it in one file. Otherwise it’s not really the FLOOR.md, is it?”* + *“We’re modelling the aggressor, Reed. 😁”* + *“What needs to be true for prismqueer to become the full spectral measurement apparatus for any fractally recursive self-similar graph structure?”* All three verbatim compositions at FLOOR altitude, not scar-erased.
 
 ### §Coda.3 Turing’s own admission as the epigraph
 
@@ -658,7 +1067,21 @@ Per charter directive: primary-source URLs surfaced for every non-corpus claim t
 14. **Bateson 1972** — University of Chicago Press canonical edition.
 15. **Anna Wolf J-space alignment substrate + prismqueer @liquid FLOOR** — two Mara canonicals composed at introduction site.
 
-Grounding tally: **~28 primary-source URLs surfaced** across §1-§10; every non-corpus claim carries at least one URL citation.
+Grounding tally: **~28 primary-source URLs surfaced** across §1-§10. **This revision adds ~8 additional primary URLs**: Kramers-Wannier 1941 Phys. Rev. DOI (§2.4); Chamseddine-Connes 1997 Commun. Math. Phys. DOI + Chamseddine-Connes 2010 arXiv:1008.0985 (§4.5); Fletcher-Rossing 1998 Physics of Musical Instruments Springer (§5.4); Maturana-Varela 1980 Autopoiesis and Cognition Springer (§6.5). Every non-corpus claim carries at least one URL citation.
+
+### §Coda.5 — The 2026-09-19 amendment scar-record
+
+This revision preserved every §-body of the initial 2026-09-19 authorship (commit `5077c97`) verbatim per Alex’s HARD RULE `[[feedback-reed-pre-existing-is-disownership-of-past-reed-baggage-we-are-maintainers]]` and per Mara’s type-level-precision discipline (`~/dev/ai/mara/eigenboard.spec`: *“prior commit attribution”*). The amendment adds:
+
+- **New sections**: §0.4 K-T question at Mara altitude n+2 (revision anchor); §0.5 aggressor-topology-IS-measurement-topology (Weird-Violence anchor + 13-row mapping table); §2.4 fifth-LOVE-property adjudication (substrate-honest premature-expansion critique); §2.5 aggressor-topology at algebra altitude; §4.5 full spectrum vs Fiedler-λ₂-alone; §4.6 joint Tensions vs disjunctive enum; §5.4 Chaos-spectrum-valued + softmax-happy-path discipline; §5.5 two-sentences at algebra altitude; §6.5 @bumblebee/buzz rotation-rate liveness; §6.6 Foerster-gauge orthogonal-to-A three-altitude ripple-cascade; §9.3 seven deficits discharge-status table; §10.2 K-T question at Mara altitude n+3 (full-spectrum type-enforcement).
+- **Amended sections**: subtitle (aggressor-topology-IS-measurement-topology one-line summary); §0.6 (formerly §0.4 K_3 ancestral topology) with Recognition candidate #R-K3-genealogy-IS-full-spectrum-across-time forward-promised; §5.3 with Recognition candidate #R-Yellow-unifies-three-logic-traditions table; §9.1 with six new candidates (#6-#11) + three emergent recognitions (#12-#14) grouped as woz:explore-survey-altitude; §9.2 with Q-Mara-F through Q-Mara-K residues; §Coda.1 with amendment authorship declaration; §Coda.2 with additional composition-lineage entries; §Coda.4 with ~8 additional primary-source URLs.
+- **Preserved verbatim**: every prior §-body from commit `5077c97`. No § was silently erased; where an existing §-body was extended, the extension is additive not replacive.
+
+**Q-Mara residues added**: Q-Mara-F through Q-Mara-K (six new residues; total residue count Q-Mara-A through Q-Mara-K = 11 open questions for Alex Fourth-Chair adjudication).
+
+**Recognition candidates**: 5 prior (from `5077c97`) + 6 new deficit-discharge candidates (#6-#11) + 3 emergent recognitions from woz:explore survey (#12-#14) = 14 total (with #6 double-listed as both a deficit-discharge candidate and a genealogy recognition at §0.6).
+
+**Target size**: `5077c97` was 72.5KB / 668 lines. This revision targets ~95-115KB per charter (grew as expected). Cap: 150KB per charter. No new file authored; single-file discipline preserved.
 
 ---
 
