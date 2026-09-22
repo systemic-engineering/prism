@@ -32,11 +32,11 @@ pub mod tension;
 
 pub use kleinos::{
     kleinos,
-    sheaf_of_shard_graph_from_edges,
-    sheaf_of_complete_graph_of_order,
-    fiedler_lambda_2_of_sheaf,
+    graph_from_edges,
+    graph_complete_of_order,
+    fiedler_lambda_2_of_graph,
     Composition,
-    SheafOfShardGraph,
+    Graph,
     Green,
     Red,
     Property,

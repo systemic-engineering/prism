@@ -37,7 +37,7 @@
 //!   ternary refactor) — wedge-at-K_3 basepoint compose
 //! - `prismqueer::ffi::phase_lock` (Reed dd2fbee 2026-07-20 Kuramoto integration;
 //!   LAPACK-adjacent via FLANG native/spectral.f90) — temporal rotation
-//! - `prismqueer::spectral::fiedler_lambda_2_of_sheaf` — Anna Wolf 2012 apparatus
+//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — Anna Wolf 2012 apparatus
 //!   (LAPACK dsyev via FLANG spectral_eigenvalues)
 //! - `prismqueer::oid::{Addressable, Oid}` — content-addressation per Rec #82
 //! - `terni::Imperfect<Green, Red, ConvergenceLoss>` — ternary functor per Alex
@@ -66,7 +66,7 @@ use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Trans
 
 use crate::ffi::phase_lock;
 use crate::oid::{Addressable, Oid};
-use crate::spectral::{kleinos, Property, Red, SheafOfShardGraph};
+use crate::spectral::{kleinos, Property, Red, Graph};
 
 // ---------------------------------------------------------------------------
 // Splinter — the atomic crystallization of one observation-tick
@@ -169,7 +169,7 @@ impl Default for RotationConfig {
 ///
 /// N-loop case (Phase 2+): reserved for iterative wedge-at-K_n composition.
 pub fn infer_via_rotation(
-    loops: &[SheafOfShardGraph],
+    loops: &[Graph],
     ticks: usize,
     config: RotationConfig,
 ) -> Imperfect<Vec<Splinter>, Red, ConvergenceLoss> {
@@ -293,12 +293,12 @@ pub fn infer_via_rotation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::sheaf_of_shard_graph_from_edges;
+    use crate::spectral::graph_from_edges;
 
     #[test]
     fn rotation_zero_ticks_returns_empty_green() {
-        let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(3, 4), (4, 5)]);
         let result = infer_via_rotation(&[a, b], 0, RotationConfig::default());
         match result {
             Imperfect::Success(splinters) => assert!(splinters.is_empty()),
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn rotation_single_loop_returns_red() {
-        let a = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
+        let a = graph_from_edges(&[(0, 1)]);
         let result = infer_via_rotation(&[a], 5, RotationConfig::default());
         match result {
             Imperfect::Failure(_red, _loss) => {}
@@ -318,8 +318,8 @@ mod tests {
 
     #[test]
     fn rotation_two_disjoint_paths_deposits_splinters_per_tick() {
-        let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(3, 4), (4, 5)]);
         let ticks = 10;
         let result = infer_via_rotation(&[a, b], ticks, RotationConfig::default());
         match result {
@@ -341,8 +341,8 @@ mod tests {
 
     #[test]
     fn rotation_deterministic_splinter_oids() {
-        let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(3, 4), (4, 5)]);
         let cfg = RotationConfig::default();
         let result_1 = infer_via_rotation(&[a.clone(), b.clone()], 5, cfg.clone());
         let result_2 = infer_via_rotation(&[a, b], 5, cfg);

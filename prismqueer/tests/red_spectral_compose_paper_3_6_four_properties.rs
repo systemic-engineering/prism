@@ -65,8 +65,8 @@
 
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
-    fiedler_lambda_2_of_sheaf, kleinos, sheaf_of_complete_graph_of_order,
-    sheaf_of_shard_graph_from_edges,
+    fiedler_lambda_2_of_graph, kleinos, graph_complete_of_order,
+    graph_from_edges,
 };
 use terni::Imperfect;
 
@@ -96,8 +96,8 @@ use terni::Imperfect;
 /// ```
 #[test]
 fn compose_property_1_sovereignty_preservation() {
-    let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-    let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+    let a = graph_from_edges(&[(0, 1), (1, 2)]);
+    let b = graph_from_edges(&[(3, 4), (4, 5)]);
     let composed = kleinos(&a, &b)
         .expect("disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green");
 
@@ -155,8 +155,8 @@ fn compose_property_1_sovereignty_preservation() {
 /// ```
 #[test]
 fn compose_property_2_emergent_third_admission() {
-    let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-    let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+    let a = graph_from_edges(&[(0, 1), (1, 2)]);
+    let b = graph_from_edges(&[(3, 4), (4, 5)]);
     let composed = kleinos(&a, &b)
         .expect("disjoint paths admit compose per emergent-third K_2→K_3 — expected Green");
 
@@ -209,13 +209,13 @@ fn compose_property_2_emergent_third_admission() {
 /// ```
 #[test]
 fn compose_property_3_fiedler_lambda_2_strict_rise() {
-    let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
-    let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
+    let a = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
+    let b = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
     let composed = kleinos(&a, &b)
         .expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
 
-    let lambda_a = fiedler_lambda_2_of_sheaf(&a);
-    let lambda_b = fiedler_lambda_2_of_sheaf(&b);
+    let lambda_a = fiedler_lambda_2_of_graph(&a);
+    let lambda_b = fiedler_lambda_2_of_graph(&b);
     let lambda_composed = composed.fiedler_lambda_2();
 
     assert!(
@@ -263,7 +263,7 @@ fn compose_property_3_fiedler_lambda_2_strict_rise() {
 /// ```
 #[test]
 fn compose_property_4_fusion_refusal() {
-    let a = sheaf_of_complete_graph_of_order(5); // K_5
+    let a = graph_complete_of_order(5); // K_5
     let b = a.clone(); // identical inputs — compose would fuse, not compose
     let result = kleinos(&a, &b);
 
@@ -319,8 +319,8 @@ fn compose_property_4_fusion_refusal() {
 /// ```
 #[test]
 fn compose_property_5_content_address_determinism() {
-    let a = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-    let b = sheaf_of_shard_graph_from_edges(&[(3, 4), (4, 5)]);
+    let a = graph_from_edges(&[(0, 1), (1, 2)]);
+    let b = graph_from_edges(&[(3, 4), (4, 5)]);
 
     let composed_1 = kleinos(&a, &b)
         .expect("disjoint paths compose — expected Green (first invocation)");
@@ -355,8 +355,8 @@ fn compose_meta_module_exposed() {
     // succeeds iff the module + primitives are exposed at public API surface. That import
     // is exercised by tests 1-5 above; this test asserts the primitives are callable at
     // the public boundary.
-    let a = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
-    let b = sheaf_of_shard_graph_from_edges(&[(2, 3)]);
+    let a = graph_from_edges(&[(0, 1)]);
+    let b = graph_from_edges(&[(2, 3)]);
     // Runtime discharge: invoking kleinos on trivially-disjoint two-vertex sheafs must
     // succeed (sovereignty trivially holds; emergent third admitted; Fiedler rises;
     // fusion refusal N/A for disjoint inputs).

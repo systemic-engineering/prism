@@ -36,12 +36,12 @@
 //!
 //! # Composition (over LANDED per FLOOR Definition M8.1)
 //!
-//! - `prismqueer::spectral::kleinos::SheafOfShardGraph` — input carrier
+//! - `prismqueer::spectral::kleinos::Graph` — input carrier
 //! - `prismqueer::ffi::eigenvalues` — LAPACK dsyev via FLANG-compiled `native/spectral.f90`
 
 use std::collections::BTreeMap;
 
-use crate::spectral::kleinos::{SheafOfShardGraph, VertexId};
+use crate::spectral::kleinos::{Graph, VertexId};
 
 /// Full non-trivial harmonic spectrum of the sheaf Laplacian.
 ///
@@ -58,7 +58,7 @@ impl Spectrum {
     ///
     /// Composes over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via
     /// FLANG-compiled `native/spectral.f90`).
-    pub fn of(sheaf: &SheafOfShardGraph) -> Self {
+    pub fn of(sheaf: &Graph) -> Self {
         let n = sheaf.vertex_count();
         if n < 2 {
             return Self { eigenvalues: Vec::new() };
@@ -216,7 +216,7 @@ pub struct DeltaCritical {
 
 impl DeltaCritical {
     /// Read the Folk Theorem discount factor of `sheaf`.
-    pub fn of(sheaf: &SheafOfShardGraph) -> Self {
+    pub fn of(sheaf: &Graph) -> Self {
         let evals = Spectrum::of(sheaf).eigenvalues;
         if evals.is_empty() {
             return Self { value: None };
@@ -233,13 +233,13 @@ impl DeltaCritical {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::kleinos::{sheaf_of_complete_graph_of_order, sheaf_of_shard_graph_from_edges};
+    use crate::spectral::kleinos::{graph_complete_of_order, graph_from_edges};
 
     /// K_5: Laplacian spectrum = {0, 5, 5, 5, 5} per void-dual-geometry.md.
     /// `Spectrum::of(K_5).eigenvalues → {5, 5, 5, 5}`.
     #[test]
     fn spectrum_of_k5_returns_four_nontrivial_eigenvalues_all_equal_to_five() {
-        let k5 = sheaf_of_complete_graph_of_order(5);
+        let k5 = graph_complete_of_order(5);
         let evals = Spectrum::of(&k5).eigenvalues;
         assert_eq!(evals.len(), 4, "K_5 has n-1 = 4 non-trivial eigenvalues");
         for (i, &lambda) in evals.iter().enumerate() {
@@ -253,7 +253,7 @@ mod tests {
     /// K_3: Laplacian spectrum = {0, 3, 3}. `Spectrum::of(K_3).eigenvalues → {3, 3}`.
     #[test]
     fn spectrum_of_k3_returns_two_nontrivial_eigenvalues_all_equal_to_three() {
-        let k3 = sheaf_of_complete_graph_of_order(3);
+        let k3 = graph_complete_of_order(3);
         let evals = Spectrum::of(&k3).eigenvalues;
         assert_eq!(evals.len(), 2, "K_3 has n-1 = 2 non-trivial eigenvalues");
         for &lambda in &evals {
@@ -264,7 +264,7 @@ mod tests {
     /// Path P_3: Laplacian spectrum = {0, 1, 3}. `eigenvalues → {1, 3}`.
     #[test]
     fn spectrum_of_path_p3_returns_distinct_eigenvalues() {
-        let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
+        let p3 = graph_from_edges(&[(0, 1), (1, 2)]);
         let evals = Spectrum::of(&p3).eigenvalues;
         assert_eq!(evals.len(), 2, "P_3 has n-1 = 2 non-trivial eigenvalues");
         assert!(
@@ -282,7 +282,7 @@ mod tests {
     /// Empty sheaf returns empty spectrum.
     #[test]
     fn spectrum_of_empty_sheaf_returns_empty() {
-        let empty = sheaf_of_shard_graph_from_edges(&[]);
+        let empty = graph_from_edges(&[]);
         assert!(Spectrum::of(&empty).eigenvalues.is_empty());
     }
 
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn spectrum_is_sorted_ascending() {
         // Star K_{1,4} = vertex 0 hub connected to vertices 1..=4
-        let star = sheaf_of_shard_graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
+        let star = graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
         let evals = Spectrum::of(&star).eigenvalues;
         for window in evals.windows(2) {
             assert!(
@@ -310,7 +310,7 @@ mod tests {
     /// eigenvalue for Splinter pole = 5).
     #[test]
     fn split_of_k5_returns_fiedler_five() {
-        let k5 = sheaf_of_complete_graph_of_order(5);
+        let k5 = graph_complete_of_order(5);
         let split = Spectrum::of(&k5).split();
         assert_eq!(split, Split(5.0));
     }
@@ -319,7 +319,7 @@ mod tests {
     /// eigenvalue for P_3 = 1).
     #[test]
     fn split_of_path_p3_returns_fiedler_one() {
-        let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
+        let p3 = graph_from_edges(&[(0, 1), (1, 2)]);
         let split = Spectrum::of(&p3).split();
         assert!((split.0 - 1.0).abs() < 1e-9, "P_3 Fiedler = 1.0; got {:?}", split);
     }
@@ -329,7 +329,7 @@ mod tests {
     /// each p_i = 5/20 = 0.25; entropy = -4 · 0.25 · log(0.25) = log(4) ≈ 1.386.
     #[test]
     fn refract_of_k5_returns_log_four_entropy() {
-        let k5 = sheaf_of_complete_graph_of_order(5);
+        let k5 = graph_complete_of_order(5);
         let refract = Spectrum::of(&k5).refract();
         let expected = (4.0_f64).ln();
         assert!(
@@ -342,7 +342,7 @@ mod tests {
     /// K_5 project axis reading: Cheeger upper bound = √(2·λ_2) = √10 ≈ 3.162.
     #[test]
     fn project_of_k5_returns_cheeger_bound() {
-        let k5 = sheaf_of_complete_graph_of_order(5);
+        let k5 = graph_complete_of_order(5);
         let project = Spectrum::of(&k5).project();
         let expected = (10.0_f64).sqrt();
         assert!(
@@ -355,7 +355,7 @@ mod tests {
     /// Empty-spectrum axis readings: all three return zero-valued newtypes.
     #[test]
     fn empty_spectrum_axis_readings_return_zero() {
-        let empty = sheaf_of_shard_graph_from_edges(&[]);
+        let empty = graph_from_edges(&[]);
         let spec = Spectrum::of(&empty);
         assert_eq!(spec.split(), Split(0.0));
         assert_eq!(spec.refract(), Refract(0.0));
@@ -389,7 +389,7 @@ mod tests {
     /// Splinter pole (K_5): spectrum = {5, 5, 5, 5} → λ_2 = λ_max → δ = 0.
     #[test]
     fn delta_critical_of_k5_returns_zero_splinter_pole() {
-        let k5 = sheaf_of_complete_graph_of_order(5);
+        let k5 = graph_complete_of_order(5);
         let delta = DeltaCritical::of(&k5).value.expect("K_5 has non-empty spectrum");
         assert!(
             delta.abs() < 1e-9,
@@ -400,7 +400,7 @@ mod tests {
     /// Star K_{1,4}: spectrum = {1, 1, 1, 5} → δ_critical = 1 - 1/5 = 0.8.
     #[test]
     fn delta_critical_of_star_k14_returns_0_8_narcissus_pole() {
-        let star = sheaf_of_shard_graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
+        let star = graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
         let delta = DeltaCritical::of(&star).value.expect("K_{1,4} has non-empty spectrum");
         assert!(
             (delta - 0.8).abs() < 1e-9,
@@ -411,7 +411,7 @@ mod tests {
     /// Path P_3: spectrum = {1, 3} → δ_critical = 1 - 1/3 = 2/3.
     #[test]
     fn delta_critical_of_path_p3_returns_two_thirds() {
-        let p3 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
+        let p3 = graph_from_edges(&[(0, 1), (1, 2)]);
         let delta = DeltaCritical::of(&p3).value.expect("P_3 has non-empty spectrum");
         assert!(
             (delta - (2.0 / 3.0)).abs() < 1e-9,
@@ -422,7 +422,7 @@ mod tests {
     /// Empty sheaf: DeltaCritical value is None.
     #[test]
     fn delta_critical_of_empty_sheaf_returns_none() {
-        let empty = sheaf_of_shard_graph_from_edges(&[]);
+        let empty = graph_from_edges(&[]);
         assert!(DeltaCritical::of(&empty).value.is_none());
     }
 }

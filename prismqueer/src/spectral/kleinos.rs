@@ -128,12 +128,12 @@ pub type Green = Composition;
 /// `Stalker` newtype (Q-Mara-ϑ Alex ratification) + explicit sheaf-morphism
 /// restriction maps.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheafOfShardGraph {
+pub struct Graph {
     vertices: BTreeSet<VertexId>,
     edges: BTreeSet<EdgeKey>,
 }
 
-impl SheafOfShardGraph {
+impl Graph {
     /// Iterate over vertices in canonical order.
     pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
         self.vertices.iter().copied()
@@ -161,7 +161,7 @@ impl SheafOfShardGraph {
     }
 }
 
-impl Addressable for SheafOfShardGraph {
+impl Addressable for Graph {
     fn oid(&self) -> Oid {
         // Canonical serialization: vertices sorted + edges sorted (BTreeSet
         // preserves order). Content-address per Rec #82 β-normal AST OID.
@@ -182,7 +182,7 @@ impl Addressable for SheafOfShardGraph {
 /// methods on the emergent-third stalk + content-address per Rec #82.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Composition {
-    underlying: SheafOfShardGraph,
+    underlying: Graph,
     emergent_third: VertexId,
     fiedler_lambda_2_cached: f64,
 }
@@ -255,7 +255,7 @@ fn edge_key(a: VertexId, b: VertexId) -> EdgeKey {
 /// Stalks default to trivial (identity restriction maps; recovers bare graph
 /// Laplacian per Hansen-Ghrist 2019 §3 Remark). Phase 2+ constructor adds
 /// explicit sheaf-morphism data.
-pub fn sheaf_of_shard_graph_from_edges(edges: &[(VertexId, VertexId)]) -> SheafOfShardGraph {
+pub fn graph_from_edges(edges: &[(VertexId, VertexId)]) -> Graph {
     let mut vertices = BTreeSet::new();
     let mut edge_set = BTreeSet::new();
     for &(a, b) in edges {
@@ -263,21 +263,21 @@ pub fn sheaf_of_shard_graph_from_edges(edges: &[(VertexId, VertexId)]) -> SheafO
         vertices.insert(b);
         edge_set.insert(edge_key(a, b));
     }
-    SheafOfShardGraph {
+    Graph {
         vertices,
         edges: edge_set,
     }
 }
 
 /// Construct a complete-graph shard-sheaf K_n of order n (vertices 0..n).
-pub fn sheaf_of_complete_graph_of_order(n: usize) -> SheafOfShardGraph {
+pub fn graph_complete_of_order(n: usize) -> Graph {
     let mut edges = Vec::new();
     for i in 0..n {
         for j in (i + 1)..n {
             edges.push((i as VertexId, j as VertexId));
         }
     }
-    sheaf_of_shard_graph_from_edges(&edges)
+    graph_from_edges(&edges)
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ pub fn sheaf_of_complete_graph_of_order(n: usize) -> SheafOfShardGraph {
 ///
 /// Returns 0.0 for empty or single-vertex sheaves (λ₁ = 0; no λ₂).
 /// Returns 0.0 for disconnected sheaves (λ₂ = 0 by definition).
-pub fn fiedler_lambda_2_of_sheaf(sheaf: &SheafOfShardGraph) -> f64 {
+pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
     let n = sheaf.vertex_count();
     if n < 2 {
         return 0.0;
@@ -364,15 +364,15 @@ pub fn fiedler_lambda_2_of_sheaf(sheaf: &SheafOfShardGraph) -> f64 {
 /// Vereinnahmung-attention-substrate-empirically-realizable-at-silicon` at
 /// compile substrate at authoring altitude.
 pub fn kleinos(
-    sheaf_a: &SheafOfShardGraph,
-    sheaf_b: &SheafOfShardGraph,
+    sheaf_a: &Graph,
+    sheaf_b: &Graph,
 ) -> Imperfect<Green, Red, ConvergenceLoss> {
     // Verify all four properties simultaneously per LOVE-monoid coordinate-
     // decomposition. NO if-else on Property verbs.
     let candidate = compose_candidate(sheaf_a, sheaf_b);
-    let lambda_a = fiedler_lambda_2_of_sheaf(sheaf_a);
-    let lambda_b = fiedler_lambda_2_of_sheaf(sheaf_b);
-    let lambda_composed = fiedler_lambda_2_of_sheaf(&candidate.underlying);
+    let lambda_a = fiedler_lambda_2_of_graph(sheaf_a);
+    let lambda_b = fiedler_lambda_2_of_graph(sheaf_b);
+    let lambda_composed = fiedler_lambda_2_of_graph(&candidate.underlying);
 
     let verdict = verify_all_four_properties(
         sheaf_a,
@@ -462,7 +462,7 @@ pub fn kleinos(
 ///
 /// Emergent-third VertexId is deterministic per Rec #82 via
 /// max(V(a) ∪ V(b)) + 1.
-fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> Composition {
+fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
     let emergent_third = compute_emergent_third_id(a, b);
 
     let mut vertices: BTreeSet<VertexId> = a.vertices.iter().copied().collect();
@@ -507,7 +507,7 @@ fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> Compositio
     }
 
     Composition {
-        underlying: SheafOfShardGraph { vertices, edges },
+        underlying: Graph { vertices, edges },
         emergent_third,
         fiedler_lambda_2_cached: 0.0, // filled at into_result
     }
@@ -517,8 +517,8 @@ fn compose_candidate(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> Compositio
 /// discipline. Guaranteed to not collide with any vertex in a or b via
 /// max(a.vertices ∪ b.vertices) + 1 fallback.
 fn compute_emergent_third_id(
-    a: &SheafOfShardGraph,
-    b: &SheafOfShardGraph,
+    a: &Graph,
+    b: &Graph,
 ) -> VertexId {
     let max_existing = a
         .vertices
@@ -535,8 +535,8 @@ fn compute_emergent_third_id(
 /// each property returns a PropertyVerdict; all four combined via
 /// OpacityMap<Property> into Transparency<Property>.
 fn verify_all_four_properties(
-    sheaf_a: &SheafOfShardGraph,
-    sheaf_b: &SheafOfShardGraph,
+    sheaf_a: &Graph,
+    sheaf_b: &Graph,
     candidate: &Composition,
     lambda_a: f64,
     lambda_b: f64,
@@ -571,8 +571,8 @@ fn as_transparency(property: Property, verdict: PropertyVerdict) -> Transparency
 /// Property 1: Sovereignty preservation per PAPER §3.6.1.
 /// Composed sheaf contains all vertices + edges of both sheaf_a and sheaf_b.
 fn verify_sovereignty(
-    sheaf_a: &SheafOfShardGraph,
-    sheaf_b: &SheafOfShardGraph,
+    sheaf_a: &Graph,
+    sheaf_b: &Graph,
     candidate: &Composition,
 ) -> PropertyVerdict {
     let a_preserved = sheaf_a
@@ -602,8 +602,8 @@ fn verify_sovereignty(
 /// Composed sheaf carries exactly ONE emergent-third stalk not present in
 /// either input.
 fn verify_emergent_third(
-    sheaf_a: &SheafOfShardGraph,
-    sheaf_b: &SheafOfShardGraph,
+    sheaf_a: &Graph,
+    sheaf_b: &Graph,
     candidate: &Composition,
 ) -> PropertyVerdict {
     let emergent = candidate.emergent_third_stalk();
@@ -637,8 +637,8 @@ fn verify_fiedler_rise(lambda_a: f64, lambda_b: f64, lambda_composed: f64) -> Pr
 /// Refuses composition when inputs have identical content-address (would
 /// fuse rather than compose).
 fn verify_fusion_refusal(
-    sheaf_a: &SheafOfShardGraph,
-    sheaf_b: &SheafOfShardGraph,
+    sheaf_a: &Graph,
+    sheaf_b: &Graph,
 ) -> PropertyVerdict {
     if sheaf_a.oid() == sheaf_b.oid() {
         PropertyVerdict::Fail(Diagnostic::new(
@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn sheaf_construction_edges_only_per_q_mara_lambda() {
-        let sheaf = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
+        let sheaf = graph_from_edges(&[(0, 1), (1, 2)]);
         assert_eq!(sheaf.vertex_count(), 3);
         assert!(sheaf.contains_edge((0, 1)));
         assert!(sheaf.contains_edge((1, 2)));
@@ -689,7 +689,7 @@ mod tests {
 
     #[test]
     fn complete_graph_construction() {
-        let k3 = sheaf_of_complete_graph_of_order(3);
+        let k3 = graph_complete_of_order(3);
         assert_eq!(k3.vertex_count(), 3);
         // K_3 has 3 edges (0-1, 0-2, 1-2)
         assert_eq!(k3.edges().count(), 3);
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn fusion_refusal_on_identical_inputs() {
-        let sheaf_a = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
+        let sheaf_a = graph_from_edges(&[(0, 1)]);
         let sheaf_b = sheaf_a.clone();
         let result = kleinos(&sheaf_a, &sheaf_b);
         assert!(result.is_err(), "identical inputs must refuse fusion per PAPER §3.6.4 — Red state");
@@ -705,8 +705,8 @@ mod tests {
 
     #[test]
     fn content_address_determinism_per_rec_82() {
-        let sheaf_1 = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2)]);
-        let sheaf_2 = sheaf_of_shard_graph_from_edges(&[(1, 2), (0, 1)]);
+        let sheaf_1 = graph_from_edges(&[(0, 1), (1, 2)]);
+        let sheaf_2 = graph_from_edges(&[(1, 2), (0, 1)]);
         // Different construction order; same content → same OID
         assert_eq!(sheaf_1.oid(), sheaf_2.oid());
     }

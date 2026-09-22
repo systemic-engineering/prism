@@ -30,13 +30,13 @@
 //!
 //! # Composes over LANDED
 //!
-//! - `prismqueer::spectral::kleinos::SheafOfShardGraph` — input carrier
+//! - `prismqueer::spectral::kleinos::Graph` — input carrier
 //! - `prismqueer::ffi::singular_values` — LAPACK dgesdd via FLANG-compiled
 //!   `native/spectral.f90`
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::spectral::kleinos::{SheafOfShardGraph, VertexId};
+use crate::spectral::kleinos::{Graph, VertexId};
 
 /// Singular-value spectrum of the sheaf-Laplacian commutator `[L_A, L_B]`.
 ///
@@ -52,7 +52,7 @@ impl CommutatorSpectrum {
     ///
     /// Filters numerical zeros (`σ ≤ 1e-12`) from the returned spectrum;
     /// empty spectrum witnesses commutative composition.
-    pub fn of(a: &SheafOfShardGraph, b: &SheafOfShardGraph) -> Self {
+    pub fn of(a: &Graph, b: &Graph) -> Self {
         let vertices: BTreeSet<VertexId> = a.vertices().chain(b.vertices()).collect();
         let n = vertices.len();
         if n < 2 {
@@ -83,7 +83,7 @@ impl CommutatorSpectrum {
 /// Build the graph Laplacian of `sheaf` over the given vertex-index basis.
 /// Edges whose endpoints are outside the basis are skipped.
 fn build_laplacian(
-    sheaf: &SheafOfShardGraph,
+    sheaf: &Graph,
     vertex_index: &BTreeMap<VertexId, usize>,
     n: usize,
 ) -> Vec<f64> {
@@ -119,14 +119,14 @@ fn matmul(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
 mod tests {
     use super::*;
     use crate::spectral::kleinos::{
-        sheaf_of_complete_graph_of_order, sheaf_of_shard_graph_from_edges,
+        graph_complete_of_order, graph_from_edges,
     };
 
     /// `[L_A, L_A] = L_A L_A - L_A L_A = 0`. Self-commutator vanishes.
     /// Substrate-reading: composition of A with itself is trivially commutative.
     #[test]
     fn commutator_of_sheaf_with_itself_is_zero() {
-        let k3 = sheaf_of_complete_graph_of_order(3);
+        let k3 = graph_complete_of_order(3);
         let cs = CommutatorSpectrum::of(&k3, &k3);
         assert!(
             cs.spectrum.is_empty(),
@@ -143,8 +143,8 @@ mod tests {
     /// values `{0, √3, √3}`; filtered spectrum `{√3, √3}`.
     #[test]
     fn commutator_of_disjoint_edges_is_nonzero() {
-        let ab = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
-        let bc = sheaf_of_shard_graph_from_edges(&[(1, 2)]);
+        let ab = graph_from_edges(&[(0, 1)]);
+        let bc = graph_from_edges(&[(1, 2)]);
         let cs = CommutatorSpectrum::of(&ab, &bc);
         assert!(
             !cs.spectrum.is_empty(),
@@ -161,7 +161,7 @@ mod tests {
     /// Empty sheafs → empty vertex-union → empty commutator spectrum.
     #[test]
     fn commutator_of_empty_sheaves_is_empty() {
-        let empty = sheaf_of_shard_graph_from_edges(&[]);
+        let empty = graph_from_edges(&[]);
         let cs = CommutatorSpectrum::of(&empty, &empty);
         assert!(cs.spectrum.is_empty());
     }
@@ -172,8 +172,8 @@ mod tests {
     /// commutative composition (nothing to observe).
     #[test]
     fn commutator_of_disjoint_vertex_sets_is_zero() {
-        let ab = sheaf_of_shard_graph_from_edges(&[(0, 1)]);
-        let cd = sheaf_of_shard_graph_from_edges(&[(2, 3)]);
+        let ab = graph_from_edges(&[(0, 1)]);
+        let cd = graph_from_edges(&[(2, 3)]);
         let cs = CommutatorSpectrum::of(&ab, &cd);
         assert!(
             cs.spectrum.is_empty(),

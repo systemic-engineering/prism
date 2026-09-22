@@ -28,11 +28,11 @@
 //! Composes over LANDED per HARD RULE `feedback-rust-delivers-primitives-
 //! substrate-delivers-composition`:
 //!
-//! - `prismqueer::spectral::fiedler_lambda_2_of_sheaf` — Anna Wolf 2012 apparatus
+//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — Anna Wolf 2012 apparatus
 //!   at basepoint via LAPACK dsyev (composes into tension detection)
 //! - `prismqueer::ffi::eigenvalues` — full spectrum for component-count via
 //!   zero-eigenvalue-multiplicity read
-//! - `prismqueer::spectral::SheafOfShardGraph` — input carrier
+//! - `prismqueer::spectral::Graph` — input carrier
 //! - `terni::Imperfect<Vec<Tension>, Red, ConvergenceLoss>` — ternary functor
 //!   return per Alex 2026-09-02 color-coded repo state
 //!
@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 use crate::ffi::eigenvalues;
-use crate::spectral::{Property, Red, SheafOfShardGraph, VertexId};
+use crate::spectral::{Property, Red, Graph, VertexId};
 
 // ---------------------------------------------------------------------------
 // TensionKind, Location, Tension carriers
@@ -123,7 +123,7 @@ pub struct Tension {
 /// - **Red** (`Imperfect::Failure(red, loss)`) — detection refused: eigenvalue
 ///   computation failed OR sheaf is empty
 pub fn detect_tensions(
-    sheaf: &SheafOfShardGraph,
+    sheaf: &Graph,
 ) -> Imperfect<Vec<Tension>, Red, ConvergenceLoss> {
     let vertex_count = sheaf.vertices().count();
     let edge_count = sheaf.edges().count();
@@ -138,7 +138,7 @@ pub fn detect_tensions(
         return Imperfect::Success(Vec::new());
     }
 
-    // Build graph Laplacian L = D - A per fiedler_lambda_2_of_sheaf pattern.
+    // Build graph Laplacian L = D - A per fiedler_lambda_2_of_graph pattern.
     let mut vertex_index: std::collections::BTreeMap<VertexId, usize> =
         std::collections::BTreeMap::new();
     for (i, v) in sheaf.vertices().enumerate() {
@@ -246,11 +246,11 @@ pub fn detect_tensions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::{sheaf_of_complete_graph_of_order, sheaf_of_shard_graph_from_edges};
+    use crate::spectral::{graph_complete_of_order, graph_from_edges};
 
     #[test]
     fn tension_empty_sheaf_is_green_with_no_tensions() {
-        let sheaf = sheaf_of_shard_graph_from_edges(&[]);
+        let sheaf = graph_from_edges(&[]);
         let result = detect_tensions(&sheaf);
         match result {
             Imperfect::Success(tensions) => assert!(tensions.is_empty()),
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn tension_tree_has_no_cohomological_tension() {
         // Path 0-1-2-3 is a tree; β₁ = 0; single component; connected.
-        let sheaf = sheaf_of_shard_graph_from_edges(&[(0, 1), (1, 2), (2, 3)]);
+        let sheaf = graph_from_edges(&[(0, 1), (1, 2), (2, 3)]);
         let tensions = detect_tensions(&sheaf).expect("tree detection");
         // Trees have no cycles (Cohomological), single component (no Disconnection).
         // Coherence may or may not fire depending on path-graph baseline.
@@ -281,7 +281,7 @@ mod tests {
     #[test]
     fn tension_k3_has_cohomological_one() {
         // K_3 has 3 vertices, 3 edges, 1 component → β₁ = 1.
-        let sheaf = sheaf_of_complete_graph_of_order(3);
+        let sheaf = graph_complete_of_order(3);
         let tensions = detect_tensions(&sheaf).expect("K_3 detection");
         let cohomological: Vec<_> = tensions
             .iter()
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn tension_two_disjoint_edges_shows_disconnection() {
         // Two edges (0,1) + (2,3) with no bridge → 2 components.
-        let sheaf = sheaf_of_shard_graph_from_edges(&[(0, 1), (2, 3)]);
+        let sheaf = graph_from_edges(&[(0, 1), (2, 3)]);
         let tensions = detect_tensions(&sheaf).expect("disjoint detection");
         let disconnection: Vec<_> = tensions
             .iter()
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn tension_k5_has_cohomological_six() {
         // K_5 has 5 vertices, 10 edges, 1 component → β₁ = 6.
-        let sheaf = sheaf_of_complete_graph_of_order(5);
+        let sheaf = graph_complete_of_order(5);
         let tensions = detect_tensions(&sheaf).expect("K_5 detection");
         let cohomological: Vec<_> = tensions
             .iter()
