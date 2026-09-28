@@ -115,6 +115,67 @@ pub enum Wall {
     NonFinite,
     /// The section has no value at this vertex.
     Missing(VertexId),
+    /// LAPACK could not certify the kernel apart from the slowest mode: its
+    /// error cannot resolve the spectral gap at this size, or its spectrum
+    /// contradicts the component count.
+    Unseparated {
+        /// Connected components, counted exactly.
+        components: usize,
+    },
+}
+
+/// Connected components, counted by union-find: the exact size of the kernel.
+fn components(graph: &Graph, index: &BTreeMap<VertexId, usize>) -> usize {
+    fn root(parent: &mut [usize], i: usize) -> usize {
+        let mut r = i;
+        while parent[r] != r {
+            r = parent[r];
+        }
+        let mut j = i;
+        while parent[j] != r {
+            let next = parent[j];
+            parent[j] = r;
+            j = next;
+        }
+        r
+    }
+    let mut parent: Vec<usize> = (0..index.len()).collect();
+    let mut count = index.len();
+    for (u, v) in graph.edges() {
+        let (ru, rv) = (root(&mut parent, index[&u]), root(&mut parent, index[&v]));
+        if ru != rv {
+            parent[ru] = rv;
+            count -= 1;
+        }
+    }
+    count
+}
+
+/// How many eigenvalues are the kernel, certified.
+///
+/// `components` decides it: the first `components` eigenvalues are the kernel
+/// by index, with no threshold. LAPACK only has to agree. Those eigenvalues
+/// must sit within its error of zero, and the next must clear the gap every
+/// connected simple graph on at most `n` vertices has: λ₂ ≥ 1/(n·diam) ≥
+/// 1/(n(n−1)). If the error cannot resolve that gap, or LAPACK disagrees,
+/// the kernel is not certified and nothing is called settled.
+fn kernel(values: &[f64], components: usize, n: usize) -> Result<usize, Wall> {
+    let unseparated = Err(Wall::Unseparated { components });
+    if components > values.len() {
+        return unseparated;
+    }
+    let scale = values.iter().fold(1.0_f64, |m, l| m.max(l.abs()));
+    let error = 16.0 * f64::EPSILON * scale * n.max(1) as f64;
+    if values[..components].iter().any(|l| l.abs() > error) {
+        return unseparated;
+    }
+    if let Some(&slowest) = values.get(components) {
+        let gap = 1.0 / (n as f64 * (n as f64 - 1.0));
+        if error >= gap / 2.0 || slowest < gap - error {
+            return unseparated;
+        }
+    }
+    Ok(components)
 }
 
 /// A graph's Laplacian eigensystem: vertices in canonical order, eigenvalues
@@ -123,6 +184,8 @@ struct Eigen {
     vertices: Vec<VertexId>,
     values: Vec<f64>,
     vectors: Vec<f64>,
+    /// The first `harmonic` eigenvalues are the kernel, certified.
+    harmonic: usize,
 }
 
 impl Eigen {
@@ -134,14 +197,13 @@ impl Eigen {
         let laplacian = build_laplacian(graph, &index, n);
         let (values, vectors) =
             crate::ffi::eigensystem(n, &laplacian).map_err(Wall::Eigensystem)?;
-        Ok(Self { vertices, values, vectors })
+        let harmonic = kernel(&values, components(graph, &index), n)?;
+        Ok(Self { vertices, values, vectors, harmonic })
     }
 
-    /// Eigenvalues this close to zero are harmonic. Scaled to the spectrum,
-    /// not absolute.
-    fn is_harmonic(&self, eigenvalue: f64) -> bool {
-        let scale = self.values.iter().fold(1.0_f64, |m, &l| m.max(l.abs()));
-        eigenvalue.abs() <= 1e-9 * scale
+    /// Whether mode `k` is in the kernel. Decided by index, not by threshold.
+    fn is_harmonic(&self, k: usize) -> bool {
+        k < self.harmonic
     }
 
     fn vector(&self, k: usize) -> Vec<f64> {
@@ -180,7 +242,7 @@ pub fn settle(
     for (k, &eigenvalue) in eigen.values.iter().enumerate() {
         let v = eigen.vector(k);
         let was: f64 = v.iter().zip(&psi).map(|(a, b)| a * b).sum();
-        let harmonic = eigen.is_harmonic(eigenvalue);
+        let harmonic = eigen.is_harmonic(k);
         let now = if harmonic { was } else { was * (-eigenvalue * t.0).exp() };
         for (o, &vi) in out.iter_mut().zip(&v) {
             *o += now * vi;
@@ -208,7 +270,7 @@ pub fn settle(
 #[cfg(test)]
 fn harmonic_dimension(graph: &Graph) -> Option<usize> {
     let eigen = Eigen::of(graph).ok()?;
-    Some(eigen.values.iter().filter(|&&l| eigen.is_harmonic(l)).count())
+    Some(eigen.harmonic)
 }
 
 #[cfg(test)]
