@@ -586,6 +586,12 @@ pub mod pillar {
             self.bias = Some(*bias);
         }
 
+        /// The bytes the draws so far have consumed. Replaying them through
+        /// [`Sample::from_bytes`] reproduces those draws exactly.
+        pub fn consumed(&self) -> &[u8] {
+            &self.buffer[..self.position]
+        }
+
         /// Read next byte; extend buffer via SplitMix64 if exhausted.
         fn read_u8(&mut self) -> u8 {
             if self.position >= self.buffer.len() {
@@ -679,6 +685,73 @@ pub mod pillar {
             let bytes: [u8; 8] = sample.read_bytes(8).try_into().unwrap();
             u64::from_le_bytes(bytes)
         }
+    }
+
+    /// One run of a search: the content address of the bytes it consumed.
+    ///
+    /// Takes touch nothing, so distinct takes commute and a repeated take
+    /// depends on its earlier copy. Coverage built from them has no time.
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct Take {
+        address: crate::oid::Oid,
+        untouched: std::collections::BTreeSet<crate::oid::Oid>,
+    }
+
+    impl Take {
+        fn of(consumed: &[u8]) -> Self {
+            Self {
+                address: crate::oid::Oid::hash(consumed),
+                untouched: std::collections::BTreeSet::new(),
+            }
+        }
+    }
+
+    impl crate::oid::Addressable for Take {
+        fn oid(&self) -> crate::oid::Oid {
+            self.address.clone()
+        }
+    }
+
+    impl crate::time::Touches for Take {
+        fn reads(&self) -> &std::collections::BTreeSet<crate::oid::Oid> {
+            &self.untouched
+        }
+        fn writes(&self) -> &std::collections::BTreeSet<crate::oid::Oid> {
+            &self.untouched
+        }
+    }
+
+    /// What a search saw: every take, distinct ones in one chord.
+    pub type Coverage = crate::time::Progression<Take, crate::time::Polyphony>;
+
+    /// A failing run, kept: its consumed bytes replay to the failing value.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct Counterexample {
+        /// Replay with [`Sample::from_bytes`].
+        pub buffer: Vec<u8>,
+    }
+
+    /// Search a property over explicit seeds.
+    ///
+    /// Never `Success`: sampling cannot settle a universal claim. A clean
+    /// search is `Partial` with its coverage; the first failure is
+    /// `Failure` with its replayable buffer and the coverage up to it.
+    pub fn search<T: Arbitrary>(
+        seeds: impl IntoIterator<Item = Vec<u8>>,
+        mut holds: impl FnMut(&T) -> bool,
+    ) -> terni::Imperfect<(), Counterexample, Coverage> {
+        use terni::Loss;
+        let mut coverage = Coverage::zero();
+        for seed in seeds {
+            let mut sample = Sample::from_bytes(seed);
+            let value = T::arbitrary(&mut sample);
+            let consumed = sample.consumed().to_vec();
+            coverage.push(Take::of(&consumed));
+            if !holds(&value) {
+                return terni::Imperfect::Failure(Counterexample { buffer: consumed }, coverage);
+            }
+        }
+        terni::Imperfect::Partial((), coverage)
     }
 
     /// The property-based-testing runner.
