@@ -122,11 +122,24 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
         |s| s.0.graph().oid(),
     );
     match steered {
-        Imperfect::Partial(run, _) => assert!(
+        Imperfect::Partial(run, coverage) => {
+            eprintln!(
+                "blind best {blind:.4}; steered best {:.4} after {:?} runs, {:?}",
+                run.best_score.unwrap_or(f64::NAN),
+                coverage.len(),
+                run.stop
+            );
+            assert!(
             run.best_score.expect("scored") < blind,
             "steered {:?} did not beat blind {blind}",
             run.best_score
-        ),
+        );
+            // Pin, for this deterministic configuration: the steered search
+            // reaches Fiedler's extremum, the path on 7 vertices, whose
+            // quietest mode is sqrt(2 - 2cos(pi/7)) in closed form.
+            let path = (2.0 - 2.0 * (std::f64::consts::PI / 7.0).cos()).sqrt();
+            assert!((run.best_score.unwrap() - path).abs() < 1e-9, "did not reach the path");
+        }
         Imperfect::Failure(cx, _) => panic!("kernel != b0 + b1 on {:?}", cx.buffer),
         Imperfect::Success(_) => panic!("a search must never be Success"),
     }

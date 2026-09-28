@@ -699,8 +699,12 @@ pub mod pillar {
 
     impl Take {
         fn of(consumed: &[u8]) -> Self {
+            Self::at(crate::oid::Oid::hash(consumed))
+        }
+
+        fn at(address: crate::oid::Oid) -> Self {
             Self {
-                address: crate::oid::Oid::hash(consumed),
+                address,
                 untouched: std::collections::BTreeSet::new(),
             }
         }
@@ -752,6 +756,109 @@ pub mod pillar {
             }
         }
         terni::Imperfect::Partial((), coverage)
+    }
+
+    /// How many runs a search may make.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct Budget(pub usize);
+
+    /// How many runs in a row may bring nothing new before the search has
+    /// stopped moving.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct Patience(pub usize);
+
+    /// Why a clean search stopped.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub enum Stop {
+        /// Nothing new appeared for `Patience` runs: the recursion stopped moving.
+        Saturated,
+        /// The budget ran out while new values were still appearing.
+        Budget,
+    }
+
+    /// What a clean steered search found.
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Steered {
+        /// The replayable buffer of the lowest-scoring value seen.
+        pub best: Option<Vec<u8>>,
+        /// Its score under the steering measure.
+        pub best_score: Option<f64>,
+        /// Why the search stopped.
+        pub stop: Stop,
+    }
+
+    /// Distinct values seen so far: the size of the coverage's first chord.
+    fn distinct(coverage: &Coverage) -> usize {
+        coverage
+            .foata()
+            .and_then(|chords| chords.first())
+            .map_or(0, std::collections::BTreeSet::len)
+    }
+
+    /// Flip one bit of one byte; half the time the low bit, which
+    /// [`Sample::draw_bool`] reads.
+    fn mutate(buffer: &[u8], rng: &mut Sample) -> Vec<u8> {
+        let mut b = buffer.to_vec();
+        if b.is_empty() {
+            return vec![rng.draw_integer(0, 255) as u8];
+        }
+        let i = rng.draw_integer(0, b.len() as i64 - 1) as usize;
+        let bit = if rng.draw_bool() { 0 } else { rng.draw_integer(0, 7) };
+        b[i] ^= 1 << bit;
+        b
+    }
+
+    /// A search steered by a measure: run the seeds, then keep mutating the
+    /// lowest-scoring buffer seen, aiming at where the measure says the
+    /// property is hardest.
+    ///
+    /// Never `Success`. Stops with `Failure` at the first value that breaks
+    /// `holds` (buffer kept, replayable), or with `Partial` when `Patience`
+    /// runs in a row brought no new address (the recursion stopped moving)
+    /// or the `Budget` ran out. Deterministic: mutations come from a fixed
+    /// sample.
+    pub fn steer<T: Arbitrary>(
+        seeds: impl IntoIterator<Item = Vec<u8>>,
+        budget: Budget,
+        patience: Patience,
+        mut measure: impl FnMut(&T) -> f64,
+        mut holds: impl FnMut(&T) -> bool,
+        mut address: impl FnMut(&T) -> crate::oid::Oid,
+    ) -> terni::Imperfect<Steered, Counterexample, Coverage> {
+        use terni::Loss;
+        let mut seeds = seeds.into_iter();
+        let mut mutations = Sample::from_bytes(b"prismqueer::flux::steer".to_vec());
+        let mut coverage = Coverage::zero();
+        let mut best: Option<(Vec<u8>, f64)> = None;
+        let mut quiet = 0;
+        let clean = |best: Option<(Vec<u8>, f64)>, stop| {
+            let (best, best_score) = best.map_or((None, None), |(b, s)| (Some(b), Some(s)));
+            Steered { best, best_score, stop }
+        };
+        for _ in 0..budget.0 {
+            let buffer = match (seeds.next(), &best) {
+                (Some(seed), _) => seed,
+                (None, Some((b, _))) => mutate(b, &mut mutations),
+                (None, None) => break,
+            };
+            let mut sample = Sample::from_bytes(buffer);
+            let value = T::arbitrary(&mut sample);
+            let consumed = sample.consumed().to_vec();
+            let before = distinct(&coverage);
+            coverage.push(Take::at(address(&value)));
+            if !holds(&value) {
+                return terni::Imperfect::Failure(Counterexample { buffer: consumed }, coverage);
+            }
+            let score = measure(&value);
+            if best.as_ref().map_or(true, |(_, s)| score < *s) {
+                best = Some((consumed, score));
+            }
+            quiet = if distinct(&coverage) > before { 0 } else { quiet + 1 };
+            if quiet >= patience.0 {
+                return terni::Imperfect::Partial(clean(best, Stop::Saturated), coverage);
+            }
+        }
+        terni::Imperfect::Partial(clean(best, Stop::Budget), coverage)
     }
 
     /// The property-based-testing runner.
