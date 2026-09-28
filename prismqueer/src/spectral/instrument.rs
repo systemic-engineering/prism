@@ -1,5 +1,10 @@
 //! `prismqueer::spectral::instrument` — the Hodge–Dirac operator of a graph.
 //!
+//! Punk names (ratified 2026-09-28): the operator is the [`Instrument`] (its
+//! shape decides the sound); vertex values are pitches, edge values are
+//! intervals (δ of the pitches); H⁰ is the tonic, H¹ is the comma (a
+//! disagreement no tuning produces); e^{-tD²} is `decay`, e^{itD} is `ring`.
+//!
 //! H = C⁰ ⊕ C¹: values on vertices (assertions) and on oriented edges
 //! (questions). D = δ + δ*, self-adjoint and odd: it maps vertices to edges
 //! and back. D² = Δ₀ ⊕ Δ₁, and Δ₀ is the Laplacian `settle` flows under.
