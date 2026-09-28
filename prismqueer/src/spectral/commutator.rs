@@ -82,7 +82,7 @@ impl CommutatorSpectrum {
 
 /// Build the graph Laplacian of `sheaf` over the given vertex-index basis.
 /// Edges whose endpoints are outside the basis are skipped.
-fn build_laplacian(
+pub(crate) fn build_laplacian(
     sheaf: &Graph,
     vertex_index: &BTreeMap<VertexId, usize>,
     n: usize,

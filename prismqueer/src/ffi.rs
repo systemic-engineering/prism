@@ -237,11 +237,12 @@ pub fn eigenvalues(n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
 /// Compute eigenvalues and eigenvectors of a real symmetric `n×n` matrix.
 ///
 /// Returns `(eigenvalues, eigenvectors)`.  Eigenvalues are in ascending order.
-/// Eigenvectors are returned as a row-major flat `n×n` matrix where each
-/// **row** is an eigenvector corresponding to the same-index eigenvalue.
+/// Eigenvectors are returned as a row-major flat `n×n` matrix whose
+/// **columns** are the eigenvectors: `evecs[c * n + k]` is component `c` of
+/// eigenvector `k` (same index as eigenvalue `k`).
 ///
-/// Note: LAPACK stores eigenvectors as **columns**; the wrapper converts back
-/// to row-major so `evecs[i * n .. i * n + n]` is eigenvector `i`.
+/// Note: an earlier version of this comment claimed rows were eigenvectors.
+/// They are not; `fate::derive` and `spectral::settle` read columns.
 ///
 /// Returns `Ok((vec![], vec![]))` when `n == 0`.
 /// Returns `Err(info)` if LAPACK convergence fails (info != 0).
@@ -269,7 +270,7 @@ pub fn eigensystem(n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32
     }
 
     // LAPACK stores eigenvectors as columns of evecs_cm (col-major n×n).
-    // col_to_row_major converts so that row i holds eigenvector i.
+    // col_to_row_major keeps them as columns of a row-major matrix.
     let evecs = col_to_row_major(&evecs_cm, n, n);
     Ok((evals, evecs))
 }

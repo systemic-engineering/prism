@@ -27,6 +27,7 @@
 pub mod commutator;
 pub mod kleinos;
 pub mod rotation;
+pub mod settle;
 pub mod spectrum;
 pub mod tension;
 
