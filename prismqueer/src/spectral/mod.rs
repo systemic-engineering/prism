@@ -46,7 +46,7 @@ pub use kleinos::{
     EdgeKey,
 };
 
-pub use commutator::CommutatorSpectrum;
+pub use commutator::{CommutatorSpectrum, Unmeasured};
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
 pub use spectrum::{DeltaCritical, Focus, Lift, Project, Refract, Spectrum, Split};
 pub use tension::{detect_tensions, Tension, TensionKind};

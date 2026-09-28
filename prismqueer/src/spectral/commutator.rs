@@ -36,6 +36,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use terni::Imperfect;
+
 use crate::spectral::kleinos::{Graph, VertexId};
 
 /// Singular-value spectrum of the sheaf-Laplacian commutator `[L_A, L_B]`.
@@ -50,13 +52,19 @@ impl CommutatorSpectrum {
     /// Read the singular-value spectrum of `[L_A, L_B]` over the union of
     /// A and B vertex sets.
     ///
-    /// Filters numerical zeros (`σ ≤ 1e-12`) from the returned spectrum;
-    /// empty spectrum witnesses commutative composition.
-    pub fn of(a: &Graph, b: &Graph) -> Self {
+    /// Thresholds are relative to the operators' scale (product of Frobenius
+    /// norms). Numerical zeros are dropped; an empty spectrum in `Success`
+    /// witnesses commutative composition.
+    ///
+    /// Fails closed: if LAPACK cannot measure, the answer is
+    /// `Failure(Unmeasured)`, never an empty spectrum (which would read as
+    /// "commutes"). Singular values between numerical zero and clearly
+    /// nonzero are returned as `Partial`: not dropped, not guessed.
+    pub fn of(a: &Graph, b: &Graph) -> Imperfect<Self, Unmeasured, Vec<f64>> {
         let vertices: BTreeSet<VertexId> = a.vertices().chain(b.vertices()).collect();
         let n = vertices.len();
         if n < 2 {
-            return Self { spectrum: Vec::new() };
+            return Imperfect::Success(Self { spectrum: Vec::new() });
         }
         let vertex_index: BTreeMap<VertexId, usize> = vertices
             .into_iter()
@@ -71,12 +79,45 @@ impl CommutatorSpectrum {
         let ba = matmul(&l_b, &l_a, n);
         let commutator: Vec<f64> = ab.iter().zip(ba.iter()).map(|(x, y)| x - y).collect();
 
-        let spectrum = match crate::ffi::singular_values(n, n, &commutator) {
-            Ok(svs) => svs.into_iter().filter(|&s| s > 1e-12).collect(),
-            _ => Vec::new(),
-        };
+        let frobenius = |m: &[f64]| m.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let scale = frobenius(&l_a) * frobenius(&l_b);
+        read(crate::ffi::singular_values(n, n, &commutator), scale)
+    }
+}
 
-        Self { spectrum }
+/// LAPACK could not compute the singular values (`info` code).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Unmeasured(pub i32);
+
+/// Below this fraction of the scale, a singular value is numerical zero.
+const NUMERICAL_ZERO: f64 = 1e-12;
+
+/// At or above this fraction of the scale, a singular value is clearly nonzero.
+/// Between the two thresholds the instrument does not know yet.
+const CLEARLY_NONZERO: f64 = 1e-6;
+
+/// Classify a singular-value measurement against the operators' scale
+/// (product of their Frobenius norms, floored at 1).
+fn read(measured: Result<Vec<f64>, i32>, scale: f64) -> Imperfect<CommutatorSpectrum, Unmeasured, Vec<f64>> {
+    let svs = match measured {
+        Ok(svs) => svs,
+        Err(info) => return Imperfect::Failure(Unmeasured(info), Vec::new()),
+    };
+    let scale = scale.max(1.0);
+    let mut spectrum = Vec::new();
+    let mut ambiguous = Vec::new();
+    for s in svs {
+        if s >= CLEARLY_NONZERO * scale {
+            spectrum.push(s);
+        } else if s > NUMERICAL_ZERO * scale {
+            ambiguous.push(s);
+        }
+    }
+    let cs = CommutatorSpectrum { spectrum };
+    if ambiguous.is_empty() {
+        Imperfect::Success(cs)
+    } else {
+        Imperfect::Partial(cs, ambiguous)
     }
 }
 
@@ -124,10 +165,48 @@ mod tests {
 
     /// `[L_A, L_A] = L_A L_A - L_A L_A = 0`. Self-commutator vanishes.
     /// Substrate-reading: composition of A with itself is trivially commutative.
+    fn measured(a: &Graph, b: &Graph) -> CommutatorSpectrum {
+        match CommutatorSpectrum::of(a, b) {
+            terni::Imperfect::Success(cs) => cs,
+            other => panic!("expected a clean measurement, got {other:?}"),
+        }
+    }
+
+    // --- Fail closed, scale-relative, honest about the ambiguous band ---
+
+    #[test]
+    fn lapack_failure_is_unmeasured_not_commuting() {
+        match read(Err(7), 1.0) {
+            terni::Imperfect::Failure(Unmeasured(7), _) => {}
+            other => panic!("expected Failure(Unmeasured(7)), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn numerical_zero_is_dropped_relative_to_scale() {
+        // 1e-10 is noise next to a scale of 1e3 (threshold 1e-9), so it is zero.
+        match read(Ok(vec![1e-10]), 1e3) {
+            terni::Imperfect::Success(cs) => assert!(cs.spectrum.is_empty()),
+            other => panic!("expected Success(empty), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ambiguous_singular_values_say_dont_know_yet() {
+        // Above numerical zero, below clearly nonzero: carried, not dropped.
+        match read(Ok(vec![1e-8, 2.0]), 1.0) {
+            terni::Imperfect::Partial(cs, ambiguous) => {
+                assert_eq!(cs.spectrum, vec![2.0]);
+                assert_eq!(ambiguous, vec![1e-8]);
+            }
+            other => panic!("expected Partial, got {other:?}"),
+        }
+    }
+
     #[test]
     fn commutator_of_sheaf_with_itself_is_zero() {
         let k3 = graph_complete_of_order(3);
-        let cs = CommutatorSpectrum::of(&k3, &k3);
+        let cs = measured(&k3, &k3);
         assert!(
             cs.spectrum.is_empty(),
             "self-commutator must be zero; got {:?}",
@@ -145,7 +224,7 @@ mod tests {
     fn commutator_of_disjoint_edges_is_nonzero() {
         let ab = graph_from_edges(&[(0, 1)]);
         let bc = graph_from_edges(&[(1, 2)]);
-        let cs = CommutatorSpectrum::of(&ab, &bc);
+        let cs = measured(&ab, &bc);
         assert!(
             !cs.spectrum.is_empty(),
             "disjoint-edge commutator must be non-zero (shared vertex 1); got empty"
@@ -162,7 +241,7 @@ mod tests {
     #[test]
     fn commutator_of_empty_sheaves_is_empty() {
         let empty = graph_from_edges(&[]);
-        let cs = CommutatorSpectrum::of(&empty, &empty);
+        let cs = measured(&empty, &empty);
         assert!(cs.spectrum.is_empty());
     }
 
@@ -174,7 +253,7 @@ mod tests {
     fn commutator_of_disjoint_vertex_sets_is_zero() {
         let ab = graph_from_edges(&[(0, 1)]);
         let cd = graph_from_edges(&[(2, 3)]);
-        let cs = CommutatorSpectrum::of(&ab, &cd);
+        let cs = measured(&ab, &cd);
         assert!(
             cs.spectrum.is_empty(),
             "disjoint-vertex-set commutator must be zero; got {:?}",
