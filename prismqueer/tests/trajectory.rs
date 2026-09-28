@@ -99,8 +99,8 @@ fn swapping_independent_steps_is_the_same_trajectory() {
 
     assert!(ab == ba, "independent swap changed the trace");
     assert!(same(&ab.oid(), &ba.oid()), "independent swap changed the address");
-    assert_eq!(ab.len(), 4, "sequential time counts every step");
-    assert_eq!(ab.height(), 3, "parallel time: u, then a and b together, then v");
+    assert_eq!(ab.len(), Some(4), "sequential time counts every step");
+    assert_eq!(ab.height(), Some(3), "parallel time: u, then a and b together, then v");
 }
 
 #[test]
@@ -126,8 +126,8 @@ fn the_same_word_under_linear_time_is_a_different_trajectory() {
     let nonlinear: Progression<Step, Polyphony> = Progression::from_word([a.clone(), b.clone()]);
     let linear: Progression<Step, Monophony> = Progression::from_word([a, b]);
 
-    assert_eq!(nonlinear.height(), 1, "independent steps share one Foata step");
-    assert_eq!(linear.height(), 2, "under Monophony every step is its own");
+    assert_eq!(nonlinear.height(), Some(1), "independent steps share one Foata step");
+    assert_eq!(linear.height(), Some(2), "under Monophony every step is its own");
     assert!(
         !same(&nonlinear.oid(), &linear.oid()),
         "{{a,b}} and {{a}}{{b}} must not share an address"

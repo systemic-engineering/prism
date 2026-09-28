@@ -14,6 +14,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt::Debug;
 
 use prismqueer::spectral::settle::{Mode, Tail};
+use prismqueer::time::{Monophony, Progression};
 use prismqueer::ScalarLoss;
 use terni::{
     ApertureLoss, ConvergenceLoss, Diagnostic, Loss, PropertyVerdict, RoutingLoss, Transparency,
@@ -93,6 +94,13 @@ fn all_violations() -> Vec<String> {
     v.extend(audit(
         "ScalarLoss",
         &[ScalarLoss::new(0.0), ScalarLoss::new(0.1), ScalarLoss::new(0.2), ScalarLoss::new(0.3)],
+    ));
+    // The free monoid (a Vec) with one adjoined absorbing element. The
+    // collection carriers above fail absorption; this one must not.
+    type Line = Progression<u8, Monophony>;
+    v.extend(audit(
+        "Progression<u8, Monophony>",
+        &[Line::zero(), Line::from_word([1u8]), Line::from_word([2u8, 1]), Line::total()],
     ));
     v.extend(audit(
         "Tail",
