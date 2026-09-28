@@ -14,12 +14,12 @@ use crate::oid::{Addressable, Oid};
 /// trace equivalence.
 ///
 /// The relation is a type parameter: one pipeline, one relation.
-pub struct Trace<E: Ord, I> {
+pub struct Progression<E: Ord, I> {
     steps: Vec<BTreeSet<E>>,
     rel: PhantomData<I>,
 }
 
-impl<E: Ord, I: Independence<E>> Trace<E, I> {
+impl<E: Ord, I: Independence<E>> Progression<E, I> {
     /// The trace of a word: push each event in order.
     pub fn from_word(word: impl IntoIterator<Item = E>) -> Self {
         let mut trace = Self::default();
@@ -54,7 +54,7 @@ impl<E: Ord, I: Independence<E>> Trace<E, I> {
         self.steps.len()
     }
 
-    /// Sequential time: the number of events.
+    /// Monophony time: the number of events.
     pub fn len(&self) -> usize {
         self.steps.iter().map(BTreeSet::len).sum()
     }
@@ -65,7 +65,7 @@ impl<E: Ord, I: Independence<E>> Trace<E, I> {
     }
 }
 
-impl<E: Ord, I> Default for Trace<E, I> {
+impl<E: Ord, I> Default for Progression<E, I> {
     fn default() -> Self {
         Self {
             steps: Vec::new(),
@@ -74,7 +74,7 @@ impl<E: Ord, I> Default for Trace<E, I> {
     }
 }
 
-impl<E: Ord + Clone, I> Clone for Trace<E, I> {
+impl<E: Ord + Clone, I> Clone for Progression<E, I> {
     fn clone(&self) -> Self {
         Self {
             steps: self.steps.clone(),
@@ -83,18 +83,18 @@ impl<E: Ord + Clone, I> Clone for Trace<E, I> {
     }
 }
 
-impl<E: Ord, I> PartialEq for Trace<E, I> {
+impl<E: Ord, I> PartialEq for Progression<E, I> {
     fn eq(&self, other: &Self) -> bool {
         self.steps == other.steps
     }
 }
 
-impl<E: Ord, I> Eq for Trace<E, I> {}
+impl<E: Ord, I> Eq for Progression<E, I> {}
 
 /// The address hashes the relation and every step boundary: `{a, b}` and
 /// `{a}{b}` never share an address, and neither does one word under two
 /// relations.
-impl<E: Ord + Addressable, I: Independence<E>> Addressable for Trace<E, I> {
+impl<E: Ord + Addressable, I: Independence<E>> Addressable for Progression<E, I> {
     fn oid(&self) -> Oid {
         let mut bytes = I::default().oid().as_str().as_bytes().to_vec();
         for step in &self.steps {

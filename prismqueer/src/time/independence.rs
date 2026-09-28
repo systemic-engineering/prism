@@ -29,9 +29,9 @@ pub trait Touches {
 /// Declared, not measured: sound exactly as far as the footprints are honest.
 /// Hidden shared state (global counters, clocks, RNGs) makes it unsound.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Footprint;
+pub struct Polyphony;
 
-impl<E: Touches + PartialEq> Independence<E> for Footprint {
+impl<E: Touches + PartialEq> Independence<E> for Polyphony {
     fn independent(&self, a: &E, b: &E) -> bool {
         let conflicts = |x: &E, y: &E| {
             x.writes()
@@ -42,20 +42,20 @@ impl<E: Touches + PartialEq> Independence<E> for Footprint {
     }
 
     fn oid(&self) -> Oid {
-        Oid::hash(b"prismqueer::time::Footprint")
+        Oid::hash(b"prismqueer::time::Polyphony")
     }
 }
 
 /// Nothing commutes. Linear time: every trace is a word.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Sequential;
+pub struct Monophony;
 
-impl<E> Independence<E> for Sequential {
+impl<E> Independence<E> for Monophony {
     fn independent(&self, _: &E, _: &E) -> bool {
         false
     }
 
     fn oid(&self) -> Oid {
-        Oid::hash(b"prismqueer::time::Sequential")
+        Oid::hash(b"prismqueer::time::Monophony")
     }
 }

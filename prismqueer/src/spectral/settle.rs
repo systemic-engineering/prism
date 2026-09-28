@@ -8,8 +8,8 @@
 //! The answer is ternary and honest about what it does not know yet:
 //!
 //! - `Success`: nothing moving, nothing lost. The section was already harmonic.
-//! - `Partial`: here is the section now. [`Motion`] says what is still moving
-//!   (ahead) and what faded below the observer's [`Resolution`] (behind).
+//! - `Partial`: here is the section now. [`Tail`] says what is still moving
+//!   (ahead) and what faded below the observer's [`Noise`] (behind).
 //!   Settled iff nothing is still moving.
 //! - `Failure`: the instrument could not measure. Fails closed: an
 //!   unmeasured answer is never reported as settled.
@@ -25,9 +25,9 @@ use crate::spectral::kleinos::{Graph, VertexId};
 
 /// A value per vertex. Keyed by vertex, not by position.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Section(BTreeMap<VertexId, f64>);
+pub struct Pitches(BTreeMap<VertexId, f64>);
 
-impl Section {
+impl Pitches {
     /// Build a section from `(vertex, value)` pairs.
     pub fn new(values: impl IntoIterator<Item = (VertexId, f64)>) -> Self {
         Self(values.into_iter().collect())
@@ -45,7 +45,7 @@ pub struct Time(pub f64);
 
 /// The observer's resolution: amplitudes below it count as not visible.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct Resolution(pub f64);
+pub struct Noise(pub f64);
 
 /// One eigenmode of the flow: its eigenvalue, and its amplitude before and
 /// after flowing.
@@ -64,7 +64,7 @@ pub struct Mode {
 /// The loss carried by `Partial`. Both halves are kept; neither is averaged
 /// into the other.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Motion {
+pub struct Tail {
     /// Ahead: modes still visible at the observer's resolution.
     pub moving: Vec<Mode>,
     /// Behind: modes that were visible and faded below the resolution.
@@ -73,14 +73,14 @@ pub struct Motion {
     pub opaque: bool,
 }
 
-impl Motion {
+impl Tail {
     /// Whether the recursion has stopped moving at this resolution.
     pub fn settled(&self) -> bool {
         !self.opaque && self.moving.is_empty()
     }
 }
 
-impl Loss for Motion {
+impl Loss for Tail {
     fn zero() -> Self {
         Self::default()
     }
@@ -216,29 +216,29 @@ impl Eigen {
 /// what settled, what is still moving, and what faded getting here.
 pub fn settle(
     graph: &Graph,
-    section: &Section,
+    section: &Pitches,
     t: Time,
-    eps: Resolution,
-) -> Imperfect<Section, Wall, Motion> {
+    eps: Noise,
+) -> Imperfect<Pitches, Wall, Tail> {
     if !t.0.is_finite() || t.0 < 0.0 || !eps.0.is_finite() || eps.0 <= 0.0 {
-        return Imperfect::Failure(Wall::NonFinite, Motion::total());
+        return Imperfect::Failure(Wall::NonFinite, Tail::total());
     }
     let eigen = match Eigen::of(graph) {
         Ok(e) => e,
-        Err(wall) => return Imperfect::Failure(wall, Motion::total()),
+        Err(wall) => return Imperfect::Failure(wall, Tail::total()),
     };
     let mut psi = Vec::with_capacity(eigen.vertices.len());
     for &v in &eigen.vertices {
         match section.get(v) {
             Some(x) if x.is_finite() => psi.push(x),
-            Some(_) => return Imperfect::Failure(Wall::NonFinite, Motion::total()),
-            None => return Imperfect::Failure(Wall::Missing(v), Motion::total()),
+            Some(_) => return Imperfect::Failure(Wall::NonFinite, Tail::total()),
+            None => return Imperfect::Failure(Wall::Missing(v), Tail::total()),
         }
     }
 
     let n = psi.len();
     let mut out = vec![0.0_f64; n];
-    let mut motion = Motion::zero();
+    let mut motion = Tail::zero();
     for (k, &eigenvalue) in eigen.values.iter().enumerate() {
         let v = eigen.vector(k);
         let was: f64 = v.iter().zip(&psi).map(|(a, b)| a * b).sum();
@@ -258,7 +258,7 @@ pub fn settle(
         }
     }
 
-    let now = Section::new(eigen.vertices.iter().copied().zip(out));
+    let now = Pitches::new(eigen.vertices.iter().copied().zip(out));
     if motion.is_zero() {
         Imperfect::Success(now)
     } else {
@@ -279,13 +279,13 @@ mod tests {
     use crate::spectral::kleinos::graph_from_edges;
     use crate::spectral::tension::{detect_tensions, TensionKind};
 
-    const EPS: Resolution = Resolution(1e-6);
+    const EPS: Noise = Noise(1e-6);
 
-    fn section(values: &[f64]) -> Section {
-        Section::new(values.iter().enumerate().map(|(i, &x)| (i as VertexId, x)))
+    fn section(values: &[f64]) -> Pitches {
+        Pitches::new(values.iter().enumerate().map(|(i, &x)| (i as VertexId, x)))
     }
 
-    fn values(s: &Section, n: usize) -> Vec<f64> {
+    fn values(s: &Pitches, n: usize) -> Vec<f64> {
         (0..n).map(|i| s.get(i as VertexId).expect("vertex present")).collect()
     }
 
@@ -293,7 +293,7 @@ mod tests {
         a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-9)
     }
 
-    fn flow(graph: &Graph, s: &Section, t: f64) -> Section {
+    fn flow(graph: &Graph, s: &Pitches, t: f64) -> Pitches {
         settle(graph, s, Time(t), EPS).ok().expect("flow measured")
     }
 
@@ -423,14 +423,14 @@ mod tests {
 
     #[test]
     fn motion_is_a_lawful_loss() {
-        let a = Motion {
+        let a = Tail {
             moving: vec![Mode { eigenvalue: 1.0, was: 1.0, now: 0.5 }],
-            ..Motion::zero()
+            ..Tail::zero()
         };
-        assert_eq!(Motion::zero().combine(a.clone()), a);
-        assert_eq!(a.clone().combine(Motion::zero()), a);
-        assert_eq!(Motion::total().combine(a.clone()), Motion::total());
-        assert_eq!(a.combine(Motion::total()), Motion::total());
+        assert_eq!(Tail::zero().combine(a.clone()), a);
+        assert_eq!(a.clone().combine(Tail::zero()), a);
+        assert_eq!(Tail::total().combine(a.clone()), Tail::total());
+        assert_eq!(a.combine(Tail::total()), Tail::total());
     }
 
     // --- Standing question: the smallest nonlinear falsification in linear tests ---
@@ -484,7 +484,7 @@ mod tests {
 mod rewiring_property {
     use super::*;
     use crate::flux::pillar::{Arbitrary, Sample};
-    use crate::spectral::commutator::CommutatorSpectrum;
+    use crate::spectral::commutator::Dissonance;
     use crate::spectral::kleinos::graph_from_edges;
 
     const S: f64 = 0.5;
@@ -531,12 +531,12 @@ mod rewiring_property {
         Rewiring::arbitrary(&mut Sample::from_bytes(seed.to_le_bytes().to_vec()))
     }
 
-    fn flow(g: &Graph, s: &Section) -> Section {
-        settle(g, s, Time(S), Resolution(1e-6)).ok().expect("flow measured")
+    fn flow(g: &Graph, s: &Pitches) -> Pitches {
+        settle(g, s, Time(S), Noise(1e-6)).ok().expect("flow measured")
     }
 
-    fn basis(n: usize, i: usize) -> Section {
-        Section::new((0..n).map(|v| (v as VertexId, if v == i { 1.0 } else { 0.0 })))
+    fn basis(n: usize, i: usize) -> Pitches {
+        Pitches::new((0..n).map(|v| (v as VertexId, if v == i { 1.0 } else { 0.0 })))
     }
 
     /// Operator equality, checked on every basis section.
@@ -556,7 +556,7 @@ mod rewiring_property {
         let (mut commuting, mut not, mut nontrivial) = (0, 0, 0);
         for seed in 0..budget as u64 {
             let r = seeded(seed);
-            let by_graph = match CommutatorSpectrum::of(&r.before, &r.after) {
+            let by_graph = match Dissonance::of(&r.before, &r.after) {
                 Imperfect::Success(cs) => cs.spectrum.is_empty(),
                 other => {
                     return Imperfect::Failure(format!("seed {seed}: instrument undecided: {other:?}"), budget)

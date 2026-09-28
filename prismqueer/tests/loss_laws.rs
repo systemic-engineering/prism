@@ -13,7 +13,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::Debug;
 
-use prismqueer::spectral::settle::{Mode, Motion};
+use prismqueer::spectral::settle::{Mode, Tail};
 use prismqueer::ScalarLoss;
 use terni::{
     ApertureLoss, ConvergenceLoss, Diagnostic, Loss, PropertyVerdict, RoutingLoss, Transparency,
@@ -95,11 +95,11 @@ fn all_violations() -> Vec<String> {
         &[ScalarLoss::new(0.0), ScalarLoss::new(0.1), ScalarLoss::new(0.2), ScalarLoss::new(0.3)],
     ));
     v.extend(audit(
-        "Motion",
+        "Tail",
         &[
-            Motion::zero(),
-            Motion { moving: vec![mode(1.0)], ..Motion::zero() },
-            Motion { faded: vec![mode(3.0)], ..Motion::zero() },
+            Tail::zero(),
+            Tail { moving: vec![mode(1.0)], ..Tail::zero() },
+            Tail { faded: vec![mode(3.0)], ..Tail::zero() },
         ],
     ));
     v
@@ -119,7 +119,7 @@ fn kinds(violations: &[String]) -> BTreeSet<String> {
 /// - Collections (`Vec`, `String`, `HashSet`, `BTreeSet`, and tuples that
 ///   contain them): `total()` equals `zero()` (empty), so it cannot absorb.
 ///   Structural, not a slip: a free monoid has no absorbing element. Options:
-///   adjoin an absorbing element (as `Motion::opaque` and `Transparency`'s
+///   adjoin an absorbing element (as `Tail::opaque` and `Transparency`'s
 ///   catastrophic sentinel do), or weaken the trait's third law.
 /// - `ApertureLoss`: `total()` does not absorb.
 /// - `f64`, `ScalarLoss`: not associative at floating-point round-off

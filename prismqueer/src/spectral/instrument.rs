@@ -1,4 +1,4 @@
-//! `prismqueer::spectral::dirac` — the Hodge–Dirac operator of a graph.
+//! `prismqueer::spectral::instrument` — the Hodge–Dirac operator of a graph.
 //!
 //! H = C⁰ ⊕ C¹: values on vertices (assertions) and on oriented edges
 //! (questions). D = δ + δ*, self-adjoint and odd: it maps vertices to edges
@@ -68,12 +68,12 @@ impl Cochain {
     }
 
     /// The value on a vertex, if present.
-    pub fn vertex(&self, v: VertexId) -> Option<f64> {
+    pub fn pitch(&self, v: VertexId) -> Option<f64> {
         self.vertex.get(&v).copied()
     }
 
     /// The value on an oriented edge, if present.
-    pub fn edge(&self, e: EdgeKey) -> Option<f64> {
+    pub fn interval(&self, e: EdgeKey) -> Option<f64> {
         let (key, sign) = oriented(e);
         self.edge.get(&key).map(|x| sign * x)
     }
@@ -118,7 +118,7 @@ pub struct Rotated {
 const ZERO: f64 = 1e-9;
 
 /// The Hodge–Dirac operator of a graph, with its eigensystem.
-pub struct Dirac {
+pub struct Instrument {
     vertices: BTreeMap<VertexId, usize>,
     edges: BTreeMap<EdgeKey, usize>,
     matrix: Vec<f64>,
@@ -128,7 +128,7 @@ pub struct Dirac {
     vectors: Vec<f64>,
 }
 
-impl Dirac {
+impl Instrument {
     /// Build D = δ + δ* for `graph` and measure its eigensystem.
     ///
     /// Fails closed: if LAPACK cannot measure, there is no operator.
@@ -193,13 +193,13 @@ impl Dirac {
     }
 
     /// e^{-tD²} x: settles onto ker D and keeps all of it.
-    pub fn heat(&self, t: Time, x: &Cochain) -> Result<Cochain, Outside> {
+    pub fn decay(&self, t: Time, x: &Cochain) -> Result<Cochain, Outside> {
         let x = self.dense(x)?;
         Ok(self.sparse(&self.apply(&x, |l| (-t.0 * l * l).exp())))
     }
 
     /// e^{i·angle·D} x: isometric, never settles.
-    pub fn rotate(&self, angle: Angle, x: &Cochain) -> Result<Rotated, Outside> {
+    pub fn ring(&self, angle: Angle, x: &Cochain) -> Result<Rotated, Outside> {
         let x = self.dense(x)?;
         Ok(Rotated {
             real: self.sparse(&self.apply(&x, |l| (angle.0 * l).cos())),

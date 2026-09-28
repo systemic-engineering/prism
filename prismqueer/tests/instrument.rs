@@ -15,13 +15,13 @@
 
 use std::collections::BTreeMap;
 
-use prismqueer::spectral::dirac::{Angle, Cochain, Dirac};
+use prismqueer::spectral::instrument::{Angle, Cochain, Instrument};
 use prismqueer::spectral::settle::Time;
 use prismqueer::spectral::{graph_from_edges, Graph};
 
-fn dirac(edges: &[(u64, u64)]) -> (Graph, Dirac) {
+fn instrument(edges: &[(u64, u64)]) -> (Graph, Instrument) {
     let g = graph_from_edges(edges);
-    let d = Dirac::of(&g).expect("LAPACK must measure a small integer graph");
+    let d = Instrument::of(&g).expect("LAPACK must measure a small integer graph");
     (g, d)
 }
 
@@ -48,7 +48,7 @@ fn close(a: f64, b: f64) -> bool {
 
 #[test]
 fn dirac_is_self_adjoint_and_odd() {
-    let (g, d) = dirac(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
+    let (g, d) = instrument(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
     let (n0, n1) = (g.vertex_count(), g.edges().count());
     let n = n0 + n1;
     let m = d.matrix();
@@ -74,7 +74,7 @@ fn kernel_counts_components_and_cycles() {
         &[(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (2, 4)], // bowtie: 1, 2
     ];
     for edges in cases {
-        let (g, d) = dirac(edges);
+        let (g, d) = instrument(edges);
         let b0 = components(&g);
         let b1 = g.edges().count() + b0 - g.vertex_count();
         assert_eq!(d.kernel_dimension(), b0 + b1, "dim ker D != b0 + b1 for {edges:?}");
@@ -84,7 +84,7 @@ fn kernel_counts_components_and_cycles() {
 #[test]
 fn vertex_and_edge_laplacians_share_their_nonzero_spectrum() {
     let edges = [(0, 1), (1, 2), (0, 2), (2, 3), (3, 4)];
-    let (g, d) = dirac(&edges);
+    let (g, d) = instrument(&edges);
 
     // Spectrum of D is symmetric: D is odd.
     let mut values: Vec<f64> = d.eigenvalues().to_vec();
@@ -119,7 +119,7 @@ fn vertex_and_edge_laplacians_share_their_nonzero_spectrum() {
 
 #[test]
 fn a_settled_assertion_asks_nothing() {
-    let (_, d) = dirac(&[(0, 1), (1, 2), (0, 2)]);
+    let (_, d) = instrument(&[(0, 1), (1, 2), (0, 2)]);
 
     let settled = Cochain::new([(0, 2.0), (1, 2.0), (2, 2.0)], []);
     let q = d.question(&settled).expect("on the complex");
@@ -127,54 +127,54 @@ fn a_settled_assertion_asks_nothing() {
 
     let unsettled = Cochain::new([(0, 0.0), (1, 1.0), (2, 3.0)], []);
     let q = d.question(&unsettled).expect("on the complex");
-    assert!(close(q.edge((0, 1)).unwrap(), 1.0), "δs on (0,1) is s(1) - s(0)");
-    assert!(close(q.edge((1, 2)).unwrap(), 2.0));
-    assert!(close(q.edge((0, 2)).unwrap(), 3.0));
+    assert!(close(q.interval((0, 1)).unwrap(), 1.0), "δs on (0,1) is s(1) - s(0)");
+    assert!(close(q.interval((1, 2)).unwrap(), 2.0));
+    assert!(close(q.interval((0, 2)).unwrap(), 3.0));
     for v in 0..3 {
-        assert!(close(q.vertex(v).unwrap_or(0.0), 0.0), "an assertion's question lives on edges only");
+        assert!(close(q.pitch(v).unwrap_or(0.0), 0.0), "an assertion's question lives on edges only");
     }
 }
 
 #[test]
-fn heat_on_the_full_complex_keeps_the_unanswerable_question() {
+fn decay_keeps_the_comma() {
     // Four-cycle. The circulation around it is a harmonic 1-cochain: a
     // disagreement that is not the question of any assertion.
-    let (_, d) = dirac(&[(0, 1), (1, 2), (2, 3), (0, 3)]);
+    let (_, d) = instrument(&[(0, 1), (1, 2), (2, 3), (0, 3)]);
     let circulation = [((0, 1), 1.0), ((1, 2), 1.0), ((2, 3), 1.0), ((0, 3), -1.0)];
 
     let x = Cochain::new([(0, 4.0), (1, 0.0), (2, 0.0), (3, 0.0)], circulation);
-    let settled = d.heat(Time(60.0), &x).expect("on the complex");
+    let settled = d.decay(Time(60.0), &x).expect("on the complex");
     for v in 0..4 {
-        assert!(close(settled.vertex(v).unwrap(), 1.0), "vertex part must settle to the mean");
+        assert!(close(settled.pitch(v).unwrap(), 1.0), "vertex part must settle to the mean");
     }
     for (e, h) in circulation {
-        assert!(close(settled.edge(e).unwrap(), h), "the circulation must survive untouched");
+        assert!(close(settled.interval(e).unwrap(), h), "the circulation must survive untouched");
     }
 
     // Control: a disagreement on one edge only is partly answerable. It
     // settles to its projection onto the circulation, <e, h>/<h, h> = 1/4.
     let one_edge = Cochain::new([], [((0, 1), 1.0)]);
-    let settled = d.heat(Time(60.0), &one_edge).expect("on the complex");
+    let settled = d.decay(Time(60.0), &one_edge).expect("on the complex");
     for (e, h) in circulation {
-        assert!(close(settled.edge(e).unwrap(), h / 4.0), "edge {e:?} did not settle to h/4");
+        assert!(close(settled.interval(e).unwrap(), h / 4.0), "edge {e:?} did not settle to h/4");
     }
 }
 
 #[test]
-fn heat_and_rotation_commute_and_rotation_never_settles() {
-    let (_, d) = dirac(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
+fn decay_and_ring_commute_and_ring_never_settles() {
+    let (_, d) = instrument(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
     let x = Cochain::new([(0, 1.0), (1, -2.0), (2, 0.5), (3, 3.0)], [((1, 2), 0.7)]);
 
-    let rotated = d.rotate(Angle(0.9), &x).expect("on the complex");
+    let rotated = d.ring(Angle(0.9), &x).expect("on the complex");
     let energy = rotated.real.norm().powi(2) + rotated.imag.norm().powi(2);
     assert!(close(energy, x.norm().powi(2)), "rotation must be isometric");
 
-    let heated = d.heat(Time(0.3), &x).expect("on the complex");
+    let heated = d.decay(Time(0.3), &x).expect("on the complex");
     assert!(heated.norm() < x.norm(), "heat must lose energy off the kernel");
 
-    let heat_then_rotate = d.rotate(Angle(0.9), &heated).expect("on the complex");
-    let rotate_then_heat_re = d.heat(Time(0.3), &rotated.real).expect("on the complex");
-    let rotate_then_heat_im = d.heat(Time(0.3), &rotated.imag).expect("on the complex");
+    let heat_then_rotate = d.ring(Angle(0.9), &heated).expect("on the complex");
+    let rotate_then_heat_re = d.decay(Time(0.3), &rotated.real).expect("on the complex");
+    let rotate_then_heat_im = d.decay(Time(0.3), &rotated.imag).expect("on the complex");
     assert!(
         heat_then_rotate.real.distance(&rotate_then_heat_re) < 1e-9
             && heat_then_rotate.imag.distance(&rotate_then_heat_im) < 1e-9,
@@ -184,7 +184,7 @@ fn heat_and_rotation_commute_and_rotation_never_settles() {
 
 #[test]
 fn a_cochain_off_the_complex_fails_closed() {
-    let (_, d) = dirac(&[(0, 1), (1, 2)]);
-    assert!(d.heat(Time(1.0), &Cochain::new([(9, 1.0)], [])).is_err(), "unknown vertex");
+    let (_, d) = instrument(&[(0, 1), (1, 2)]);
+    assert!(d.decay(Time(1.0), &Cochain::new([(9, 1.0)], [])).is_err(), "unknown vertex");
     assert!(d.question(&Cochain::new([], [((0, 2), 1.0)])).is_err(), "unknown edge");
 }

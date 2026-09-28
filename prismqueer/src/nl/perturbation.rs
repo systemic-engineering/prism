@@ -60,7 +60,7 @@
 //!
 //! Runtime-altitude Move 2 fire (`vow!(kleinos keeps Sovereignty ... under
 //! Perturbation::narcissus_pull() N=200)` returning `PropertyVerdict::Pass|
-//! Partial` + non-empty `CommutatorSpectrum`) forward-promised at Bundle E2+.
+//! Partial` + non-empty `Dissonance`) forward-promised at Bundle E2+.
 
 use crate::spectral::{Focus, Lift, Project, Refract, Split};
 

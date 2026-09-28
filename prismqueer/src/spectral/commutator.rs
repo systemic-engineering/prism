@@ -44,11 +44,11 @@ use crate::spectral::kleinos::{Graph, VertexId};
 ///
 /// Substrate-noun per Alex 2026-09-05 "Simple made Easy" naming discipline.
 #[derive(Clone, Debug)]
-pub struct CommutatorSpectrum {
+pub struct Dissonance {
     pub spectrum: Vec<f64>,
 }
 
-impl CommutatorSpectrum {
+impl Dissonance {
     /// Read the singular-value spectrum of `[L_A, L_B]` over the union of
     /// A and B vertex sets.
     ///
@@ -98,7 +98,7 @@ const CLEARLY_NONZERO: f64 = 1e-6;
 
 /// Classify a singular-value measurement against the operators' scale
 /// (product of their Frobenius norms, floored at 1).
-fn read(measured: Result<Vec<f64>, i32>, scale: f64) -> Imperfect<CommutatorSpectrum, Unmeasured, Vec<f64>> {
+fn read(measured: Result<Vec<f64>, i32>, scale: f64) -> Imperfect<Dissonance, Unmeasured, Vec<f64>> {
     let svs = match measured {
         Ok(svs) => svs,
         Err(info) => return Imperfect::Failure(Unmeasured(info), Vec::new()),
@@ -113,7 +113,7 @@ fn read(measured: Result<Vec<f64>, i32>, scale: f64) -> Imperfect<CommutatorSpec
             ambiguous.push(s);
         }
     }
-    let cs = CommutatorSpectrum { spectrum };
+    let cs = Dissonance { spectrum };
     if ambiguous.is_empty() {
         Imperfect::Success(cs)
     } else {
@@ -165,8 +165,8 @@ mod tests {
 
     /// `[L_A, L_A] = L_A L_A - L_A L_A = 0`. Self-commutator vanishes.
     /// Substrate-reading: composition of A with itself is trivially commutative.
-    fn measured(a: &Graph, b: &Graph) -> CommutatorSpectrum {
-        match CommutatorSpectrum::of(a, b) {
+    fn measured(a: &Graph, b: &Graph) -> Dissonance {
+        match Dissonance::of(a, b) {
             terni::Imperfect::Success(cs) => cs,
             other => panic!("expected a clean measurement, got {other:?}"),
         }

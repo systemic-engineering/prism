@@ -16,7 +16,7 @@
 use std::collections::BTreeSet;
 
 use prismqueer::oid::{Addressable, Oid};
-use prismqueer::time::{Footprint, Independence, Sequential, Touches, Trace};
+use prismqueer::time::{Polyphony, Independence, Monophony, Touches, Progression};
 
 /// A step that touches named sites.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -69,7 +69,7 @@ fn footprint_independence_is_symmetric_and_irreflexive() {
         step("c", &["x"], &["z"]),
         step("d", &["y"], &["y"]),
     ];
-    let i = Footprint;
+    let i = Polyphony;
     for p in &steps {
         assert!(!i.independent(p, p), "{} is independent of itself", p.name);
         for q in &steps {
@@ -92,10 +92,10 @@ fn swapping_independent_steps_is_the_same_trajectory() {
     let a = step("a", &["x"], &["x"]);
     let b = step("b", &["y"], &["y"]);
     let v = step("v", &["x", "y"], &[]);
-    assert!(Footprint.independent(&a, &b), "precondition: a and b touch disjoint sites");
+    assert!(Polyphony.independent(&a, &b), "precondition: a and b touch disjoint sites");
 
-    let ab: Trace<Step, Footprint> = Trace::from_word([u.clone(), a.clone(), b.clone(), v.clone()]);
-    let ba: Trace<Step, Footprint> = Trace::from_word([u, b, a, v]);
+    let ab: Progression<Step, Polyphony> = Progression::from_word([u.clone(), a.clone(), b.clone(), v.clone()]);
+    let ba: Progression<Step, Polyphony> = Progression::from_word([u, b, a, v]);
 
     assert!(ab == ba, "independent swap changed the trace");
     assert!(same(&ab.oid(), &ba.oid()), "independent swap changed the address");
@@ -107,10 +107,10 @@ fn swapping_independent_steps_is_the_same_trajectory() {
 fn swapping_dependent_steps_is_a_different_trajectory() {
     let a = step("a", &[], &["x"]);
     let b = step("b", &["x"], &["y"]);
-    assert!(!Footprint.independent(&a, &b), "precondition: b reads what a writes");
+    assert!(!Polyphony.independent(&a, &b), "precondition: b reads what a writes");
 
-    let ab: Trace<Step, Footprint> = Trace::from_word([a.clone(), b.clone()]);
-    let ba: Trace<Step, Footprint> = Trace::from_word([b, a]);
+    let ab: Progression<Step, Polyphony> = Progression::from_word([a.clone(), b.clone()]);
+    let ba: Progression<Step, Polyphony> = Progression::from_word([b, a]);
 
     assert!(ab != ba, "dependent swap left the trace unchanged");
     assert!(!same(&ab.oid(), &ba.oid()), "dependent swap left the address unchanged");
@@ -123,11 +123,11 @@ fn the_same_word_under_linear_time_is_a_different_trajectory() {
     let a = step("a", &[], &["x"]);
     let b = step("b", &[], &["y"]);
 
-    let nonlinear: Trace<Step, Footprint> = Trace::from_word([a.clone(), b.clone()]);
-    let linear: Trace<Step, Sequential> = Trace::from_word([a, b]);
+    let nonlinear: Progression<Step, Polyphony> = Progression::from_word([a.clone(), b.clone()]);
+    let linear: Progression<Step, Monophony> = Progression::from_word([a, b]);
 
     assert_eq!(nonlinear.height(), 1, "independent steps share one Foata step");
-    assert_eq!(linear.height(), 2, "under Sequential every step is its own");
+    assert_eq!(linear.height(), 2, "under Monophony every step is its own");
     assert!(
         !same(&nonlinear.oid(), &linear.oid()),
         "{{a,b}} and {{a}}{{b}} must not share an address"
@@ -149,21 +149,21 @@ fn the_same_word_under_linear_time_is_a_different_trajectory() {
 #[test]
 fn state_equivalence_is_not_trajectory_equivalence() {
     use prismqueer::spectral::{graph_from_edges, Graph};
-    use prismqueer::spectral::settle::{settle, Resolution, Section, Time};
-    use prismqueer::spectral::CommutatorSpectrum;
+    use prismqueer::spectral::settle::{settle, Noise, Pitches, Time};
+    use prismqueer::spectral::Dissonance;
     use terni::Imperfect;
 
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
     let b = graph_from_edges(&[(1, 0), (0, 2)]);
-    match CommutatorSpectrum::of(&a, &b) {
+    match Dissonance::of(&a, &b) {
         Imperfect::Success(cs) => assert!(!cs.spectrum.is_empty(), "precondition: [L_a, L_b] != 0"),
         other => panic!("precondition: commutator must be measured cleanly, got {other:?}"),
     }
 
-    let s = Section::new([(0, 1.0), (1, 1.0), (2, 1.0)]);
-    let run = |first: &Graph, second: &Graph| -> Section {
-        let mid = settle(first, &s, Time(0.5), Resolution(1e-9)).ok().expect("first flow");
-        settle(second, &mid, Time(0.5), Resolution(1e-9)).ok().expect("second flow")
+    let s = Pitches::new([(0, 1.0), (1, 1.0), (2, 1.0)]);
+    let run = |first: &Graph, second: &Graph| -> Pitches {
+        let mid = settle(first, &s, Time(0.5), Noise(1e-9)).ok().expect("first flow");
+        settle(second, &mid, Time(0.5), Noise(1e-9)).ok().expect("second flow")
     };
     let ab = run(&a, &b);
     let ba = run(&b, &a);
@@ -176,7 +176,7 @@ fn state_equivalence_is_not_trajectory_equivalence() {
 
     let flow_a = step("settle under a", &["section"], &["section"]);
     let flow_b = step("settle under b", &["section"], &["section"]);
-    let t_ab: Trace<Step, Footprint> = Trace::from_word([flow_a.clone(), flow_b.clone()]);
-    let t_ba: Trace<Step, Footprint> = Trace::from_word([flow_b, flow_a]);
+    let t_ab: Progression<Step, Polyphony> = Progression::from_word([flow_a.clone(), flow_b.clone()]);
+    let t_ba: Progression<Step, Polyphony> = Progression::from_word([flow_b, flow_a]);
     assert!(!same(&t_ab.oid(), &t_ba.oid()), "the trace forgot the order too");
 }
