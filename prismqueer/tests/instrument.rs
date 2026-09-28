@@ -15,7 +15,7 @@
 
 use std::collections::BTreeMap;
 
-use prismqueer::spectral::instrument::{Angle, Cochain, Instrument};
+use prismqueer::spectral::instrument::{Angle, Cochain, Instrument, Solo};
 use prismqueer::spectral::settle::Time;
 use prismqueer::spectral::{graph_from_edges, Graph};
 
@@ -180,6 +180,67 @@ fn decay_and_ring_commute_and_ring_never_settles() {
             && heat_then_rotate.imag.distance(&rotate_then_heat_im) < 1e-9,
         "heat and rotation under one D must commute"
     );
+}
+
+// --- Bleed: attending and questioning do not commute at the edge of attention ---
+
+fn boundary(g: &Graph, solo: &[u64]) -> std::collections::BTreeSet<(u64, u64)> {
+    g.edges().filter(|(u, v)| solo.contains(u) != solo.contains(v)).collect()
+}
+
+#[test]
+fn bleed_lives_exactly_on_the_solo_boundary() {
+    let cases: [(&[(u64, u64)], &[u64]); 3] = [
+        (&[(0, 1), (1, 2), (2, 3)], &[0, 1]),
+        (&[(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (2, 4)], &[0, 1, 2]),
+        (&[(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], &[1]),
+    ];
+    for (edges, region) in cases {
+        let (g, d) = instrument(edges);
+        let bleed = d.bleed(&Solo::new(region.iter().copied())).expect("on the complex");
+        assert_eq!(bleed.edges(), boundary(&g, region), "bleed off the boundary for {edges:?}");
+        for x in bleed.matrix() {
+            assert!([0.0, 0.5, -0.5].contains(x), "bleed entry {x} is not exactly 0 or ±1/2");
+        }
+    }
+}
+
+#[test]
+fn soloing_everything_or_nothing_does_not_bleed() {
+    let (_, d) = instrument(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
+    for region in [vec![], vec![0, 1, 2, 3]] {
+        let bleed = d.bleed(&Solo::new(region)).expect("on the complex");
+        assert!(bleed.edges().is_empty(), "a constant solo is in the center and must commute");
+    }
+}
+
+#[test]
+fn attend_then_ask_is_not_ask_then_attend() {
+    // A settled assertion asks nothing. Solo it first and it asks exactly at
+    // the edge of attention; ask first and there is nothing left to solo.
+    let (g, d) = instrument(&[(0, 1), (1, 2), (2, 3), (0, 3)]);
+    let region = [0, 1];
+    let solo = Solo::new(region);
+    let settled = Cochain::new([(0, 1.0), (1, 1.0), (2, 1.0), (3, 1.0)], []);
+
+    let attend_then_ask = d.question(&d.solo(&solo, &settled).unwrap()).unwrap();
+    let ask_then_attend = d.solo(&solo, &d.question(&settled).unwrap()).unwrap();
+
+    assert!(ask_then_attend.norm() < 1e-12, "asking a settled assertion raised a question");
+    for (u, v) in g.edges() {
+        let q = attend_then_ask.interval((u, v)).unwrap();
+        if boundary(&g, &region).contains(&(u, v)) {
+            assert!((q.abs() - 1.0).abs() < 1e-12, "edge ({u},{v}) crosses attention and must ask");
+        } else {
+            assert!(q.abs() < 1e-12, "edge ({u},{v}) is inside or outside attention and must not ask");
+        }
+    }
+}
+
+#[test]
+fn a_solo_off_the_complex_fails_closed() {
+    let (_, d) = instrument(&[(0, 1), (1, 2)]);
+    assert!(d.bleed(&Solo::new([7])).is_err(), "unknown vertex in the solo");
 }
 
 #[test]
