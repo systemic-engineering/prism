@@ -243,6 +243,35 @@ mod tests {
         graph_from_edges(&[(0, 1), (0, 2)])
     }
 
+    // --- S3: the kernel is decided exactly, LAPACK only certifies it ---
+
+    #[test]
+    fn exact_components_decide_the_kernel() {
+        assert_eq!(kernel(&[0.0, 1e-17, 0.7, 1.2], 2, 4), Ok(2));
+    }
+
+    #[test]
+    fn beyond_certifiable_size_a_slow_mode_fails_closed() {
+        // The old tolerance (1e-9 · λ_max = 4e-9) would call 1e-10 harmonic and
+        // report "settled". At this size the gap 1/(n(n−1)) is below LAPACK's
+        // error, so the only honest answer is that it cannot tell.
+        assert_eq!(
+            kernel(&[0.0, 1e-10, 4.0], 1, 100_000),
+            Err(Wall::Unseparated { components: 1 })
+        );
+    }
+
+    #[test]
+    fn lapack_contradicting_the_components_fails_closed() {
+        // One component, but a second eigenvalue far below the proven gap.
+        assert_eq!(
+            kernel(&[0.0, 3e-9, 4.0], 1, 3),
+            Err(Wall::Unseparated { components: 1 })
+        );
+        // One component, but its kernel eigenvalue is not zero.
+        assert_eq!(kernel(&[0.3, 1.0], 1, 2), Err(Wall::Unseparated { components: 1 }));
+    }
+
     // --- Loop 1: where the recursion stops moving ---
 
     #[test]
