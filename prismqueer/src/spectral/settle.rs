@@ -381,3 +381,141 @@ mod tests {
         assert!(close(&values(&ab, 3), &values(&ba, 3)));
     }
 }
+
+/// Loop 4 around loop 1: the commutator claim over sampled graphs.
+///
+/// Theorem (symmetric A, B; s, t > 0): e^{-sA} e^{-tB} = e^{-tB} e^{-sA}
+/// iff [A, B] = 0. exp is injective on the reals, so e^{-sA} has the same
+/// eigenprojectors as A; commuting symmetric matrices share an eigenbasis.
+/// So the graph commutator (measured on graphs) and flow commutation
+/// (measured by execution, on every basis section) must agree on every pair.
+#[cfg(all(test, feature = "bundle"))]
+mod rewiring_property {
+    use super::*;
+    use crate::flux::pillar::{Arbitrary, Sample};
+    use crate::spectral::commutator::CommutatorSpectrum;
+    use crate::spectral::kleinos::graph_from_edges;
+
+    const S: f64 = 0.5;
+    const BUDGET: usize = 256;
+
+    /// Two graphs on the same vertex set {0..n-1}, every vertex covered.
+    #[derive(Debug)]
+    struct Rewiring {
+        n: usize,
+        before: Graph,
+        after: Graph,
+    }
+
+    /// Bernoulli(1/2) edges, then any uncovered vertex v gets edge (v, v+1 mod n).
+    /// Biased toward covered graphs by design: a Graph cannot hold isolated vertices.
+    fn covered_graph(sample: &mut Sample, n: usize) -> Graph {
+        let mut edges = Vec::new();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if sample.draw_bool() {
+                    edges.push((i as VertexId, j as VertexId));
+                }
+            }
+        }
+        for v in 0..n as VertexId {
+            if !edges.iter().any(|&(a, b)| a == v || b == v) {
+                let w = ((v as usize + 1) % n) as VertexId;
+                edges.push((v.min(w), v.max(w)));
+            }
+        }
+        graph_from_edges(&edges)
+    }
+
+    impl Arbitrary for Rewiring {
+        fn arbitrary(sample: &mut Sample) -> Self {
+            let n = sample.draw_integer(2, 6) as usize;
+            let before = covered_graph(sample, n);
+            let after = covered_graph(sample, n);
+            Rewiring { n, before, after }
+        }
+    }
+
+    fn seeded(seed: u64) -> Rewiring {
+        Rewiring::arbitrary(&mut Sample::from_bytes(seed.to_le_bytes().to_vec()))
+    }
+
+    fn flow(g: &Graph, s: &Section) -> Section {
+        settle(g, s, Time(S), Resolution(1e-6)).ok().expect("flow measured")
+    }
+
+    fn basis(n: usize, i: usize) -> Section {
+        Section::new((0..n).map(|v| (v as VertexId, if v == i { 1.0 } else { 0.0 })))
+    }
+
+    /// Operator equality, checked on every basis section.
+    fn flows_commute(r: &Rewiring) -> bool {
+        (0..r.n).all(|i| {
+            let e = basis(r.n, i);
+            let ab = flow(&r.after, &flow(&r.before, &e));
+            let ba = flow(&r.before, &flow(&r.after, &e));
+            (0..r.n as VertexId).all(|v| (ab.get(v).unwrap() - ba.get(v).unwrap()).abs() < 1e-9)
+        })
+    }
+
+    /// Partial((commuting, not), budget): checked `budget` pairs, universal
+    /// claim not settled by sampling. Failure: a counterexample, or the
+    /// instrument could not decide, or the sample was vacuous.
+    fn check(budget: usize) -> Imperfect<(usize, usize), String, usize> {
+        let (mut commuting, mut not, mut nontrivial) = (0, 0, 0);
+        for seed in 0..budget as u64 {
+            let r = seeded(seed);
+            let by_graph = match CommutatorSpectrum::of(&r.before, &r.after) {
+                Imperfect::Success(cs) => cs.spectrum.is_empty(),
+                other => {
+                    return Imperfect::Failure(format!("seed {seed}: instrument undecided: {other:?}"), budget)
+                }
+            };
+            let by_execution = flows_commute(&r);
+            if by_graph != by_execution {
+                return Imperfect::Failure(
+                    format!("seed {seed}: graph says {by_graph}, execution says {by_execution}: {r:?}"),
+                    budget,
+                );
+            }
+            if by_graph {
+                commuting += 1;
+                // Trivially commuting: two vertices (one possible graph) or identical graphs.
+                if r.n > 2 && r.before != r.after {
+                    nontrivial += 1;
+                }
+            } else {
+                not += 1;
+            }
+        }
+        eprintln!("commuting={commuting} (nontrivial={nontrivial}), not={not}");
+        if nontrivial == 0 || not == 0 {
+            return Imperfect::Failure(
+                format!("vacuous: nontrivial commuting={nontrivial}, not={not}"),
+                budget,
+            );
+        }
+        Imperfect::Partial((commuting, not), budget)
+    }
+
+    #[test]
+    fn sampler_covers_every_vertex() {
+        for seed in 0..BUDGET as u64 {
+            let r = seeded(seed);
+            assert_eq!(r.before.vertex_count(), r.n, "seed {seed}");
+            assert_eq!(r.after.vertex_count(), r.n, "seed {seed}");
+        }
+    }
+
+    #[test]
+    fn graph_commutator_and_execution_order_agree() {
+        match check(BUDGET) {
+            Imperfect::Partial((commuting, not), budget) => {
+                assert_eq!(commuting + not, budget);
+                eprintln!("agreed on {budget} pairs: {commuting} commuting, {not} not");
+            }
+            Imperfect::Failure(why, _) => panic!("falsified: {why}"),
+            Imperfect::Success(_) => unreachable!("sampling never proves a universal claim"),
+        }
+    }
+}
