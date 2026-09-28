@@ -25,6 +25,7 @@
 //!   Offer. Wait = the canonical operational register**
 
 pub mod commutator;
+pub mod dirac;
 pub mod kleinos;
 pub mod rotation;
 pub mod settle;
