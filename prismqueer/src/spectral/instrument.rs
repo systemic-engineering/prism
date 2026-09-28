@@ -18,7 +18,7 @@
 //! Spec: `docs/loop/CURRENT.md`; the correction to the Glasswall triple
 //! (H is cochains, not cohomology) is argued there.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::spectral::commutator::Unmeasured;
 use crate::spectral::kleinos::{EdgeKey, Graph, VertexId};
@@ -103,6 +103,43 @@ impl Cochain {
                 .sum()
         }
         (part(&self.vertex, &other.vertex) + part(&self.edge, &other.edge)).sqrt()
+    }
+}
+
+/// A region to attend to: the indicator of a set of vertices, an element of
+/// the algebra A.
+///
+/// It acts on pitches by the indicator and on intervals by the mean of the
+/// two endpoints. So it is self-adjoint, and it fixes every interval that lies
+/// wholly inside or wholly outside the region. Only intervals that cross the
+/// edge of attention are half-soloed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Solo(BTreeSet<VertexId>);
+
+impl Solo {
+    /// Solo these vertices.
+    pub fn new(vertices: impl IntoIterator<Item = VertexId>) -> Self {
+        Self(vertices.into_iter().collect())
+    }
+}
+
+/// [Instrument, Solo]: where attending and questioning fail to commute.
+///
+/// Non-zero exactly on the intervals that cross the edge of attention.
+pub struct Bleed {
+    matrix: Vec<f64>,
+    edges: BTreeSet<EdgeKey>,
+}
+
+impl Bleed {
+    /// The commutator, row-major, in the instrument's basis.
+    pub fn matrix(&self) -> &[f64] {
+        &self.matrix
+    }
+
+    /// The intervals it bleeds across.
+    pub fn edges(&self) -> BTreeSet<EdgeKey> {
+        self.edges.clone()
     }
 }
 
@@ -210,6 +247,46 @@ impl Instrument {
             real: self.sparse(&self.apply(&x, |l| (angle.0 * l).cos())),
             imag: self.sparse(&self.apply(&x, |l| (angle.0 * l).sin())),
         })
+    }
+
+    /// Attend: multiply by the solo, pitches by the indicator, intervals by
+    /// the mean of their endpoints.
+    pub fn solo(&self, solo: &Solo, x: &Cochain) -> Result<Cochain, Outside> {
+        let w = self.weights(solo)?;
+        let x = self.dense(x)?;
+        Ok(self.sparse(&x.iter().zip(&w).map(|(a, b)| a * b).collect::<Vec<_>>()))
+    }
+
+    /// [D, solo]: exactly where attention and question fail to commute.
+    pub fn bleed(&self, solo: &Solo) -> Result<Bleed, Outside> {
+        let w = self.weights(solo)?;
+        let n = self.dim();
+        let matrix: Vec<f64> = (0..n * n)
+            .map(|ij| self.matrix[ij] * (w[ij % n] - w[ij / n]))
+            .collect();
+        let edges = self
+            .edges
+            .iter()
+            .filter(|(_, &k)| (0..n).any(|j| matrix[k * n + j] != 0.0))
+            .map(|(&e, _)| e)
+            .collect();
+        Ok(Bleed { matrix, edges })
+    }
+
+    fn weights(&self, solo: &Solo) -> Result<Vec<f64>, Outside> {
+        if let Some(&v) = solo.0.iter().find(|v| !self.vertices.contains_key(v)) {
+            return Err(Outside::Vertex(v));
+        }
+        let mut w = vec![0.0_f64; self.dim()];
+        for (v, &i) in &self.vertices {
+            if solo.0.contains(v) {
+                w[i] = 1.0;
+            }
+        }
+        for (&(u, v), &k) in &self.edges {
+            w[k] = (w[self.vertices[&u]] + w[self.vertices[&v]]) / 2.0;
+        }
+        Ok(w)
     }
 
     /// f(D) x through the eigenbasis.
