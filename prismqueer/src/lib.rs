@@ -37,6 +37,8 @@ pub mod scalar_loss;
 pub mod substrate_ref;
 pub mod trace;
 
+pub mod time;
+
 pub mod connection;
 pub mod content;
 pub mod kernel;

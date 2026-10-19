@@ -25,8 +25,10 @@
 //!   Offer. Wait = the canonical operational register**
 
 pub mod commutator;
+pub mod instrument;
 pub mod kleinos;
 pub mod rotation;
+pub mod settle;
 pub mod spectrum;
 pub mod tension;
 
@@ -45,7 +47,7 @@ pub use kleinos::{
     EdgeKey,
 };
 
-pub use commutator::CommutatorSpectrum;
+pub use commutator::{Dissonance, Unmeasured};
 pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
 pub use spectrum::{DeltaCritical, Focus, Lift, Project, Refract, Spectrum, Split};
 pub use tension::{detect_tensions, Tension, TensionKind};
