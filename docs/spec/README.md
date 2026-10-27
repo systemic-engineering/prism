@@ -17,7 +17,6 @@ PRISM_SPEC_UPDATE=1 cargo test -p prismqueer --test spec_vectors
 
 ## Licence
 
-- terni (`imperfect/Cargo.toml`) and prismqueer (`prismqueer/Cargo.toml`) declare `license = "Apache-2.0"`.
-- **Neither the prism repository nor the imperfect repository has a LICENSE file today** (checked 2026-10-27). The declaration lives only in the Cargo metadata.
-- These specs and vectors are derived from that Apache-2.0 code and are meant to be under Apache-2.0 too, so they can be copied into bullet-up (also Apache-2.0) with attribution.
-- Before copying: adding the Apache-2.0 LICENSE text (and, if wanted, a NOTICE) to both repositories would make that explicit instead of implied. That's a decision for Alex.
+- Apache-2.0, for all repositories (Alex, 2026-10-27). prism's `LICENSE` and imperfect's `LICENSE` carry the full text; terni and prismqueer also declare it in `Cargo.toml`.
+- These specs and vectors are Apache-2.0 and can be copied into bullet-up (also Apache-2.0) with attribution.
+- imperfect is public, so the submodule is fetched over HTTPS (`.gitmodules`); no deploy key is needed in CI.
