@@ -416,7 +416,9 @@ fn main() {
         let fc = env::var("FC")
             .or_else(|_| env::var("FLANG"))
             .unwrap_or_else(|_| "gfortran".to_string());
-        let native_dir = Path::new("native");
+        // Absolute, because the compiler runs inside OUT_DIR (below).
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let native_dir = Path::new(&manifest_dir).join("native");
 
         // Sanity check: native/ dir must exist with the two Fortran sources.
         assert!(
@@ -439,7 +441,11 @@ fn main() {
             let stem = src_path.file_stem().unwrap().to_str().unwrap();
             let obj_path = out.join(format!("{}.o", stem));
 
+            // Run inside OUT_DIR: gfortran and flang write `.mod` files to
+            // the working directory, and the source tree may be read-only
+            // (nix store). Nothing the build writes belongs next to the crate.
             let status = Command::new(&fc)
+                .current_dir(out)
                 .arg("-c")
                 .arg("-fPIC")
                 .arg("-O2")
