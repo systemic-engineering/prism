@@ -1,0 +1,3487 @@
+{
+  "cases": [
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 3
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": 0,
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 3,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 3,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 3,
+        "status": "failure"
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 3,
+        "status": "failure"
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 3
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": 1,
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 4,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 4,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 4,
+        "status": "failure"
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 4,
+        "status": "failure"
+      },
+      "input": {
+        "loss": 1,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 3
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": 0,
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 3,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 3,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 3,
+        "status": "failure"
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 3,
+        "status": "failure"
+      },
+      "input": {
+        "loss": 0,
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "boom!",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": 1,
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": "boom",
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "err": "boom"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 7
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 4,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 3,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": 0,
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": 4,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": 3,
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": 1,
+        "status": "failure"
+      },
+      "loss": "count",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 5
+      },
+      "input": {
+        "ok": 5
+      },
+      "loss": "count",
+      "op": "from_result"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "nope",
+        "loss": 0,
+        "status": "failure"
+      },
+      "input": {
+        "err": "nope"
+      },
+      "loss": "count",
+      "op": "from_result"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 5
+      },
+      "input": 5,
+      "loss": "count",
+      "op": "from_option"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": null,
+        "loss": 0,
+        "status": "failure"
+      },
+      "input": null,
+      "loss": "count",
+      "op": "from_option"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": []
+      },
+      "expected": {
+        "status": "success",
+        "value": 1
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "status": "success",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "success",
+        "value": 1
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": 1,
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": 1,
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": 0,
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": 0,
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": 1,
+            "status": "partial",
+            "value": 1
+          },
+          {
+            "status": "success",
+            "value": 1
+          },
+          {
+            "loss": 3,
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": 4,
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "steps": [
+          {
+            "loss": 1,
+            "status": "partial",
+            "value": 1
+          },
+          {
+            "error": "stop",
+            "loss": 3,
+            "status": "failure"
+          }
+        ]
+      },
+      "expected": {
+        "accumulated": 4,
+        "error": "stop"
+      },
+      "input": null,
+      "loss": "count",
+      "op": "eh_context_failure"
+    },
+    {
+      "args": {
+        "a": 0,
+        "b": 1
+      },
+      "expected": 1,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": 1,
+        "b": 0
+      },
+      "expected": 1,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": 1,
+        "b": 3
+      },
+      "expected": 4,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": 3,
+        "b": 1
+      },
+      "expected": 4,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": 18446744073709551615,
+        "b": 1
+      },
+      "expected": 18446744073709551615,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": 1,
+        "b": 18446744073709551615
+      },
+      "expected": 18446744073709551615,
+      "input": null,
+      "loss": "count",
+      "op": "combine"
+    },
+    {
+      "args": {},
+      "expected": 0,
+      "input": null,
+      "loss": "count",
+      "op": "zero"
+    },
+    {
+      "args": {},
+      "expected": 18446744073709551615,
+      "input": null,
+      "loss": "count",
+      "op": "total"
+    },
+    {
+      "args": {
+        "loss": 0
+      },
+      "expected": true,
+      "input": null,
+      "loss": "count",
+      "op": "is_zero"
+    },
+    {
+      "args": {
+        "loss": 1
+      },
+      "expected": false,
+      "input": null,
+      "loss": "count",
+      "op": "is_zero"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 3
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": [],
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "status": "success",
+        "value": 2
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "status": "success",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 3
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 3
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": [],
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": 2,
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "ok": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 12
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "loss": [],
+        "status": "partial",
+        "value": 2
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "map"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "boom!",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "map_err"
+    },
+    {
+      "args": {},
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "loss"
+    },
+    {
+      "args": {},
+      "expected": null,
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "ok"
+    },
+    {
+      "args": {},
+      "expected": "boom",
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "err"
+    },
+    {
+      "args": {},
+      "expected": {
+        "err": "boom"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "into_result"
+    },
+    {
+      "args": {
+        "default": 7
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 7
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "unwrap_or"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "status": "success",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 10
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "loss": [],
+          "status": "partial",
+          "value": 10
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "eh"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "bad",
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "recover"
+    },
+    {
+      "args": {
+        "next": {
+          "error": "bad",
+          "loss": [
+            "field 'date' dropped"
+          ],
+          "status": "failure"
+        }
+      },
+      "expected": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "input": {
+        "error": "boom",
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "failure"
+      },
+      "loss": "list",
+      "op": "compose"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 5
+      },
+      "input": {
+        "ok": 5
+      },
+      "loss": "list",
+      "op": "from_result"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": "nope",
+        "loss": [],
+        "status": "failure"
+      },
+      "input": {
+        "err": "nope"
+      },
+      "loss": "list",
+      "op": "from_result"
+    },
+    {
+      "args": {},
+      "expected": {
+        "status": "success",
+        "value": 5
+      },
+      "input": 5,
+      "loss": "list",
+      "op": "from_option"
+    },
+    {
+      "args": {},
+      "expected": {
+        "error": null,
+        "loss": [],
+        "status": "failure"
+      },
+      "input": null,
+      "loss": "list",
+      "op": "from_option"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": []
+      },
+      "expected": {
+        "status": "success",
+        "value": 1
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "status": "success",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "status": "success",
+        "value": 1
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": [
+              "line 4 not parsed"
+            ],
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed"
+        ],
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": [],
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": [],
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "finish": 1,
+        "steps": [
+          {
+            "loss": [
+              "line 4 not parsed"
+            ],
+            "status": "partial",
+            "value": 1
+          },
+          {
+            "status": "success",
+            "value": 1
+          },
+          {
+            "loss": [
+              "field 'date' dropped"
+            ],
+            "status": "partial",
+            "value": 1
+          }
+        ]
+      },
+      "expected": {
+        "loss": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "status": "partial",
+        "value": 1
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context"
+    },
+    {
+      "args": {
+        "steps": [
+          {
+            "loss": [
+              "line 4 not parsed"
+            ],
+            "status": "partial",
+            "value": 1
+          },
+          {
+            "error": "stop",
+            "loss": [
+              "field 'date' dropped"
+            ],
+            "status": "failure"
+          }
+        ]
+      },
+      "expected": {
+        "accumulated": [
+          "line 4 not parsed",
+          "field 'date' dropped"
+        ],
+        "error": "stop"
+      },
+      "input": null,
+      "loss": "list",
+      "op": "eh_context_failure"
+    },
+    {
+      "args": {
+        "a": [],
+        "b": [
+          "line 4 not parsed"
+        ]
+      },
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": [
+          "line 4 not parsed"
+        ],
+        "b": []
+      },
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": [
+          "line 4 not parsed"
+        ],
+        "b": [
+          "field 'date' dropped"
+        ]
+      },
+      "expected": [
+        "line 4 not parsed",
+        "field 'date' dropped"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": [
+          "field 'date' dropped"
+        ],
+        "b": [
+          "line 4 not parsed"
+        ]
+      },
+      "expected": [
+        "field 'date' dropped",
+        "line 4 not parsed"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": [],
+        "b": [
+          "line 4 not parsed"
+        ]
+      },
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {
+        "a": [
+          "line 4 not parsed"
+        ],
+        "b": []
+      },
+      "expected": [
+        "line 4 not parsed"
+      ],
+      "input": null,
+      "loss": "list",
+      "op": "combine"
+    },
+    {
+      "args": {},
+      "expected": [],
+      "input": null,
+      "loss": "list",
+      "op": "zero"
+    },
+    {
+      "args": {},
+      "expected": [],
+      "input": null,
+      "loss": "list",
+      "op": "total"
+    },
+    {
+      "args": {
+        "loss": []
+      },
+      "expected": true,
+      "input": null,
+      "loss": "list",
+      "op": "is_zero"
+    },
+    {
+      "args": {
+        "loss": [
+          "line 4 not parsed"
+        ]
+      },
+      "expected": false,
+      "input": null,
+      "loss": "list",
+      "op": "is_zero"
+    }
+  ],
+  "functions": {
+    "compose": "args.next",
+    "eh": "v -> args.next with its value increased by v",
+    "eh_context": "feed each step to one context, then finish(args.finish)",
+    "eh_context_failure": "feed each step; the Failure step returns its error; report the accumulated loss",
+    "map": "v -> v + 1",
+    "map_err": "e -> e + \"!\"",
+    "recover": "e -> args.next",
+    "unwrap_or": "args.default"
+  },
+  "losses": {
+    "count": "non-negative integer; zero = 0; combine = saturating add; total = 18446744073709551615 (u64 max, absorbing)",
+    "list": "list of strings; zero = []; combine = append; total = [] (NOT absorbing, see spec)"
+  },
+  "source": "terni 0.7.0 (prism/imperfect), generated by prismqueer/tests/spec_vectors.rs",
+  "spec": "docs/spec/imperfect.md",
+  "types": {
+    "error": "string",
+    "value": "integer"
+  },
+  "wire": "terni serde: {status: success, value} | {status: partial, value, loss} | {status: failure, error, loss}"
+}

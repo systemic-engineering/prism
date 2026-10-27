@@ -1,0 +1,81 @@
+{
+  "spec": "docs/spec/gate.md",
+  "source": "hand-written worked examples, checked against the rule by prismqueer/tests/gate_vectors.rs",
+  "observer_result": "terni wire format with value null and a list of open items as loss: {status: success, value: null} | {status: partial, value: null, loss: [items]} | {status: failure, error, loss: []}",
+  "gate_result": "{status: success, value: draft} | {status: partial, value: draft, loss: {kept | moving: [items]}} | {status: failure, error: unmeasured, loss: {unmeasured: [items]}}",
+  "cases": [
+    {
+      "name": "green after a confirming round",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "success", "value": null } } },
+        { "draft": "d1", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "success", "value": "d1" }
+    },
+    {
+      "name": "a kept disagreement (comma) is not green",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["tone too formal"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["tone too formal"] }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "partial", "value": "d1", "loss": { "kept": ["a: tone too formal"] } }
+    },
+    {
+      "name": "resolved, then confirmed",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["tone too formal"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d2", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "success", "value": null } } },
+        { "draft": "d2", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "success", "value": "d2" }
+    },
+    {
+      "name": "still moving when the budget runs out",
+      "budget": 3,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["x"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d2", "observers": { "a": { "status": "partial", "value": null, "loss": ["y"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d3", "observers": { "a": { "status": "partial", "value": null, "loss": ["z"] }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "partial", "value": "d3", "loss": { "moving": ["a: z"] } }
+    },
+    {
+      "name": "an observer that could not review is never dropped",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "failure", "error": "timeout", "loss": [] } } },
+        { "draft": "d1", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "failure", "error": "timeout", "loss": [] } } }
+      ],
+      "expected": { "status": "partial", "value": "d1", "loss": { "kept": ["b: did not review (timeout)"] } }
+    },
+    {
+      "name": "nobody could review: fail closed",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "failure", "error": "timeout", "loss": [] }, "b": { "status": "failure", "error": "refused", "loss": [] } } }
+      ],
+      "expected": { "status": "failure", "error": "unmeasured", "loss": { "unmeasured": ["a: did not review (timeout)", "b: did not review (refused)"] } }
+    },
+    {
+      "name": "one round is not a fixed point",
+      "budget": 1,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "success", "value": null }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "partial", "value": "d1", "loss": { "moving": [] } }
+    },
+    {
+      "name": "a reworded objection counts as change",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["tone too formal"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["the tone is too formal"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["the tone is too formal"] }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "partial", "value": "d1", "loss": { "kept": ["a: the tone is too formal"] } }
+    }
+  ]
+}
