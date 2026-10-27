@@ -12,6 +12,13 @@ use serde_json::{json, Value};
 /// One round's state: the draft's address and the sorted set of open items.
 type State = (String, BTreeSet<String>);
 
+/// An objection's word-level identity: its words, in order. (bullet-up also
+/// normalises to Unicode NFC first; the examples are ASCII, so that step is
+/// the identity here.)
+fn words(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn open_items(observers: &serde_json::Map<String, Value>) -> (BTreeSet<String>, usize) {
     let mut open = BTreeSet::new();
     let mut failed = 0;
@@ -20,7 +27,7 @@ fn open_items(observers: &serde_json::Map<String, Value>) -> (BTreeSet<String>, 
             "success" => {}
             "partial" => {
                 for item in result["loss"].as_array().expect("loss list") {
-                    open.insert(format!("{name}: {}", item.as_str().expect("string")));
+                    open.insert(format!("{name}: {}", words(item.as_str().expect("string"))));
                 }
             }
             "failure" => {
