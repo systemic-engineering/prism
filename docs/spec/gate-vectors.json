@@ -76,6 +76,15 @@
         { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["the tone is too formal"] }, "b": { "status": "success", "value": null } } }
       ],
       "expected": { "status": "partial", "value": "d1", "loss": { "kept": ["a: the tone is too formal"] } }
+    },
+    {
+      "name": "different spacing is not change (word-level ids)",
+      "budget": 4,
+      "rounds": [
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["tone too formal"] }, "b": { "status": "success", "value": null } } },
+        { "draft": "d1", "observers": { "a": { "status": "partial", "value": null, "loss": ["  tone   too\nformal "] }, "b": { "status": "success", "value": null } } }
+      ],
+      "expected": { "status": "partial", "value": "d1", "loss": { "kept": ["a: tone too formal"] } }
     }
   ]
 }

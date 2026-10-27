@@ -7,7 +7,7 @@
 | `imperfect.md` | `Imperfect`: three cases, loss laws, every operation's rules, what must never happen |
 | `imperfect-vectors.json` | 192 cases generated from terni 0.7.0 by `prismqueer/tests/spec_vectors.rs` |
 | `gate.md` | The convergence gate for review rounds, taken from settle semantics; proven parts vs. modelling choices |
-| `gate-vectors.json` | 8 worked examples, checked against the rule by `prismqueer/tests/gate_vectors.rs` |
+| `gate-vectors.json` | 9 worked examples, checked against the rule by `prismqueer/tests/gate_vectors.rs` |
 
 Regenerate the Imperfect vectors after an intended change in terni:
 

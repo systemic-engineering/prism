@@ -39,6 +39,7 @@ All eight are in `gate-vectors.json`:
 6. Every observer fails → fail closed.
 7. A budget of 1 → still moving, even with no objections: one round can't show a fixed point.
 8. The same objection, reworded in round two, then repeated → the rewording counts as change; it converges in round three, kept.
+9. The same objection with different spacing → not a change (same words in the same order); converged in round two, kept.
 
 ## What's proven in prism, and what's a choice for bullet-up
 
@@ -55,7 +56,7 @@ All eight are in `gate-vectors.json`:
 
 **Choices for bullet-up** (reasonable defaults, not theorems):
 
-- **What counts as "the same".** Here: the draft's address plus the exact text of each objection. Example 8 shows the cost: a reworded objection looks like movement. Asking observers to cite a stable id per objection makes rewording invisible. Where this line is drawn decides where the review stops. It's the observer's boundary, so it should be written down, not left implicit.
+- **What counts as "the same".** The draft's address plus each objection's **word-level id** (decided by bullet-up, 2026-10-27): normalise the text to Unicode NFC, take its words in order, hash them. So spacing and Unicode encoding don't count as change (example 9), but a reworded objection does (example 8). Where this line is drawn decides where the review stops. It's the observer's boundary, written down. The reference evaluator compares words in order; it doesn't apply NFC itself, so the examples stay in ASCII.
 - **One confirming round** (patience 1). More rounds of patience make green slower and more certain.
 - **Budget 4.**
 - **A failed observer counts as an open item.** The alternative, ignoring it, would let a crashed reviewer turn red into green.
