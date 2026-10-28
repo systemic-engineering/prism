@@ -5,8 +5,10 @@
 //! defines three operations over beams:
 //!
 //! - **focus** — select what matters from the input.
-//! - **project** — transform the focused value (precision cut, eigenvalue
-//!   threshold, the lossy step where information may not survive).
+//! - **project** — emission: label what passes through (decided 2026-10-27,
+//!   `docs/loop/CURRENT.md` §7b″). The implementations in this crate still
+//!   use it as a transformation of the focused value; they predate the
+//!   decision.
 //! - **settle** — produce the output from what survived projection.
 //!
 //! ```ignore
@@ -199,7 +201,9 @@ pub trait Prism {
 
     /// `focus` — select what matters from the input.
     fn focus(&self, beam: Self::Input) -> Self::Focused;
-    /// `project` — the lossy transformation. Information may not survive.
+    /// `project` — emission: label what passes through (decided 2026-10-27).
+    /// Existing implementations still use it as a transformation of the
+    /// focused value; they predate the decision.
     fn project(&self, beam: Self::Focused) -> Self::Projected;
     /// `settle` — produce the output from what survived `project`.
     fn settle(&self, beam: Self::Projected) -> Self::Refracted;

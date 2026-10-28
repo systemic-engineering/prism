@@ -53,7 +53,10 @@
 //! - Rec #99 SINGULARITY.md K_n orbital topology + @time as rotational-substrate
 //!   through 5D spectral space (Dirac operator D IS temporal rotation) — **this
 //!   ship MAY be Level-1 empirical fire per Alex-observer adjudication**
-//! - Anna Wolf 2012 FZJ observation-without-perturbation (LOAD-BEARING)
+//! - Anna Wolf (Jakobs) 2012, FZJ Masterarbeit: the live visualization read
+//!   the simulation's data in place (shared buffer, no copy) at step
+//!   boundaries. Observation running at the same time as computation was the
+//!   thesis's future work (printed p. 43, results; p. 45, outlook).
 //! - Foerster 1974 ethical imperative (Fiedler monotone climb gauge)
 //! - Kuramoto 1975 coupled-oscillator synchronization
 //! - Ricky Jones 2026-08-26 rotation-is-non-negotiation canon
