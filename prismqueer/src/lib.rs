@@ -92,6 +92,9 @@ pub mod nl;
 pub mod field;
 
 #[cfg(feature = "lapack")]
+pub mod band;
+
+#[cfg(feature = "lapack")]
 pub mod shard;
 
 #[cfg(feature = "lapack")]
