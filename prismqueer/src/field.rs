@@ -20,6 +20,28 @@
 //! [`Noise`] band ([`check_flat_within`]). No silent tolerance.
 //!
 //! Geometry only. Rulers, approvals and signatures live in mirror.
+//!
+//! A curved group field has no collapse: group values aren't a [`Lattice`],
+//! so `meet` doesn't exist for them. The control compiles (same imports, a
+//! group field as a type, `meet` on a lattice field):
+//!
+//! ```
+//! use prismqueer::field::{Discrete, Field, Graph, Least, Ratio};
+//! fn names_a_group_field(_: &Field<Graph, Ratio>) {}
+//! fn collapse(f: &Field<Discrete, Least>) -> Least {
+//!     f.meet()
+//! }
+//! ```
+//!
+//! and the only change, `meet` on group values, doesn't (rustdoc on stable
+//! doesn't check the error code, which is why the control is here):
+//!
+//! ```compile_fail,E0599
+//! use prismqueer::field::{Field, Graph, Ratio};
+//! fn collapse(f: &Field<Graph, Ratio>) -> Ratio {
+//!     f.meet()
+//! }
+//! ```
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
@@ -305,6 +327,11 @@ impl<V> Field<Point, V> {
     pub fn point(value: V) -> Self {
         Field { base: Point, values: vec![value], edges: Vec::new() }
     }
+
+    /// The one value of a single truth.
+    pub fn value(&self) -> &V {
+        &self.values[0]
+    }
 }
 
 impl<V> Field<Discrete, V> {
@@ -352,6 +379,21 @@ impl<V: Group> Field<Graph, V> {
         if a <= b { self.values[i].clone() } else { self.values[i].inverse() }
     }
 }
+
+// --- Prisms that settle into fields ------------------------------------------
+
+/// A prism whose `settle` ends in a field: multi-truth over `B`.
+///
+/// Nothing to implement. Every [`Prism`](crate::Prism) whose refracted beam
+/// carries a `Field<B, V>` is one, by what it settles into.
+pub trait FieldPrism<B, V>: crate::Prism<Refracted: crate::Beam<Out = Field<B, V>>> {}
+
+impl<P, B, V> FieldPrism<B, V> for P where P: crate::Prism<Refracted: crate::Beam<Out = Field<B, V>>> {}
+
+/// A field prism over a point: a single truth.
+pub trait ScalarPrism<V>: FieldPrism<Point, V> {}
+
+impl<P, V> ScalarPrism<V> for P where P: FieldPrism<Point, V> {}
 
 // --- Flat or curved ----------------------------------------------------------
 
