@@ -29,7 +29,7 @@ use crate::spectral::settle::Time;
 pub struct Angle(pub f64);
 
 /// A cochain named a vertex or edge the complex does not have.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Outside {
     /// No such vertex.
     Vertex(VertexId),
@@ -37,6 +37,49 @@ pub enum Outside {
     Edge(EdgeKey),
     /// An operation on intervals was handed a pitch value.
     NotAnInterval(VertexId),
+    /// An eigenvalue sits on a window edge, within LAPACK's error: whether
+    /// its mode is inside the window can't be decided.
+    Straddles(f64),
+}
+
+/// A spectral window `[low, high]` over D's eigenvalues: which frequencies a
+/// restriction keeps.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Window {
+    low: f64,
+    high: f64,
+}
+
+impl Window {
+    /// The closed window `[low, high]`. Panics if `low > high`.
+    pub fn new(low: f64, high: f64) -> Self {
+        assert!(low <= high, "a window is low ≤ high");
+        Window { low, high }
+    }
+}
+
+/// A restriction to a window: what it kept and what it erased. The pair is
+/// lossless (`kept + erased` is the input); the restriction alone isn't.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Restriction {
+    kept: Cochain,
+    erased: Cochain,
+    lossless: bool,
+}
+
+impl Restriction {
+    /// The modes inside the window.
+    pub fn kept(&self) -> &Cochain {
+        &self.kept
+    }
+    /// The modes outside it: the erasure.
+    pub fn erased(&self) -> &Cochain {
+        &self.erased
+    }
+    /// Whether nothing outside the window carried any weight.
+    pub fn is_lossless(&self) -> bool {
+        self.lossless
+    }
 }
 
 /// Intervals split into what an assertion could ask (gradient, im δ) and
@@ -135,6 +178,10 @@ impl Cochain {
 /// two endpoints. So it is self-adjoint, and it fixes every interval that lies
 /// wholly inside or wholly outside the region. Only intervals that cross the
 /// edge of attention are half-soloed.
+///
+/// So a solo **attenuates**; it doesn't restrict. On a crossing interval it
+/// weighs ½, applied twice ¼: not idempotent, not a projector. To restrict
+/// to frequencies, use a [`Window`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Solo(BTreeSet<VertexId>);
 
@@ -375,6 +422,39 @@ impl Instrument {
             gradient: self.sparse_intervals(&gradient),
             harmonic: self.sparse_intervals(&harmonic),
         })
+    }
+
+    /// Restrict `x` to the modes of D inside `window`.
+    ///
+    /// `kept` and `erased` are each built from their own eigenmodes, so
+    /// `kept + erased = x` is a check, not an identity by construction. The
+    /// projector is a function of D, so it commutes with `decay` and `ring`.
+    /// If an eigenvalue lies within LAPACK's error (`16·ε·dim·scale`, the
+    /// `settle` band) of a window edge, the restriction is refused.
+    pub fn restrict(&self, window: &Window, x: &Cochain) -> Result<Restriction, Outside> {
+        let dense = self.dense(x)?;
+        let n = self.dim();
+        let scale = self.values.iter().fold(1.0_f64, |m, v| m.max(v.abs()));
+        let error = 16.0 * f64::EPSILON * n as f64 * scale;
+        let mut kept = vec![0.0_f64; n];
+        let mut erased = vec![0.0_f64; n];
+        let mut lossless = true;
+        for (k, &l) in self.values.iter().enumerate() {
+            if (l - window.low).abs() <= error || (l - window.high).abs() <= error {
+                return Err(Outside::Straddles(l));
+            }
+            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
+            let weight: f64 = v.iter().zip(&dense).map(|(a, b)| a * b).sum();
+            let inside = window.low <= l && l <= window.high;
+            if !inside && weight != 0.0 {
+                lossless = false;
+            }
+            let target = if inside { &mut kept } else { &mut erased };
+            for (t, vc) in target.iter_mut().zip(&v) {
+                *t += weight * vc;
+            }
+        }
+        Ok(Restriction { kept: self.sparse(&kept), erased: self.sparse(&erased), lossless })
     }
 
     /// b₀ + b₁, exactly: components by union-find, then |E| − |V| + b₀.
