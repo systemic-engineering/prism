@@ -412,3 +412,34 @@ impl Instrument {
         }
     }
 }
+
+#[cfg(test)]
+mod certify_tests {
+    use super::certify;
+    use terni::Imperfect;
+
+    #[test]
+    fn a_separated_spectrum_certifies_the_exact_count() {
+        // Triangle: b0 + b1 = 2, D's spectrum is {0, 0, ±sqrt3, ±sqrt3}.
+        let s = 3f64.sqrt();
+        assert_eq!(certify(&[-s, -s, 0.0, 1e-17, s, s], 2, 3, 6), Imperfect::Success(2));
+    }
+
+    #[test]
+    fn a_kernel_mode_that_is_not_zero_is_partial_not_a_guess() {
+        let s = 3f64.sqrt();
+        match certify(&[-s, -s, 0.0, 0.3, s, s], 2, 3, 6) {
+            Imperfect::Partial(2, ambiguous) => assert_eq!(ambiguous, vec![0.3]),
+            other => panic!("expected Partial(2, [0.3]), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_mode_inside_the_proven_gap_is_partial() {
+        // n = 3: every non-kernel |eigenvalue| of D is at least 1/sqrt(6).
+        match certify(&[0.0, 0.0, 0.01, 2.0], 2, 3, 4) {
+            Imperfect::Partial(2, ambiguous) => assert_eq!(ambiguous, vec![0.01]),
+            other => panic!("expected Partial(2, [0.01]), got {other:?}"),
+        }
+    }
+}

@@ -97,7 +97,7 @@ fn betti(f: &Field) -> (usize, usize) {
 fn kernel_is_tonics_plus_commas(f: &Field) -> bool {
     let (b0, b1) = betti(f);
     Instrument::of(&f.graph())
-        .map(|d| d.kernel_dimension() == b0 + b1)
+        .map(|d| d.kernel_dimension() == Imperfect::Success(b0 + b1))
         .unwrap_or(false)
 }
 
@@ -107,7 +107,7 @@ fn quietest(f: &Field) -> f64 {
     let mut modes: Vec<f64> = d.eigenvalues().iter().map(|x| x.abs()).collect();
     modes.sort_by(f64::total_cmp);
     modes
-        .get(d.kernel_dimension())
+        .get(d.kernel_dimension().ok().expect("an exact count"))
         .copied()
         .unwrap_or(f64::INFINITY)
 }
