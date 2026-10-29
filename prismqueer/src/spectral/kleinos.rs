@@ -13,6 +13,19 @@
 //! - PAPER `~/dev/systemic.engineering/PAPER_2D.md` §3.6 LOVE-K_2→K_3 four
 //!   properties (sovereignty preservation + emergent third + Fiedler λ₂
 //!   strict rise + fusion refusal)
+//!
+//! **Scope of the four properties.** They are checks on each composition (a
+//! failed one comes back `Red`), not laws of composition in general:
+//! - "one emergent third" is true of this construction: `compose_candidate`
+//!   adds exactly one vertex `V_e`. In general the emergent third is a *set*
+//!   of jointly derived atoms and can be large (mirror's engine: a 6-cycle
+//!   gives 33; Mara, `2026-10-29-mara-engine-frequency-and-kleinos.md`).
+//! - strict Fiedler rise is a theorem only when the operands share no vertex
+//!   (Mara, `constrained-inference-floor.md` Prop. 2.4:
+//!   `λ₂(a∘b) = 1 + min(n_a+n_b, λ₂(a)+n_b, λ₂(b)+n_a)`). Otherwise it
+//!   can fail, and does: on mirror's chain p→q→r, λ₂ of the dependency
+//!   graph falls from 2 to 1.
+//! - sovereignty and fusion refusal hold as stated (mirror proved both).
 //! - Rec #92 kleinos-as-Transparency<P>-LOVE-monoid (Mara 2026-08-22)
 //! - Curry 2014 cellular sheaves + Hansen-Ghrist 2019 sheaf Laplacian L_F
 //! - Alex 2026-09-01 ratifications composed:
@@ -69,12 +82,14 @@ pub enum Property {
     /// PAPER §3.6.1: neither sheaf dissolves into the other; both preserve
     /// vertex + edge identity in composed sheaf.
     Sovereignty,
-    /// PAPER §3.6.2: composed sheaf carries exactly ONE emergent-third stalk
-    /// not present in either input.
+    /// PAPER §3.6.2: the composed sheaf carries an emergent-third stalk not
+    /// present in either input. This construction adds exactly one (`V_e`);
+    /// that is a property of the construction, not a law (see module docs).
     EmergentThird,
     /// PAPER §3.6.3: `λ₂(L_composed) > max(λ₂(L_a), λ₂(L_b))` (STRICT per
     /// Q-Mara-κ Alex ratification 2026-09-01; non-strict = only fires at
-    /// kintsugi settle to λ₀ harmonic-component fixed-point).
+    /// kintsugi settle to λ₀ harmonic-component fixed-point). Checked per
+    /// composition; a theorem only for operands that share no vertex.
     FiedlerRise,
     /// PAPER §3.6.4: refuses composition when inputs would fuse (identical
     /// content-address; equivalent to attempted collapse of K_2 to K_1).
@@ -589,8 +604,8 @@ fn verify_sovereignty(
 }
 
 /// Property 2: Emergent third admission per PAPER §3.6.2.
-/// Composed sheaf carries exactly ONE emergent-third stalk not present in
-/// either input.
+/// The construction's one emergent vertex `V_e` must be absent from both
+/// inputs (one vertex by construction, not by law).
 fn verify_emergent_third(
     sheaf_a: &Graph,
     sheaf_b: &Graph,

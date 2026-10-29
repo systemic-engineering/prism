@@ -35,6 +35,28 @@ pub enum Outside {
     Vertex(VertexId),
     /// No such edge, in either orientation.
     Edge(EdgeKey),
+    /// An operation on intervals was handed a pitch value.
+    NotAnInterval(VertexId),
+}
+
+/// Intervals split into what an assertion could ask (gradient, im δ) and
+/// what no assertion answers (harmonic, ker δ*: the comma). Complementary
+/// orthogonal projections; `gradient + harmonic` is the input.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hodge {
+    gradient: Cochain,
+    harmonic: Cochain,
+}
+
+impl Hodge {
+    /// The part that is the question of some assertion.
+    pub fn gradient(&self) -> &Cochain {
+        &self.gradient
+    }
+    /// The part no assertion answers: what the edge settle keeps.
+    pub fn harmonic(&self) -> &Cochain {
+        &self.harmonic
+    }
 }
 
 /// A value per vertex and per oriented edge. Sparse: an absent entry is zero.
@@ -152,12 +174,42 @@ pub struct Rotated {
     pub imag: Cochain,
 }
 
-/// Below this fraction of the spectral scale an eigenvalue of D is zero.
+/// Certify an exact kernel count against a measured spectrum.
 ///
-/// D's smallest nonzero eigenvalue is √λ₂ of the Laplacian, so near zero D
-/// is better separated than L: a connected unweighted graph has
-/// √λ₂ ≥ 1/√(n(n−1)).
-const ZERO: f64 = 1e-9;
+/// `count` is b₀ + b₁ from union-find: exact, never in doubt. The spectrum
+/// is a measurement, and it agrees when the `count` smallest |eigenvalues|
+/// sit within LAPACK's error of zero and the rest clear the proven gap. D's
+/// non-zero eigenvalues are ±√λ of a Laplacian, and every connected simple
+/// graph on at most `n_vertices` vertices has λ₂ ≥ 1/(n(n−1)), so the gap
+/// is 1/√(n(n−1)). Disagreement is `Partial(count, the ambiguous
+/// magnitudes)`: the count stands, the measurement doesn't back it.
+fn certify(
+    values: &[f64],
+    count: usize,
+    n_vertices: usize,
+    dim: usize,
+) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+    let mut magnitudes: Vec<f64> = values.iter().map(|x| x.abs()).collect();
+    magnitudes.sort_by(f64::total_cmp);
+    let scale = magnitudes.last().copied().unwrap_or(0.0).max(1.0);
+    let error = 16.0 * f64::EPSILON * scale * dim.max(1) as f64;
+    let gap = if n_vertices >= 2 {
+        1.0 / ((n_vertices * (n_vertices - 1)) as f64).sqrt()
+    } else {
+        f64::INFINITY
+    };
+    let ambiguous: Vec<f64> = magnitudes
+        .iter()
+        .enumerate()
+        .filter(|&(i, &m)| if i < count { m > error } else { m < gap - error })
+        .map(|(_, &m)| m)
+        .collect();
+    if ambiguous.is_empty() {
+        terni::Imperfect::Success(count)
+    } else {
+        terni::Imperfect::Partial(count, ambiguous)
+    }
+}
 
 /// The Hodge–Dirac operator of a graph, with its eigensystem.
 pub struct Instrument {
@@ -218,12 +270,12 @@ impl Instrument {
     }
 
     /// dim ker D = b₀ + b₁: components plus independent cycles.
-    pub fn kernel_dimension(&self) -> usize {
-        let scale = self.values.iter().fold(1.0_f64, |m, x| m.max(x.abs()));
-        self.values
-            .iter()
-            .filter(|x| x.abs() <= ZERO * scale)
-            .count()
+    ///
+    /// Exact, by union-find; LAPACK certifies it. `Success(count)` when the
+    /// measured spectrum separates at the proven gap, `Partial(count,
+    /// ambiguous magnitudes)` when it doesn't. Never a count from a threshold.
+    pub fn kernel_dimension(&self) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+        certify(&self.values, self.betti(), self.vertices.len(), self.dim())
     }
 
     /// D x, exactly: an assertion's question lands on the edges, an edge
@@ -292,6 +344,70 @@ impl Instrument {
         Ok(w)
     }
 
+    /// The Hodge split of intervals: `(gradient, harmonic)`.
+    ///
+    /// The harmonic part is the projection onto ker D. An interval-only input
+    /// projects only into H¹ (H⁰ lives on pitches), so the result doesn't
+    /// depend on which eigenbasis LAPACK chose. The kernel is counted exactly,
+    /// b₀ + b₁ by union-find, not by a threshold. A pitch value is refused.
+    pub fn hodge(&self, x: &Cochain) -> Result<Hodge, Outside> {
+        if let Some(&v) = x.vertex.iter().find(|(_, x)| **x != 0.0).map(|(v, _)| v) {
+            return Err(Outside::NotAnInterval(v));
+        }
+        let dense = self.dense(x)?;
+        let n = self.dim();
+        let mut by_size: Vec<usize> = (0..self.values.len()).collect();
+        by_size.sort_by(|&a, &b| self.values[a].abs().total_cmp(&self.values[b].abs()));
+        let mut harmonic = vec![0.0_f64; n];
+        for &k in by_size.iter().take(self.betti()) {
+            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
+            let weight: f64 = v.iter().zip(&dense).map(|(a, b)| a * b).sum();
+            for (h, vc) in harmonic.iter_mut().zip(&v) {
+                *h += weight * vc;
+            }
+        }
+        let n0 = self.vertices.len();
+        for h in harmonic.iter_mut().take(n0) {
+            *h = 0.0;
+        }
+        let gradient: Vec<f64> = dense.iter().zip(&harmonic).map(|(a, h)| a - h).collect();
+        Ok(Hodge {
+            gradient: self.sparse_intervals(&gradient),
+            harmonic: self.sparse_intervals(&harmonic),
+        })
+    }
+
+    /// b₀ + b₁, exactly: components by union-find, then |E| − |V| + b₀.
+    fn betti(&self) -> usize {
+        let mut parent: Vec<usize> = (0..self.vertices.len()).collect();
+        fn root(p: &mut [usize], i: usize) -> usize {
+            if p[i] == i {
+                i
+            } else {
+                let r = root(p, p[i]);
+                p[i] = r;
+                r
+            }
+        }
+        let mut b0 = self.vertices.len();
+        for &(u, v) in self.edges.keys() {
+            let (ru, rv) = (root(&mut parent, self.vertices[&u]), root(&mut parent, self.vertices[&v]));
+            if ru != rv {
+                parent[ru] = rv;
+                b0 -= 1;
+            }
+        }
+        let b1 = self.edges.len() + b0 - self.vertices.len();
+        b0 + b1
+    }
+
+    fn sparse_intervals(&self, y: &[f64]) -> Cochain {
+        Cochain {
+            vertex: BTreeMap::new(),
+            edge: self.edges.iter().map(|(&e, &k)| (e, y[k])).collect(),
+        }
+    }
+
     /// f(D) x through the eigenbasis.
     fn apply(&self, x: &[f64], f: impl Fn(f64) -> f64) -> Vec<f64> {
         let n = self.dim();
@@ -323,6 +439,37 @@ impl Instrument {
         Cochain {
             vertex: self.vertices.iter().map(|(&v, &i)| (v, y[i])).collect(),
             edge: self.edges.iter().map(|(&e, &k)| (e, y[k])).collect(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod certify_tests {
+    use super::certify;
+    use terni::Imperfect;
+
+    #[test]
+    fn a_separated_spectrum_certifies_the_exact_count() {
+        // Triangle: b0 + b1 = 2, D's spectrum is {0, 0, ±sqrt3, ±sqrt3}.
+        let s = 3f64.sqrt();
+        assert_eq!(certify(&[-s, -s, 0.0, 1e-17, s, s], 2, 3, 6), Imperfect::Success(2));
+    }
+
+    #[test]
+    fn a_kernel_mode_that_is_not_zero_is_partial_not_a_guess() {
+        let s = 3f64.sqrt();
+        match certify(&[-s, -s, 0.0, 0.3, s, s], 2, 3, 6) {
+            Imperfect::Partial(2, ambiguous) => assert_eq!(ambiguous, vec![0.3]),
+            other => panic!("expected Partial(2, [0.3]), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_mode_inside_the_proven_gap_is_partial() {
+        // n = 3: every non-kernel |eigenvalue| of D is at least 1/sqrt(6).
+        match certify(&[0.0, 0.0, 0.01, 2.0], 2, 3, 4) {
+            Imperfect::Partial(2, ambiguous) => assert_eq!(ambiguous, vec![0.01]),
+            other => panic!("expected Partial(2, [0.01]), got {other:?}"),
         }
     }
 }

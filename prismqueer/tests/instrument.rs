@@ -89,7 +89,7 @@ fn kernel_counts_components_and_cycles() {
         let b1 = g.edges().count() + b0 - g.vertex_count();
         assert_eq!(
             d.kernel_dimension(),
-            b0 + b1,
+            terni::Imperfect::Success(b0 + b1),
             "dim ker D != b0 + b1 for {edges:?}"
         );
     }
