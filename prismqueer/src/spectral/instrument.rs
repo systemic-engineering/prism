@@ -174,12 +174,42 @@ pub struct Rotated {
     pub imag: Cochain,
 }
 
-/// Below this fraction of the spectral scale an eigenvalue of D is zero.
+/// Certify an exact kernel count against a measured spectrum.
 ///
-/// D's smallest nonzero eigenvalue is √λ₂ of the Laplacian, so near zero D
-/// is better separated than L: a connected unweighted graph has
-/// √λ₂ ≥ 1/√(n(n−1)).
-const ZERO: f64 = 1e-9;
+/// `count` is b₀ + b₁ from union-find: exact, never in doubt. The spectrum
+/// is a measurement, and it agrees when the `count` smallest |eigenvalues|
+/// sit within LAPACK's error of zero and the rest clear the proven gap. D's
+/// non-zero eigenvalues are ±√λ of a Laplacian, and every connected simple
+/// graph on at most `n_vertices` vertices has λ₂ ≥ 1/(n(n−1)), so the gap
+/// is 1/√(n(n−1)). Disagreement is `Partial(count, the ambiguous
+/// magnitudes)`: the count stands, the measurement doesn't back it.
+fn certify(
+    values: &[f64],
+    count: usize,
+    n_vertices: usize,
+    dim: usize,
+) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+    let mut magnitudes: Vec<f64> = values.iter().map(|x| x.abs()).collect();
+    magnitudes.sort_by(f64::total_cmp);
+    let scale = magnitudes.last().copied().unwrap_or(0.0).max(1.0);
+    let error = 16.0 * f64::EPSILON * scale * dim.max(1) as f64;
+    let gap = if n_vertices >= 2 {
+        1.0 / ((n_vertices * (n_vertices - 1)) as f64).sqrt()
+    } else {
+        f64::INFINITY
+    };
+    let ambiguous: Vec<f64> = magnitudes
+        .iter()
+        .enumerate()
+        .filter(|&(i, &m)| if i < count { m > error } else { m < gap - error })
+        .map(|(_, &m)| m)
+        .collect();
+    if ambiguous.is_empty() {
+        terni::Imperfect::Success(count)
+    } else {
+        terni::Imperfect::Partial(count, ambiguous)
+    }
+}
 
 /// The Hodge–Dirac operator of a graph, with its eigensystem.
 pub struct Instrument {
@@ -240,12 +270,12 @@ impl Instrument {
     }
 
     /// dim ker D = b₀ + b₁: components plus independent cycles.
-    pub fn kernel_dimension(&self) -> usize {
-        let scale = self.values.iter().fold(1.0_f64, |m, x| m.max(x.abs()));
-        self.values
-            .iter()
-            .filter(|x| x.abs() <= ZERO * scale)
-            .count()
+    ///
+    /// Exact, by union-find; LAPACK certifies it. `Success(count)` when the
+    /// measured spectrum separates at the proven gap, `Partial(count,
+    /// ambiguous magnitudes)` when it doesn't. Never a count from a threshold.
+    pub fn kernel_dimension(&self) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+        certify(&self.values, self.betti(), self.vertices.len(), self.dim())
     }
 
     /// D x, exactly: an assertion's question lands on the edges, an edge
