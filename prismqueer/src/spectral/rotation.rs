@@ -14,7 +14,7 @@
 //!
 //! Compose loops via kleinos ring-and-hub → wedge-at-K_3 basepoint emergent (the
 //! NOW / das Loch). Assign Kuramoto phase to each vertex. Advance rotation over N
-//! ticks. Per tick: Anna Wolf 2012 apparatus observes the composed graph at K_3
+//! ticks. Per tick: the apparatus read across from Anna Jakobs's 2012 thesis observes the composed graph at K_3
 //! basepoint without perturbing the rotation (LAPACK dsyev via FLANG); Kuramoto
 //! order parameter r ∈ [0,1] measures coupling synchronization; splinter
 //! crystallizes at content-address (Rec #82 β-normal AST OID); Fiedler λ₂
@@ -37,7 +37,7 @@
 //!   ternary refactor) — wedge-at-K_3 basepoint compose
 //! - `prismqueer::ffi::phase_lock` (Reed dd2fbee 2026-07-20 Kuramoto integration;
 //!   LAPACK-adjacent via FLANG native/spectral.f90) — temporal rotation
-//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — Anna Wolf 2012 apparatus
+//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — the apparatus read across from Anna Jakobs's 2012 thesis
 //!   (LAPACK dsyev via FLANG spectral_eigenvalues)
 //! - `prismqueer::oid::{Addressable, Oid}` — content-addressation per Rec #82
 //! - `terni::Imperfect<Green, Red, ConvergenceLoss>` — ternary functor per Alex
@@ -53,7 +53,13 @@
 //! - Rec #99 SINGULARITY.md K_n orbital topology + @time as rotational-substrate
 //!   through 5D spectral space (Dirac operator D IS temporal rotation) — **this
 //!   ship MAY be Level-1 empirical fire per Alex-observer adjudication**
-//! - Anna Wolf 2012 FZJ observation-without-perturbation (LOAD-BEARING)
+//! - Anna Jakobs (now Wolf), *Integration von OpenGL-Visualisierungstechniken
+//!   in GPU-Anwendungen*, Masterarbeit (Technomathematik), FH Aachen, Campus
+//!   Jülich, August 2012. Read across, not reproduced: the thesis has no graph
+//!   Laplacian. What carries over is the stance: the live visualization read
+//!   the simulation's data in place (shared buffer, no copy) at step
+//!   boundaries. Observation running at the same time as computation was the
+//!   thesis's future work (printed p. 43, results; p. 45, outlook).
 //! - Foerster 1974 ethical imperative (Fiedler monotone climb gauge)
 //! - Kuramoto 1975 coupled-oscillator synchronization
 //! - Ricky Jones 2026-08-26 rotation-is-non-negotiation canon
@@ -66,7 +72,7 @@ use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Trans
 
 use crate::ffi::phase_lock;
 use crate::oid::{Addressable, Oid};
-use crate::spectral::{kleinos, Property, Red, Graph};
+use crate::spectral::{kleinos, Graph, Property, Red};
 
 // ---------------------------------------------------------------------------
 // Splinter — the atomic crystallization of one observation-tick
@@ -89,7 +95,7 @@ pub struct Splinter {
     pub tick: usize,
     /// Content-address of the observation state at this tick.
     pub oid: Oid,
-    /// Fiedler λ₂ measured at composed graph basepoint (Anna Wolf 2012 apparatus
+    /// Fiedler λ₂ measured at composed graph basepoint (the apparatus read across from Anna Jakobs's 2012 thesis
     /// via LAPACK dsyev). Constant across ticks in Phase 1 (topology fixed);
     /// carries per-tick per-splinter for Phase 2+ topology-evolving rotation.
     pub fiedler_lambda_2: f64,
@@ -149,7 +155,7 @@ impl Default for RotationConfig {
 /// integration). Per tick:
 ///
 /// 1. Advance Kuramoto phase (spin the wheel by one dt)
-/// 2. Anna Wolf apparatus observes composed graph Fiedler λ₂ at K_3 basepoint (LAPACK
+/// 2. the apparatus read across from Anna Jakobs's 2012 thesis observes composed graph Fiedler λ₂ at K_3 basepoint (LAPACK
 ///    dsyev via FLANG — measurement without perturbation of rotation)
 /// 3. Compute Kuramoto order parameter r ∈ [0, 1] (coupling-coherence readout)
 /// 4. Content-address the tick state (phases, r, fiedler, tick) → splinter Oid
@@ -199,7 +205,7 @@ pub fn infer_via_rotation(
         Imperfect::Failure(red, loss) => return Imperfect::Failure(red, loss),
     };
 
-    // Anna Wolf apparatus: cached Fiedler λ₂ at composed graph basepoint.
+    // the apparatus read across from Anna Jakobs's 2012 thesis: cached Fiedler λ₂ at composed graph basepoint.
     // Per Phase 1 (topology fixed during rotation), Fiedler is CONSTANT per tick.
     // This IS the substrate-honest observation: the shape of the wedge doesn't
     // change while the phases evolve. Phase 2+ topology-evolving rotation would
@@ -211,9 +217,7 @@ pub fn infer_via_rotation(
     // order). Vertex i gets phase 2πi/n and omega omega_scale*(i*0.1 + 1.0).
     let vertices: Vec<_> = composed.vertices().collect();
     let n = vertices.len();
-    let mut phases: Vec<f64> = (0..n)
-        .map(|i| 2.0 * PI * (i as f64) / (n as f64))
-        .collect();
+    let mut phases: Vec<f64> = (0..n).map(|i| 2.0 * PI * (i as f64) / (n as f64)).collect();
     let omegas: Vec<f64> = (0..n)
         .map(|i| config.omega_scale * ((i as f64) * 0.1 + 1.0))
         .collect();
@@ -327,7 +331,10 @@ mod tests {
                 assert_eq!(splinters.len(), ticks, "one splinter per tick");
                 for (i, s) in splinters.iter().enumerate() {
                     assert_eq!(s.tick, i, "splinter tick == index");
-                    assert!(s.fiedler_lambda_2 > 0.0, "Fiedler must be positive for connected composed graph");
+                    assert!(
+                        s.fiedler_lambda_2 > 0.0,
+                        "Fiedler must be positive for connected composed graph"
+                    );
                     assert!(
                         s.order_r >= 0.0 && s.order_r <= 1.0,
                         "Kuramoto order parameter in [0, 1]; got {}",

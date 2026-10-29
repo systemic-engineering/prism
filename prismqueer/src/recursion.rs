@@ -30,7 +30,7 @@ use terni::Loss;
 
 /// Recursion state carrier per Alex Move 8+9.
 ///
-/// The thing that passes through prismqueer::bundle Baez-Schreiber tower + Anna Wolf ψ
+/// The thing that passes through prismqueer::bundle Baez-Schreiber tower + ψ (read across from Anna Jakobs's 2012 thesis)
 /// apparatus + Mandelbrot iteration. Iteration bounds → Crystal condenses; leftover
 /// harmonic content → Chaos emerges.
 #[derive(Clone, Debug)]
@@ -70,23 +70,22 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
     /// crystallizes the first Fractured shard. Chaos defaults to zero (asymptotic
     /// settled limit).
     ///
-    /// Full implementation composing prismqueer::bundle Baez-Schreiber tower + Anna
-    /// Wolf ψ + Mandelbrot iteration + Fiedler λ_2 monotone-climb check FORWARD-PROMISED.
+    /// Full implementation composing prismqueer::bundle Baez-Schreiber tower +
+    /// ψ (read across from Anna Jakobs's 2012 thesis) + Mandelbrot iteration + Fiedler λ_2 monotone-climb check FORWARD-PROMISED.
     pub fn tick(self) -> Observation<T> {
         match self.reality {
             Reality::Settled(crystal) => Observation::new(crystal, ScalarChaos::zero()),
             Reality::Fractured(mut shards) => {
-                let crystal: Crystal<T> = shards
-                    .drain(..)
-                    .next()
-                    .unwrap_or_else(|| Shard::from_parts(
+                let crystal: Crystal<T> = shards.drain(..).next().unwrap_or_else(|| {
+                    Shard::from_parts(
                         // Placeholder Shard for empty Fractured; iteration_index=0
                         // signals "no observation possible" per substrate-honest.
                         panic_helper_empty::<T>(),
                         crate::oid::Oid::dark(),
                         terni::Transparency::Clear,
                         0,
-                    ));
+                    )
+                });
                 Observation::new(crystal, ScalarChaos::zero())
             }
         }
@@ -94,7 +93,9 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
 }
 
 fn panic_helper_empty<T>() -> T {
-    unimplemented!("empty Fractured cannot produce a Crystal without a payload; caller must ensure non-empty")
+    unimplemented!(
+        "empty Fractured cannot produce a Crystal without a payload; caller must ensure non-empty"
+    )
 }
 
 #[cfg(test)]

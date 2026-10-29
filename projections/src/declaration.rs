@@ -132,6 +132,10 @@ use syn::{braced, parenthesized, FnArg, Ident, LitStr, Result, Token, Type};
 /// enum. T23 lands `Type`; T24 lands `Prism`; T25 lands `Action`;
 /// T26 lands `Grammar` — the four-shim cascade is now total at the
 /// Rust altitude.
+///
+/// Variant sizes differ a lot, but this is a parse-time value built once
+/// per macro invocation and consumed immediately, so boxing would buy nothing.
+#[allow(clippy::large_enum_variant)]
 enum SubstrateDecl {
     Type(SubstrateTypeDecl),
     Prism(SubstratePrismDecl),

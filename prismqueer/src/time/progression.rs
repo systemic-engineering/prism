@@ -71,7 +71,8 @@ impl<E: Ord, I: Independence<E>> Progression<E, I> {
 
     /// Sequential time: the number of events, if known.
     pub fn len(&self) -> Option<usize> {
-        self.foata().map(|steps| steps.iter().map(BTreeSet::len).sum())
+        self.foata()
+            .map(|steps| steps.iter().map(BTreeSet::len).sum())
     }
 
     /// Whether this is the known, empty history.
@@ -100,7 +101,10 @@ impl<E: Ord + Clone, I> Clone for Progression<E, I> {
             Body::Known(steps) => Body::Known(steps.clone()),
             Body::Lost => Body::Lost,
         };
-        Self { body, rel: PhantomData }
+        Self {
+            body,
+            rel: PhantomData,
+        }
     }
 }
 

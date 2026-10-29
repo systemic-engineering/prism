@@ -45,7 +45,10 @@ fn of_health_healthy_yields_pass() {
 fn of_health_too_shallow_yields_partial_confidence_half() {
     let verdict = pillar::of_health(&HolonomyHealth::TooShallow);
     match verdict {
-        PropertyVerdict::Partial { confidence, diagnostics } => {
+        PropertyVerdict::Partial {
+            confidence,
+            diagnostics,
+        } => {
             assert!(
                 (confidence - 0.5).abs() < 1e-9,
                 "expected confidence 0.5, got {confidence}",
@@ -87,7 +90,10 @@ fn end_to_end_berry_phase_loss_yields_pass() {
 fn end_to_end_zero_loss_yields_partial() {
     let health = holonomy_health(0.0);
     let verdict = pillar::of_health(&health);
-    assert!(matches!(verdict, PropertyVerdict::Partial { .. }), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Partial { .. }),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
@@ -95,7 +101,10 @@ fn end_to_end_zero_loss_yields_partial() {
 fn end_to_end_extreme_loss_yields_fail() {
     let health = holonomy_health(BERRY_PHASE * 100.0);
     let verdict = pillar::of_health(&health);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -107,7 +116,10 @@ fn end_to_end_extreme_loss_yields_fail() {
 fn boundary_just_below_shallow_threshold_yields_partial() {
     let health = holonomy_health(BERRY_PHASE * 0.099);
     let verdict = pillar::of_health(&health);
-    assert!(matches!(verdict, PropertyVerdict::Partial { .. }), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Partial { .. }),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
@@ -131,7 +143,10 @@ fn boundary_just_below_over_cutting_yields_pass() {
 fn boundary_just_above_over_cutting_yields_fail() {
     let health = holonomy_health(BERRY_PHASE * 11.0);
     let verdict = pillar::of_health(&health);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -144,10 +159,10 @@ fn boundary_just_above_over_cutting_yields_fail() {
 /// forces Fail per Beer audit-channel semantics (iter 8 witnesses).
 fn folded_training_run_with_over_cutting_yields_fail() {
     let losses = vec![
-        BERRY_PHASE,               // Healthy → Pass
-        BERRY_PHASE * 2.0,         // Healthy → Pass
-        BERRY_PHASE * 15.0,        // OverCutting → Fail
-        BERRY_PHASE * 1.5,         // Healthy → Pass
+        BERRY_PHASE,        // Healthy → Pass
+        BERRY_PHASE * 2.0,  // Healthy → Pass
+        BERRY_PHASE * 15.0, // OverCutting → Fail
+        BERRY_PHASE * 1.5,  // Healthy → Pass
     ];
     let verdicts: Vec<PropertyVerdict> = losses
         .iter()

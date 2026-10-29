@@ -28,7 +28,7 @@
 //! Composes over LANDED per HARD RULE `feedback-rust-delivers-primitives-
 //! substrate-delivers-composition`:
 //!
-//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — Anna Wolf 2012 apparatus
+//! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — the apparatus read across from Anna Jakobs's 2012 thesis
 //!   at basepoint via LAPACK dsyev (composes into tension detection)
 //! - `prismqueer::ffi::eigenvalues` — full spectrum for component-count via
 //!   zero-eigenvalue-multiplicity read
@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 use crate::ffi::eigenvalues;
-use crate::spectral::{Property, Red, Graph, VertexId};
+use crate::spectral::{Graph, Property, Red, VertexId};
 
 // ---------------------------------------------------------------------------
 // TensionKind, Location, Tension carriers
@@ -122,9 +122,7 @@ pub struct Tension {
 ///   partial due to spectrum-computation loss)
 /// - **Red** (`Imperfect::Failure(red, loss)`) — detection refused: eigenvalue
 ///   computation failed OR sheaf is empty
-pub fn detect_tensions(
-    sheaf: &Graph,
-) -> Imperfect<Vec<Tension>, Red, ConvergenceLoss> {
+pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, ConvergenceLoss> {
     let vertex_count = sheaf.vertices().count();
     let edge_count = sheaf.edges().count();
 
@@ -191,11 +189,7 @@ pub fn detect_tensions(
 
     // 2. Cohomological tension: β₁ = |E| - |V| + |components|.
     // Independent cycles = topological holes.
-    let betti_one = if edge_count + component_count >= n {
-        edge_count + component_count - n
-    } else {
-        0
-    };
+    let betti_one = (edge_count + component_count).saturating_sub(n);
     if betti_one > 0 {
         tensions.push(Tension {
             kind: TensionKind::Cohomological { betti_one },

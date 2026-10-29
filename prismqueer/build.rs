@@ -416,7 +416,9 @@ fn main() {
         let fc = env::var("FC")
             .or_else(|_| env::var("FLANG"))
             .unwrap_or_else(|_| "gfortran".to_string());
-        let native_dir = Path::new("native");
+        // Absolute, because the compiler runs inside OUT_DIR (below).
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let native_dir = Path::new(&manifest_dir).join("native");
 
         // Sanity check: native/ dir must exist with the two Fortran sources.
         assert!(
@@ -431,15 +433,15 @@ fn main() {
 
         for src in &["spectral.f90", "prism.f90"] {
             let src_path = native_dir.join(src);
-            assert!(
-                src_path.exists(),
-                "prismqueer/native/{} not found",
-                src
-            );
+            assert!(src_path.exists(), "prismqueer/native/{} not found", src);
             let stem = src_path.file_stem().unwrap().to_str().unwrap();
             let obj_path = out.join(format!("{}.o", stem));
 
+            // Run inside OUT_DIR: gfortran and flang write `.mod` files to
+            // the working directory, and the source tree may be read-only
+            // (nix store). Nothing the build writes belongs next to the crate.
             let status = Command::new(&fc)
+                .current_dir(out)
                 .arg("-c")
                 .arg("-fPIC")
                 .arg("-O2")
@@ -479,7 +481,11 @@ fn main() {
         let status = ar_cmd
             .status()
             .unwrap_or_else(|e| panic!("failed to invoke ar `{}`: {}", ar, e));
-        assert!(status.success(), "ar failed archiving {}", lib_path.display());
+        assert!(
+            status.success(),
+            "ar failed archiving {}",
+            lib_path.display()
+        );
 
         // Link the Fortran static lib + LAPACK/BLAS/flang-rt.
         println!("cargo:rustc-link-search=native={}", out.display());
@@ -497,7 +503,11 @@ fn main() {
 
         // Fortran runtime: gfortran path (nix devshell). Discover the
         // libgfortran directory via `gfortran -print-file-name=...`.
-        let ext = if cfg!(target_os = "macos") { "dylib" } else { "so" };
+        let ext = if cfg!(target_os = "macos") {
+            "dylib"
+        } else {
+            "so"
+        };
         if let Ok(out) = Command::new(&fc)
             .arg(format!("-print-file-name=libgfortran.{}", ext))
             .output()

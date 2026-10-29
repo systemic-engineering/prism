@@ -61,15 +61,14 @@ impl Spectrum {
     pub fn of(sheaf: &Graph) -> Self {
         let n = sheaf.vertex_count();
         if n < 2 {
-            return Self { eigenvalues: Vec::new() };
+            return Self {
+                eigenvalues: Vec::new(),
+            };
         }
 
         // Map VertexId → matrix index (canonical order per BTreeSet).
-        let vertex_index: BTreeMap<VertexId, usize> = sheaf
-            .vertices()
-            .enumerate()
-            .map(|(i, v)| (v, i))
-            .collect();
+        let vertex_index: BTreeMap<VertexId, usize> =
+            sheaf.vertices().enumerate().map(|(i, v)| (v, i)).collect();
 
         // Build graph Laplacian L = D - A (row-major flat matrix; symmetric).
         let mut laplacian = vec![0.0_f64; n * n];
@@ -226,7 +225,9 @@ impl DeltaCritical {
         if lambda_max == 0.0 {
             return Self { value: None };
         }
-        Self { value: Some(1.0 - lambda_2 / lambda_max) }
+        Self {
+            value: Some(1.0 - lambda_2 / lambda_max),
+        }
     }
 }
 
@@ -257,7 +258,10 @@ mod tests {
         let evals = Spectrum::of(&k3).eigenvalues;
         assert_eq!(evals.len(), 2, "K_3 has n-1 = 2 non-trivial eigenvalues");
         for &lambda in &evals {
-            assert!((lambda - 3.0).abs() < 1e-9, "K_3 eigenvalue should equal n = 3; got {lambda}");
+            assert!(
+                (lambda - 3.0).abs() < 1e-9,
+                "K_3 eigenvalue should equal n = 3; got {lambda}"
+            );
         }
     }
 
@@ -321,7 +325,11 @@ mod tests {
     fn split_of_path_p3_returns_fiedler_one() {
         let p3 = graph_from_edges(&[(0, 1), (1, 2)]);
         let split = Spectrum::of(&p3).split();
-        assert!((split.0 - 1.0).abs() < 1e-9, "P_3 Fiedler = 1.0; got {:?}", split);
+        assert!(
+            (split.0 - 1.0).abs() < 1e-9,
+            "P_3 Fiedler = 1.0; got {:?}",
+            split
+        );
     }
 
     /// K_5 refract axis reading: Von Neumann entropy of density matrix
@@ -390,7 +398,9 @@ mod tests {
     #[test]
     fn delta_critical_of_k5_returns_zero_splinter_pole() {
         let k5 = graph_complete_of_order(5);
-        let delta = DeltaCritical::of(&k5).value.expect("K_5 has non-empty spectrum");
+        let delta = DeltaCritical::of(&k5)
+            .value
+            .expect("K_5 has non-empty spectrum");
         assert!(
             delta.abs() < 1e-9,
             "K_5 (Splinter pole) δ_critical = 0 (cooperation trivial); got {delta}"
@@ -401,7 +411,9 @@ mod tests {
     #[test]
     fn delta_critical_of_star_k14_returns_0_8_narcissus_pole() {
         let star = graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)]);
-        let delta = DeltaCritical::of(&star).value.expect("K_{1,4} has non-empty spectrum");
+        let delta = DeltaCritical::of(&star)
+            .value
+            .expect("K_{1,4} has non-empty spectrum");
         assert!(
             (delta - 0.8).abs() < 1e-9,
             "K_{{1,4}} (Narcissus-adjacent) δ_critical = 1 - 1/5 = 0.8; got {delta}"
@@ -412,7 +424,9 @@ mod tests {
     #[test]
     fn delta_critical_of_path_p3_returns_two_thirds() {
         let p3 = graph_from_edges(&[(0, 1), (1, 2)]);
-        let delta = DeltaCritical::of(&p3).value.expect("P_3 has non-empty spectrum");
+        let delta = DeltaCritical::of(&p3)
+            .value
+            .expect("P_3 has non-empty spectrum");
         assert!(
             (delta - (2.0 / 3.0)).abs() < 1e-9,
             "P_3 δ_critical = 1 - 1/3 = 2/3; got {delta}"

@@ -164,7 +164,7 @@ fn compile_library(device: &Device, src: &str) -> Result<metal::Library, String>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{runtime::FateRuntime, FEATURE_DIM, MODELS};
+    use crate::fate::{runtime::FateRuntime, FEATURE_DIM, MODELS};
 
     fn zero_features() -> Features {
         [0.0; FEATURE_DIM]

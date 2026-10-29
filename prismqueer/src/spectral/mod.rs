@@ -33,18 +33,8 @@ pub mod spectrum;
 pub mod tension;
 
 pub use kleinos::{
-    kleinos,
-    graph_from_edges,
-    graph_complete_of_order,
-    fiedler_lambda_2_of_graph,
-    Composition,
-    Graph,
-    Green,
-    Red,
-    Property,
-    WhichSide,
-    VertexId,
-    EdgeKey,
+    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, kleinos, Composition,
+    EdgeKey, Graph, Green, Property, Red, VertexId, WhichSide,
 };
 
 pub use commutator::{Dissonance, Unmeasured};

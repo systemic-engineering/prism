@@ -198,7 +198,12 @@ impl Eigen {
         let (values, vectors) =
             crate::ffi::eigensystem(n, &laplacian).map_err(Wall::Eigensystem)?;
         let harmonic = kernel(&values, components(graph, &index), n)?;
-        Ok(Self { vertices, values, vectors, harmonic })
+        Ok(Self {
+            vertices,
+            values,
+            vectors,
+            harmonic,
+        })
     }
 
     /// Whether mode `k` is in the kernel. Decided by index, not by threshold.
@@ -243,14 +248,22 @@ pub fn settle(
         let v = eigen.vector(k);
         let was: f64 = v.iter().zip(&psi).map(|(a, b)| a * b).sum();
         let harmonic = eigen.is_harmonic(k);
-        let now = if harmonic { was } else { was * (-eigenvalue * t.0).exp() };
+        let now = if harmonic {
+            was
+        } else {
+            was * (-eigenvalue * t.0).exp()
+        };
         for (o, &vi) in out.iter_mut().zip(&v) {
             *o += now * vi;
         }
         if harmonic {
             continue;
         }
-        let mode = Mode { eigenvalue, was, now };
+        let mode = Mode {
+            eigenvalue,
+            was,
+            now,
+        };
         if now.abs() >= eps.0 {
             motion.moving.push(mode);
         } else if was.abs() >= eps.0 {
@@ -286,7 +299,9 @@ mod tests {
     }
 
     fn values(s: &Pitches, n: usize) -> Vec<f64> {
-        (0..n).map(|i| s.get(i as VertexId).expect("vertex present")).collect()
+        (0..n)
+            .map(|i| s.get(i as VertexId).expect("vertex present"))
+            .collect()
     }
 
     fn close(a: &[f64], b: &[f64]) -> bool {
@@ -331,7 +346,10 @@ mod tests {
             Err(Wall::Unseparated { components: 1 })
         );
         // One component, but its kernel eigenvalue is not zero.
-        assert_eq!(kernel(&[0.3, 1.0], 1, 2), Err(Wall::Unseparated { components: 1 }));
+        assert_eq!(
+            kernel(&[0.3, 1.0], 1, 2),
+            Err(Wall::Unseparated { components: 1 })
+        );
     }
 
     // --- Loop 1: where the recursion stops moving ---
@@ -424,7 +442,11 @@ mod tests {
     #[test]
     fn motion_is_a_lawful_loss() {
         let a = Tail {
-            moving: vec![Mode { eigenvalue: 1.0, was: 1.0, now: 0.5 }],
+            moving: vec![Mode {
+                eigenvalue: 1.0,
+                was: 1.0,
+                now: 0.5,
+            }],
             ..Tail::zero()
         };
         assert_eq!(Tail::zero().combine(a.clone()), a);
@@ -465,7 +487,10 @@ mod tests {
     fn control_the_complete_graph_commutes_with_any_rewiring() {
         // L(K_n) = nI - J commutes with every Laplacian on the same vertices,
         // because J·L = L·J = 0. At the Splinter pole, order stops mattering.
-        let (g1, k3) = (path_centered_at_1(), graph_from_edges(&[(0, 1), (1, 2), (0, 2)]));
+        let (g1, k3) = (
+            path_centered_at_1(),
+            graph_from_edges(&[(0, 1), (1, 2), (0, 2)]),
+        );
         let start = section(&[3.0, 0.0, 1.0]);
         let ab = flow(&k3, &flow(&g1, &start, 0.3), 0.3);
         let ba = flow(&g1, &flow(&k3, &start, 0.3), 0.3);
@@ -532,7 +557,9 @@ mod rewiring_property {
     }
 
     fn flow(g: &Graph, s: &Pitches) -> Pitches {
-        settle(g, s, Time(S), Noise(1e-6)).ok().expect("flow measured")
+        settle(g, s, Time(S), Noise(1e-6))
+            .ok()
+            .expect("flow measured")
     }
 
     fn basis(n: usize, i: usize) -> Pitches {
@@ -559,13 +586,18 @@ mod rewiring_property {
             let by_graph = match Dissonance::of(&r.before, &r.after) {
                 Imperfect::Success(cs) => cs.spectrum.is_empty(),
                 other => {
-                    return Imperfect::Failure(format!("seed {seed}: instrument undecided: {other:?}"), budget)
+                    return Imperfect::Failure(
+                        format!("seed {seed}: instrument undecided: {other:?}"),
+                        budget,
+                    )
                 }
             };
             let by_execution = flows_commute(&r);
             if by_graph != by_execution {
                 return Imperfect::Failure(
-                    format!("seed {seed}: graph says {by_graph}, execution says {by_execution}: {r:?}"),
+                    format!(
+                        "seed {seed}: graph says {by_graph}, execution says {by_execution}: {r:?}"
+                    ),
                     budget,
                 );
             }

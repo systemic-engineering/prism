@@ -245,15 +245,13 @@ fn extract_oid_name(input: &DeriveInput, derive_name: &str) -> String {
         if attr.path().is_ident("oid") {
             if let Meta::List(meta_list) = &attr.meta {
                 let tokens = meta_list.tokens.clone();
-                if let Ok(expr) = syn::parse2::<Expr>(tokens) {
-                    if let Expr::Lit(lit) = expr {
-                        if let Lit::Str(s) = &lit.lit {
-                            let val = s.value();
-                            if !val.starts_with('@') {
-                                panic!("#[oid(\"...\")] value must start with '@', got: {:?}", val);
-                            }
-                            return val;
+                if let Ok(Expr::Lit(lit)) = syn::parse2::<Expr>(tokens) {
+                    if let Lit::Str(s) = &lit.lit {
+                        let val = s.value();
+                        if !val.starts_with('@') {
+                            panic!("#[oid(\"...\")] value must start with '@', got: {:?}", val);
                         }
+                        return val;
                     }
                 }
             }
@@ -320,17 +318,14 @@ fn extract_annotated_fields(input: &DeriveInput) -> Vec<AnnotatedField> {
 /// Validate optic annotations against field types.
 fn validate_annotations(fields: &[AnnotatedField]) {
     for field in fields {
-        match field.kind {
-            FieldKind::Lens => {
-                // #[lens] on Option<T> is a compile error
-                if is_option_type(&field.ty) {
-                    panic!(
-                        "#[lens] on field `{}`: Lens is total, but Option<T> is partial. Use #[prism] instead.",
-                        field.ident
-                    );
-                }
+        // #[lens] on Option<T> is a compile error
+        if let FieldKind::Lens = field.kind {
+            if is_option_type(&field.ty) {
+                panic!(
+                    "#[lens] on field `{}`: Lens is total, but Option<T> is partial. Use #[prism] instead.",
+                    field.ident
+                );
             }
-            _ => {}
         }
     }
 }

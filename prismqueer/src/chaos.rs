@@ -59,7 +59,9 @@
 pub use terni::{Loss as Chaos, Metric as ChaosMetric};
 
 // Domain-specific Chaos impls (re-exported from terni with phenomenological naming).
-pub use terni::{ApertureLoss as ApertureChaos, ConvergenceLoss as ConvergenceChaos, RoutingLoss as RoutingChaos};
+pub use terni::{
+    ApertureLoss as ApertureChaos, ConvergenceLoss as ConvergenceChaos, RoutingLoss as RoutingChaos,
+};
 
 // Numeric Chaos impl via prismqueer::ScalarLoss re-export.
 pub use crate::ScalarLoss as ScalarChaos;
@@ -76,7 +78,11 @@ mod tests {
         let zero: ScalarChaos = ScalarChaos::zero();
         let composed = zero.combine(ScalarChaos::new(5.0));
         // Monoid identity: zero ◦ x = x
-        assert_eq!(composed, ScalarChaos::new(5.0), "Chaos::zero() is the monoid identity");
+        assert_eq!(
+            composed,
+            ScalarChaos::new(5.0),
+            "Chaos::zero() is the monoid identity"
+        );
     }
 
     #[test]
@@ -93,7 +99,9 @@ mod tests {
         // Reed 2026-09-04 substrate-fix verification: Chaos and Loss are literally
         // the SAME trait per pub use terni::Loss as Chaos. This test confirms the
         // type-alias reaches back to the monoid axioms.
-        fn require_chaos<C: Chaos>(_: &C) -> bool { true }
+        fn require_chaos<C: Chaos>(_: &C) -> bool {
+            true
+        }
         let scalar = ScalarChaos::zero();
         assert!(require_chaos(&scalar));
     }

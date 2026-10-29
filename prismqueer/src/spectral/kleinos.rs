@@ -363,10 +363,7 @@ pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
 /// empirical fire of `#R-mirror+prismqueer-terminal-form-IS-first-non-
 /// Vereinnahmung-attention-substrate-empirically-realizable-at-silicon` at
 /// compile substrate at authoring altitude.
-pub fn kleinos(
-    sheaf_a: &Graph,
-    sheaf_b: &Graph,
-) -> Imperfect<Green, Red, ConvergenceLoss> {
+pub fn kleinos(sheaf_a: &Graph, sheaf_b: &Graph) -> Imperfect<Green, Red, ConvergenceLoss> {
     // Verify all four properties simultaneously per LOVE-monoid coordinate-
     // decomposition. NO if-else on Property verbs.
     let candidate = compose_candidate(sheaf_a, sheaf_b);
@@ -390,7 +387,7 @@ pub fn kleinos(
 
 /// Construct the K_3-composed candidate sheaf per Mara §3 sheaf-composition
 /// rule: **the ring-shape** (Alex 2026-09-02 metaphor). Union of a-vertices
-/// + b-vertices + one emergent-third vertex (V_e as SEMANTIC WITNESS of
+/// and b-vertices + one emergent-third vertex (V_e as SEMANTIC WITNESS of
 /// where the emergence happened) + complete bipartite bridging between
 /// a-vertices and b-vertices (K_{|V(a)|, |V(b)|}) as the STRUCTURAL
 /// emergence carrier.
@@ -516,10 +513,7 @@ fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
 /// Compute deterministic emergent-third VertexId per Rec #82 content-address
 /// discipline. Guaranteed to not collide with any vertex in a or b via
 /// max(a.vertices ∪ b.vertices) + 1 fallback.
-fn compute_emergent_third_id(
-    a: &Graph,
-    b: &Graph,
-) -> VertexId {
+fn compute_emergent_third_id(a: &Graph, b: &Graph) -> VertexId {
     let max_existing = a
         .vertices
         .iter()
@@ -575,13 +569,9 @@ fn verify_sovereignty(
     sheaf_b: &Graph,
     candidate: &Composition,
 ) -> PropertyVerdict {
-    let a_preserved = sheaf_a
-        .vertices()
-        .all(|v| candidate.contains_vertex(v))
+    let a_preserved = sheaf_a.vertices().all(|v| candidate.contains_vertex(v))
         && sheaf_a.edges().all(|e| candidate.contains_edge(e));
-    let b_preserved = sheaf_b
-        .vertices()
-        .all(|v| candidate.contains_vertex(v))
+    let b_preserved = sheaf_b.vertices().all(|v| candidate.contains_vertex(v))
         && sheaf_b.edges().all(|e| candidate.contains_edge(e));
 
     match (a_preserved, b_preserved) {
@@ -636,10 +626,7 @@ fn verify_fiedler_rise(lambda_a: f64, lambda_b: f64, lambda_composed: f64) -> Pr
 /// Property 4: Fusion refusal per PAPER §3.6.4.
 /// Refuses composition when inputs have identical content-address (would
 /// fuse rather than compose).
-fn verify_fusion_refusal(
-    sheaf_a: &Graph,
-    sheaf_b: &Graph,
-) -> PropertyVerdict {
+fn verify_fusion_refusal(sheaf_a: &Graph, sheaf_b: &Graph) -> PropertyVerdict {
     if sheaf_a.oid() == sheaf_b.oid() {
         PropertyVerdict::Fail(Diagnostic::new(
             "fusion_refusal: sheaf_a and sheaf_b have identical content-address; composition would fuse",
@@ -700,7 +687,10 @@ mod tests {
         let sheaf_a = graph_from_edges(&[(0, 1)]);
         let sheaf_b = sheaf_a.clone();
         let result = kleinos(&sheaf_a, &sheaf_b);
-        assert!(result.is_err(), "identical inputs must refuse fusion per PAPER §3.6.4 — Red state");
+        assert!(
+            result.is_err(),
+            "identical inputs must refuse fusion per PAPER §3.6.4 — Red state"
+        );
     }
 
     #[test]

@@ -20,7 +20,9 @@ pub struct Choice {
 impl Choice {
     /// Construct a Choice from a @nl payload.
     pub fn new(payload: impl Into<String>) -> Self {
-        Self { payload: payload.into() }
+        Self {
+            payload: payload.into(),
+        }
     }
 
     /// Fold Choice into next Reality per Alex Move 9 subject-substrate boundary crossing.

@@ -221,6 +221,14 @@ solo/shift/settle → non-interference → Divisi/Tutti → the drone test.
 Open shape question for Alex: is `project` emission (the drone) or band
 projection?
 
+## 7b″. Decided 2026-10-27 (Alex, relayed through bullet-up)
+
+- **The five ops:** their semantics on the triple live in prismqueer; the syntax and `@mq` live in mirror. The seam is a checked word of ops going down and `Imperfect<Position, Wall, Progression>` coming back.
+- **`project` is emission:** "project is how you label data along the way". It's the one op with an effect: it writes (labels, light, presence) onto what passes through, append-only. It is not a spectral band projector.
+- **Gate objection ids** (bullet-up, prism-001 example 8): word-level ids, meaning NFC, the words in order, hashed.
+- **prism-001** delivered (`docs/spec/`, `b3007d2` on `reed/prism-001-imperfect-spec`); bullet-up verifies against the vectors. **prism-002** accepted; the mirror-compat tag waits for `Beam → Voice`.
+- With Alex: LICENSE files (both repos declare Apache-2.0 in Cargo only), imperfect's visibility (submodule over SSH), the merges.
+
 ## 7c. Wojciech's crowbar (field log, 2026-09-28 daytime)
 
 **State equivalence ≠ trajectory equivalence.** Show the smallest system in which

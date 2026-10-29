@@ -114,9 +114,8 @@ fn apply_equals_manual_focus_project_settle_pipeline() {
 /// (spectral-triple operator on Hilbert space).
 fn apply_h_over_identity_prism_returns_success_with_input_state() {
     let prism: IdentityPrism<u32> = IdentityPrism::new();
-    let out = apply_h::<_, u32, u32, u32, std::convert::Infallible, prismqueer::ScalarLoss>(
-        &prism, 100,
-    );
+    let out =
+        apply_h::<_, u32, u32, u32, std::convert::Infallible, prismqueer::ScalarLoss>(&prism, 100);
     match out {
         terni::Imperfect::Success(v) => assert_eq!(v, 100),
         other => panic!("expected Success(100), got {other:?}"),
@@ -156,7 +155,10 @@ fn identity_prism_produces_success_beam_with_no_loss() {
     let beam: Optic<(), [f64; 4]> = Optic::ok((), seed);
     let refracted = apply(&prism, beam);
     assert!(refracted.is_ok(), "IdentityPrism must produce Success beam");
-    assert!(!refracted.is_err(), "IdentityPrism must not produce Failure");
+    assert!(
+        !refracted.is_err(),
+        "IdentityPrism must not produce Failure"
+    );
     // Value present + equals seed.
     assert_eq!(refracted.value(), Some(&seed));
 }
@@ -176,9 +178,9 @@ fn prism_law_composes_to_property_verdict() {
     let refracted = apply(&prism, Optic::<(), u32>::ok((), seed));
     let verdict = match refracted.value() {
         Some(v) if *v == seed => PropertyVerdict::Pass,
-        Some(v) => PropertyVerdict::Fail(Diagnostic::new(
-            format!("IdentityPrism roundtrip failed: expected {seed}, got {v}"),
-        )),
+        Some(v) => PropertyVerdict::Fail(Diagnostic::new(format!(
+            "IdentityPrism roundtrip failed: expected {seed}, got {v}"
+        ))),
         None => PropertyVerdict::Fail(Diagnostic::new(
             "IdentityPrism produced dark beam — no value",
         )),

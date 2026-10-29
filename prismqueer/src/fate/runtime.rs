@@ -127,7 +127,7 @@ impl FateRuntime {
         let mut input = Vec::with_capacity(22);
         // 16 feature bytes (clamp f64 to 0-255)
         for &f in features.iter() {
-            input.push((f as f64).clamp(0.0_f64, 255.0_f64) as u8);
+            input.push(f.clamp(0.0_f64, 255.0_f64) as u8);
         }
         // Model index byte
         input.push(model_idx);
@@ -300,7 +300,7 @@ impl UniversalRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Fate, FEATURE_DIM, MODELS};
+    use crate::fate::{Fate, FEATURE_DIM, MODELS};
 
     fn zero_features() -> Features {
         [0.0; FEATURE_DIM]

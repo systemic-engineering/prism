@@ -16,7 +16,7 @@
 use std::collections::BTreeSet;
 
 use prismqueer::oid::{Addressable, Oid};
-use prismqueer::time::{Polyphony, Independence, Monophony, Touches, Progression};
+use prismqueer::time::{Independence, Monophony, Polyphony, Progression, Touches};
 
 /// A step that touches named sites.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -92,28 +92,45 @@ fn swapping_independent_steps_is_the_same_trajectory() {
     let a = step("a", &["x"], &["x"]);
     let b = step("b", &["y"], &["y"]);
     let v = step("v", &["x", "y"], &[]);
-    assert!(Polyphony.independent(&a, &b), "precondition: a and b touch disjoint sites");
+    assert!(
+        Polyphony.independent(&a, &b),
+        "precondition: a and b touch disjoint sites"
+    );
 
-    let ab: Progression<Step, Polyphony> = Progression::from_word([u.clone(), a.clone(), b.clone(), v.clone()]);
+    let ab: Progression<Step, Polyphony> =
+        Progression::from_word([u.clone(), a.clone(), b.clone(), v.clone()]);
     let ba: Progression<Step, Polyphony> = Progression::from_word([u, b, a, v]);
 
     assert!(ab == ba, "independent swap changed the trace");
-    assert!(same(&ab.oid(), &ba.oid()), "independent swap changed the address");
+    assert!(
+        same(&ab.oid(), &ba.oid()),
+        "independent swap changed the address"
+    );
     assert_eq!(ab.len(), Some(4), "sequential time counts every step");
-    assert_eq!(ab.height(), Some(3), "parallel time: u, then a and b together, then v");
+    assert_eq!(
+        ab.height(),
+        Some(3),
+        "parallel time: u, then a and b together, then v"
+    );
 }
 
 #[test]
 fn swapping_dependent_steps_is_a_different_trajectory() {
     let a = step("a", &[], &["x"]);
     let b = step("b", &["x"], &["y"]);
-    assert!(!Polyphony.independent(&a, &b), "precondition: b reads what a writes");
+    assert!(
+        !Polyphony.independent(&a, &b),
+        "precondition: b reads what a writes"
+    );
 
     let ab: Progression<Step, Polyphony> = Progression::from_word([a.clone(), b.clone()]);
     let ba: Progression<Step, Polyphony> = Progression::from_word([b, a]);
 
     assert!(ab != ba, "dependent swap left the trace unchanged");
-    assert!(!same(&ab.oid(), &ba.oid()), "dependent swap left the address unchanged");
+    assert!(
+        !same(&ab.oid(), &ba.oid()),
+        "dependent swap left the address unchanged"
+    );
 }
 
 // --- T4: the relation and the step boundaries are part of the address ---
@@ -126,8 +143,16 @@ fn the_same_word_under_linear_time_is_a_different_trajectory() {
     let nonlinear: Progression<Step, Polyphony> = Progression::from_word([a.clone(), b.clone()]);
     let linear: Progression<Step, Monophony> = Progression::from_word([a, b]);
 
-    assert_eq!(nonlinear.height(), Some(1), "independent steps share one Foata step");
-    assert_eq!(linear.height(), Some(2), "under Monophony every step is its own");
+    assert_eq!(
+        nonlinear.height(),
+        Some(1),
+        "independent steps share one Foata step"
+    );
+    assert_eq!(
+        linear.height(),
+        Some(2),
+        "under Monophony every step is its own"
+    );
     assert!(
         !same(&nonlinear.oid(), &linear.oid()),
         "{{a,b}} and {{a}}{{b}} must not share an address"
@@ -148,9 +173,9 @@ fn the_same_word_under_linear_time_is_a_different_trajectory() {
 #[cfg(feature = "lapack")]
 #[test]
 fn state_equivalence_is_not_trajectory_equivalence() {
-    use prismqueer::spectral::{graph_from_edges, Graph};
     use prismqueer::spectral::settle::{settle, Noise, Pitches, Time};
     use prismqueer::spectral::Dissonance;
+    use prismqueer::spectral::{graph_from_edges, Graph};
     use terni::Imperfect;
 
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
@@ -162,8 +187,12 @@ fn state_equivalence_is_not_trajectory_equivalence() {
 
     let s = Pitches::new([(0, 1.0), (1, 1.0), (2, 1.0)]);
     let run = |first: &Graph, second: &Graph| -> Pitches {
-        let mid = settle(first, &s, Time(0.5), Noise(1e-9)).ok().expect("first flow");
-        settle(second, &mid, Time(0.5), Noise(1e-9)).ok().expect("second flow")
+        let mid = settle(first, &s, Time(0.5), Noise(1e-9))
+            .ok()
+            .expect("first flow");
+        settle(second, &mid, Time(0.5), Noise(1e-9))
+            .ok()
+            .expect("second flow")
     };
     let ab = run(&a, &b);
     let ba = run(&b, &a);
@@ -176,7 +205,11 @@ fn state_equivalence_is_not_trajectory_equivalence() {
 
     let flow_a = step("settle under a", &["section"], &["section"]);
     let flow_b = step("settle under b", &["section"], &["section"]);
-    let t_ab: Progression<Step, Polyphony> = Progression::from_word([flow_a.clone(), flow_b.clone()]);
+    let t_ab: Progression<Step, Polyphony> =
+        Progression::from_word([flow_a.clone(), flow_b.clone()]);
     let t_ba: Progression<Step, Polyphony> = Progression::from_word([flow_b, flow_a]);
-    assert!(!same(&t_ab.oid(), &t_ba.oid()), "the trace forgot the order too");
+    assert!(
+        !same(&t_ab.oid(), &t_ba.oid()),
+        "the trace forgot the order too"
+    );
 }

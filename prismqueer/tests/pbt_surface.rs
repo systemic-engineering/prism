@@ -106,7 +106,10 @@ fn sample_draw_from_returns_element_from_choices() {
     for _ in 0..50 {
         let mut s = Sample::new();
         let v = s.draw_from(&choices);
-        assert!(choices.contains(&v), "draw_from returned foreign value: {v}");
+        assert!(
+            choices.contains(&v),
+            "draw_from returned foreign value: {v}"
+        );
     }
 }
 
@@ -129,7 +132,11 @@ fn sample_buffer_oid_content_addresses_the_buffer() {
     assert_eq!(a.buffer_oid(), b.buffer_oid(), "same buffer = same oid");
 
     let c = Sample::from_bytes(vec![9u8; 8]);
-    assert_ne!(a.buffer_oid(), c.buffer_oid(), "different buffer = different oid");
+    assert_ne!(
+        a.buffer_oid(),
+        c.buffer_oid(),
+        "different buffer = different oid"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -193,7 +200,10 @@ fn arbitrary_u64_generates_full_range() {
 fn forall_tautology_returns_pass() {
     // Every i32 satisfies `true`.
     let v = forall::<i32, _>(50, |_x| PropertyVerdict::Pass);
-    assert!(matches!(v, PropertyVerdict::Pass), "tautology must Pass, got {v:?}");
+    assert!(
+        matches!(v, PropertyVerdict::Pass),
+        "tautology must Pass, got {v:?}"
+    );
 }
 
 #[test]
@@ -202,7 +212,10 @@ fn forall_contradiction_returns_fail() {
     let v = forall::<i32, _>(50, |_x| {
         PropertyVerdict::Fail(terni::Diagnostic::new("always fails"))
     });
-    assert!(matches!(v, PropertyVerdict::Fail(_)), "contradiction must Fail, got {v:?}");
+    assert!(
+        matches!(v, PropertyVerdict::Fail(_)),
+        "contradiction must Fail, got {v:?}"
+    );
 }
 
 #[test]
@@ -217,7 +230,10 @@ fn forall_partial_when_property_sometimes_holds() {
         }
     });
     // With enough draws, at least one false hit → Fail.
-    assert!(matches!(v, PropertyVerdict::Fail(_)), "expected Fail (any false is a counterexample), got {v:?}");
+    assert!(
+        matches!(v, PropertyVerdict::Fail(_)),
+        "expected Fail (any false is a counterexample), got {v:?}"
+    );
 }
 
 #[test]
@@ -232,7 +248,10 @@ fn forall_composes_with_pillar_algedonic_of_magnitude() {
         let magnitude: f64 = (60 + (x.rem_euclid(40))) as f64;
         pillar::algedonic_of_magnitude(&magnitude, &theta)
     });
-    assert!(matches!(v, PropertyVerdict::Pass), "all-above-threshold must Pass, got {v:?}");
+    assert!(
+        matches!(v, PropertyVerdict::Pass),
+        "all-above-threshold must Pass, got {v:?}"
+    );
 }
 
 #[test]
@@ -259,5 +278,8 @@ fn forall_composes_via_fold() {
     let v1 = forall::<i32, _>(10, |_| PropertyVerdict::Pass);
     let v2 = forall::<bool, _>(10, |_| PropertyVerdict::Pass);
     let unified = pillar::fold(&[v1, v2]);
-    assert!(matches!(unified, PropertyVerdict::Pass), "two Pass forall folds to Pass");
+    assert!(
+        matches!(unified, PropertyVerdict::Pass),
+        "two Pass forall folds to Pass"
+    );
 }

@@ -104,7 +104,7 @@ impl<const N: usize> Observer<N> {
     /// **Forward-promised at future tick**: full `observe(Reality) -> Observation` signature
     /// per Alex Move 2+8+15 pipeline (Reality perturbed by Choice → Recursion.tick through
     /// @void → Observation = { crystal, chaos }). Requires `prismqueer::reality::Reality`
-    /// + `prismqueer::observation::Observation` + `prismqueer::recursion::Recursion` to
+    /// and `prismqueer::observation::Observation` + `prismqueer::recursion::Recursion` to
     /// land. When they land, this method's signature extends to compose them at N-dim.
     pub fn observe_payload<T>(&self, payload: T) -> Shard<T>
     where
@@ -123,9 +123,12 @@ impl<const N: usize> Observer<N> {
     /// Observer::observe(reality) = Recursion::from_reality(reality).tick()
     /// ```
     ///
-    /// Full bundle-tower + Anna Wolf ψ + Fiedler λ_2 climb composition happens INSIDE
+    /// Full bundle-tower + ψ (read across from Anna Jakobs's 2012 thesis) + Fiedler λ_2 climb composition happens INSIDE
     /// Recursion.tick() per Move 8+9 pipeline; this method is the outer entry point.
-    pub fn observe<T>(self, reality: crate::reality::Reality<T>) -> crate::observation::Observation<T>
+    pub fn observe<T>(
+        self,
+        reality: crate::reality::Reality<T>,
+    ) -> crate::observation::Observation<T>
     where
         T: AsRef<[u8]> + Clone,
     {
@@ -244,11 +247,11 @@ mod tests {
 
     #[test]
     fn observer_observe_reality_settled_full_pipeline_composes_per_alex_move_8() {
+        use crate::chaos::ScalarChaos;
         use crate::crystal_shard::Crystal;
+        use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
         use crate::reality::Reality;
-        use crate::hypothesis::KTQuestionShape;
-        use crate::chaos::ScalarChaos;
         use terni::Loss;
 
         // Full Move 8+9 fluent pipeline:

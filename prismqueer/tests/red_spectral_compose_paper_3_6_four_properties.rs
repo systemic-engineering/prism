@@ -63,10 +63,11 @@
 //! verification via `cargo check --tests --features "lapack bundle"` discharges RED→GREEN
 //! at compile-substrate altitude.
 
+#![cfg(feature = "lapack")]
+
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
-    fiedler_lambda_2_of_graph, kleinos, graph_complete_of_order,
-    graph_from_edges,
+    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, kleinos,
 };
 use terni::Imperfect;
 
@@ -98,8 +99,9 @@ use terni::Imperfect;
 fn compose_property_1_sovereignty_preservation() {
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
     let b = graph_from_edges(&[(3, 4), (4, 5)]);
-    let composed = kleinos(&a, &b)
-        .expect("disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green");
+    let composed = kleinos(&a, &b).expect(
+        "disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green",
+    );
 
     for v in a.vertices() {
         assert!(
@@ -211,8 +213,8 @@ fn compose_property_2_emergent_third_admission() {
 fn compose_property_3_fiedler_lambda_2_strict_rise() {
     let a = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
     let b = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
-    let composed = kleinos(&a, &b)
-        .expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
+    let composed =
+        kleinos(&a, &b).expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
 
     let lambda_a = fiedler_lambda_2_of_graph(&a);
     let lambda_b = fiedler_lambda_2_of_graph(&b);
@@ -322,10 +324,10 @@ fn compose_property_5_content_address_determinism() {
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
     let b = graph_from_edges(&[(3, 4), (4, 5)]);
 
-    let composed_1 = kleinos(&a, &b)
-        .expect("disjoint paths compose — expected Green (first invocation)");
-    let composed_2 = kleinos(&a, &b)
-        .expect("disjoint paths compose — expected Green (second invocation)");
+    let composed_1 =
+        kleinos(&a, &b).expect("disjoint paths compose — expected Green (first invocation)");
+    let composed_2 =
+        kleinos(&a, &b).expect("disjoint paths compose — expected Green (second invocation)");
 
     assert_eq!(
         composed_1.oid(),
