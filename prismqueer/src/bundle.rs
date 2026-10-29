@@ -174,7 +174,7 @@ where
 /// Fate. `selectors\[4\]` = self-reference.
 ///
 /// The fixed-point witness must implement [`LawvereFixedPoint`] (idempotence
-/// + kernel projection). This links `Closure::Fixed` to the Lawvere fixed
+/// and kernel projection). This links `Closure::Fixed` to the Lawvere fixed
 /// point declared in `@epistemologic/math/lawvere.fixed_point`. (Gap 3 of
 /// `docs/specs/spectral-triple-grammar.md`.)
 pub trait Closure: Transport
@@ -627,8 +627,8 @@ pub mod examples {
         fn compose(&self, other: &Self) -> Self {
             // (self ∘ other)(i) = self(other(i))
             let mut out = [0u8; 3];
-            for i in 0..3 {
-                out[i] = self.0[other.0[i] as usize];
+            for (i, o) in out.iter_mut().enumerate() {
+                *o = self.0[other.0[i] as usize];
             }
             Perm3(out)
         }

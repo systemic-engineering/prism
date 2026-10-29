@@ -387,7 +387,7 @@ pub fn kleinos(sheaf_a: &Graph, sheaf_b: &Graph) -> Imperfect<Green, Red, Conver
 
 /// Construct the K_3-composed candidate sheaf per Mara §3 sheaf-composition
 /// rule: **the ring-shape** (Alex 2026-09-02 metaphor). Union of a-vertices
-/// + b-vertices + one emergent-third vertex (V_e as SEMANTIC WITNESS of
+/// and b-vertices + one emergent-third vertex (V_e as SEMANTIC WITNESS of
 /// where the emergence happened) + complete bipartite bridging between
 /// a-vertices and b-vertices (K_{|V(a)|, |V(b)|}) as the STRUCTURAL
 /// emergence carrier.

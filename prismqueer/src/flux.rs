@@ -1,4 +1,9 @@
-//! Liquid — property verdicts over the spectral commutator.
+//! Flux — property verdicts over the spectral commutator.
+//!
+//! "Flux" here is the middle arm of `Fractured | Flux | Settled`: a state
+//! still in motion, not yet settled. It is unrelated to *Flux: Liquid Types
+//! for Rust* (Lehmann, Geller, Vazou, Jhala, PLDI 2023), which is refinement
+//! types; this module does not implement those.
 //!
 //! Composes over prismqueer's Bundle tower (`Transport` supertrait chain
 //! `Fiber → Connection → Gauge → Transport`) and terni's verdict machinery
@@ -831,7 +836,7 @@ pub mod pillar {
                 return terni::Imperfect::Failure(Counterexample { buffer: consumed }, coverage);
             }
             let score = measure(&value);
-            if best.as_ref().map_or(true, |(_, s)| score < *s) {
+            if best.as_ref().is_none_or(|(_, s)| score < *s) {
                 best = Some((consumed, score));
             }
             quiet = if distinct(&coverage) > before {

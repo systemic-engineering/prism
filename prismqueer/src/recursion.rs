@@ -30,7 +30,7 @@ use terni::Loss;
 
 /// Recursion state carrier per Alex Move 8+9.
 ///
-/// The thing that passes through prismqueer::bundle Baez-Schreiber tower + Anna Wolf ψ
+/// The thing that passes through prismqueer::bundle Baez-Schreiber tower + ψ (read across from Anna Jakobs's 2012 thesis)
 /// apparatus + Mandelbrot iteration. Iteration bounds → Crystal condenses; leftover
 /// harmonic content → Chaos emerges.
 #[derive(Clone, Debug)]
@@ -70,8 +70,8 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
     /// crystallizes the first Fractured shard. Chaos defaults to zero (asymptotic
     /// settled limit).
     ///
-    /// Full implementation composing prismqueer::bundle Baez-Schreiber tower + Anna
-    /// Wolf ψ + Mandelbrot iteration + Fiedler λ_2 monotone-climb check FORWARD-PROMISED.
+    /// Full implementation composing prismqueer::bundle Baez-Schreiber tower +
+    /// ψ (read across from Anna Jakobs's 2012 thesis) + Mandelbrot iteration + Fiedler λ_2 monotone-climb check FORWARD-PROMISED.
     pub fn tick(self) -> Observation<T> {
         match self.reality {
             Reality::Settled(crystal) => Observation::new(crystal, ScalarChaos::zero()),

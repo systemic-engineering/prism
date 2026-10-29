@@ -2,23 +2,26 @@
 
 # Run all tests
 test:
-    nix develop -c cargo test --workspace --features optics
+    nix develop -c cargo test --workspace --features lapack,fate
 
 # Run tests with coverage report
 coverage:
-    nix develop -c cargo llvm-cov --workspace --features optics
+    nix develop -c cargo llvm-cov --workspace --features lapack,fate
 
-# Coverage gate — fails if below threshold
+# Coverage gate — fails if below threshold.
+# Ratchet: 93.85% of lines measured 2026-10-29 under lapack,fate (the old 99%
+# was met only because the gate built the optics feature alone). Raise it as
+# coverage rises; never lower it.
 pre-push:
-    nix develop -c cargo llvm-cov --workspace --features optics --fail-under-lines 99
+    nix develop -c cargo llvm-cov --workspace --features lapack,fate --fail-under-lines 93
 
 # Build workspace
 build:
-    nix develop -c cargo build --workspace --features optics
+    nix develop -c cargo build --workspace --features lapack,fate
 
 # Clippy lint
 lint:
-    nix develop -c cargo clippy --workspace --features optics -- -D warnings
+    nix develop -c cargo clippy --workspace --features lapack,fate -- -D warnings
 
 # Format check
 fmt-check:
@@ -61,6 +64,6 @@ merge:
         git merge --no-ff --no-gpg-sign "$branch" -m "🔀 merge $branch into main"
     fi
     echo "→ running tests"
-    cargo test --workspace --features optics,pq
+    cargo test --workspace --features lapack,fate,pq
     echo "✔ merged $branch into main"
     echo "  next: \`git push origin main\` when ready"

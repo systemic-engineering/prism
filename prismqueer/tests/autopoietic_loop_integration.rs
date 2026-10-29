@@ -28,6 +28,8 @@
 //! - Fluent pipeline methods (Discharge #17 `efe7989`)
 //! - Loop-closure methods (Discharge #18 `773c0ec`)
 
+#![cfg(feature = "lapack")]
+
 use prismqueer::assertion::Assertion;
 use prismqueer::chaos::ScalarChaos;
 use prismqueer::choice::Choice;

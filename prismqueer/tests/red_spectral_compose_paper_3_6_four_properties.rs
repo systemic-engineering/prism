@@ -63,6 +63,8 @@
 //! verification via `cargo check --tests --features "lapack bundle"` discharges RED→GREEN
 //! at compile-substrate altitude.
 
+#![cfg(feature = "lapack")]
+
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
     fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, kleinos,

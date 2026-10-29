@@ -307,6 +307,9 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, i
     }
 }
 
+/// A full SVD: `(singular_values, u, vt)`, as returned by [`svd`].
+pub type Svd = (Vec<f64>, Vec<f64>, Vec<f64>);
+
 /// Compute the full SVD of an `m×n` matrix.
 ///
 /// Returns `(singular_values, u, vt)` where:
@@ -316,7 +319,7 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, i
 ///
 /// Returns `Ok((vec![], vec![], vec![]))` when `m == 0` or `n == 0`.
 /// Returns `Err(info)` if LAPACK convergence fails (info != 0).
-pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>), i32> {
+pub fn svd(m: usize, n: usize, matrix: &[f64]) -> Result<Svd, i32> {
     let k = m.min(n);
     if k == 0 {
         return Ok((Vec::new(), Vec::new(), Vec::new()));
