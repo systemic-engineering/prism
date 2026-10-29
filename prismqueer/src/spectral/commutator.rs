@@ -91,15 +91,11 @@ impl Dissonance {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Unmeasured(pub i32);
 
-/// Below this fraction of the scale, a singular value is numerical zero.
-const NUMERICAL_ZERO: f64 = 1e-12;
-
-/// At or above this fraction of the scale, a singular value is clearly nonzero.
-/// Between the two thresholds the instrument does not know yet.
-const CLEARLY_NONZERO: f64 = 1e-6;
-
 /// Classify a singular-value measurement against the operators' scale
-/// (product of their Frobenius norms, floored at 1).
+/// (product of their Frobenius norms) through the declared band
+/// [`zeros::commutator`](crate::band::zeros::commutator): zero below `1e-12`,
+/// non-zero from `1e-6`, both times `max(scale, 1)`. In between, the
+/// instrument doesn't know yet.
 fn read(
     measured: Result<Vec<f64>, i32>,
     scale: f64,
@@ -108,14 +104,14 @@ fn read(
         Ok(svs) => svs,
         Err(info) => return Imperfect::Failure(Unmeasured(info), Vec::new()),
     };
-    let scale = scale.max(1.0);
+    let band = crate::band::zeros::commutator();
     let mut spectrum = Vec::new();
     let mut ambiguous = Vec::new();
     for s in svs {
-        if s >= CLEARLY_NONZERO * scale {
-            spectrum.push(s);
-        } else if s > NUMERICAL_ZERO * scale {
-            ambiguous.push(s);
+        match band.read(s, scale) {
+            crate::band::Verdict::NonZero => spectrum.push(s),
+            crate::band::Verdict::DontKnow => ambiguous.push(s),
+            crate::band::Verdict::Zero => {}
         }
     }
     let cs = Dissonance { spectrum };

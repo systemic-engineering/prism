@@ -156,5 +156,23 @@ fn a_field_missing_a_transport_is_refused() {
     assert!(Field::transports(&graph, [((0, 1), Zn::<12>::new(1)), ((1, 2), Zn::<12>::new(1)), ((0, 2), Zn::<12>::new(1)), ((5, 6), Zn::<12>::new(1))]).is_err(), "an edge off the graph");
 }
 
+/// Loki's napkin (prism-007): 45/32 × 64/45 = 2 closes, but two tritones
+/// up and an octave back leave the diaschisma, 2025/2048, every lap. A
+/// characterization test: the capability exists since prism-005.
+#[test]
+fn two_tritones_and_an_octave_leave_the_diaschisma() {
+    let graph = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]);
+    let closes = Field::transports(&graph, [((0, 1), Ratio::of(45, 32)), ((1, 2), Ratio::of(64, 45)), ((2, 0), Ratio::of(1, 2))]).unwrap();
+    assert!(matches!(check_flat(&closes), Flatness::Flat(_)), "45/32 × 64/45 × 1/2 = 1");
+    let twice = Field::transports(&graph, [((0, 1), Ratio::of(45, 32)), ((1, 2), Ratio::of(45, 32)), ((2, 0), Ratio::of(1, 2))]).unwrap();
+    match check_flat(&twice) {
+        Flatness::Curved(c) => {
+            assert_eq!(c.loops()[0].vertices(), &[0, 1, 2, 0]);
+            assert_eq!(*c.loops()[0].holonomy(), Ratio::of(2025, 2048), "the diaschisma, exactly");
+        }
+        Flatness::Flat(_) => panic!("(45/32)² doesn't reach the octave"),
+    }
+}
+
 /// Compile-level: only exact groups get `check_flat`; this just names the bound.
 fn _exact_bound<V: Exact>() {}

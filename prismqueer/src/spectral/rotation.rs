@@ -53,13 +53,14 @@
 //! - Rec #99 SINGULARITY.md K_n orbital topology + @time as rotational-substrate
 //!   through 5D spectral space (Dirac operator D IS temporal rotation) — **this
 //!   ship MAY be Level-1 empirical fire per Alex-observer adjudication**
-//! - Anna Jakobs (now Wolf), *Integration von OpenGL-Visualisierungstechniken
-//!   in GPU-Anwendungen*, Masterarbeit (Technomathematik), FH Aachen, Campus
-//!   Jülich, August 2012. Read across, not reproduced: the thesis has no graph
-//!   Laplacian. What carries over is the stance: the live visualization read
-//!   the simulation's data in place (shared buffer, no copy) at step
-//!   boundaries. Observation running at the same time as computation was the
-//!   thesis's future work (printed p. 43, results; p. 45, outlook).
+//! - Anna Jakobs, *Integration von OpenGL-Visualisierungstechniken in
+//!   GPU-Anwendungen*, Masterarbeit (Technomathematik), FH Aachen, Campus
+//!   Jülich, August 2012. Cited with her consent (2026-10-28). Read across,
+//!   not reproduced: the thesis has no graph Laplacian. What carries over is
+//!   the stance: the live visualization read the simulation's data without
+//!   copying, at step boundaries, at about a third of the throughput
+//!   (printed p. 43). Simultaneous access and live analysis were future work
+//!   (printed pp. 42, 45).
 //! - Foerster 1974 ethical imperative (Fiedler monotone climb gauge)
 //! - Kuramoto 1975 coupled-oscillator synchronization
 //! - Ricky Jones 2026-08-26 rotation-is-non-negotiation canon
@@ -156,7 +157,7 @@ impl Default for RotationConfig {
 ///
 /// 1. Advance Kuramoto phase (spin the wheel by one dt)
 /// 2. the apparatus read across from Anna Jakobs's 2012 thesis observes composed graph Fiedler λ₂ at K_3 basepoint (LAPACK
-///    dsyev via FLANG — measurement without perturbation of rotation)
+///    dsyev via FLANG; reading the composed graph's spectrum doesn't change the phases)
 /// 3. Compute Kuramoto order parameter r ∈ [0, 1] (coupling-coherence readout)
 /// 4. Content-address the tick state (phases, r, fiedler, tick) → splinter Oid
 /// 5. Foerster gauge check: Fiedler λ₂ must monotone-non-decrease across ticks
