@@ -69,7 +69,7 @@ use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Trans
 
 use crate::ffi::phase_lock;
 use crate::oid::{Addressable, Oid};
-use crate::spectral::{kleinos, Property, Red, Graph};
+use crate::spectral::{kleinos, Graph, Property, Red};
 
 // ---------------------------------------------------------------------------
 // Splinter — the atomic crystallization of one observation-tick
@@ -214,9 +214,7 @@ pub fn infer_via_rotation(
     // order). Vertex i gets phase 2πi/n and omega omega_scale*(i*0.1 + 1.0).
     let vertices: Vec<_> = composed.vertices().collect();
     let n = vertices.len();
-    let mut phases: Vec<f64> = (0..n)
-        .map(|i| 2.0 * PI * (i as f64) / (n as f64))
-        .collect();
+    let mut phases: Vec<f64> = (0..n).map(|i| 2.0 * PI * (i as f64) / (n as f64)).collect();
     let omegas: Vec<f64> = (0..n)
         .map(|i| config.omega_scale * ((i as f64) * 0.1 + 1.0))
         .collect();
@@ -330,7 +328,10 @@ mod tests {
                 assert_eq!(splinters.len(), ticks, "one splinter per tick");
                 for (i, s) in splinters.iter().enumerate() {
                     assert_eq!(s.tick, i, "splinter tick == index");
-                    assert!(s.fiedler_lambda_2 > 0.0, "Fiedler must be positive for connected composed graph");
+                    assert!(
+                        s.fiedler_lambda_2 > 0.0,
+                        "Fiedler must be positive for connected composed graph"
+                    );
                     assert!(
                         s.order_r >= 0.0 && s.order_r <= 1.0,
                         "Kuramoto order parameter in [0, 1]; got {}",

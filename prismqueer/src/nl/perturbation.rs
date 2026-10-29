@@ -159,10 +159,10 @@ impl Perturbation {
     pub const fn narcissus_pull() -> Self {
         Self {
             pull: Pull {
-                focus:   Focus(1.0),
-                split:   Split(0.0),
+                focus: Focus(1.0),
+                split: Split(0.0),
                 project: Project(0.0),
-                lift:    Lift(0.0),
+                lift: Lift(0.0),
                 refract: Refract(0.0),
             },
             force: Force(1.0),
@@ -178,10 +178,10 @@ impl Perturbation {
     pub const fn splinter_pull() -> Self {
         Self {
             pull: Pull {
-                focus:   Focus(1.0),
-                split:   Split(1.0),
+                focus: Focus(1.0),
+                split: Split(1.0),
                 project: Project(1.0),
-                lift:    Lift(1.0),
+                lift: Lift(1.0),
                 refract: Refract(1.0),
             },
             force: Force(1.0),
@@ -203,10 +203,10 @@ mod tests {
     #[test]
     fn perturbation_construction_requires_typed_axes_and_typed_force() {
         let pull = Pull {
-            focus:   Focus(0.3),
-            split:   Split(0.7),
+            focus: Focus(0.3),
+            split: Split(0.7),
             project: Project(0.5),
-            lift:    Lift(0.1),
+            lift: Lift(0.1),
             refract: Refract(0.9),
         };
         let force = Force(1.5);
@@ -230,10 +230,10 @@ mod tests {
     #[test]
     fn narcissus_pull_is_high_focus_zero_everything_else() {
         let p = Perturbation::narcissus_pull();
-        assert_eq!(p.pull.focus,   Focus(1.0));
-        assert_eq!(p.pull.split,   Split(0.0));
+        assert_eq!(p.pull.focus, Focus(1.0));
+        assert_eq!(p.pull.split, Split(0.0));
         assert_eq!(p.pull.project, Project(0.0));
-        assert_eq!(p.pull.lift,    Lift(0.0));
+        assert_eq!(p.pull.lift, Lift(0.0));
         assert_eq!(p.pull.refract, Refract(0.0));
         assert_eq!(p.force, Force(1.0));
     }
@@ -243,10 +243,10 @@ mod tests {
     #[test]
     fn splinter_pull_is_uniform_across_five_axes() {
         let p = Perturbation::splinter_pull();
-        assert_eq!(p.pull.focus,   Focus(1.0));
-        assert_eq!(p.pull.split,   Split(1.0));
+        assert_eq!(p.pull.focus, Focus(1.0));
+        assert_eq!(p.pull.split, Split(1.0));
         assert_eq!(p.pull.project, Project(1.0));
-        assert_eq!(p.pull.lift,    Lift(1.0));
+        assert_eq!(p.pull.lift, Lift(1.0));
         assert_eq!(p.pull.refract, Refract(1.0));
         assert_eq!(p.force, Force(1.0));
     }
@@ -305,12 +305,18 @@ mod tests {
     #[test]
     fn pull_destructures_with_typed_axis_bindings() {
         let p = Perturbation::narcissus_pull();
-        let Pull { focus, split, project, lift, refract } = p.pull;
+        let Pull {
+            focus,
+            split,
+            project,
+            lift,
+            refract,
+        } = p.pull;
         // Each binding carries its axis type at compile-time.
-        assert_eq!(focus,   Focus(1.0));
-        assert_eq!(split,   Split(0.0));
+        assert_eq!(focus, Focus(1.0));
+        assert_eq!(split, Split(0.0));
         assert_eq!(project, Project(0.0));
-        assert_eq!(lift,    Lift(0.0));
+        assert_eq!(lift, Lift(0.0));
         assert_eq!(refract, Refract(0.0));
     }
 }

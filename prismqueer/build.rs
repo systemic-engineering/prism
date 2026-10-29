@@ -433,11 +433,7 @@ fn main() {
 
         for src in &["spectral.f90", "prism.f90"] {
             let src_path = native_dir.join(src);
-            assert!(
-                src_path.exists(),
-                "prismqueer/native/{} not found",
-                src
-            );
+            assert!(src_path.exists(), "prismqueer/native/{} not found", src);
             let stem = src_path.file_stem().unwrap().to_str().unwrap();
             let obj_path = out.join(format!("{}.o", stem));
 
@@ -485,7 +481,11 @@ fn main() {
         let status = ar_cmd
             .status()
             .unwrap_or_else(|e| panic!("failed to invoke ar `{}`: {}", ar, e));
-        assert!(status.success(), "ar failed archiving {}", lib_path.display());
+        assert!(
+            status.success(),
+            "ar failed archiving {}",
+            lib_path.display()
+        );
 
         // Link the Fortran static lib + LAPACK/BLAS/flang-rt.
         println!("cargo:rustc-link-search=native={}", out.display());
@@ -503,7 +503,11 @@ fn main() {
 
         // Fortran runtime: gfortran path (nix devshell). Discover the
         // libgfortran directory via `gfortran -print-file-name=...`.
-        let ext = if cfg!(target_os = "macos") { "dylib" } else { "so" };
+        let ext = if cfg!(target_os = "macos") {
+            "dylib"
+        } else {
+            "so"
+        };
         if let Ok(out) = Command::new(&fc)
             .arg(format!("-print-file-name=libgfortran.{}", ext))
             .output()

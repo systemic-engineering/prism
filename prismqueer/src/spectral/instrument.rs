@@ -220,7 +220,10 @@ impl Instrument {
     /// dim ker D = b₀ + b₁: components plus independent cycles.
     pub fn kernel_dimension(&self) -> usize {
         let scale = self.values.iter().fold(1.0_f64, |m, x| m.max(x.abs()));
-        self.values.iter().filter(|x| x.abs() <= ZERO * scale).count()
+        self.values
+            .iter()
+            .filter(|x| x.abs() <= ZERO * scale)
+            .count()
     }
 
     /// D x, exactly: an assertion's question lands on the edges, an edge

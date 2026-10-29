@@ -197,7 +197,10 @@ fn commutator_norm_zero_over_default_state_for_test_bundle() {
     let a = TestBundle::default();
     let b = TestBundle::default();
     let norm = commutator_norm(&a, &b);
-    assert!(norm.is_zero(), "commutator_norm over Default state = {norm:?}, expected zero");
+    assert!(
+        norm.is_zero(),
+        "commutator_norm over Default state = {norm:?}, expected zero"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -250,25 +253,37 @@ fn pillar_dispatch_ambiguity_pass_when_all_conditions_met() {
 #[test]
 fn pillar_dispatch_ambiguity_fail_when_fewer_than_two_arms() {
     let verdict = pillar::dispatch_ambiguity(1, 1, true, true);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
 fn pillar_dispatch_ambiguity_fail_when_witness_count_mismatches() {
     let verdict = pillar::dispatch_ambiguity(3, 2, true, true);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
 fn pillar_dispatch_ambiguity_fail_when_tie_breaking_not_exhausted() {
     let verdict = pillar::dispatch_ambiguity(3, 3, false, true);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
 fn pillar_dispatch_ambiguity_fail_when_pivot_song_missing() {
     let verdict = pillar::dispatch_ambiguity(3, 3, true, false);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -298,7 +313,10 @@ fn pillar_algedonic_partial_below_threshold_but_nonzero() {
     let verdict = pillar::algedonic(&c, &theta);
     match verdict {
         PropertyVerdict::Partial { confidence, .. } => {
-            assert!((0.0..=1.0).contains(&confidence), "confidence out of range: {confidence}");
+            assert!(
+                (0.0..=1.0).contains(&confidence),
+                "confidence out of range: {confidence}"
+            );
         }
         other => panic!("expected Partial, got {other:?}"),
     }
@@ -313,7 +331,10 @@ fn pillar_algedonic_fail_when_commutator_vanishes() {
     let c = commutator(&a, &b, &state);
     let theta = ScalarLoss::new(0.5);
     let verdict = pillar::algedonic(&c, &theta);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -348,7 +369,10 @@ fn pillar_viability_fail_when_accumulated_below_threshold() {
     let history = vec![c1, c2, c3];
     let theta = ScalarLoss::new(10.0);
     let verdict = pillar::viability(&history, &theta, 3);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
@@ -363,7 +387,10 @@ fn pillar_viability_partial_when_history_shorter_than_window() {
     let verdict = pillar::viability(&history, &theta, 5);
     match verdict {
         PropertyVerdict::Partial { confidence, .. } => {
-            assert!((confidence - 0.2).abs() < 1e-9, "confidence = {confidence}, expected 0.2");
+            assert!(
+                (confidence - 0.2).abs() < 1e-9,
+                "confidence = {confidence}, expected 0.2"
+            );
         }
         other => panic!("expected Partial, got {other:?}"),
     }
@@ -410,7 +437,11 @@ fn perm3_identity_law() {
 fn perm3_inverse_law() {
     let id = Perm3::identity();
     for &x in Perm3::ALL.iter() {
-        assert_eq!(x.compose(&x.inverse()), id, "right inverse failed for {x:?}");
+        assert_eq!(
+            x.compose(&x.inverse()),
+            id,
+            "right inverse failed for {x:?}"
+        );
         assert_eq!(x.inverse().compose(&x), id, "left inverse failed for {x:?}");
     }
 }
@@ -550,7 +581,10 @@ fn viability_of_magnitudes_fail_below_threshold() {
     // accumulated = 3.0, theta = 10.0 → Fail
     let theta = ScalarLoss::new(10.0);
     let verdict = pillar::viability_of_magnitudes(&history, &theta, 3);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
@@ -598,7 +632,10 @@ fn fold_with_any_fail_is_fail() {
         PropertyVerdict::Fail(Diagnostic::new("stalled")),
         PropertyVerdict::Pass,
     ]);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]
@@ -620,7 +657,10 @@ fn fold_all_partial_takes_min_confidence() {
         },
     ]);
     match verdict {
-        PropertyVerdict::Partial { confidence, diagnostics } => {
+        PropertyVerdict::Partial {
+            confidence,
+            diagnostics,
+        } => {
             assert!(
                 (confidence - 0.4).abs() < 1e-9,
                 "min confidence 0.4, got {confidence}",
@@ -650,7 +690,10 @@ fn algedonic_of_magnitude_fail_when_zero() {
     let magnitude = ScalarLoss::zero();
     let theta = ScalarLoss::new(1.0);
     let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
-    assert!(matches!(verdict, PropertyVerdict::Fail(_)), "got {verdict:?}");
+    assert!(
+        matches!(verdict, PropertyVerdict::Fail(_)),
+        "got {verdict:?}"
+    );
 }
 
 #[test]

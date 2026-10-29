@@ -10,5 +10,5 @@
 mod independence;
 mod progression;
 
-pub use independence::{Polyphony, Independence, Monophony, Touches};
+pub use independence::{Independence, Monophony, Polyphony, Touches};
 pub use progression::Progression;

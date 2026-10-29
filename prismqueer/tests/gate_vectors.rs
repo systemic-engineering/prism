@@ -68,7 +68,8 @@ fn gate(budget: usize, rounds: &[Value]) -> Value {
 
 #[test]
 fn gate_vectors_agree_with_the_rule() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/spec/gate-vectors.json");
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/spec/gate-vectors.json");
     let doc: Value = serde_json::from_str(
         &std::fs::read_to_string(&path).expect("docs/spec/gate-vectors.json must exist"),
     )

@@ -125,7 +125,10 @@ impl<const N: usize> Observer<N> {
     ///
     /// Full bundle-tower + Anna Wolf ψ + Fiedler λ_2 climb composition happens INSIDE
     /// Recursion.tick() per Move 8+9 pipeline; this method is the outer entry point.
-    pub fn observe<T>(self, reality: crate::reality::Reality<T>) -> crate::observation::Observation<T>
+    pub fn observe<T>(
+        self,
+        reality: crate::reality::Reality<T>,
+    ) -> crate::observation::Observation<T>
     where
         T: AsRef<[u8]> + Clone,
     {
@@ -244,11 +247,11 @@ mod tests {
 
     #[test]
     fn observer_observe_reality_settled_full_pipeline_composes_per_alex_move_8() {
+        use crate::chaos::ScalarChaos;
         use crate::crystal_shard::Crystal;
+        use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
         use crate::reality::Reality;
-        use crate::hypothesis::KTQuestionShape;
-        use crate::chaos::ScalarChaos;
         use terni::Loss;
 
         // Full Move 8+9 fluent pipeline:

@@ -76,17 +76,16 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
         match self.reality {
             Reality::Settled(crystal) => Observation::new(crystal, ScalarChaos::zero()),
             Reality::Fractured(mut shards) => {
-                let crystal: Crystal<T> = shards
-                    .drain(..)
-                    .next()
-                    .unwrap_or_else(|| Shard::from_parts(
+                let crystal: Crystal<T> = shards.drain(..).next().unwrap_or_else(|| {
+                    Shard::from_parts(
                         // Placeholder Shard for empty Fractured; iteration_index=0
                         // signals "no observation possible" per substrate-honest.
                         panic_helper_empty::<T>(),
                         crate::oid::Oid::dark(),
                         terni::Transparency::Clear,
                         0,
-                    ));
+                    )
+                });
                 Observation::new(crystal, ScalarChaos::zero())
             }
         }
@@ -94,7 +93,9 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
 }
 
 fn panic_helper_empty<T>() -> T {
-    unimplemented!("empty Fractured cannot produce a Crystal without a payload; caller must ensure non-empty")
+    unimplemented!(
+        "empty Fractured cannot produce a Crystal without a payload; caller must ensure non-empty"
+    )
 }
 
 #[cfg(test)]

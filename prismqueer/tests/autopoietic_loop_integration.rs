@@ -51,10 +51,10 @@ fn autopoietic_loop_one_tick_fluent_composition() {
 
     // Arrows 1-4: substrate side (fluent method-chain per Move 8+9)
     let question: Question = observer
-        .observe(reality)              // arrow 1: Reality → Observation
-        .assert(model)                  // arrow 2: + Model → Assertion
-        .hypothesize()                  // arrow 3: → Hypothesis
-        .compose(ScalarChaos::zero());  // arrow 4: + Chaos → Question
+        .observe(reality) // arrow 1: Reality → Observation
+        .assert(model) // arrow 2: + Model → Assertion
+        .hypothesize() // arrow 3: → Hypothesis
+        .compose(ScalarChaos::zero()); // arrow 4: + Chaos → Question
 
     assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
 }
@@ -126,11 +126,13 @@ fn autopoietic_loop_all_three_canonical_observer_dimensions() {
 
     // N=3 K_3 peer stability (past+now+future; @reality/object sufficient)
     let observer_3: PeerObserver = Observer::new();
-    let _obs: Observation<&[u8]> = observer_3.observe(Reality::Settled(Crystal::new(b"t3" as &[u8])));
+    let _obs: Observation<&[u8]> =
+        observer_3.observe(Reality::Settled(Crystal::new(b"t3" as &[u8])));
 
     // N=5 K_5 @void gauge basis (@reality/subject + hodobodo required)
     let observer_5: VoidObserver = Observer::new();
-    let _obs: Observation<&[u8]> = observer_5.observe(Reality::Settled(Crystal::new(b"t5" as &[u8])));
+    let _obs: Observation<&[u8]> =
+        observer_5.observe(Reality::Settled(Crystal::new(b"t5" as &[u8])));
 
     assert_eq!(Observer::<1>::dimensionality(), 1);
     assert_eq!(Observer::<3>::dimensionality(), 3);

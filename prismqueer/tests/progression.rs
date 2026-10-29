@@ -34,7 +34,11 @@ impl Touches for Step {
 
 fn step(name: &'static str, reads: &[&str], writes: &[&str]) -> Step {
     let set = |s: &[&str]| s.iter().map(|x| Oid::hash(x.as_bytes())).collect();
-    Step { name, reads: set(reads), writes: set(writes) }
+    Step {
+        name,
+        reads: set(reads),
+        writes: set(writes),
+    }
 }
 
 /// Every word of length 0..=2 over an alphabet with both independent and
@@ -77,9 +81,18 @@ fn progression_is_a_monoid_with_an_adjoined_total() {
     let ps: Vec<P> = words().into_iter().map(P::from_word).collect();
     assert!(P::zero().is_zero() && !P::total().is_zero());
     for a in &ps {
-        assert!(P::zero().combine(a.clone()) == *a && a.clone().combine(P::zero()) == *a, "identity");
-        assert!(P::total().combine(a.clone()) == P::total(), "total absorbs from the left");
-        assert!(a.clone().combine(P::total()) == P::total(), "total absorbs from the right");
+        assert!(
+            P::zero().combine(a.clone()) == *a && a.clone().combine(P::zero()) == *a,
+            "identity"
+        );
+        assert!(
+            P::total().combine(a.clone()) == P::total(),
+            "total absorbs from the left"
+        );
+        assert!(
+            a.clone().combine(P::total()) == P::total(),
+            "total absorbs from the right"
+        );
         assert!(*a != P::total(), "a known history is never the lost one");
         for b in &ps {
             for c in &ps {
@@ -98,6 +111,9 @@ fn a_lost_history_has_no_measures() {
     assert_eq!(lost.len(), None);
     assert_eq!(lost.height(), None);
     assert!(lost.foata().is_none());
-    assert!(lost.oid() != P::zero().oid(), "lost and empty must not share an address");
+    assert!(
+        lost.oid() != P::zero().oid(),
+        "lost and empty must not share an address"
+    );
     assert_eq!(P::zero().len(), Some(0));
 }

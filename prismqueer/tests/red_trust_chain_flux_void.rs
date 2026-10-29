@@ -136,9 +136,7 @@ impl<T: Clone + 'static> Arbitrary for TrustChainStep<T> {
             prev: Oid::arbitrary(sample),
             subject: Oid::arbitrary(sample),
             auth_proof: AuthProof::arbitrary(sample),
-            entropy: (0..16)
-                .map(|_| sample.draw_integer(0, 255) as u8)
-                .collect(),
+            entropy: (0..16).map(|_| sample.draw_integer(0, 255) as u8).collect(),
         }
     }
 }

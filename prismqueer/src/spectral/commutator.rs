@@ -64,7 +64,9 @@ impl Dissonance {
         let vertices: BTreeSet<VertexId> = a.vertices().chain(b.vertices()).collect();
         let n = vertices.len();
         if n < 2 {
-            return Imperfect::Success(Self { spectrum: Vec::new() });
+            return Imperfect::Success(Self {
+                spectrum: Vec::new(),
+            });
         }
         let vertex_index: BTreeMap<VertexId, usize> = vertices
             .into_iter()
@@ -98,7 +100,10 @@ const CLEARLY_NONZERO: f64 = 1e-6;
 
 /// Classify a singular-value measurement against the operators' scale
 /// (product of their Frobenius norms, floored at 1).
-fn read(measured: Result<Vec<f64>, i32>, scale: f64) -> Imperfect<Dissonance, Unmeasured, Vec<f64>> {
+fn read(
+    measured: Result<Vec<f64>, i32>,
+    scale: f64,
+) -> Imperfect<Dissonance, Unmeasured, Vec<f64>> {
     let svs = match measured {
         Ok(svs) => svs,
         Err(info) => return Imperfect::Failure(Unmeasured(info), Vec::new()),
@@ -159,9 +164,7 @@ fn matmul(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::kleinos::{
-        graph_complete_of_order, graph_from_edges,
-    };
+    use crate::spectral::kleinos::{graph_complete_of_order, graph_from_edges};
 
     /// `[L_A, L_A] = L_A L_A - L_A L_A = 0`. Self-commutator vanishes.
     /// Substrate-reading: composition of A with itself is trivially commutative.

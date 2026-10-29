@@ -18,5 +18,8 @@ fn the_fortran_build_leaves_no_module_files_in_the_source_tree() {
         .filter(|p| p.extension().is_some_and(|x| x == "mod"))
         .map(|p| p.display().to_string())
         .collect();
-    assert!(stray.is_empty(), "the build wrote into the source tree: {stray:?}");
+    assert!(
+        stray.is_empty(),
+        "the build wrote into the source tree: {stray:?}"
+    );
 }

@@ -70,8 +70,20 @@ fn cases<L: Fixture>() -> Vec<Value> {
     let n = L::NAME;
     let mut out = Vec::new();
     for x in inputs::<L>() {
-        out.push(case(n, "map", wire(&x), json!({}), wire(&x.clone().map(|v| v + 1))));
-        out.push(case(n, "map_err", wire(&x), json!({}), wire(&x.clone().map_err(|e| format!("{e}!")))));
+        out.push(case(
+            n,
+            "map",
+            wire(&x),
+            json!({}),
+            wire(&x.clone().map(|v| v + 1)),
+        ));
+        out.push(case(
+            n,
+            "map_err",
+            wire(&x),
+            json!({}),
+            wire(&x.clone().map_err(|e| format!("{e}!"))),
+        ));
         out.push(case(n, "loss", wire(&x), json!({}), wire(&x.loss())));
         out.push(case(n, "ok", wire(&x), json!({}), wire(&x.clone().ok())));
         out.push(case(n, "err", wire(&x), json!({}), wire(&x.clone().err())));
@@ -81,7 +93,13 @@ fn cases<L: Fixture>() -> Vec<Value> {
             Err(e) => json!({ "err": e }),
         };
         out.push(case(n, "into_result", wire(&x), json!({}), result));
-        out.push(case(n, "unwrap_or", wire(&x), json!({ "default": 7 }), wire(&x.clone().unwrap_or(7))));
+        out.push(case(
+            n,
+            "unwrap_or",
+            wire(&x),
+            json!({ "default": 7 }),
+            wire(&x.clone().unwrap_or(7)),
+        ));
         for next in nexts::<L>() {
             let args = json!({ "next": wire(&next) });
             let bound = x.clone().eh(|v| next.clone().map(|w| v + w));
@@ -94,8 +112,20 @@ fn cases<L: Fixture>() -> Vec<Value> {
     }
     let ok: I<L> = Ok(5).into();
     let err: I<L> = Err("nope".to_string()).into();
-    out.push(case(n, "from_result", json!({ "ok": 5 }), json!({}), wire(&ok)));
-    out.push(case(n, "from_result", json!({ "err": "nope" }), json!({}), wire(&err)));
+    out.push(case(
+        n,
+        "from_result",
+        json!({ "ok": 5 }),
+        json!({}),
+        wire(&ok),
+    ));
+    out.push(case(
+        n,
+        "from_result",
+        json!({ "err": "nope" }),
+        json!({}),
+        wire(&err),
+    ));
     let some: Imperfect<i64, (), L> = Some(5).into();
     let none: Imperfect<i64, (), L> = None.into();
     out.push(case(n, "from_option", json!(5), json!({}), wire(&some)));
@@ -106,7 +136,11 @@ fn cases<L: Fixture>() -> Vec<Value> {
         vec![Imperfect::Success(1)],
         vec![Imperfect::Partial(1, L::small())],
         vec![Imperfect::Partial(1, L::zero())],
-        vec![Imperfect::Partial(1, L::small()), Imperfect::Success(1), Imperfect::Partial(1, L::other())],
+        vec![
+            Imperfect::Partial(1, L::small()),
+            Imperfect::Success(1),
+            Imperfect::Partial(1, L::other()),
+        ],
     ];
     for steps in sequences {
         let mut ctx = Eh::<L>::new();
@@ -115,12 +149,24 @@ fn cases<L: Fixture>() -> Vec<Value> {
         }
         let finished: I<L> = ctx.finish(1);
         let steps: Vec<Value> = steps.iter().map(wire).collect();
-        out.push(case(n, "eh_context", Value::Null, json!({ "steps": steps, "finish": 1 }), wire(&finished)));
+        out.push(case(
+            n,
+            "eh_context",
+            Value::Null,
+            json!({ "steps": steps, "finish": 1 }),
+            wire(&finished),
+        ));
     }
     let mut ctx = Eh::<L>::new();
     let _ = ctx.eh(Imperfect::<i64, String, L>::Partial(1, L::small()));
-    let stopped = ctx.eh(Imperfect::<i64, String, L>::Failure("stop".into(), L::other()));
-    let steps = vec![wire(&I::<L>::Partial(1, L::small())), wire(&I::<L>::Failure("stop".into(), L::other()))];
+    let stopped = ctx.eh(Imperfect::<i64, String, L>::Failure(
+        "stop".into(),
+        L::other(),
+    ));
+    let steps = vec![
+        wire(&I::<L>::Partial(1, L::small())),
+        wire(&I::<L>::Failure("stop".into(), L::other())),
+    ];
     out.push(case(
         n,
         "eh_context_failure",
@@ -144,7 +190,13 @@ fn cases<L: Fixture>() -> Vec<Value> {
     out.push(case(n, "zero", Value::Null, json!({}), wire(&L::zero())));
     out.push(case(n, "total", Value::Null, json!({}), wire(&L::total())));
     for l in [L::zero(), L::small()] {
-        out.push(case(n, "is_zero", Value::Null, json!({ "loss": wire(&l) }), json!(l.is_zero())));
+        out.push(case(
+            n,
+            "is_zero",
+            Value::Null,
+            json!({ "loss": wire(&l) }),
+            json!(l.is_zero()),
+        ));
     }
     out
 }
@@ -177,11 +229,16 @@ fn document() -> Value {
 
 #[test]
 fn imperfect_vectors_match_the_crate() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/spec/imperfect-vectors.json");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../docs/spec/imperfect-vectors.json");
     let generated = serde_json::to_string_pretty(&document()).expect("json") + "\n";
     if std::env::var("PRISM_SPEC_UPDATE").is_ok() {
         std::fs::write(&path, &generated).expect("write vectors");
     }
-    let committed = std::fs::read_to_string(&path).expect("docs/spec/imperfect-vectors.json must exist");
-    assert!(committed == generated, "vectors drifted from terni; regenerate with PRISM_SPEC_UPDATE=1");
+    let committed =
+        std::fs::read_to_string(&path).expect("docs/spec/imperfect-vectors.json must exist");
+    assert!(
+        committed == generated,
+        "vectors drifted from terni; regenerate with PRISM_SPEC_UPDATE=1"
+    );
 }

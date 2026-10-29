@@ -167,21 +167,31 @@ mod tests {
         let shard: Shard<&[u8]> = Shard::new(b"hello");
         assert_eq!(shard.iteration_index, 0);
         assert!(matches!(shard.transparency, Transparency::Clear));
-        assert_ne!(shard.oid, Oid::dark(), "non-zero payload must produce non-dark OID");
+        assert_ne!(
+            shard.oid,
+            Oid::dark(),
+            "non-zero payload must produce non-dark OID"
+        );
     }
 
     #[test]
     fn shard_oid_deterministic_for_same_bytes_per_rec_82() {
         let shard_a: Shard<&[u8]> = Shard::new(b"hello");
         let shard_b: Shard<&[u8]> = Shard::new(b"hello");
-        assert_eq!(shard_a.oid, shard_b.oid, "same bytes must produce same OID per Rec #82 content-addressing");
+        assert_eq!(
+            shard_a.oid, shard_b.oid,
+            "same bytes must produce same OID per Rec #82 content-addressing"
+        );
     }
 
     #[test]
     fn shard_oid_differs_for_different_bytes() {
         let shard_a: Shard<&[u8]> = Shard::new(b"hello");
         let shard_b: Shard<&[u8]> = Shard::new(b"world");
-        assert_ne!(shard_a.oid, shard_b.oid, "different bytes must produce different OIDs");
+        assert_ne!(
+            shard_a.oid, shard_b.oid,
+            "different bytes must produce different OIDs"
+        );
     }
 
     #[test]
@@ -205,18 +215,10 @@ mod tests {
         // ShardBinary<T> is what love(shard_a, shard_b) inhabits per Mara canonical §4.1
         // TICK 2B forward-promised.
         let take_first: ShardBinary<String> = |a, _b| a;
-        let shard_a: Shard<String> = Shard::from_parts(
-            "a".to_string(),
-            Oid::hash(b"a"),
-            Transparency::Clear,
-            0,
-        );
-        let shard_b: Shard<String> = Shard::from_parts(
-            "b".to_string(),
-            Oid::hash(b"b"),
-            Transparency::Clear,
-            0,
-        );
+        let shard_a: Shard<String> =
+            Shard::from_parts("a".to_string(), Oid::hash(b"a"), Transparency::Clear, 0);
+        let shard_b: Shard<String> =
+            Shard::from_parts("b".to_string(), Oid::hash(b"b"), Transparency::Clear, 0);
         let result = take_first(shard_a, shard_b);
         assert_eq!(result.payload, "a");
     }

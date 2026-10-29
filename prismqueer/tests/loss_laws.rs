@@ -31,10 +31,14 @@ fn audit<L: Loss + PartialEq + Debug>(name: &str, xs: &[L]) -> Vec<String> {
             v.push(format!("{name}: right identity fails on {a:?}"));
         }
         if t.clone().combine(a.clone()) != t {
-            v.push(format!("{name}: total does not absorb from the left on {a:?}"));
+            v.push(format!(
+                "{name}: total does not absorb from the left on {a:?}"
+            ));
         }
         if a.clone().combine(t.clone()) != t {
-            v.push(format!("{name}: total does not absorb from the right on {a:?}"));
+            v.push(format!(
+                "{name}: total does not absorb from the right on {a:?}"
+            ));
         }
         for b in xs {
             for c in xs {
@@ -51,25 +55,44 @@ fn audit<L: Loss + PartialEq + Debug>(name: &str, xs: &[L]) -> Vec<String> {
 
 fn all_violations() -> Vec<String> {
     let fail = |m: &str| PropertyVerdict::Fail(Diagnostic::new(m));
-    let mode = |e: f64| Mode { eigenvalue: e, was: 1.0, now: 0.5 };
+    let mode = |e: f64| Mode {
+        eigenvalue: e,
+        was: 1.0,
+        now: 0.5,
+    };
     let mut v = Vec::new();
     v.extend(audit("Vec<u8>", &[vec![], vec![1u8], vec![2, 3]]));
     v.extend(audit(
         "HashSet<u8>",
-        &[HashSet::new(), HashSet::from([1u8]), HashSet::from([1u8, 2])],
+        &[
+            HashSet::new(),
+            HashSet::from([1u8]),
+            HashSet::from([1u8, 2]),
+        ],
     ));
     v.extend(audit(
         "BTreeSet<u8>",
-        &[BTreeSet::new(), BTreeSet::from([1u8]), BTreeSet::from([1u8, 2])],
+        &[
+            BTreeSet::new(),
+            BTreeSet::from([1u8]),
+            BTreeSet::from([1u8, 2]),
+        ],
     ));
     v.extend(audit("String", &[String::new(), "a".into(), "b".into()]));
     v.extend(audit("usize", &[0usize, 1, usize::MAX - 1, usize::MAX]));
     v.extend(audit("u64", &[0u64, 1, u64::MAX - 1, u64::MAX]));
     v.extend(audit("f64", &[0.0f64, 0.1, 0.2, 0.3, 1e16]));
-    v.extend(audit("(usize, String)", &[(0usize, String::new()), (1, "a".into())]));
+    v.extend(audit(
+        "(usize, String)",
+        &[(0usize, String::new()), (1, "a".into())],
+    ));
     v.extend(audit(
         "ConvergenceLoss",
-        &[ConvergenceLoss::new(0), ConvergenceLoss::new(3), ConvergenceLoss::new(7)],
+        &[
+            ConvergenceLoss::new(0),
+            ConvergenceLoss::new(3),
+            ConvergenceLoss::new(7),
+        ],
     ));
     v.extend(audit(
         "ApertureLoss",
@@ -81,7 +104,11 @@ fn all_violations() -> Vec<String> {
     ));
     v.extend(audit(
         "RoutingLoss",
-        &[RoutingLoss::new(0.0, 1.0), RoutingLoss::new(0.5, 0.4), RoutingLoss::new(1.2, 0.1)],
+        &[
+            RoutingLoss::new(0.0, 1.0),
+            RoutingLoss::new(0.5, 0.4),
+            RoutingLoss::new(1.2, 0.1),
+        ],
     ));
     v.extend(audit(
         "Transparency<u8>",
@@ -93,21 +120,37 @@ fn all_violations() -> Vec<String> {
     ));
     v.extend(audit(
         "ScalarLoss",
-        &[ScalarLoss::new(0.0), ScalarLoss::new(0.1), ScalarLoss::new(0.2), ScalarLoss::new(0.3)],
+        &[
+            ScalarLoss::new(0.0),
+            ScalarLoss::new(0.1),
+            ScalarLoss::new(0.2),
+            ScalarLoss::new(0.3),
+        ],
     ));
     // The free monoid (a Vec) with one adjoined absorbing element. The
     // collection carriers above fail absorption; this one must not.
     type Line = Progression<u8, Monophony>;
     v.extend(audit(
         "Progression<u8, Monophony>",
-        &[Line::zero(), Line::from_word([1u8]), Line::from_word([2u8, 1]), Line::total()],
+        &[
+            Line::zero(),
+            Line::from_word([1u8]),
+            Line::from_word([2u8, 1]),
+            Line::total(),
+        ],
     ));
     v.extend(audit(
         "Tail",
         &[
             Tail::zero(),
-            Tail { moving: vec![mode(1.0)], ..Tail::zero() },
-            Tail { faded: vec![mode(3.0)], ..Tail::zero() },
+            Tail {
+                moving: vec![mode(1.0)],
+                ..Tail::zero()
+            },
+            Tail {
+                faded: vec![mode(3.0)],
+                ..Tail::zero()
+            },
         ],
     ));
     v
@@ -147,7 +190,14 @@ fn loss_laws_hold_except_known_violations() {
         ]
     };
     let mut expected: BTreeSet<String> = BTreeSet::new();
-    for name in ["Vec<u8>", "HashSet<u8>", "BTreeSet<u8>", "String", "(usize, String)", "ApertureLoss"] {
+    for name in [
+        "Vec<u8>",
+        "HashSet<u8>",
+        "BTreeSet<u8>",
+        "String",
+        "(usize, String)",
+        "ApertureLoss",
+    ] {
         expected.extend(absorb(name));
     }
     expected.insert("f64: not associative".into());

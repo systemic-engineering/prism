@@ -136,11 +136,7 @@ where
 }
 
 /// Construct a commutator of two connections at a specified state.
-pub fn commutator<'a, C: FluxThread>(
-    a: &'a C,
-    b: &'a C,
-    state: &'a C::State,
-) -> Commutator<'a, C>
+pub fn commutator<'a, C: FluxThread>(a: &'a C, b: &'a C, state: &'a C::State) -> Commutator<'a, C>
 where
     C::Optic: crate::Prism,
     <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
@@ -206,9 +202,7 @@ pub mod pillar {
             ));
         }
         if witness_count != arm_count {
-            return PropertyVerdict::Fail(Diagnostic::new(
-                "witness count must match arm count",
-            ));
+            return PropertyVerdict::Fail(Diagnostic::new("witness count must match arm count"));
         }
         if !tie_breaking_exhausted {
             return PropertyVerdict::Fail(Diagnostic::new(
@@ -216,9 +210,7 @@ pub mod pillar {
             ));
         }
         if !pivot_song_present {
-            return PropertyVerdict::Fail(Diagnostic::new(
-                "pivot_song handle missing",
-            ));
+            return PropertyVerdict::Fail(Diagnostic::new("pivot_song handle missing"));
         }
         PropertyVerdict::Pass
     }
@@ -245,9 +237,7 @@ pub mod pillar {
     ///
     /// Behind `fate` feature.
     #[cfg(feature = "fate")]
-    pub fn of_health(
-        health: &crate::fate::feature::HolonomyHealth,
-    ) -> PropertyVerdict {
+    pub fn of_health(health: &crate::fate::feature::HolonomyHealth) -> PropertyVerdict {
         use crate::fate::feature::HolonomyHealth;
         match health {
             HolonomyHealth::Healthy => PropertyVerdict::Pass,
@@ -310,9 +300,7 @@ pub mod pillar {
         if magnitude > theta {
             PropertyVerdict::Pass
         } else if magnitude.is_zero() {
-            PropertyVerdict::Fail(Diagnostic::new(
-                "magnitude vanished; no algedonic signal",
-            ))
+            PropertyVerdict::Fail(Diagnostic::new("magnitude vanished; no algedonic signal"))
         } else {
             PropertyVerdict::Partial {
                 confidence: 0.5,
@@ -333,10 +321,7 @@ pub mod pillar {
     ///
     /// Requires `C::Holonomy: PartialOrd` because the pillar compares
     /// magnitude against `theta`. `ScalarLoss` satisfies this.
-    pub fn algedonic<'a, C>(
-        commutator: &Commutator<'a, C>,
-        theta: &C::Holonomy,
-    ) -> PropertyVerdict
+    pub fn algedonic<'a, C>(commutator: &Commutator<'a, C>, theta: &C::Holonomy) -> PropertyVerdict
     where
         C: FluxThread,
         C::Holonomy: PartialOrd,
@@ -347,9 +332,7 @@ pub mod pillar {
         if &m > theta {
             PropertyVerdict::Pass
         } else if m.is_zero() {
-            PropertyVerdict::Fail(Diagnostic::new(
-                "commutator vanished; no algedonic signal",
-            ))
+            PropertyVerdict::Fail(Diagnostic::new("commutator vanished; no algedonic signal"))
         } else {
             // Partial: got a signal but below threshold. Confidence 0.5
             // is a Rice-safe midpoint; consumers with domain-specific
@@ -382,20 +365,14 @@ pub mod pillar {
     /// - Partial when `history.len() < omega`
     ///   (`confidence = history.len() / omega`).
     /// - Fail when the window is full but accumulated `<= theta`.
-    pub fn viability_of_magnitudes<L>(
-        history: &[L],
-        theta: &L,
-        omega: usize,
-    ) -> PropertyVerdict
+    pub fn viability_of_magnitudes<L>(history: &[L], theta: &L, omega: usize) -> PropertyVerdict
     where
         L: Loss + PartialOrd,
     {
         if history.len() < omega {
             return PropertyVerdict::Partial {
                 confidence: history.len() as f64 / omega.max(1) as f64,
-                diagnostics: vec![Diagnostic::new(
-                    "history shorter than viability window",
-                )],
+                diagnostics: vec![Diagnostic::new("history shorter than viability window")],
             };
         }
 
@@ -439,9 +416,7 @@ pub mod pillar {
         if history.len() < omega {
             return PropertyVerdict::Partial {
                 confidence: history.len() as f64 / omega.max(1) as f64,
-                diagnostics: vec![Diagnostic::new(
-                    "history shorter than viability window",
-                )],
+                diagnostics: vec![Diagnostic::new("history shorter than viability window")],
             };
         }
 
@@ -529,9 +504,7 @@ pub mod pillar {
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_nanos() as u64)
                 .unwrap_or(0);
-            let seed = splitmix64(
-                time.wrapping_add(counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)),
-            );
+            let seed = splitmix64(time.wrapping_add(counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)));
             Self {
                 buffer: Vec::new(),
                 position: 0,
@@ -803,7 +776,11 @@ pub mod pillar {
             return vec![rng.draw_integer(0, 255) as u8];
         }
         let i = rng.draw_integer(0, b.len() as i64 - 1) as usize;
-        let bit = if rng.draw_bool() { 0 } else { rng.draw_integer(0, 7) };
+        let bit = if rng.draw_bool() {
+            0
+        } else {
+            rng.draw_integer(0, 7)
+        };
         b[i] ^= 1 << bit;
         b
     }
@@ -833,7 +810,11 @@ pub mod pillar {
         let mut quiet = 0;
         let clean = |best: Option<(Vec<u8>, f64)>, stop| {
             let (best, best_score) = best.map_or((None, None), |(b, s)| (Some(b), Some(s)));
-            Steered { best, best_score, stop }
+            Steered {
+                best,
+                best_score,
+                stop,
+            }
         };
         for _ in 0..budget.0 {
             let buffer = match (seeds.next(), &best) {
@@ -853,7 +834,11 @@ pub mod pillar {
             if best.as_ref().map_or(true, |(_, s)| score < *s) {
                 best = Some((consumed, score));
             }
-            quiet = if distinct(&coverage) > before { 0 } else { quiet + 1 };
+            quiet = if distinct(&coverage) > before {
+                0
+            } else {
+                quiet + 1
+            };
             if quiet >= patience.0 {
                 return terni::Imperfect::Partial(clean(best, Stop::Saturated), coverage);
             }

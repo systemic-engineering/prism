@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 use crate::ffi::eigenvalues;
-use crate::spectral::{Property, Red, Graph, VertexId};
+use crate::spectral::{Graph, Property, Red, VertexId};
 
 // ---------------------------------------------------------------------------
 // TensionKind, Location, Tension carriers
@@ -122,9 +122,7 @@ pub struct Tension {
 ///   partial due to spectrum-computation loss)
 /// - **Red** (`Imperfect::Failure(red, loss)`) — detection refused: eigenvalue
 ///   computation failed OR sheaf is empty
-pub fn detect_tensions(
-    sheaf: &Graph,
-) -> Imperfect<Vec<Tension>, Red, ConvergenceLoss> {
+pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, ConvergenceLoss> {
     let vertex_count = sheaf.vertices().count();
     let edge_count = sheaf.edges().count();
 

@@ -147,12 +147,20 @@ fn merge_partial_partial_takes_min_confidence_and_unions_diagnostics() {
     };
     a.merge_with(&b);
     match a {
-        PropertyVerdict::Partial { confidence, diagnostics } => {
+        PropertyVerdict::Partial {
+            confidence,
+            diagnostics,
+        } => {
             assert!(
                 (confidence - 0.3).abs() < 1e-9,
                 "expected min confidence 0.3, got {confidence}",
             );
-            assert_eq!(diagnostics.len(), 2, "expected 2 diagnostics, got {}", diagnostics.len());
+            assert_eq!(
+                diagnostics.len(),
+                2,
+                "expected 2 diagnostics, got {}",
+                diagnostics.len()
+            );
             assert_eq!(diagnostics[0].as_str(), "left-probe");
             assert_eq!(diagnostics[1].as_str(), "right-probe");
         }
@@ -219,5 +227,8 @@ fn folded_pass_verdicts_with_one_fail_yields_fail() {
     for v in &verdicts {
         unified.merge_with(v);
     }
-    assert!(matches!(unified, PropertyVerdict::Fail(_)), "got {unified:?}");
+    assert!(
+        matches!(unified, PropertyVerdict::Fail(_)),
+        "got {unified:?}"
+    );
 }
