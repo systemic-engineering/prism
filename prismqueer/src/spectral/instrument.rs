@@ -35,6 +35,28 @@ pub enum Outside {
     Vertex(VertexId),
     /// No such edge, in either orientation.
     Edge(EdgeKey),
+    /// An operation on intervals was handed a pitch value.
+    NotAnInterval(VertexId),
+}
+
+/// Intervals split into what an assertion could ask (gradient, im δ) and
+/// what no assertion answers (harmonic, ker δ*: the comma). Complementary
+/// orthogonal projections; `gradient + harmonic` is the input.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hodge {
+    gradient: Cochain,
+    harmonic: Cochain,
+}
+
+impl Hodge {
+    /// The part that is the question of some assertion.
+    pub fn gradient(&self) -> &Cochain {
+        &self.gradient
+    }
+    /// The part no assertion answers: what the edge settle keeps.
+    pub fn harmonic(&self) -> &Cochain {
+        &self.harmonic
+    }
 }
 
 /// A value per vertex and per oriented edge. Sparse: an absent entry is zero.
@@ -290,6 +312,70 @@ impl Instrument {
             w[k] = (w[self.vertices[&u]] + w[self.vertices[&v]]) / 2.0;
         }
         Ok(w)
+    }
+
+    /// The Hodge split of intervals: `(gradient, harmonic)`.
+    ///
+    /// The harmonic part is the projection onto ker D. An interval-only input
+    /// projects only into H¹ (H⁰ lives on pitches), so the result doesn't
+    /// depend on which eigenbasis LAPACK chose. The kernel is counted exactly,
+    /// b₀ + b₁ by union-find, not by a threshold. A pitch value is refused.
+    pub fn hodge(&self, x: &Cochain) -> Result<Hodge, Outside> {
+        if let Some(&v) = x.vertex.iter().find(|(_, x)| **x != 0.0).map(|(v, _)| v) {
+            return Err(Outside::NotAnInterval(v));
+        }
+        let dense = self.dense(x)?;
+        let n = self.dim();
+        let mut by_size: Vec<usize> = (0..self.values.len()).collect();
+        by_size.sort_by(|&a, &b| self.values[a].abs().total_cmp(&self.values[b].abs()));
+        let mut harmonic = vec![0.0_f64; n];
+        for &k in by_size.iter().take(self.betti()) {
+            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
+            let weight: f64 = v.iter().zip(&dense).map(|(a, b)| a * b).sum();
+            for (h, vc) in harmonic.iter_mut().zip(&v) {
+                *h += weight * vc;
+            }
+        }
+        let n0 = self.vertices.len();
+        for h in harmonic.iter_mut().take(n0) {
+            *h = 0.0;
+        }
+        let gradient: Vec<f64> = dense.iter().zip(&harmonic).map(|(a, h)| a - h).collect();
+        Ok(Hodge {
+            gradient: self.sparse_intervals(&gradient),
+            harmonic: self.sparse_intervals(&harmonic),
+        })
+    }
+
+    /// b₀ + b₁, exactly: components by union-find, then |E| − |V| + b₀.
+    fn betti(&self) -> usize {
+        let mut parent: Vec<usize> = (0..self.vertices.len()).collect();
+        fn root(p: &mut [usize], i: usize) -> usize {
+            if p[i] == i {
+                i
+            } else {
+                let r = root(p, p[i]);
+                p[i] = r;
+                r
+            }
+        }
+        let mut b0 = self.vertices.len();
+        for &(u, v) in self.edges.keys() {
+            let (ru, rv) = (root(&mut parent, self.vertices[&u]), root(&mut parent, self.vertices[&v]));
+            if ru != rv {
+                parent[ru] = rv;
+                b0 -= 1;
+            }
+        }
+        let b1 = self.edges.len() + b0 - self.vertices.len();
+        b0 + b1
+    }
+
+    fn sparse_intervals(&self, y: &[f64]) -> Cochain {
+        Cochain {
+            vertex: BTreeMap::new(),
+            edge: self.edges.iter().map(|(&e, &k)| (e, y[k])).collect(),
+        }
     }
 
     /// f(D) x through the eigenbasis.

@@ -14,7 +14,10 @@
 //! - `Failure`: the instrument could not measure. Fails closed: an
 //!   unmeasured answer is never reported as settled.
 //!
-//! Scope: vertices only (`H⁰`). Cycles (`H¹`) need the edge Laplacian.
+//! Scope: vertices only (`H⁰`). The edge side (`H¹`, the comma) is
+//! [`Instrument::decay`](crate::spectral::instrument::Instrument::decay) on the
+//! full complex, and its exact split is
+//! [`Instrument::hodge`](crate::spectral::instrument::Instrument::hodge).
 
 use std::collections::BTreeMap;
 
