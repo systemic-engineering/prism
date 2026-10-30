@@ -333,18 +333,31 @@ mod tests {
         }
     }
 
+    /// Side length of the 3D torus both 3D tests read.
+    const TORUS_3D_L: usize = 14;
+
+    /// Laplacian spectrum of the l=14 3D torus (N=2744), computed once and
+    /// shared by the two 3D tests below. A dense N=2744 dsyev is the most
+    /// expensive thing in the unit suite; both tests read only eigenvalues
+    /// (see `eigenvalues_match_eigensystem_on_a_small_torus`), so the
+    /// vectors aren't computed.
+    fn torus_3d_spectrum() -> &'static [f64] {
+        static SPECTRUM: std::sync::OnceLock<Vec<f64>> = std::sync::OnceLock::new();
+        SPECTRUM.get_or_init(|| {
+            let (n, edges) = torus_3d(TORUS_3D_L);
+            let lap = laplacian_from_edges(n, &edges);
+            ffi::eigenvalues(n, &lap).expect("dsyev converges")
+        })
+    }
+
     /// d_s should recover 3.0 on a 3D torus.
     ///
-    /// l=10 ⇒ N=1000 vertices, degree 6. Smallest non-zero λ ≈ (2π/10)² ≈ 0.39,
-    /// largest 12. Plateau window σ∈[1.5,5]: small enough that the zero mode is
-    /// still negligible, large enough that the lattice-discreteness (max-λ tail)
-    /// has averaged out.
+    /// l=14 ⇒ N=2744 vertices, degree 6. Smallest non-zero λ ≈ (2π/14)² ≈ 0.20,
+    /// largest 12. The window is chosen below.
     #[test]
     fn torus_3d_recovers_dimension_three() {
-        let l = 14;
-        let (n, edges) = torus_3d(l);
-        let lap = laplacian_from_edges(n, &edges);
-        let (evals, _) = ffi::eigensystem(n, &lap).expect("dsyev converges");
+        let l = TORUS_3D_L;
+        let evals = torus_3d_spectrum();
 
         // Window σ∈[3,6]. A discrete d-torus has no perfectly flat d_s plateau:
         // at small σ the lattice band structure overshoots above d, and the
@@ -353,7 +366,7 @@ mod tests {
         // crossing-through-3 band sits in σ∈[3,6] with d_s within 0.3 of 3.
         let window = [3.0_f64, 3.5, 4.0, 4.5, 5.0, 6.0];
         for &s in &window {
-            let ds = spectral_dimension(&evals, Sigma::new(s)).as_f64();
+            let ds = spectral_dimension(evals, Sigma::new(s)).as_f64();
             println!("  [3D l={l}] σ={s:>5.1}  d_s={ds:.4}");
             assert!(
                 (ds - 3.0).abs() < 0.3,
@@ -370,24 +383,22 @@ mod tests {
     /// scale-dependence (dimensional flow) the cosmology probe relies on.
     #[test]
     fn dimensional_flow_curve_on_3d_torus() {
-        let l = 14;
-        let (n, edges) = torus_3d(l);
-        let lap = laplacian_from_edges(n, &edges);
-        let (evals, _) = ffi::eigensystem(n, &lap).expect("dsyev converges");
+        let evals = torus_3d_spectrum();
+        let n = evals.len();
 
         let grid = log_grid(0.05, 500.0, 18);
         println!("\n  d_s(σ) flow — 3D torus, N={n}, degree 6");
         println!("  {:>12}  {:>10}  {:>10}", "σ", "P(σ)", "d_s(σ)");
         let mut peak = 0.0_f64;
         for &s in &grid {
-            let p = heat_return_probability(&evals, Sigma::new(s));
-            let ds = spectral_dimension(&evals, Sigma::new(s)).as_f64();
+            let p = heat_return_probability(evals, Sigma::new(s));
+            let ds = spectral_dimension(evals, Sigma::new(s)).as_f64();
             peak = peak.max(ds);
             println!("  {s:>12.4}  {p:>10.6}  {ds:>10.4}");
         }
         // The curve must reach near the embedding dimension somewhere in the
         // sweep, and collapse toward 0 at the coarse end (zero-mode dominance).
-        let ds_large = spectral_dimension(&evals, Sigma::new(500.0)).as_f64();
+        let ds_large = spectral_dimension(evals, Sigma::new(500.0)).as_f64();
         assert!(peak > 2.5, "flow never approached d≈3 (peak d_s={peak})");
         assert!(
             ds_large < 0.5,
