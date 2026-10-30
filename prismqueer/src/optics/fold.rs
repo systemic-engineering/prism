@@ -36,7 +36,7 @@ impl<S: 'static, A: 'static> Fold<S, A> {
 impl<S: 'static, A: 'static> crate::Addressable for Fold<S, A> {
     fn oid(&self) -> crate::Oid {
         let bytes = (self.fold_fn as usize).to_le_bytes();
-        crate::Oid::hash(&bytes)
+        crate::Oid::hash(&crate::Scope::public(), &bytes)
     }
 }
 

@@ -18,7 +18,7 @@
 //!
 //! - `payload: T` (substrate content carrier)
 //! - `oid: Oid` (content-addressed per Rec #82; composes over `prismqueer::oid::Oid` LANDED
-//!   via `CoincidenceHash<3>`)
+//!   via scoped BLAKE3)
 //! - `transparency: Transparency<Property>` (LOVE-monoid verdict per Rec #92 M2.1;
 //!   composes over `terni::Transparency<Property>` LANDED; encodes Foerster-gauge
 //!   preservation as the ternary variant — Clear = preserved; Opaque = residual — per
@@ -45,7 +45,7 @@
 //!
 //! # Composition (grep-verified LANDED per FLOOR Definition M8.1)
 //!
-//! - `prismqueer::oid::Oid` — content-addressed via `CoincidenceHash<3>` (LANDED)
+//! - `prismqueer::oid::Oid` — content-addressed via scoped BLAKE3 (LANDED)
 //! - `terni::Transparency<Property>` — LOVE-monoid per Rec #92 M2.1 (LANDED via prismqueer
 //!   re-export at `lib.rs`)
 //! - `prismqueer::spectral::kleinos::Property` — four LOVE properties enum (LANDED)
@@ -69,7 +69,7 @@
 
 use terni::Transparency;
 
-use crate::oid::Oid;
+use crate::oid::{Oid, Scope};
 use crate::spectral::kleinos::Property;
 
 /// The prismqueer Shard<T> per Mara loving-lambda-calculus canonical §2.2.
@@ -88,7 +88,7 @@ pub struct Shard<T> {
     pub payload: T,
 
     /// Content-addressed OID per Rec #82 β-normal AST addressing.
-    /// Composes over `prismqueer::oid::Oid` LANDED via `CoincidenceHash<3>`.
+    /// Composes over `prismqueer::oid::Oid` LANDED via scoped BLAKE3.
     pub oid: Oid,
 
     /// LOVE-monoid `Transparency<Property>` verdict per Rec #92 M2.1 four properties
@@ -108,12 +108,12 @@ impl<T> Shard<T>
 where
     T: AsRef<[u8]>,
 {
-    /// Construct a Shard from a payload with content-addressed OID via `CoincidenceHash<3>`.
+    /// Construct a Shard from a payload with content-addressed OID via scoped BLAKE3.
     ///
     /// - `transparency` defaults to `Transparency::Clear` (gauge preserved; no violations)
     /// - `iteration_index` defaults to 0 (Mandelbrot start; z_0 = 0)
     pub fn new(payload: T) -> Self {
-        let oid = Oid::hash(payload.as_ref());
+        let oid = Oid::hash(&Scope::public(), payload.as_ref());
         Self {
             payload,
             oid,
@@ -201,7 +201,7 @@ mod tests {
         let identity: ShardEndo<String> = |s| s;
         let shard: Shard<String> = Shard::from_parts(
             "hello".to_string(),
-            Oid::hash(b"hello"),
+            Oid::hash(&Scope::public(), b"hello"),
             Transparency::Clear,
             0,
         );
@@ -215,10 +215,18 @@ mod tests {
         // ShardBinary<T> is what love(shard_a, shard_b) inhabits per Mara canonical §4.1
         // TICK 2B forward-promised.
         let take_first: ShardBinary<String> = |a, _b| a;
-        let shard_a: Shard<String> =
-            Shard::from_parts("a".to_string(), Oid::hash(b"a"), Transparency::Clear, 0);
-        let shard_b: Shard<String> =
-            Shard::from_parts("b".to_string(), Oid::hash(b"b"), Transparency::Clear, 0);
+        let shard_a: Shard<String> = Shard::from_parts(
+            "a".to_string(),
+            Oid::hash(&Scope::public(), b"a"),
+            Transparency::Clear,
+            0,
+        );
+        let shard_b: Shard<String> = Shard::from_parts(
+            "b".to_string(),
+            Oid::hash(&Scope::public(), b"b"),
+            Transparency::Clear,
+            0,
+        );
         let result = take_first(shard_a, shard_b);
         assert_eq!(result.payload, "a");
     }

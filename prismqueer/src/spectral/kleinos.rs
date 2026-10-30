@@ -60,7 +60,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::oid::{Addressable, Oid};
+use crate::oid::{Addressable, Oid, Scope};
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ impl Addressable for Graph {
             bytes.extend_from_slice(&e.0.to_le_bytes());
             bytes.extend_from_slice(&e.1.to_le_bytes());
         }
-        Oid::hash(&bytes)
+        Oid::hash(&Scope::public(), &bytes)
     }
 }
 
@@ -247,7 +247,7 @@ impl Addressable for Composition {
         bytes.extend_from_slice(&self.emergent_third.to_le_bytes());
         bytes.push(0xFF);
         bytes.extend_from_slice(&self.fiedler_lambda_2_cached.to_le_bytes());
-        Oid::hash(&bytes)
+        Oid::hash(&Scope::public(), &bytes)
     }
 }
 

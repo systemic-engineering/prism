@@ -26,9 +26,10 @@
 //!
 //! # Substrate-pull
 //!
-//! `[substrate-pull:realize]` — prismqueer stays deps-free. The
-//! BLAKE3 computation lives in fragmentation; this crate takes the
-//! hash bytes as an opaque `&[u8; 32]` parameter. Quantization of
+//! `[substrate-pull:realize]` — `SpectralUuid` takes the content
+//! hash as an opaque `&[u8; 32]` parameter and computes no hash
+//! itself. (prismqueer does depend on BLAKE3, for `Oid::hash`; this
+//! carrier doesn't use it.) Quantization of
 //! `SpectralCoordinate<5>` into 48 bits lives at fragmentation's
 //! boundary; this crate takes a pre-quantized `u64` (lower 48 bits
 //! used; upper 16 bits ignored).

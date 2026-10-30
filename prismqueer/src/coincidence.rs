@@ -1,10 +1,12 @@
-//! Minimal coincidence hash — eigenvalue-based content addressing.
+//! Minimal coincidence detector — an eigenvalue-based measurement of bytes.
 //!
 //! Ported from the coincidence crate. This is the minimal code path:
 //! bytes -> StateVector -> N projections -> Detection -> eigenvalue hex.
 //!
-//! N=3 is the canonical detector for Oid::hash(). Three independent observers,
-//! deterministic projections from SHA-256 seeds.
+//! N=3 is the canonical detector. Three independent observers, deterministic
+//! projections from SHA-256 seeds. A detection is a measurement, not an
+//! identity: content addresses are `Oid::hash` (scoped BLAKE3, see
+//! `docs/spec/identity.md`).
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -463,13 +465,14 @@ impl<const N: usize> HashPrism for Detector<N> {
     }
 }
 
-// --- Canonical hash ---
+// --- Canonical detection ---
 
-/// The canonical N=3 detector for content addressing.
+/// The canonical N=3 detector.
 static CANONICAL: LazyLock<Detector<3>> =
     LazyLock::new(|| Detector::canonical("content", DEFAULT_DIMENSION));
 
-/// Compute the canonical coincidence hash of raw bytes.
+/// Detect raw bytes with the canonical detector: a measurement, not an
+/// identity (that is `Oid::hash`).
 ///
 /// Uses Detector<3> with dimension=16 in the "content" space.
 /// The eigenvalue (multi-observer agreement record) is hashed through SHA-256
@@ -477,7 +480,7 @@ static CANONICAL: LazyLock<Detector<3>> =
 /// separation for degenerate input (empty bytes, zero state vector).
 ///
 /// Delegates to `HashPrism::review` on the canonical `Detector<3>`.
-pub fn canonical_hash(bytes: &[u8]) -> String {
+pub fn detect(bytes: &[u8]) -> String {
     CANONICAL.review(bytes)
 }
 
@@ -492,7 +495,7 @@ pub fn coincidence_hash() -> crate::named::Named<Detector<3>> {
 impl<const N: usize> crate::oid::Addressable for Detector<N> {
     fn oid(&self) -> crate::oid::Oid {
         let identity = format!("detector:{}:{}", N, self.space);
-        crate::oid::Oid::hash(identity.as_bytes())
+        crate::oid::Oid::hash(&crate::oid::Scope::public(), identity.as_bytes())
     }
 }
 
@@ -508,21 +511,21 @@ mod tests {
 
     #[test]
     fn canonical_hash_deterministic() {
-        let a = canonical_hash(b"hello");
-        let b = canonical_hash(b"hello");
+        let a = detect(b"hello");
+        let b = detect(b"hello");
         assert_eq!(a, b);
     }
 
     #[test]
     fn canonical_hash_different_input() {
-        let a = canonical_hash(b"hello");
-        let b = canonical_hash(b"world");
+        let a = detect(b"hello");
+        let b = detect(b"world");
         assert_ne!(a, b);
     }
 
     #[test]
     fn canonical_hash_produces_valid_hex() {
-        let h = canonical_hash(b"test");
+        let h = detect(b"test");
         assert_eq!(
             h.len(),
             64,
@@ -540,13 +543,13 @@ mod tests {
             detection.eigenvalue_hex().is_some(),
             "detection must agree for non-empty input"
         );
-        let h = canonical_hash(b"hello");
+        let h = detect(b"hello");
         assert_eq!(h.len(), 64);
     }
 
     #[test]
     fn canonical_hash_empty_input_fallback() {
-        let h = canonical_hash(b"");
+        let h = detect(b"");
         assert_eq!(h.len(), 64); // SHA-256 = 32 bytes = 64 hex chars
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
@@ -615,7 +618,7 @@ mod tests {
     fn hash_prism_review_matches_canonical_hash() {
         let detector = Detector::<3>::canonical("content", DEFAULT_DIMENSION);
         let review_result = detector.review(b"hello");
-        let canonical_result = canonical_hash(b"hello");
+        let canonical_result = detect(b"hello");
         assert_eq!(review_result, canonical_result);
     }
 
@@ -686,7 +689,7 @@ mod tests {
     fn named_detector_review_matches_canonical() {
         let named = coincidence_hash();
         let review_result = named.inner().review(b"hello");
-        let canonical_result = canonical_hash(b"hello");
+        let canonical_result = detect(b"hello");
         assert_eq!(review_result, canonical_result);
     }
 

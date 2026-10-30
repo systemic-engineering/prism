@@ -29,8 +29,8 @@
 //!
 //! Observer<N> at type-level with const-generic N encoding observation-dimensionality.
 //! `observe_payload(T) -> Shard<T>` composes over LANDED `prismqueer::shard::Shard<T>`
-//! (Discharge #5 `22723bb`) which itself content-addresses via `Oid::hash` via
-//! `CoincidenceHash<3>` at prismqueer::coincidence LANDED.
+//! (Discharge #5 `22723bb`) which itself content-addresses via `Oid::hash`
+//! (scoped BLAKE3, `docs/spec/identity.md`).
 //!
 //! Full `Observer<N>::observe(Reality) -> Observation` per Move 2+8 pipeline signature
 //! FORWARD-PROMISED when `prismqueer::reality::Reality` + `prismqueer::observation::Observation`
@@ -42,7 +42,7 @@
 //! - `prismqueer::coincidence::Detector<N>` — N-projection observation apparatus at prism-repo
 //!   (currently private detect method; observe_payload composes via Shard::new which uses
 //!   Oid::hash internally; future ticks may expose Detector<N> observation directly)
-//! - `prismqueer::oid::Oid` — content-addressed via CoincidenceHash<3> (used by Shard::new)
+//! - `prismqueer::oid::Oid` — content-addressed via scoped BLAKE3 (used by Shard::new)
 
 use std::marker::PhantomData;
 
@@ -98,8 +98,7 @@ impl<const N: usize> Observer<N> {
     /// Observe a payload → Shard<T> per Move 8 tick.
     ///
     /// Composes over `prismqueer::shard::Shard<T>::new` (LANDED Discharge #5 `22723bb`)
-    /// which content-addresses via `Oid::hash` via `CoincidenceHash<3>` at
-    /// `prismqueer::coincidence` LANDED.
+    /// which content-addresses via `Oid::hash` (scoped BLAKE3).
     ///
     /// **Forward-promised at future tick**: full `observe(Reality) -> Observation` signature
     /// per Alex Move 2+8+15 pipeline (Reality perturbed by Choice → Recursion.tick through

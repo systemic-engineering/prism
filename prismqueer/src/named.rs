@@ -1,6 +1,6 @@
 //! Named — a labeled Prism.
 
-use crate::oid::{Addressable, Oid};
+use crate::oid::{Addressable, Oid, Scope};
 
 /// A labeled Prism. The name is for humans. The OID is for the graph.
 ///
@@ -30,7 +30,7 @@ impl<P: Addressable> Addressable for Named<P> {
     fn oid(&self) -> Oid {
         let inner_oid = self.1.oid();
         let combined = format!("named:{}:{}", self.0, inner_oid);
-        Oid::hash(combined.as_bytes())
+        Oid::hash(&Scope::public(), combined.as_bytes())
     }
 }
 
@@ -43,7 +43,7 @@ mod tests {
 
     impl Addressable for FocusOptic {
         fn oid(&self) -> Oid {
-            Oid::hash(&self.0.to_le_bytes())
+            Oid::hash(&Scope::public(), &self.0.to_le_bytes())
         }
     }
 
@@ -224,7 +224,7 @@ mod tests {
         struct HandWritten;
         impl Addressable for HandWritten {
             fn oid(&self) -> Oid {
-                Oid::hash("@test/simple".as_bytes())
+                Oid::hash(&Scope::public(), "@test/simple".as_bytes())
             }
         }
         // Derive-generated
@@ -249,9 +249,8 @@ mod tests {
         }
         let elapsed = start.elapsed();
         eprintln!("--- derive(Prism) oid: 1k calls in {:?} ---", elapsed);
-        // Each call runs CoincidenceHash<3> (eigenvalue-based).
+        // Each call runs one keyed BLAKE3 over the name (scoped identity).
         // No LazyLock in the derive — each call recomputes the hash.
-        // ~1ms per call is expected for the full coincidence detector pipeline.
     }
 
     // -----------------------------------------------------------------------

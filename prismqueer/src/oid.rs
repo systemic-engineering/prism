@@ -1,9 +1,56 @@
-//! Object identity. An [`Oid`] is the content address of a value — two values
-//! with the same bytes produce the same Oid. Oids are the nodes in every
-//! graph this system builds: content-addressed, comparable, hashable.
+//! Object identity. An [`Oid`] is the content address of a value inside a
+//! [`Scope`]: two values with the same bytes in the same scope produce the
+//! same Oid. Oids are the nodes in every graph this system builds:
+//! content-addressed, comparable, hashable. The function is specified in
+//! `docs/spec/identity.md`.
 
-/// Content address. The identity of a thing is its content.
-/// Two values with the same bytes have the same Oid.
+use std::sync::LazyLock;
+
+/// The context string of the public scope. Names the scope for the whole
+/// stack; `v1` versions the identity function.
+pub const PUBLIC_CONTEXT: &str = "systemic.engineering://visibility/public/v1";
+
+static PUBLIC_KEY: LazyLock<[u8; 32]> = LazyLock::new(|| blake3::derive_key(PUBLIC_CONTEXT, b""));
+
+/// The scope an address is taken in: a 32-byte BLAKE3 key.
+///
+/// [`Scope::public`] derives its key from [`PUBLIC_CONTEXT`], so anyone can
+/// recompute a public address. [`Scope::keyed`] takes a held key; where held
+/// keys come from is outside prism. The key is never exposed, and `Debug`
+/// doesn't print it.
+#[derive(Clone)]
+pub struct Scope {
+    key: [u8; 32],
+    public: bool,
+}
+
+impl Scope {
+    /// The public scope: `K_public = BLAKE3-derive-key(PUBLIC_CONTEXT, "")`.
+    pub fn public() -> Self {
+        Scope {
+            key: *PUBLIC_KEY,
+            public: true,
+        }
+    }
+
+    /// A held scope under a 32-byte key.
+    pub fn keyed(key: [u8; 32]) -> Self {
+        Scope { key, public: false }
+    }
+}
+
+impl std::fmt::Debug for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.public {
+            "Scope(public)"
+        } else {
+            "Scope(held)"
+        })
+    }
+}
+
+/// Content address. The identity of a thing is its content, in a scope.
+/// Two values with the same bytes in the same scope have the same Oid.
 /// Oids are the nodes in every graph this system builds.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "pq", derive(serde::Serialize, serde::Deserialize))]
@@ -17,20 +64,14 @@ impl Oid {
         Oid(s.into())
     }
 
-    /// Hash bytes to produce an Oid. Deterministic content addressing.
-    ///
-    /// Uses CoincidenceHash<3> — three independent projection observers
-    /// in a 16-dimensional space. The shared eigenvalue becomes the content
-    /// address, compressed through SHA-256 to a fixed 64-char hex string.
-    /// Falls back to SHA-256 with domain separation for degenerate input.
-    ///
-    /// Deterministic across Rust versions (no SipHash/DefaultHasher).
-    pub fn hash(bytes: &[u8]) -> Self {
-        let hex_str = crate::coincidence::canonical_hash(bytes);
-        Oid(hex_str)
+    /// The address of `bytes` in `scope`: `BLAKE3-keyed(K_scope, bytes)`,
+    /// 64 lowercase hex characters. Every caller names its scope.
+    pub fn hash(scope: &Scope, bytes: &[u8]) -> Self {
+        Oid(blake3::keyed_hash(&scope.key, bytes).to_hex().to_string())
     }
 
-    /// The dark OID. The address of absence. Constant.
+    /// The dark OID. The address of absence. Constant, and not the address
+    /// of any content in any scope.
     pub fn dark() -> Self {
         Oid("0".repeat(64))
     }
@@ -159,21 +200,21 @@ mod tests {
 
     #[test]
     fn oid_from_bytes() {
-        let a = Oid::hash(b"hello");
-        let b = Oid::hash(b"hello");
+        let a = Oid::hash(&Scope::public(), b"hello");
+        let b = Oid::hash(&Scope::public(), b"hello");
         assert_eq!(a, b); // deterministic
     }
 
     #[test]
     fn oid_different_content_different_hash() {
-        let a = Oid::hash(b"hello");
-        let b = Oid::hash(b"world");
+        let a = Oid::hash(&Scope::public(), b"hello");
+        let b = Oid::hash(&Scope::public(), b"world");
         assert_ne!(a, b);
     }
 
     #[test]
     fn oid_display_is_hex() {
-        let oid = Oid::hash(b"test");
+        let oid = Oid::hash(&Scope::public(), b"test");
         let s = format!("{}", oid);
         assert_eq!(s.len(), 64); // 32 bytes = 64 hex chars
         assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
@@ -186,15 +227,15 @@ mod tests {
 
     #[test]
     fn oid_dark_differs_from_any_content() {
-        assert_ne!(Oid::dark(), Oid::hash(b""));
-        assert_ne!(Oid::dark(), Oid::hash(b"anything"));
+        assert_ne!(Oid::dark(), Oid::hash(&Scope::public(), b""));
+        assert_ne!(Oid::dark(), Oid::hash(&Scope::public(), b"anything"));
     }
 
     struct TestValue(u32);
 
     impl Addressable for TestValue {
         fn oid(&self) -> Oid {
-            Oid::hash(&self.0.to_le_bytes())
+            Oid::hash(&Scope::public(), &self.0.to_le_bytes())
         }
     }
 
@@ -207,46 +248,42 @@ mod tests {
         assert_ne!(a.oid(), c.oid());
     }
 
-    // --- Coincidence hash integration tests ---
-
-    #[test]
-    fn oid_hash_is_coincidence_detector() {
-        // Oid::hash must use CoincidenceHash<3> (eigenvalue-based content addressing).
-        // The canonical detector with N=3, dim=16, space="content" produces a
-        // deterministic eigenvalue, then SHA-256 compresses it to 64 hex chars.
-        let oid = Oid::hash(b"hello");
-        let s = oid.as_str();
-        // Fixed size: SHA-256 of eigenvalue = 32 bytes = 64 hex chars
-        assert_eq!(s.len(), 64, "must be 64 hex chars");
-        assert!(s.chars().all(|c| c.is_ascii_hexdigit()), "must be hex");
-        // Deterministic
-        assert_eq!(oid, Oid::hash(b"hello"));
-        // Different input produces different hash
-        assert_ne!(oid, Oid::hash(b"world"));
-    }
-
-    #[test]
-    fn oid_hash_empty_bytes_fallback() {
-        // Empty input may produce a zero state vector, triggering the SHA-256 fallback.
-        // The fallback must still be deterministic and produce valid hex.
-        let oid = Oid::hash(b"");
-        let s = oid.as_str();
-        assert_eq!(s.len(), 64, "fallback must produce 64 hex chars");
-        assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
-        assert_eq!(oid, Oid::hash(b""), "fallback must be deterministic");
-        assert_ne!(oid, Oid::dark(), "fallback must differ from dark");
-    }
+    // --- Scoped identity (docs/spec/identity-vectors.json) ---
 
     #[test]
     fn oid_hash_cross_version_stable() {
-        // Pin a known hash value to detect if the hash function changes accidentally.
-        // This value is computed by CoincidenceHash<3> then SHA-256 compressed.
-        // If this test fails, either the hash function changed or the pin needs updating.
-        let oid = Oid::hash(b"prism");
+        // From identity-vectors.json, "public, prism" (computed with b3sum).
         assert_eq!(
-            oid.as_str(),
-            "08f8e91d230c49a5072202e4e82db8306e226d83f77aa6f57d05dc87b56efc1e",
-            "hash of b\"prism\" must match pinned CoincidenceHash<3> value"
+            Oid::hash(&Scope::public(), b"prism").as_str(),
+            "89514bceb709fad516e0273864a6f07b302d7142d7c6d53c4640e73b8d40b403"
         );
+    }
+
+    #[test]
+    fn oid_hash_empty_bytes_is_not_dark() {
+        assert_ne!(Oid::hash(&Scope::public(), b""), Oid::dark());
+        assert_ne!(Oid::hash(&Scope::keyed([0; 32]), b""), Oid::dark());
+    }
+
+    #[test]
+    fn same_content_two_scopes_two_addresses() {
+        let public = Oid::hash(&Scope::public(), b"hello");
+        let held = Oid::hash(&Scope::keyed([1; 32]), b"hello");
+        assert_ne!(public, held);
+    }
+
+    #[test]
+    fn scope_debug_does_not_print_the_key() {
+        let key = [0xab; 32];
+        let shown = format!("{:?} {:?}", Scope::keyed(key), Scope::public());
+        assert_eq!(shown, "Scope(held) Scope(public)");
+        assert!(!shown.contains("ab"));
+        assert!(!shown.contains("171"));
+    }
+
+    #[test]
+    fn scope_clone_keeps_the_key() {
+        let scope = Scope::keyed([7; 32]);
+        assert_eq!(Oid::hash(&scope.clone(), b"x"), Oid::hash(&scope, b"x"));
     }
 }

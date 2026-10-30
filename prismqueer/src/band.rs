@@ -176,7 +176,7 @@ pub mod zeros {
         Band::new(tenth(9), tenth(9), ScaleLaw::Absolute).expect("ordered")
     }
 
-    /// `coincidence.rs` (inside `Oid::hash`): `f64::EPSILON` = 2⁻⁵², absolute.
+    /// `coincidence.rs` (the detector): `f64::EPSILON` = 2⁻⁵², absolute.
     pub fn coincidence() -> Band {
         let eps = Ratio::from_primes([(2, -52)]);
         Band::new(eps.clone(), eps, ScaleLaw::Absolute).expect("ordered")

@@ -72,7 +72,7 @@ use std::f64::consts::PI;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 use crate::ffi::phase_lock;
-use crate::oid::{Addressable, Oid};
+use crate::oid::{Addressable, Oid, Scope};
 use crate::spectral::{kleinos, Graph, Property, Red};
 
 // ---------------------------------------------------------------------------
@@ -282,7 +282,7 @@ pub fn infer_via_rotation(
 
         splinters.push(Splinter {
             tick,
-            oid: Oid::hash(&bytes),
+            oid: Oid::hash(&Scope::public(), &bytes),
             fiedler_lambda_2: fiedler_at_basepoint,
             order_r,
         });

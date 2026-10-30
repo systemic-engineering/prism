@@ -677,7 +677,10 @@ pub mod pillar {
 
     impl Take {
         fn of(consumed: &[u8]) -> Self {
-            Self::at(crate::oid::Oid::hash(consumed))
+            Self::at(crate::oid::Oid::hash(
+                &crate::oid::Scope::public(),
+                consumed,
+            ))
         }
 
         fn at(address: crate::oid::Oid) -> Self {

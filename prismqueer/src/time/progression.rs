@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use terni::Loss;
 
 use super::Independence;
-use crate::oid::{Addressable, Oid};
+use crate::oid::{Addressable, Oid, Scope};
 
 /// A history up to reordering of independent steps: an element of the trace
 /// monoid M(E, I), with one adjoined absorbing element for a lost history.
@@ -180,6 +180,6 @@ impl<E: Ord + Addressable, I: Independence<E>> Addressable for Progression<E, I>
                 }
             }
         }
-        Oid::hash(&bytes)
+        Oid::hash(&Scope::public(), &bytes)
     }
 }

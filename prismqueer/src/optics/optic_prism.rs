@@ -65,7 +65,7 @@ impl<S: 'static, A: 'static> crate::Addressable for OpticPrism<S, A> {
         bytes.extend_from_slice(&(self.match_fn as usize).to_le_bytes());
         bytes.extend_from_slice(&(self.extract_fn as usize).to_le_bytes());
         bytes.extend_from_slice(&(self.review_fn as usize).to_le_bytes());
-        crate::Oid::hash(&bytes)
+        crate::Oid::hash(&crate::Scope::public(), &bytes)
     }
 }
 

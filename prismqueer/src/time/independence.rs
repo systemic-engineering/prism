@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::oid::Oid;
+use crate::oid::{Oid, Scope};
 
 /// A symmetric, irreflexive relation on steps.
 ///
@@ -42,7 +42,7 @@ impl<E: Touches + PartialEq> Independence<E> for Polyphony {
     }
 
     fn oid(&self) -> Oid {
-        Oid::hash(b"prismqueer::time::Polyphony")
+        Oid::hash(&Scope::public(), b"prismqueer::time::Polyphony")
     }
 }
 
@@ -56,6 +56,6 @@ impl<E> Independence<E> for Monophony {
     }
 
     fn oid(&self) -> Oid {
-        Oid::hash(b"prismqueer::time::Monophony")
+        Oid::hash(&Scope::public(), b"prismqueer::time::Monophony")
     }
 }

@@ -6,7 +6,7 @@
 
 use terni::{Imperfect, Loss};
 
-use crate::oid::Oid;
+use crate::oid::{Oid, Scope};
 
 use super::Lambda;
 
@@ -188,7 +188,7 @@ fn substitute<T: Clone + PartialEq>(
 mod tests {
     use super::*;
     use crate::lambda::Pattern;
-    use crate::oid::Oid;
+    use crate::oid::{Oid, Scope};
 
     #[test]
     fn reduction_loss_zero_is_zero() {
@@ -218,9 +218,9 @@ mod tests {
     #[test]
     fn beta_reduction_identity() {
         // (λx. x) arg → arg
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let id = Lambda::<String>::abs(x.clone(), Lambda::bind(x));
-        let arg = Lambda::bind(Oid::hash(b"hello"));
+        let arg = Lambda::bind(Oid::hash(&Scope::public(), b"hello"));
         let app = Lambda::apply(id, arg.clone());
 
         let result = reduce_bounded(app, 10);
@@ -230,12 +230,12 @@ mod tests {
     #[test]
     fn beta_reduction_constant() {
         // (λx. λy. x) a b → a
-        let x = Oid::hash(b"x");
-        let y = Oid::hash(b"y");
+        let x = Oid::hash(&Scope::public(), b"x");
+        let y = Oid::hash(&Scope::public(), b"y");
         let konst =
             Lambda::<String>::abs(x.clone(), Lambda::abs(y.clone(), Lambda::bind(x.clone())));
-        let a = Lambda::bind(Oid::hash(b"a"));
-        let b = Lambda::bind(Oid::hash(b"b"));
+        let a = Lambda::bind(Oid::hash(&Scope::public(), b"a"));
+        let b = Lambda::bind(Oid::hash(&Scope::public(), b"b"));
         let app = Lambda::apply(Lambda::apply(konst, a.clone()), b);
 
         let result = reduce_bounded(app, 10);
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn budget_exhausted_returns_failure() {
         // Omega combinator — non-terminating
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let omega = Lambda::<String>::abs(
             x.clone(),
             Lambda::apply(Lambda::bind(x.clone()), Lambda::bind(x.clone())),
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn normal_form_zero_budget_is_success() {
         // A bind is already normal form
-        let term = Lambda::<String>::bind(Oid::hash(b"x"));
+        let term = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         let result = reduce_bounded(term.clone(), 0);
         // Budget 0 but term is already normal — should succeed
         // Actually with budget 0, the loop checks steps >= budget first (0 >= 0 = true),
@@ -277,27 +277,30 @@ mod tests {
     #[test]
     fn shadowed_variable_not_substituted() {
         // (λx. λx. x) a → λx. x  (inner x shadows outer)
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let shadowed =
             Lambda::<String>::abs(x.clone(), Lambda::abs(x.clone(), Lambda::bind(x.clone())));
-        let a = Lambda::bind(Oid::hash(b"a"));
+        let a = Lambda::bind(Oid::hash(&Scope::public(), b"a"));
         let app = Lambda::apply(shadowed, a);
 
         let result = reduce_bounded(app, 10);
-        let expected = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
+        let expected = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
         assert_eq!(result.ok(), Some(expected));
     }
 
     #[test]
     fn substitute_in_case() {
         // (λx. case x of { _ => x }) a → case a of { _ => a }
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let body = Lambda::<String>::case(
             Lambda::bind(x.clone()),
             vec![(Pattern::Any, Lambda::bind(x.clone()))],
         );
         let abs = Lambda::abs(x, body);
-        let a = Lambda::bind(Oid::hash(b"a"));
+        let a = Lambda::bind(Oid::hash(&Scope::public(), b"a"));
         let app = Lambda::apply(abs, a.clone());
 
         let result = reduce_bounded(app, 10);
@@ -308,9 +311,9 @@ mod tests {
     #[test]
     fn reduce_under_abstraction() {
         // λy. (λx. x) z → λy. z
-        let x = Oid::hash(b"x");
-        let y = Oid::hash(b"y");
-        let z = Oid::hash(b"z");
+        let x = Oid::hash(&Scope::public(), b"x");
+        let y = Oid::hash(&Scope::public(), b"y");
+        let z = Oid::hash(&Scope::public(), b"z");
         let inner = Lambda::<String>::apply(
             Lambda::abs(x.clone(), Lambda::bind(x)),
             Lambda::bind(z.clone()),
@@ -318,16 +321,16 @@ mod tests {
         let outer = Lambda::abs(y, inner);
 
         let result = reduce_bounded(outer, 10);
-        let expected = Lambda::<String>::abs(Oid::hash(b"y"), Lambda::bind(z));
+        let expected = Lambda::<String>::abs(Oid::hash(&Scope::public(), b"y"), Lambda::bind(z));
         assert_eq!(result.ok(), Some(expected));
     }
 
     #[test]
     fn partial_result_has_loss() {
         // One step of reduction should give Partial with steps=1
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let id = Lambda::<String>::abs(x.clone(), Lambda::bind(x));
-        let arg = Lambda::bind(Oid::hash(b"hello"));
+        let arg = Lambda::bind(Oid::hash(&Scope::public(), b"hello"));
         let app = Lambda::apply(id, arg);
 
         let result = reduce_bounded(app, 10);

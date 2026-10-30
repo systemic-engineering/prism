@@ -155,7 +155,7 @@ pub use bundle::{
 };
 
 pub use beam::{Beam, Operation, Optic};
-pub use coincidence::{canonical_hash, coincidence_hash, Detector, HashPrism};
+pub use coincidence::{coincidence_hash, Detector, HashPrism};
 /// Re-export the `declaration!{}` function-like proc-macro — the
 /// `@code/rust/macro.shim_type` reception entry point (T23, per
 /// `mirror/shards/code/rust/macro.mirror` and
@@ -185,7 +185,7 @@ pub use kernel::{Decomposition, KernelSpec};
 pub use luminosity::Luminosity;
 pub use merkle::{diff, Delta, MerkleTree};
 pub use named::Named;
-pub use oid::{Addressable, Oid};
+pub use oid::{Addressable, Oid, Scope};
 pub use optic_kind::{FieldOptic, OpticKind};
 pub use precision::{Precision, Pressure};
 pub use spectral_oid::SpectralOid;

@@ -101,6 +101,7 @@ pub fn diff<M: MerkleTree>(a: &M, b: &M) -> Vec<Delta> {
 mod tests {
     use super::*;
     use crate::luminosity::Luminosity;
+    use crate::oid::Scope;
     use crate::store::Store;
     use std::collections::HashMap;
     use terni::{Imperfect, Loss};
@@ -118,7 +119,7 @@ mod tests {
             for child in &self.children {
                 content.push_str(&format!(":{}", child.oid()));
             }
-            Oid::hash(content.as_bytes())
+            Oid::hash(&Scope::public(), content.as_bytes())
         }
     }
 
@@ -383,7 +384,7 @@ mod tests {
         let store = MemStore {
             data: HashMap::new(),
         };
-        let result = store.get(&Oid::hash(b"nonexistent"));
+        let result = store.get(&Oid::hash(&Scope::public(), b"nonexistent"));
         assert!(result.is_err());
     }
 

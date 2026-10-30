@@ -11,7 +11,7 @@ pub use reduce::{reduce_bounded, ReductionError, ReductionLoss};
 pub use typed::{Composed, LambdaFn};
 
 use crate::merkle::MerkleTree;
-use crate::oid::{Addressable, Oid};
+use crate::oid::{Addressable, Oid, Scope};
 
 /// A lambda term over content-addressed trees.
 ///
@@ -120,7 +120,7 @@ impl<T: Clone + PartialEq> Lambda<T> {
     /// (structs with `#[derive(Lambda)]`) compose directly.
     pub fn then<N: Into<Lambda<T>>>(self, next: N) -> Lambda<T> {
         let next_lambda: Lambda<T> = next.into();
-        let param = Oid::hash(b"__compose");
+        let param = Oid::hash(&Scope::public(), b"__compose");
         Lambda::abs(
             param.clone(),
             Lambda::apply(next_lambda, Lambda::apply(self, Lambda::bind(param))),
@@ -135,15 +135,21 @@ impl<T: Clone + PartialEq> Lambda<T> {
 impl<T: Clone + PartialEq> Addressable for Lambda<T> {
     fn oid(&self) -> Oid {
         match self {
-            Lambda::Bind(b) => Oid::hash(format!("Bind:{}", b.name).as_bytes()),
+            Lambda::Bind(b) => Oid::hash(&Scope::public(), format!("Bind:{}", b.name).as_bytes()),
             Lambda::Abs(a) => {
                 let body_oid = a.body.oid();
-                Oid::hash(format!("Abs:{}:{}", a.param, body_oid).as_bytes())
+                Oid::hash(
+                    &Scope::public(),
+                    format!("Abs:{}:{}", a.param, body_oid).as_bytes(),
+                )
             }
             Lambda::Apply(a) => {
                 let f_oid = a.function.oid();
                 let x_oid = a.argument.oid();
-                Oid::hash(format!("Apply:{}:{}", f_oid, x_oid).as_bytes())
+                Oid::hash(
+                    &Scope::public(),
+                    format!("Apply:{}:{}", f_oid, x_oid).as_bytes(),
+                )
             }
             Lambda::Case(c) => {
                 let s_oid = c.scrutinee.oid();
@@ -153,7 +159,10 @@ impl<T: Clone + PartialEq> Addressable for Lambda<T> {
                     .map(|(p, b)| format!("{}:{}", pattern_oid(p), b.oid()))
                     .collect::<Vec<_>>()
                     .join(",");
-                Oid::hash(format!("Case:{}:[{}]", s_oid, arms).as_bytes())
+                Oid::hash(
+                    &Scope::public(),
+                    format!("Case:{}:[{}]", s_oid, arms).as_bytes(),
+                )
             }
         }
     }
@@ -162,9 +171,11 @@ impl<T: Clone + PartialEq> Addressable for Lambda<T> {
 /// Compute an Oid for a Pattern. Not exposed publicly — used by Lambda's Addressable impl.
 fn pattern_oid<T: Clone + PartialEq>(pattern: &Pattern<T>) -> Oid {
     match pattern {
-        Pattern::Exact(_) => Oid::hash(b"Pattern:Exact"),
-        Pattern::Bind(oid) => Oid::hash(format!("Pattern:Bind:{}", oid).as_bytes()),
-        Pattern::Any => Oid::hash(b"Pattern:Any"),
+        Pattern::Exact(_) => Oid::hash(&Scope::public(), b"Pattern:Exact"),
+        Pattern::Bind(oid) => {
+            Oid::hash(&Scope::public(), format!("Pattern:Bind:{}", oid).as_bytes())
+        }
+        Pattern::Any => Oid::hash(&Scope::public(), b"Pattern:Any"),
     }
 }
 
@@ -247,36 +258,47 @@ mod tests {
 
     #[test]
     fn bind_creates_variable() {
-        let x = Lambda::<String>::bind(Oid::hash(b"x"));
+        let x = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         assert!(matches!(x, Lambda::Bind(_)));
     }
 
     #[test]
     fn abs_creates_abstraction() {
-        let id = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
+        let id = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
         assert!(matches!(id, Lambda::Abs(_)));
     }
 
     #[test]
     fn apply_creates_application() {
-        let app =
-            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"x")));
+        let app = Lambda::<String>::apply(
+            Lambda::bind(Oid::hash(&Scope::public(), b"f")),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
         assert!(matches!(app, Lambda::Apply(_)));
     }
 
     #[test]
     fn case_creates_case() {
         let case = Lambda::<String>::case(
-            Lambda::bind(Oid::hash(b"x")),
-            vec![(Pattern::Any, Lambda::bind(Oid::hash(b"y")))],
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+            vec![(
+                Pattern::Any,
+                Lambda::bind(Oid::hash(&Scope::public(), b"y")),
+            )],
         );
         assert!(matches!(case, Lambda::Case(_)));
     }
 
     #[test]
     fn identity_reduces() {
-        let id = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
-        let arg = Lambda::bind(Oid::hash(b"hello"));
+        let id = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        let arg = Lambda::bind(Oid::hash(&Scope::public(), b"hello"));
         let app = Lambda::apply(id, arg.clone());
 
         let result = reduce_bounded(app, 10);
@@ -287,58 +309,86 @@ mod tests {
 
     #[test]
     fn then_composes() {
-        let f = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
-        let g = Lambda::<String>::abs(Oid::hash(b"y"), Lambda::bind(Oid::hash(b"y")));
+        let f = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        let g = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"y"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"y")),
+        );
         let composed = f.then(g);
         assert!(matches!(composed, Lambda::Abs(_)));
     }
 
     #[test]
     fn same_term_same_oid() {
-        let a = Lambda::<String>::bind(Oid::hash(b"x"));
-        let b = Lambda::<String>::bind(Oid::hash(b"x"));
+        let a = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
+        let b = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         assert_eq!(a.oid(), b.oid());
     }
 
     #[test]
     fn different_term_different_oid() {
-        let a = Lambda::<String>::bind(Oid::hash(b"x"));
-        let b = Lambda::<String>::bind(Oid::hash(b"y"));
+        let a = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
+        let b = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"y"));
         assert_ne!(a.oid(), b.oid());
     }
 
     #[test]
     fn abs_oid_depends_on_param_and_body() {
-        let a = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
-        let b = Lambda::<String>::abs(Oid::hash(b"y"), Lambda::bind(Oid::hash(b"y")));
+        let a = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        let b = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"y"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"y")),
+        );
         assert_ne!(a.oid(), b.oid());
     }
 
     #[test]
     fn abs_oid_same_structure_same_oid() {
-        let a = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
-        let b = Lambda::<String>::abs(Oid::hash(b"x"), Lambda::bind(Oid::hash(b"x")));
+        let a = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        let b = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
         assert_eq!(a.oid(), b.oid());
     }
 
     #[test]
     fn apply_oid_depends_on_function_and_argument() {
-        let a =
-            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"x")));
-        let b =
-            Lambda::<String>::apply(Lambda::bind(Oid::hash(b"f")), Lambda::bind(Oid::hash(b"y")));
+        let a = Lambda::<String>::apply(
+            Lambda::bind(Oid::hash(&Scope::public(), b"f")),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        let b = Lambda::<String>::apply(
+            Lambda::bind(Oid::hash(&Scope::public(), b"f")),
+            Lambda::bind(Oid::hash(&Scope::public(), b"y")),
+        );
         assert_ne!(a.oid(), b.oid());
     }
 
     #[test]
     fn case_oid_includes_arms() {
         let a = Lambda::<String>::case(
-            Lambda::bind(Oid::hash(b"x")),
-            vec![(Pattern::Any, Lambda::bind(Oid::hash(b"a")))],
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+            vec![(
+                Pattern::Any,
+                Lambda::bind(Oid::hash(&Scope::public(), b"a")),
+            )],
         );
         let b = Lambda::<String>::case(
-            Lambda::bind(Oid::hash(b"x")),
-            vec![(Pattern::Any, Lambda::bind(Oid::hash(b"b")))],
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+            vec![(
+                Pattern::Any,
+                Lambda::bind(Oid::hash(&Scope::public(), b"b")),
+            )],
         );
         assert_ne!(a.oid(), b.oid());
     }
@@ -346,7 +396,7 @@ mod tests {
     #[test]
     fn budget_exhausted_is_failure() {
         // Omega combinator: (λx. x x)(λx. x x) — non-terminating
-        let x = Oid::hash(b"x");
+        let x = Oid::hash(&Scope::public(), b"x");
         let omega = Lambda::<String>::abs(
             x.clone(),
             Lambda::apply(Lambda::bind(x.clone()), Lambda::bind(x.clone())),
@@ -362,13 +412,13 @@ mod tests {
         // f = λx. x (identity)
         // g = λy. y (identity)
         // f.then(g) = λz. g(f(z)) = λz. z (still identity in effect)
-        let x = Oid::hash(b"x");
-        let y = Oid::hash(b"y");
+        let x = Oid::hash(&Scope::public(), b"x");
+        let y = Oid::hash(&Scope::public(), b"y");
         let f = Lambda::<String>::abs(x.clone(), Lambda::bind(x));
         let g = Lambda::<String>::abs(y.clone(), Lambda::bind(y));
         let composed = f.then(g);
 
-        let arg = Lambda::bind(Oid::hash(b"hello"));
+        let arg = Lambda::bind(Oid::hash(&Scope::public(), b"hello"));
         let app = Lambda::apply(composed, arg);
         let result = reduce_bounded(app, 100);
         assert!(result.is_ok());
@@ -376,22 +426,22 @@ mod tests {
 
     #[test]
     fn bind_oid_is_deterministic() {
-        let a = Lambda::<String>::bind(Oid::hash(b"x"));
-        let b = Lambda::<String>::bind(Oid::hash(b"x"));
+        let a = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
+        let b = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         assert_eq!(a.oid(), b.oid());
         assert!(!a.oid().is_dark());
     }
 
     #[test]
     fn lambda_children_is_empty() {
-        let term = Lambda::<String>::bind(Oid::hash(b"x"));
+        let term = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         assert_eq!(term.children().len(), 0);
     }
 
     #[test]
     fn normal_form_is_success_with_zero_steps() {
         // A Bind is already in normal form — reduce should return Success
-        let term = Lambda::<String>::bind(Oid::hash(b"x"));
+        let term = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
         let result = reduce_bounded(term.clone(), 10);
         match result {
             terni::Imperfect::Success(v) => assert_eq!(v, term),
@@ -401,7 +451,7 @@ mod tests {
 
     #[test]
     fn pattern_bind_oid_differs_from_pattern_any() {
-        let a = pattern_oid::<String>(&Pattern::Bind(Oid::hash(b"x")));
+        let a = pattern_oid::<String>(&Pattern::Bind(Oid::hash(&Scope::public(), b"x")));
         let b = pattern_oid::<String>(&Pattern::Any);
         assert_ne!(a, b);
     }
@@ -412,7 +462,7 @@ mod tests {
 
     /// Helper: create a named identity lambda (Abs(oid, Bind(oid))).
     fn named_identity(name: &[u8]) -> Lambda<String> {
-        let oid = Oid::hash(name);
+        let oid = Oid::hash(&Scope::public(), name);
         Lambda::abs(oid.clone(), Lambda::bind(oid))
     }
 
@@ -463,7 +513,7 @@ mod tests {
 
     #[test]
     fn composable_apply_to_wraps_in_apply() {
-        let input = Lambda::<String>::bind(Oid::hash(b"input"));
+        let input = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"input"));
         let applied = TestPhaseA.apply_to(input);
         assert!(matches!(applied, Lambda::Apply(_)));
     }

@@ -84,7 +84,8 @@ mod declaration;
 ///    — emission is itself a valid Rust declaration.
 /// 3. OID functionality: same substrate input → byte-identical Rust
 ///    emission → same OID. For `prism` declarations, the runtime
-///    `Addressable::oid(&Path)` equals `Oid::hash("@path".as_bytes())`
+///    `Addressable::oid(&Path)` equals
+///    `Oid::hash(&Scope::public(), "@path".as_bytes())`
 ///    — the substrate path IS the runtime address.
 /// 4. Substrate-pull preservation: emission references only
 ///    primitive Rust types and constructs already at the
@@ -168,7 +169,7 @@ pub fn derive_prism(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #impl_generics prismqueer::Addressable for #name #ty_generics #where_clause {
             fn oid(&self) -> prismqueer::Oid {
-                prismqueer::Oid::hash(#oid_name.as_bytes())
+                prismqueer::Oid::hash(&prismqueer::Scope::public(), #oid_name.as_bytes())
             }
         }
 
@@ -217,7 +218,7 @@ pub fn derive_lambda(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl #impl_generics prismqueer::Addressable for #name #ty_generics #where_clause {
             fn oid(&self) -> prismqueer::Oid {
-                prismqueer::Oid::hash(#oid_name.as_bytes())
+                prismqueer::Oid::hash(&prismqueer::Scope::public(), #oid_name.as_bytes())
             }
         }
 
@@ -229,7 +230,7 @@ pub fn derive_lambda(input: TokenStream) -> TokenStream {
 
         impl<__LambdaT: Clone + PartialEq> ::std::convert::From<#name> for prismqueer::lambda::Lambda<__LambdaT> {
             fn from(_: #name) -> prismqueer::lambda::Lambda<__LambdaT> {
-                let oid = prismqueer::Oid::hash(#oid_name.as_bytes());
+                let oid = prismqueer::Oid::hash(&prismqueer::Scope::public(), #oid_name.as_bytes());
                 prismqueer::lambda::Lambda::abs(oid.clone(), prismqueer::lambda::Lambda::bind(oid))
             }
         }

@@ -36,7 +36,7 @@ mod tests {
     use super::*;
     use crate::luminosity::Luminosity;
     use crate::merkle::MerkleTree;
-    use crate::oid::{Addressable, Oid};
+    use crate::oid::{Addressable, Oid, Scope};
     use std::collections::HashMap;
 
     #[derive(Clone, Debug, PartialEq)]
@@ -51,7 +51,7 @@ mod tests {
             for child in &self.children {
                 content.push_str(&format!(":{}", child.oid()));
             }
-            Oid::hash(content.as_bytes())
+            Oid::hash(&Scope::public(), content.as_bytes())
         }
     }
 
@@ -139,7 +139,7 @@ mod tests {
         let store = MemoryStore {
             data: HashMap::new(),
         };
-        let result = store.get(&Oid::hash(b"nonexistent"));
+        let result = store.get(&Oid::hash(&Scope::public(), b"nonexistent"));
         assert!(result.is_err());
     }
 

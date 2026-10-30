@@ -44,6 +44,7 @@ impl<P: Addressable> Addressable for Crystal<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::oid::Scope;
 
     // A minimal Prism for testing
     #[derive(Debug, Clone, PartialEq)]
@@ -51,7 +52,7 @@ mod tests {
 
     impl Addressable for IdPrism {
         fn oid(&self) -> Oid {
-            Oid::hash(&self.0.to_le_bytes())
+            Oid::hash(&Scope::public(), &self.0.to_le_bytes())
         }
     }
 
