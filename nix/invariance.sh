@@ -67,4 +67,14 @@ mutate "a test"           prismqueer/tests/music.rs $P same  $T same  $C moved
 mutate "crate source"     prismqueer/src/lib.rs     $P moved $T same  $C moved
 mutate "terni source"     imperfect/src/lib.rs      $P moved $T moved $C moved
 
+# Every system evaluates without building anything first: no import from
+# derivation. IFD builds silently on the host and fails for any other system
+# (CI, fly, a Linux builder), and it serialises evaluation behind builds.
+if nix flake check --no-build --all-systems --option allow-import-from-derivation false \
+  "path:$work/tree" >/dev/null 2>&1; then
+  echo "✓ all systems evaluate without import-from-derivation"
+else
+  echo "✗ evaluation needs import-from-derivation (or fails) on some system"; fail=1
+fi
+
 exit $fail
