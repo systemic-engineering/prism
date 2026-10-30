@@ -256,20 +256,25 @@ fn forall_composes_with_pillar_algedonic_of_magnitude() {
 
 #[test]
 fn forall_deterministic_when_using_from_bytes() {
-    // Same buffer sequence → same verdict.
-    // (Verified indirectly: run same test twice, same result.)
+    // Same seed → same draws → same verdict, counterexample included.
+    // That is what makes a failure replayable. The property depends on its
+    // input (odd x fails), so the diagnostic names the first failing draw.
     let f = || {
         forall::<i32, _>(10, |x: i32| {
             if x.rem_euclid(2) == 0 {
                 PropertyVerdict::Pass
             } else {
-                PropertyVerdict::Pass
+                PropertyVerdict::Fail(terni::Diagnostic::new(format!("odd: {x}")))
             }
         })
     };
     let v1 = f();
     let v2 = f();
-    assert!(matches!(v1, PropertyVerdict::Pass) && matches!(v2, PropertyVerdict::Pass));
+    assert!(
+        matches!(v1, PropertyVerdict::Fail(_)),
+        "ten draws should hit an odd i32, got {v1:?}"
+    );
+    assert_eq!(v1, v2, "same seed must give the same counterexample");
 }
 
 #[test]
