@@ -1,5 +1,10 @@
 # prism — focus | project | refract
 
+# Build into prism's own target/ (gitignored), not the shared per-user target
+# dir. Launching test binaries out of a deps/ dir holding ~600k files from
+# every project cost 17-27s per binary (measured 2026-10-30); here it's <1s.
+export CARGO_TARGET_DIR := justfile_directory() / "target"
+
 # Static analysis only: formatting + clippy. Fast; runs no tests.
 check: fmt-check lint
 
