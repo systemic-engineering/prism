@@ -114,8 +114,21 @@
 
       # ── Everything prism builds, for one pkgs ─────────────────────────────────────────
       mkPrism =
-        pkgs:
+        pkgs0:
         let
+          # cargo-llvm-cov 0.9.0 in nixpkgs 58deea65 fails its own test suite
+          # on aarch64-darwin (the instrumented test binaries SIGSEGV; sandbox
+          # on or off), so Hydra has no build of it and a local one dies in
+          # checkPhase. The tool is only run here, through checks.coverage,
+          # which gates on the measured line coverage. Drop this override once
+          # nixpkgs builds it.
+          pkgs = pkgs0.extend (
+            _: prev: {
+              cargo-llvm-cov = prev.cargo-llvm-cov.overrideAttrs (_: {
+                doCheck = false;
+              });
+            }
+          );
           rustBin = rust-overlay.lib.mkRustBin { } pkgs;
           toolchain = rustBin.stable.${rustVersion}.default.override {
             extensions = [
@@ -221,7 +234,7 @@
             );
         in
         {
-          inherit toolchain craneLib;
+          inherit toolchain craneLib pkgs;
           packages = {
             prismqueer = crate "prismqueer" ./prismqueer [
               ./imperfect
@@ -328,7 +341,7 @@
               pkgs.just
               pkgs.git
               pkgs.jq
-              pkgs.cargo-llvm-cov
+              prism.pkgs.cargo-llvm-cov
               pkgs.rust-analyzer
             ];
           }
