@@ -26,6 +26,12 @@ fn laws<G: Group>(samples: &[G]) {
         assert_eq!(a.compose(&e), *a, "right identity");
         assert_eq!(e.compose(a), *a, "left identity");
         assert!(a.compose(&a.inverse()).is_identity(), "inverse");
+        // Not only through compose, which may reduce what it's handed: the
+        // inverse itself is canonical, a left inverse, and an involution.
+        let inv = a.inverse();
+        assert_eq!(inv.compose(&e), inv, "the inverse is canonical");
+        assert!(inv.compose(a).is_identity(), "left inverse");
+        assert_eq!(inv.inverse(), *a, "inverse of the inverse");
         for b in samples {
             for c in samples {
                 assert_eq!(
@@ -206,10 +212,20 @@ fn a_float_field_is_read_only_through_a_declared_band() {
     );
     // Pythagorean fifths as floats: open by 12 log2(3/2) - 7 ≈ 0.0235.
     let (_, pythagorean) = circle_of_fifths(Log2((1.5f64).log2()), Log2((0.75f64).log2()));
-    assert!(matches!(
-        check_flat_within(&pythagorean, Noise(1e-9)),
-        Flatness::Curved(_)
-    ));
+    match check_flat_within(&pythagorean, Noise(1e-9)) {
+        Flatness::Curved(curved) => {
+            let comma = 12.0 * (1.5f64).log2() - 7.0;
+            let h = curved.loops()[0].holonomy().0;
+            assert!((h - comma).abs() < 1e-12, "holonomy {h}, comma {comma}");
+        }
+        Flatness::Flat(_) => panic!("Pythagorean fifths do not close"),
+    }
+
+    // Log2 is a group too, read exactly on dyadic values, where every float
+    // sum is exact.
+    laws(&[Log2(0.5), Log2(-1.25), Log2(3.0), Log2(0.0)]);
+    assert_eq!(Log2(0.5).compose(&Log2(0.25)), Log2(0.75));
+    assert_eq!(Log2(0.5).inverse(), Log2(-0.5));
 }
 
 #[test]
