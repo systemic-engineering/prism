@@ -63,6 +63,20 @@ fn an_epsilon_scaled_band_is_lapacks_error_rule() {
     let error = 16.0 * f64::EPSILON * 6.0;
     assert_eq!(b.read(error * 0.5, 1.0), Verdict::Zero);
     assert_eq!(b.read(error * 2.0, 1.0), Verdict::NonZero);
+
+    // Off the fixed point scale = 1, where × and ÷ agree. Every factor is
+    // exact (16 · 6 · 8 = 768 times ε), so the bound itself is a reading.
+    let at_8 = 768.0 * f64::EPSILON;
+    assert_eq!(
+        b.read(at_8, 8.0),
+        Verdict::Zero,
+        "the error grows with scale"
+    );
+    assert_eq!(b.read(at_8.next_up(), 8.0), Verdict::NonZero);
+    assert_eq!(b.read(4.0 * error, 8.0), Verdict::Zero);
+    // Below 1 the scale floors at 1: a small operator gets no smaller ruler.
+    assert_eq!(b.read(error, 0.25), Verdict::Zero);
+    assert_eq!(b.read(error.next_up(), 0.25), Verdict::NonZero);
 }
 
 #[test]
@@ -100,6 +114,8 @@ fn bands_compose_coarsest_within_a_law_and_fork_across_laws() {
 ///
 /// Taut counted six zeros. Since `c7de979` the Instrument certifies its
 /// kernel with settle's rule, so today there are five, and those two are one.
+/// That `certify` actually reads `zeros::instrument` is checked where it
+/// runs: `certify_reads_the_declared_instrument_band` in instrument.rs.
 #[test]
 fn the_zeros_are_distinct_declared_bands() {
     assert_eq!(
@@ -122,4 +138,15 @@ fn the_zeros_are_distinct_declared_bands() {
     assert_eq!(zeros::commutator().read(1e-9, 1.0), Verdict::DontKnow);
     assert_eq!(zeros::tension().read(1e-9, 1.0), Verdict::Zero);
     assert_eq!(zeros::commutator().coarsest(&zeros::tension()), Err(Fork));
+}
+
+/// The coincidence band is `f64::EPSILON` = 2⁻⁵², absolute: pinned by value,
+/// not only as different from the others.
+#[test]
+fn the_coincidence_band_is_one_epsilon() {
+    let b = zeros::coincidence();
+    assert_eq!(b.read(f64::EPSILON, 1.0), Verdict::Zero);
+    assert_eq!(b.read(f64::EPSILON.next_up(), 1.0), Verdict::NonZero);
+    assert_eq!(b.read(f64::EPSILON, 1e6), Verdict::Zero, "absolute");
+    assert_eq!(b.read(1e-9, 1.0), Verdict::NonZero);
 }
