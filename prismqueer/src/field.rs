@@ -309,6 +309,7 @@ pub struct Graph(Shape);
 #[derive(Clone, Debug, PartialEq)]
 pub struct Field<B, V> {
     base: B,
+    faces: Vec<[VertexId; 3]>,
     values: Vec<V>,
     edges: Vec<EdgeKey>,
 }
@@ -325,7 +326,7 @@ pub enum FieldError {
 impl<V> Field<Point, V> {
     /// A single truth.
     pub fn point(value: V) -> Self {
-        Field { base: Point, values: vec![value], edges: Vec::new() }
+        Field { base: Point, faces: Vec::new(), values: vec![value], edges: Vec::new() }
     }
 
     /// The one value of a single truth.
@@ -337,7 +338,7 @@ impl<V> Field<Point, V> {
 impl<V> Field<Discrete, V> {
     /// k unconnected criteria.
     pub fn discrete(values: Vec<V>) -> Self {
-        Field { base: Discrete, values, edges: Vec::new() }
+        Field { base: Discrete, faces: Vec::new(), values, edges: Vec::new() }
     }
 }
 
@@ -369,7 +370,23 @@ impl<V: Group> Field<Graph, V> {
         for e in &edges {
             values.push(by_edge.remove(e).ok_or(FieldError::Missing(*e))?);
         }
-        Ok(Field { base: Graph(graph.clone()), values, edges })
+        Ok(Field { base: Graph(graph.clone()), faces: Vec::new(), values, edges })
+    }
+
+    /// Declare filled triangles (2-cells). A loop that bounds faces is no
+    /// longer a hole; a face that doesn't close is curvature on that face.
+    /// Refused if a face's edge isn't in the graph.
+    pub fn with_faces(mut self, faces: impl IntoIterator<Item = [VertexId; 3]>) -> Result<Self, FieldError> {
+        for [a, b, c] in faces {
+            for (x, y) in [(a, b), (b, c), (a, c)] {
+                let key = if x <= y { (x, y) } else { (y, x) };
+                if self.edges.binary_search(&key).is_err() {
+                    return Err(FieldError::Missing(key));
+                }
+            }
+            self.faces.push([a, b, c]);
+        }
+        Ok(self)
     }
 
     /// The transport from `a` to `b` along an edge of the graph.
@@ -432,17 +449,32 @@ impl<V> Loop<V> {
     }
 }
 
-/// A curved connection: the holonomy of every loop of a cycle basis that
-/// doesn't close. Its gauge class is these holonomies (up to conjugacy).
+/// A curved connection.
+///
+/// - `faces`: declared 2-cells whose boundary doesn't close. That is
+///   curvature on that face, a local failure on one triple overlap (the
+///   navigator's cocked hat).
+/// - `loops`: cycle-basis loops that don't close and don't bound declared
+///   faces. That is holonomy around a hole, which belongs to no observer.
+///   A basis loop that goes around a face *and* a hole isn't in the faces'
+///   span, so it's reported here, and its holonomy then includes that face's
+///   curvature. Read it together with `faces`.
+///
+/// The gauge class is these holonomies (up to conjugacy).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Curved<V> {
     loops: Vec<Loop<V>>,
+    faces: Vec<Loop<V>>,
 }
 
 impl<V> Curved<V> {
-    /// The loops that don't close.
+    /// Holes: loops that don't close and bound no faces.
     pub fn loops(&self) -> &[Loop<V>] {
         &self.loops
+    }
+    /// Faces that don't close: curvature, located on the face.
+    pub fn faces(&self) -> &[Loop<V>] {
+        &self.faces
     }
 }
 
@@ -516,20 +548,81 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
         }
     }
 
-    let mut loops = Vec::new();
-    for (u, v) in chords {
-        let vertices = canonical_loop(fundamental_cycle(&back, u, v));
+    let around = |vertices: Vec<VertexId>| {
         let holonomy = vertices
             .windows(2)
             .fold(V::identity(), |h, w| h.compose(&field.transport(w[0], w[1])));
-        if !closes(&holonomy) {
-            loops.push(Loop { vertices, holonomy });
+        Loop { vertices, holonomy }
+    };
+    let edge_set = |walk: &[VertexId]| -> BTreeSet<usize> {
+        let mut set = BTreeSet::new();
+        for w in walk.windows(2) {
+            let key = if w[0] <= w[1] { (w[0], w[1]) } else { (w[1], w[0]) };
+            let i = field.edges.binary_search(&key).expect("an edge of the field");
+            if !set.remove(&i) {
+                set.insert(i);
+            }
+        }
+        set
+    };
+
+    // Face boundaries span the cycles that aren't holes (over GF(2): exact
+    // unless H₁ of the complex has torsion).
+    let mut span = Gf2::default();
+    let mut faces = Vec::new();
+    for &[a, b, c] in &field.faces {
+        let walk = canonical_loop(vec![a, b, c, a]);
+        span.insert(edge_set(&walk));
+        let face = around(walk);
+        if !closes(&face.holonomy) {
+            faces.push(face);
         }
     }
-    if loops.is_empty() {
+
+    let mut loops = Vec::new();
+    for (u, v) in chords {
+        let walk = canonical_loop(fundamental_cycle(&back, u, v));
+        if span.contains(edge_set(&walk)) {
+            continue;
+        }
+        let hole = around(walk);
+        if !closes(&hole.holonomy) {
+            loops.push(hole);
+        }
+    }
+    if loops.is_empty() && faces.is_empty() {
         Flatness::Flat(Flat { potential })
     } else {
-        Flatness::Curved(Curved { loops })
+        Flatness::Curved(Curved { loops, faces })
+    }
+}
+
+/// A subspace of edge sets over GF(2), kept in echelon form by pivot.
+#[derive(Default)]
+struct Gf2 {
+    rows: BTreeMap<usize, BTreeSet<usize>>,
+}
+
+impl Gf2 {
+    fn reduce(&self, mut v: BTreeSet<usize>) -> BTreeSet<usize> {
+        while let Some(&p) = v.iter().next_back() {
+            match self.rows.get(&p) {
+                Some(row) => v = v.symmetric_difference(row).copied().collect(),
+                None => break,
+            }
+        }
+        v
+    }
+
+    fn insert(&mut self, v: BTreeSet<usize>) {
+        let r = self.reduce(v);
+        if let Some(&p) = r.iter().next_back() {
+            self.rows.insert(p, r);
+        }
+    }
+
+    fn contains(&self, v: BTreeSet<usize>) -> bool {
+        self.reduce(v).is_empty()
     }
 }
 
