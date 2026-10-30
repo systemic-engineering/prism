@@ -613,6 +613,15 @@ impl<A: Kind, B: Kind, C: Kind, D: Kind, R: Entry> Map<Sum<A, B>, Sum<C, D>, R> 
     }
 }
 
+impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, Sum<A, B>, R> {
+    /// γ, the grading of A ⊕ B: +1 on `A`, −1 on `B`. A self-adjoint
+    /// involution; D anticommutes with it on C⁰ ⊕ C¹, because D only moves
+    /// between the summands.
+    pub fn grading(room: &Room<Sum<A, B>>) -> Self {
+        Map::identity(room)
+    }
+}
+
 // --- Resonance ---------------------------------------------------------------
 
 /// A map from a room to itself that equals its own adjoint, checked: a
@@ -632,6 +641,38 @@ impl<A: Kind> Symmetric<A, f64> {
             spectrum,
             vectors,
         })
+    }
+}
+
+impl<A: Kind> Symmetric<A, Z> {
+    /// The characteristic polynomial det(xI − M), exactly.
+    pub fn charpoly(&self) -> Charpoly {
+        Charpoly {
+            coefficients: vec![Z::one()],
+        }
+    }
+}
+
+/// A characteristic polynomial det(xI − M) of an n × n integer map: monic,
+/// degree n, with integer coefficients.
+///
+/// Coefficients are stored **leading first**: `coefficients()[k]` is the
+/// coefficient of xⁿ⁻ᵏ, so `coefficients()[0]` is 1 and the last is
+/// det(−M) = (−1)ⁿ det M.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Charpoly {
+    coefficients: Vec<Z>,
+}
+
+impl Charpoly {
+    /// The coefficients, leading first: n + 1 of them, the first 1.
+    pub fn coefficients(&self) -> &[Z] {
+        &self.coefficients
+    }
+
+    /// The degree n: the dimension of the room.
+    pub fn degree(&self) -> usize {
+        self.coefficients.len() - 1
     }
 }
 

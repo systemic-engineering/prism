@@ -9,6 +9,10 @@
 //!    up part, and the lower block is L₁↓, not the full Hodge L₁.
 //! 3. An eigenbasis is read by columns, and every column is an eigenvector.
 //! 4. A room-built D has `Instrument`'s spectrum.
+//! 6. The exact charpoly: det(xI − M) over Z, monic, leading first, and D's
+//!    follows from D² = L₀ ⊕ L₁↓.
+//! 7. The measured spectrum roots the exact charpoly, within a declared band.
+//! 8. The triple is even: γ (+1 on C⁰, −1 on C¹) anticommutes with D exactly.
 //!
 //! (Law 5, wrong-kind composition is a compile error, is a doctest on
 //! `prismqueer::room`.)
@@ -19,6 +23,7 @@
 #![cfg(feature = "lapack")]
 
 use num_bigint::BigInt;
+use num_traits::{Signed, ToPrimitive};
 use prismqueer::band::{zeros, Verdict};
 use prismqueer::room::{coboundary, dirac, Edges, Map, Room, RoomError, Sum, Vertices, Z};
 use prismqueer::spectral::instrument::Instrument;
@@ -397,4 +402,326 @@ fn z_is_an_exact_group_in_field_terms() {
     assert_eq!(Z::identity(), Z::from(0));
     assert_eq!(two.compose(&Z::from(3)), Z::from(5));
     assert!(two.compose(&two.inverse()).is_identity());
+}
+
+// --- Law 6: the exact characteristic polynomial ------------------------------
+
+fn ints(coefficients: &[i64]) -> Vec<Z> {
+    coefficients.iter().map(|&c| Z::from(c)).collect()
+}
+
+/// P₃, the path on three vertices.
+fn p3() -> Graph {
+    graph_from_edges(&[(0, 1), (1, 2)])
+}
+
+/// Graphs for the laws: cycles, trees, a complete graph, a disconnected one.
+fn more_graphs() -> Vec<(&'static str, Graph)> {
+    let mut all: Vec<_> = graphs().into_iter().collect();
+    all.push(("P₃", p3()));
+    all.push((
+        "K₅",
+        graph_from_edges(&[
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (2, 3),
+            (2, 4),
+            (3, 4),
+        ]),
+    ));
+    all.push(("star", graph_from_edges(&[(0, 1), (0, 2), (0, 3), (0, 4)])));
+    all.push((
+        "triangle and an edge",
+        graph_from_edges(&[(0, 1), (1, 2), (0, 2), (5, 6)]),
+    ));
+    all
+}
+
+/// L₀ = δ*δ on C⁰ and L₁↓ = δδ* on C¹, exactly.
+fn laplacians(g: &Graph) -> (Map<Vertices, Vertices, Z>, Map<Edges, Edges, Z>) {
+    let delta = coboundary(g);
+    let star = delta.adjoint();
+    (
+        delta.then(&star).expect("C⁰ → C¹ → C⁰"),
+        star.then(&delta).expect("C¹ → C⁰ → C¹"),
+    )
+}
+
+#[test]
+fn the_charpoly_of_p3s_laplacian_is_x3_minus_4x2_plus_3x() {
+    let (l0, _) = laplacians(&p3());
+    let p = l0.symmetric().expect("L₀ is symmetric").charpoly();
+    // Eigenvalues 0, 1, 3: x(x − 1)(x − 3).
+    assert_eq!(p.coefficients(), ints(&[1, -4, 3, 0]).as_slice());
+    assert_eq!(p.degree(), 3);
+}
+
+#[test]
+fn the_charpoly_of_the_triangles_laplacian_is_x3_minus_6x2_plus_9x() {
+    let (l0, _) = laplacians(&triangle());
+    let p = l0.symmetric().expect("L₀ is symmetric").charpoly();
+    // Eigenvalues 0, 3, 3: x(x − 3)².
+    assert_eq!(p.coefficients(), ints(&[1, -6, 9, 0]).as_slice());
+}
+
+/// A symmetric map that isn't a graph's, with distinct entries everywhere on
+/// its band. Tridiagonal, so det(xI − M) follows the three-term recurrence
+/// pₖ = (x − aₖ)pₖ₋₁ − bₖ²pₖ₋₂, worked by hand: x⁴ − 16x³ + 86x² − 181x + 121.
+#[test]
+fn the_charpoly_of_a_tridiagonal_map_matches_its_recurrence() {
+    let room = coboundary(&path()).from().clone();
+    let rows = [
+        ints(&[2, 1, 0, 0]),
+        ints(&[1, 3, 1, 0]),
+        ints(&[0, 1, 4, 1]),
+        ints(&[0, 0, 1, 7]),
+    ];
+    let m = Map::from_rows(&room, &room, &rows).expect("4×4 on C⁰");
+    let p = m.symmetric().expect("symmetric").charpoly();
+    assert_eq!(p.coefficients(), ints(&[1, -16, 86, -181, 121]).as_slice());
+}
+
+/// K₂₀'s Laplacian is 20I − J: eigenvalues 0 and 20 (19 times), so its
+/// charpoly is x(x − 20)¹⁹. The middle coefficients, C(19, k)·20ᵏ, pass 2⁶³
+/// (20¹⁹ alone is about 5·10²⁴): the charpoly is a bigint computation.
+#[test]
+fn the_charpoly_of_k20_needs_bigints() {
+    let n = 20u64;
+    let edges: Vec<(u64, u64)> = (0..n)
+        .flat_map(|u| (u + 1..n).map(move |v| (u, v)))
+        .collect();
+    let (l0, _) = laplacians(&graph_from_edges(&edges));
+    let p = l0.symmetric().expect("symmetric").charpoly();
+    // x(x − 20)¹⁹ = Σₖ C(19, k)(−20)ᵏ x²⁰⁻ᵏ, then the constant 0.
+    let mut expected = Vec::new();
+    let mut binomial = BigInt::from(1);
+    for k in 0..=19u32 {
+        expected.push(Z::from(&binomial * BigInt::from(-20).pow(k)));
+        binomial = binomial * (19 - k) / (k + 1);
+    }
+    expected.push(Z::from(0));
+    assert_eq!(p.coefficients(), expected.as_slice());
+    assert!(
+        p.coefficients()
+            .iter()
+            .any(|c| i64::try_from(c.value()).is_err()),
+        "some coefficient is past i64"
+    );
+}
+
+#[test]
+fn an_empty_room_has_charpoly_one() {
+    let g = graph_from_edges(&[]);
+    let p = dirac(&g).symmetric().expect("symmetric").charpoly();
+    assert_eq!(p.coefficients(), ints(&[1]).as_slice());
+    assert_eq!(p.degree(), 0);
+}
+
+/// The product of two polynomials, coefficients leading first.
+fn times(a: &[Z], b: &[Z]) -> Vec<BigInt> {
+    let mut out = vec![BigInt::from(0); a.len() + b.len() - 1];
+    for (i, x) in a.iter().enumerate() {
+        for (j, y) in b.iter().enumerate() {
+            out[i + j] += x.value() * y.value();
+        }
+    }
+    out
+}
+
+/// p(x) ↦ p(x²), coefficients leading first.
+fn in_squares(p: &[Z]) -> Vec<Z> {
+    let mut out = Vec::new();
+    for (i, c) in p.iter().enumerate() {
+        if i > 0 {
+            out.push(Z::from(0));
+        }
+        out.push(c.clone());
+    }
+    out
+}
+
+/// D's charpoly, derived from D² = L₀ ⊕ L₁↓. The grading γ anticommutes with
+/// D, so D's spectrum is symmetric about 0 and p_D(−x) = (−1)ⁿp_D(x). Then
+/// p_D(x)² = (−1)ⁿp_D(x)p_D(−x) = det(x²I − D²) = p_L₀(x²)·p_L₁↓(x²).
+///
+/// On the triangle L₀ and L₁↓ both have x³ − 6x² + 9x, so p_D(x)² =
+/// (x⁶ − 6x⁴ + 9x²)² and p_D = x⁶ − 6x⁴ + 9x² (monic, and its square root
+/// among monic polynomials is unique): eigenvalues 0, 0, ±√3, ±√3.
+#[test]
+fn the_charpoly_of_dirac_follows_from_its_square() {
+    let p = dirac(&triangle()).symmetric().expect("D = D*").charpoly();
+    assert_eq!(p.coefficients(), ints(&[1, 0, -6, 0, 9, 0, 0]).as_slice());
+
+    for (name, g) in more_graphs() {
+        let (l0, l1_down) = laplacians(&g);
+        let pd = dirac(&g).symmetric().expect("D = D*").charpoly();
+        let p0 = l0.symmetric().expect("L₀").charpoly();
+        let p1 = l1_down.symmetric().expect("L₁↓").charpoly();
+        assert_eq!(
+            times(pd.coefficients(), pd.coefficients()),
+            times(
+                &in_squares(p0.coefficients()),
+                &in_squares(p1.coefficients())
+            ),
+            "{name}: p_D(x)² = p_L₀(x²)·p_L₁↓(x²)"
+        );
+    }
+}
+
+// --- Law 7: the measured spectrum against the exact charpoly ----------------
+
+/// `x` as `m · 2ᵉ`, exactly.
+fn dyadic(x: f64) -> (BigInt, i32) {
+    let bits = x.to_bits();
+    let exponent = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1 << 52) - 1);
+    let mantissa = if exponent == 0 {
+        fraction << 1
+    } else {
+        fraction | (1 << 52)
+    };
+    let m = BigInt::from(mantissa);
+    (if bits >> 63 == 1 { -m } else { m }, exponent - 1075)
+}
+
+/// `num / den` as a float, for any size of either.
+fn quotient(num: &BigInt, den: &BigInt) -> f64 {
+    let shift = |b: &BigInt| b.bits().saturating_sub(64);
+    let (sn, sd) = (shift(num), shift(den));
+    let n = (num >> sn).to_f64().expect("a float");
+    let d = (den >> sd).to_f64().expect("a float");
+    n / d * 2f64.powi(sn as i32 - sd as i32)
+}
+
+/// How far a measured eigenvalue `x` is from being a root of `p`, read in
+/// eigenvalue units: |p(x)| / S, where S = Σₖ k·|cₖ|·Rᵏ⁻¹ bounds |p′| on
+/// [−R, R]. p(x) is evaluated exactly: `x` is a dyadic rational.
+fn root_residual(p: &[Z], x: f64, radius: &BigInt) -> f64 {
+    let n = p.len() - 1;
+    let (m, e) = dyadic(x);
+    // x = m / 2ˢ with s ≥ 0; then 2ˢⁿ·p(x) = Σᵢ cᵢ mⁿ⁻ⁱ 2ˢⁱ, an integer.
+    let (m, s) = if e >= 0 {
+        (m << e as u32, 0u32)
+    } else {
+        (m, (-e) as u32)
+    };
+    let mut scaled = BigInt::from(0);
+    for (i, c) in p.iter().enumerate() {
+        scaled += c.value() * m.pow((n - i) as u32) << (s as usize * i);
+    }
+    let mut slope = BigInt::from(0);
+    for (i, c) in p.iter().enumerate() {
+        let k = n - i;
+        if k > 0 {
+            slope += BigInt::from(k) * c.value().abs() * radius.pow(k as u32 - 1);
+        }
+    }
+    quotient(&scaled.abs(), &(slope << (s as usize * n)))
+}
+
+/// Every measured eigenvalue of `map`, put back into its exact charpoly,
+/// reads `Zero` in `settle`'s band; and so does nothing shifted by `nudge`
+/// when `nudge` is given.
+fn spectrum_certifies<K: prismqueer::room::Kind>(
+    name: &str,
+    map: &Map<K, K, Z>,
+    nudge: Option<f64>,
+) {
+    let p = map.clone().symmetric().expect("symmetric").charpoly();
+    let modes = map
+        .measure()
+        .symmetric()
+        .expect("symmetric")
+        .decompose()
+        .expect("measured");
+    let n = modes.spectrum().len();
+    let scale = modes.spectrum().iter().fold(0.0_f64, |m, x| m.max(x.abs()));
+    // R bounds every true and measured eigenvalue: ρ̂ plus at least 1, far
+    // more than dsyev's error.
+    let radius = BigInt::from(scale.ceil() as u64 + 1);
+    for &value in modes.spectrum() {
+        let r = root_residual(p.coefficients(), value, &radius);
+        assert_eq!(
+            zeros::settle(n).read(r, scale),
+            Verdict::Zero,
+            "{name}: p({value}) residual {r:e}"
+        );
+        if let Some(delta) = nudge {
+            let off = value + delta * scale.max(1.0);
+            let r = root_residual(p.coefficients(), off, &radius);
+            assert_eq!(
+                zeros::settle(n).read(r, scale),
+                Verdict::NonZero,
+                "{name}: {off} is not a root (residual {r:e})"
+            );
+        }
+    }
+}
+
+/// The cross-check: `Modes` (measured, dsyev) against the exact charpoly.
+///
+/// The residual is |p(λ̂)| / S, read through `zeros::settle(n)`, the same
+/// declared band (16·ε·n·max(ρ, 1)) that certifies kernels. Why it's honest:
+/// - p(λ̂) is exact: λ̂ is a dyadic rational, so no evaluation error enters.
+/// - By the mean value theorem |p(λ̂)| = |p(λ̂) − p(λ)| ≤ S·|λ̂ − λ| for the
+///   true eigenvalue λ nearest λ̂, since S bounds |p′| on [−R, R] and both
+///   lie inside. So the residual is at most |λ̂ − λ|.
+/// - dsyev is backward stable: λ̂ are the exact eigenvalues of M + E with
+///   ‖E‖₂ ≤ c·n·ε·‖M‖₂, and by Weyl |λ̂ − λ| ≤ ‖E‖₂, whatever the
+///   multiplicities. `settle` declares c = 16, ‖M‖₂ = ρ for symmetric M.
+///
+/// The bound is one-sided (S overestimates |p′|), so a negative control checks
+/// the band still sees a miss: on graphs with simple spectra, a shift of
+/// 10⁻⁹·ρ reads `NonZero`.
+#[test]
+fn the_measured_spectrum_roots_the_exact_charpoly() {
+    for (name, g) in more_graphs() {
+        let (l0, l1_down) = laplacians(&g);
+        spectrum_certifies(&format!("{name} L₀"), &l0, None);
+        spectrum_certifies(&format!("{name} L₁↓"), &l1_down, None);
+        spectrum_certifies(&format!("{name} D"), &dirac(&g), None);
+    }
+    // Simple spectra: P₃'s L₀ (0, 1, 3) and the path's D (0, ±√λ for
+    // λ = 2 − √2, 2, 2 + √2).
+    spectrum_certifies("P₃ L₀, nudged", &laplacians(&p3()).0, Some(1e-9));
+    spectrum_certifies("path D, nudged", &dirac(&path()), Some(1e-9));
+}
+
+// --- Law 8: the triple is even ----------------------------------------------
+
+/// γ = +1 on C⁰, −1 on C¹: a grading (γ² = 1, γ = γ*) that anticommutes with
+/// D exactly, because D only moves between the rooms.
+#[test]
+fn the_grading_anticommutes_with_dirac() {
+    for (name, g) in more_graphs() {
+        let d = dirac(&g);
+        let room = d.from().clone();
+        let gamma = Map::<Sum<Vertices, Edges>, _, Z>::grading(&room);
+        let n0 = room.left().dim();
+        for i in 0..room.dim() {
+            for j in 0..room.dim() {
+                let expected = match (i == j, i < n0) {
+                    (false, _) => Z::from(0),
+                    (true, true) => Z::from(1),
+                    (true, false) => Z::from(-1),
+                };
+                assert_eq!(gamma.entry(i, j), Some(&expected), "{name}: γ[{i}, {j}]");
+            }
+        }
+        assert_eq!(
+            gamma.then(&gamma),
+            Ok(Map::identity(&room)),
+            "{name}: γ² = 1"
+        );
+        assert_eq!(gamma.adjoint(), gamma, "{name}: γ = γ*");
+        let gd = gamma.then(&d).expect("one room");
+        let dg = d.then(&gamma).expect("one room");
+        assert_eq!(gd, dg.negate(), "{name}: γD = −Dγ");
+        assert_ne!(gd, dg, "{name}: and not γD = Dγ, unless D = 0");
+    }
 }
