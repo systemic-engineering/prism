@@ -43,6 +43,10 @@ fn split_is_lossless_as_a_pair_and_settle_logs_the_erasure() {
     let r = d.restrict(&low(), &x).unwrap();
     let sum = d.restrict(&Window::new(-10.0, 10.0), r.kept()).unwrap(); // a no-op window
     assert!(sum.erased().norm() < EPS);
+    assert!(
+        sum.is_lossless(),
+        "a window holding every mode erases nothing"
+    );
     let rebuilt = add(r.kept(), r.erased());
     assert!(rebuilt.distance(&x) < EPS, "kept + erased = the input");
     assert!(r.erased().norm() > 0.1, "this window does lose something");

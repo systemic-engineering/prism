@@ -298,21 +298,38 @@ fn forall_composes_with_pillar_algedonic_of_magnitude() {
     // Compose forall with an existing pillar primitive.
     // Property: draw an i32, project to a Loss magnitude; check algedonic verdict.
     // terni::Loss is impl'd for f64 (per terni/src/lib.rs); use f64 directly.
-    let theta: f64 = 50.0;
-
-    // All values above threshold → all Pass → unified Pass.
-    let v = forall::<i32, _>(
-        b"forall_composes_with_pillar_algedonic_of_magnitude",
-        30,
-        |x: i32| {
-            let magnitude: f64 = (60 + (x.rem_euclid(40))) as f64;
-            pillar::algedonic_of_magnitude(&magnitude, &theta)
-        },
-    );
+    // Magnitudes 1..=100, so a draw can land on either side of theta, and
+    // the fold's outcome depends on the draws. The seed fixes them, so the
+    // outcome is exact: one Partial diagnostic per draw at or below theta.
+    let seed = b"forall_composes_with_pillar_algedonic_of_magnitude";
+    let magnitude = |x: i32| (1 + x.rem_euclid(100)) as f64;
+    let below = derived::<i32>(seed, 30)
+        .into_iter()
+        .filter(|&x| magnitude(x) <= 50.0)
+        .count();
     assert!(
-        matches!(v, PropertyVerdict::Pass),
-        "all-above-threshold must Pass, got {v:?}"
+        (1..30).contains(&below),
+        "the draws fall on both sides: {below} of 30 at or below"
     );
+    let v = forall::<i32, _>(seed, 30, |x: i32| {
+        pillar::algedonic_of_magnitude(&magnitude(x), &50.0)
+    });
+    match v {
+        PropertyVerdict::Partial {
+            confidence,
+            diagnostics,
+        } => {
+            assert_eq!(confidence, 0.5);
+            assert_eq!(diagnostics.len(), below, "one per draw at or below theta");
+        }
+        other => panic!("expected Partial, got {other:?}"),
+    }
+
+    // Under a threshold every magnitude clears, the same draws Pass.
+    let v = forall::<i32, _>(seed, 30, |x: i32| {
+        pillar::algedonic_of_magnitude(&magnitude(x), &0.5)
+    });
+    assert_eq!(v, PropertyVerdict::Pass);
 }
 
 #[test]

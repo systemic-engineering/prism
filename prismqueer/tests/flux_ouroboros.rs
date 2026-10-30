@@ -203,6 +203,17 @@ fn commutator_norm_zero_over_default_state_for_test_bundle() {
     );
 }
 
+#[test]
+/// commutator_norm is the magnitude at the Default state, not zero by
+/// construction: two FluxConstraints two strategies apart read 2 there.
+fn commutator_norm_is_the_magnitude_at_the_default_state() {
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(2);
+    let norm = commutator_norm(&a, &b);
+    assert_eq!(norm, ScalarLoss::new(2.0), "|0 - 2| at [0.0; 4]");
+    assert_eq!(norm, FluxThread::commutator_magnitude(&a, &b, &[0.0; 4]));
+}
+
 // ──────────────────────────────────────────────────────────────────
 // 6. FluxConstraint actually produces non-vanishing commutators.
 // ──────────────────────────────────────────────────────────────────
@@ -303,6 +314,22 @@ fn pillar_algedonic_pass_above_threshold() {
 }
 
 #[test]
+/// Pass is strictly above the threshold: a magnitude exactly at theta is a
+/// signal below it, Partial.
+fn pillar_algedonic_at_the_threshold_is_partial() {
+    let a = FluxConstraint::with_strategy(0);
+    let b = FluxConstraint::with_strategy(3);
+    let c = commutator(&a, &b, &[1.0; 4]);
+    let verdict = pillar::algedonic(&c, &ScalarLoss::new(3.0));
+    assert!(
+        matches!(verdict, PropertyVerdict::Partial { confidence, .. } if confidence == 0.5),
+        "got {verdict:?}"
+    );
+    let verdict = pillar::algedonic(&c, &ScalarLoss::new(3.0f64.next_down()));
+    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+}
+
+#[test]
 fn pillar_algedonic_partial_below_threshold_but_nonzero() {
     let a = FluxConstraint::with_strategy(0);
     let b = FluxConstraint::with_strategy(1);
@@ -347,12 +374,13 @@ fn pillar_viability_pass_when_accumulated_exceeds_threshold() {
     let b = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
     // Each commutator has magnitude 3.0; three of them combine
-    // (ScalarLoss.combine = a+b) to 9.0. Threshold 5.0 → Pass.
+    // (ScalarLoss.combine = a+b) to 9.0. Threshold 8.5 → Pass, and only
+    // the whole window clears it: any two make 6.0.
     let c1 = commutator(&a, &b, &state);
     let c2 = commutator(&a, &b, &state);
     let c3 = commutator(&a, &b, &state);
     let history = vec![c1, c2, c3];
-    let theta = ScalarLoss::new(5.0);
+    let theta = ScalarLoss::new(8.5);
     let verdict = pillar::viability(&history, &theta, 3);
     assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
 }
@@ -361,14 +389,20 @@ fn pillar_viability_pass_when_accumulated_exceeds_threshold() {
 fn pillar_viability_fail_when_accumulated_below_threshold() {
     let a = FluxConstraint::with_strategy(0);
     let b = FluxConstraint::with_strategy(1);
+    let loud = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
-    // Each commutator magnitude 1.0; three → 3.0. Threshold 10.0 → Fail.
-    let c1 = commutator(&a, &b, &state);
-    let c2 = commutator(&a, &b, &state);
-    let c3 = commutator(&a, &b, &state);
-    let history = vec![c1, c2, c3];
-    let theta = ScalarLoss::new(10.0);
-    let verdict = pillar::viability(&history, &theta, 3);
+    // Three loud commutators (3.0 each), then two quiet ones (1.0 each).
+    // omega = 2 reads only the quiet tail: 2.0, exactly theta, and Pass is
+    // strictly above it → Fail. Reading any loud one would Pass.
+    let history = vec![
+        commutator(&a, &loud, &state),
+        commutator(&a, &loud, &state),
+        commutator(&a, &loud, &state),
+        commutator(&a, &b, &state),
+        commutator(&a, &b, &state),
+    ];
+    let theta = ScalarLoss::new(2.0);
+    let verdict = pillar::viability(&history, &theta, 2);
     assert!(
         matches!(verdict, PropertyVerdict::Fail(_)),
         "got {verdict:?}"
@@ -412,6 +446,11 @@ fn prelude_reexports_delightful_surface() {
         let c = commutator(&_a, &_b, &state);
         let _m = c.magnitude();
         let _v = pillar::dispatch_ambiguity(2, 2, true, true);
+        assert_eq!(_v, PropertyVerdict::Pass, "two arms are enough");
+        assert!(matches!(
+            pillar::dispatch_ambiguity(1, 1, true, true),
+            PropertyVerdict::Fail(_)
+        ));
         let _d: Diagnostic = Diagnostic::new("probe");
         let _p: PropertyVerdict = PropertyVerdict::Pass;
     }
@@ -685,6 +724,19 @@ fn algedonic_of_magnitude_pass_above_threshold() {
 }
 
 #[test]
+/// Pass is strictly above theta: at theta it's Partial, one ulp above Pass.
+fn algedonic_of_magnitude_at_the_threshold_is_partial() {
+    let theta = ScalarLoss::new(1.0);
+    let at = pillar::algedonic_of_magnitude(&ScalarLoss::new(1.0), &theta);
+    assert!(
+        matches!(at, PropertyVerdict::Partial { confidence, .. } if confidence == 0.5),
+        "got {at:?}"
+    );
+    let above = pillar::algedonic_of_magnitude(&ScalarLoss::new(1.0f64.next_up()), &theta);
+    assert!(matches!(above, PropertyVerdict::Pass), "got {above:?}");
+}
+
+#[test]
 /// algedonic_of_magnitude Fail when magnitude vanishes.
 fn algedonic_of_magnitude_fail_when_zero() {
     let magnitude = ScalarLoss::zero();
@@ -719,14 +771,17 @@ fn algedonic_of_magnitude_partial_below_threshold_but_nonzero() {
 /// entries contribute to the accumulated magnitude.
 fn viability_of_magnitudes_uses_last_omega_entries() {
     // Early tail is huge, but window is small — recent entries decide.
+    // Five entries, omega = 2: the window starts at 5 − 2 = 3, not 5 / 2 = 2.
     let history = vec![
         ScalarLoss::new(100.0), // dropped (outside window)
+        ScalarLoss::new(100.0), // dropped
         ScalarLoss::new(100.0), // dropped
         ScalarLoss::new(1.0),   // window[0]
         ScalarLoss::new(1.0),   // window[1]
     ];
-    // omega = 2, window = [1.0, 1.0], accumulated = 2.0, theta = 5.0 → Fail
-    let theta = ScalarLoss::new(5.0);
+    // omega = 2, window = [1.0, 1.0], accumulated = 2.0, theta = 2.0 → Fail:
+    // Pass is strictly above theta.
+    let theta = ScalarLoss::new(2.0);
     let verdict = pillar::viability_of_magnitudes(&history, &theta, 2);
     assert!(
         matches!(verdict, PropertyVerdict::Fail(_)),
