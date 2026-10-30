@@ -1,19 +1,31 @@
 # prism — focus | project | refract
 
-# Run all tests
-test:
-    nix develop -c cargo test --workspace --features lapack,fate
+# Static analysis only: formatting + clippy. Fast; runs no tests.
+check: fmt-check lint
 
-# Run tests with coverage report
-coverage:
-    nix develop -c cargo llvm-cov --workspace --features lapack,fate
-
-# Coverage gate — fails if below threshold.
-# Ratchet: 93.85% of lines measured 2026-10-29 under lapack,fate (the old 99%
-# was met only because the gate built the optics feature alone). Raise it as
+# mode=coverage runs the suite once, instrumented, gated on line coverage,
+# then the doctests (llvm-cov skips them).
+#
+# Ratchet: 94.08% of lines measured 2026-10-29 under lapack,fate. Raise it as
 # coverage rises; never lower it.
-pre-push:
-    nix develop -c cargo llvm-cov --workspace --features lapack,fate --fail-under-lines 93
+#
+# Run the suite: mode=plain (cargo test) or mode=coverage (the push gate)
+test mode="plain":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{mode}}" in
+      plain)
+        nix develop -c cargo test --workspace --features lapack,fate ;;
+      coverage)
+        nix develop -c cargo llvm-cov --workspace --features lapack,fate --fail-under-lines 94
+        nix develop -c cargo test --doc --workspace --features lapack,fate ;;
+      *)
+        echo "✖ unknown test mode '{{mode}}' (plain | coverage)" >&2
+        exit 2 ;;
+    esac
+
+# What the push hook runs: the suite once, under coverage.
+pre-push: (test "coverage")
 
 # Build workspace
 build:
@@ -30,9 +42,6 @@ fmt-check:
 # Format
 fmt:
     nix develop -c cargo fmt
-
-# Full check (what CI and pre-push hook run)
-check: test lint pre-push
 
 # Merge the current branch into main.
 #
