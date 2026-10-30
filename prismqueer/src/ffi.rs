@@ -275,6 +275,39 @@ pub fn eigensystem(n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32
     Ok((evals, evecs))
 }
 
+/// The eigensystem of a real symmetric `n×n` matrix given column-major, the
+/// layout LAPACK speaks: no conversion on the way in or out.
+///
+/// Returns `(eigenvalues, eigenvectors)`, eigenvalues ascending, eigenvectors
+/// column-major: eigenvector `k` is the contiguous slice
+/// `eigenvectors[k * n..(k + 1) * n]`. Only `room` calls this; it owns the
+/// layout and the symmetry check (dsyev reads the upper triangle only).
+pub(crate) fn eigensystem_columns(n: usize, matrix: &[f64]) -> Result<(Vec<f64>, Vec<f64>), i32> {
+    debug_assert_eq!(matrix.len(), n * n, "an n×n matrix");
+    if n == 0 {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let mut evals = vec![0.0_f64; n];
+    let mut evecs = vec![0.0_f64; n * n];
+    let mut info: c_int = 0;
+
+    unsafe {
+        spectral_eigensystem(
+            n as c_int,
+            matrix.as_ptr(),
+            evals.as_mut_ptr(),
+            evecs.as_mut_ptr(),
+            &mut info,
+        );
+    }
+
+    if info != 0 {
+        Err(info)
+    } else {
+        Ok((evals, evecs))
+    }
+}
+
 /// Compute singular values of an `m×n` matrix.
 ///
 /// Returns `min(m, n)` singular values in descending order.
