@@ -31,6 +31,10 @@ terni = { version = "0.7", path = "../imperfect" }
 prismqueer-projections = { version = "0.1", path = "../projections" }
 sha2 = "0.10"
 hex = "0.4"
+# room::Z: arbitrary-precision integers, so exact topology never overflows.
+num-bigint = "0.4"
+# BigInt → f64 (room::Measure), the one explicit step to floats.
+num-traits = "0.2"
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 # Fate GPU Metal-runtime deps (feature-gated per `fate-metal`).

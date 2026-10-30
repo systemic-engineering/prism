@@ -16,6 +16,7 @@
 
 #![cfg(feature = "lapack")]
 
+use num_bigint::BigInt;
 use prismqueer::band::{zeros, Verdict};
 use prismqueer::room::{coboundary, dirac, Edges, Map, Room, RoomError, Sum, Vertices, Z};
 use prismqueer::spectral::instrument::Instrument;
@@ -57,22 +58,22 @@ fn coboundary_is_exact_signed_incidence() {
             let mut plus = 0;
             let mut minus = 0;
             for (col, &w) in vertices.iter().enumerate() {
-                let x = *delta.entry(row, col).expect("inside the map");
+                let x = delta.entry(row, col).expect("inside the map").clone();
                 assert!(
-                    x == Z(1) || x == Z(-1) || x == Z(0),
+                    x == Z::from(1) || x == Z::from(-1) || x == Z::from(0),
                     "{name}: δ[{row}, {col}] = {x:?}"
                 );
                 // (δs)(u, v) = s(v) − s(u), edges in canonical orientation.
                 let expected = if w == v {
-                    Z(1)
+                    Z::from(1)
                 } else if w == u {
-                    Z(-1)
+                    Z::from(-1)
                 } else {
-                    Z(0)
+                    Z::from(0)
                 };
                 assert_eq!(x, expected, "{name}: δ[{row}, {col}] on edge ({u}, {v})");
-                plus += usize::from(x == Z(1));
-                minus += usize::from(x == Z(-1));
+                plus += usize::from(x == Z::from(1));
+                minus += usize::from(x == Z::from(-1));
             }
             assert_eq!((plus, minus), (1, 1), "{name}: edge row {row}");
         }
@@ -239,20 +240,20 @@ fn composing_across_complexes_is_an_error() {
 fn wrong_lengths_are_errors() {
     let delta = coboundary(&triangle());
     assert_eq!(
-        delta.apply(&[Z(1), Z(2)]),
+        delta.apply(&[Z::from(1), Z::from(2)]),
         Err(RoomError::Length {
             expected: 3,
             found: 2
         })
     );
     assert_eq!(
-        delta.apply(&[Z(1), Z(2), Z(4)]),
-        Ok(vec![Z(1), Z(3), Z(2)]),
+        delta.apply(&[Z::from(1), Z::from(2), Z::from(4)]),
+        Ok(vec![Z::from(1), Z::from(3), Z::from(2)]),
         "δs(u, v) = s(v) − s(u) on (0,1), (0,2), (1,2)"
     );
     let room = delta.from().clone();
     assert_eq!(
-        Map::<Vertices, Vertices, Z>::from_rows(&room, &room, &vec![vec![Z(1); 3]; 2]),
+        Map::<Vertices, Vertices, Z>::from_rows(&room, &room, &vec![vec![Z::from(1); 3]; 2]),
         Err(RoomError::Length {
             expected: 3,
             found: 2
@@ -262,7 +263,11 @@ fn wrong_lengths_are_errors() {
         Map::<Vertices, Vertices, Z>::from_rows(
             &room,
             &room,
-            &[vec![Z(1); 3], vec![Z(1); 2], vec![Z(1); 3]]
+            &[
+                vec![Z::from(1); 3],
+                vec![Z::from(1); 2],
+                vec![Z::from(1); 3]
+            ]
         ),
         Err(RoomError::Length {
             expected: 3,
@@ -274,8 +279,8 @@ fn wrong_lengths_are_errors() {
 #[test]
 fn asymmetric_maps_have_no_spectrum() {
     let room = coboundary(&triangle()).from().clone();
-    let mut rows = vec![vec![Z(0); 3]; 3];
-    rows[0][2] = Z(1);
+    let mut rows = vec![vec![Z::from(0); 3]; 3];
+    rows[0][2] = Z::from(1);
     let a = Map::from_rows(&room, &room, &rows).unwrap();
     assert_eq!(
         a.symmetric().map(|_| ()),
@@ -284,14 +289,19 @@ fn asymmetric_maps_have_no_spectrum() {
 }
 
 #[test]
-fn exact_arithmetic_refuses_to_wrap() {
+fn exact_arithmetic_never_wraps() {
     let room = coboundary(&triangle()).from().clone();
-    let big = Map::from_rows(&room, &room, &vec![vec![Z(i64::MAX); 3]; 3]).unwrap();
-    assert_eq!(big.then(&big), Err(RoomError::Overflow));
-    assert_eq!(big.plus(&big), Err(RoomError::Overflow));
-    let min = Map::from_rows(&room, &room, &vec![vec![Z(i64::MIN); 3]; 3]).unwrap();
+    let filled = |z: BigInt| Map::from_rows(&room, &room, &vec![vec![Z::from(z); 3]; 3]).unwrap();
+    let max = BigInt::from(i64::MAX);
+    let big = filled(max.clone());
+    // Where i64 would wrap, the exact answer: 3·MAX² and 2·MAX.
+    assert_eq!(big.then(&big), Ok(filled(3 * &max * &max)));
+    assert_eq!(big.plus(&big), Ok(filled(2 * &max)));
+    let min = filled(BigInt::from(i64::MIN));
     assert_eq!(min.adjoint().then(&Map::identity(&room)), Ok(min.clone()));
-    assert_eq!(min.negate(), Err(RoomError::Overflow));
+    // −i64::MIN = 2⁶³, one past i64::MAX.
+    assert_eq!(min.negate(), filled(max + 1));
+    assert_eq!(min.negate().negate(), min);
 }
 
 /// `map` composed with itself `k` times (k ≥ 1).
@@ -317,9 +327,18 @@ fn delta_built_maps_compose_past_i64() {
     let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
     let l50 = power(&l0, 50);
     assert_eq!(l50.then(&l0), Ok(thrice(&l50)), "L₀⁵¹ = 3·L₀⁵⁰");
+    let three49 = BigInt::from(3).pow(49);
+    assert_eq!(l50.entry(0, 0), Some(&Z::from(2 * &three49)), "2·3⁴⁹");
+    assert_eq!(l50.entry(0, 1), Some(&Z::from(-three49)), "−3⁴⁹");
 
     let d = dirac(&triangle());
     let d81 = power(&d, 81);
+    let three40 = BigInt::from(3).pow(40);
+    let n = d.from().dim();
+    for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
+        let expected = Z::from(d.entry(i, j).unwrap().value() * &three40);
+        assert_eq!(d81.entry(i, j), Some(&expected), "D⁸¹[{i}, {j}] = 3⁴⁰·D");
+    }
     assert_eq!(power(&d, 83), thrice(&d81), "D⁸³ = 3·D⁸¹");
 }
 
@@ -349,7 +368,7 @@ fn identity_and_injections_are_exact_and_lawful() {
     assert_eq!(vv, Map::zero(room.left(), room.left()));
     // D = D*: exact self-adjointness.
     assert_eq!(d.adjoint(), d);
-    assert_eq!(d.plus(&d.negate().unwrap()), Ok(Map::zero(&room, &room)));
+    assert_eq!(d.plus(&d.negate()), Ok(Map::zero(&room, &room)));
 }
 
 #[test]
@@ -372,8 +391,8 @@ fn z_is_an_exact_group_in_field_terms() {
     fn exact<G: Exact>(g: G) -> G {
         g
     }
-    let two = exact(Z(2));
-    assert_eq!(Z::identity(), Z(0));
-    assert_eq!(two.compose(&Z(3)), Z(5));
+    let two = exact(Z::from(2));
+    assert_eq!(Z::identity(), Z::from(0));
+    assert_eq!(two.compose(&Z::from(3)), Z::from(5));
     assert!(two.compose(&two.inverse()).is_identity());
 }

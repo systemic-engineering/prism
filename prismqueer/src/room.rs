@@ -19,8 +19,8 @@
 //!   runtime values the room carries; a mismatch there is a checked
 //!   [`RoomError::Mismatch`], never a panic or a silent wrong answer.
 //! - **Exact topology stays exact.** δ is built over [`Z`], integers that are
-//!   an [`Exact`] group in `field`'s terms. Exact maps compose exactly and
-//!   refuse to wrap ([`RoomError::Overflow`]). Moving to `f64` is one
+//!   an [`Exact`] group in `field`'s terms. They are arbitrary-precision, so
+//!   exact maps compose exactly and never overflow. Moving to `f64` is one
 //!   explicit step, [`Map::measure`]; entry types never mix implicitly.
 //! - **Only resonance gets a spectrum.** Only a map from a room to itself
 //!   can be checked [`Map::symmetric`], and only a [`Symmetric`] measured
@@ -80,6 +80,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 use crate::field::{Exact, Group};
 use crate::oid::{Addressable, Oid};
@@ -165,8 +168,6 @@ pub enum RoomError {
         /// The length given.
         found: usize,
     },
-    /// Exact arithmetic left its range: it refuses rather than wraps.
-    Overflow,
     /// The map isn't symmetric: entry `(row, col)` differs from `(col, row)`.
     Asymmetric {
         /// The first differing row (above the diagonal).
@@ -264,21 +265,21 @@ impl<A: Kind, B: Kind> Room<Sum<A, B>> {
 
 // --- Entries -----------------------------------------------------------------
 
-/// What a map's entries are: a ring whose arithmetic can refuse.
+/// What a map's entries are: a commutative ring.
 ///
-/// Exact entries ([`Z`]) return `None` when a result leaves their range;
-/// measured entries (`f64`) never do.
+/// Exact entries ([`Z`]) are arbitrary-precision, so their arithmetic is
+/// total; measured entries (`f64`) round.
 pub trait Entry: Clone + PartialEq + Debug {
     /// The additive identity.
     fn zero() -> Self;
     /// The multiplicative identity.
     fn one() -> Self;
-    /// `self + other`, if it stays in range.
-    fn checked_add(&self, other: &Self) -> Option<Self>;
-    /// `self · other`, if it stays in range.
-    fn checked_mul(&self, other: &Self) -> Option<Self>;
-    /// `−self`, if it stays in range.
-    fn checked_neg(&self) -> Option<Self>;
+    /// `self + other`.
+    fn add(&self, other: &Self) -> Self;
+    /// `self · other`.
+    fn mul(&self, other: &Self) -> Self;
+    /// `−self`.
+    fn neg(&self) -> Self;
 }
 
 /// Exact entries that can be measured: the one explicit step to `f64`.
@@ -287,25 +288,45 @@ pub trait Measure: Entry + Exact {
     fn measure(&self) -> f64;
 }
 
-/// An integer, exactly: the entries of exact topology (δ is ±1 and 0).
+/// An integer, exactly and of any size: the entries of exact topology (δ is
+/// ±1 and 0), and of everything composed from them.
 ///
 /// In `field`'s terms an [`Exact`] group under addition: equality is exact,
-/// so a non-zero entry really isn't zero.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Z(pub i64);
+/// so a non-zero entry really isn't zero. Arbitrary-precision, so no sum,
+/// product or negation leaves its range.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Z(BigInt);
+
+impl Z {
+    /// The integer itself.
+    pub fn value(&self) -> &BigInt {
+        &self.0
+    }
+}
+
+impl From<i64> for Z {
+    fn from(n: i64) -> Self {
+        Z(BigInt::from(n))
+    }
+}
+
+impl From<BigInt> for Z {
+    fn from(n: BigInt) -> Self {
+        Z(n)
+    }
+}
 
 impl Group for Z {
     fn identity() -> Self {
-        Z(0)
+        Z::zero()
     }
-    /// Addition. Panics on overflow: a group can't refuse, and wrapping
-    /// would be a wrong answer. Maps use [`Entry::checked_add`].
+    /// Addition.
     fn compose(&self, other: &Self) -> Self {
-        self.checked_add(other).expect("Z: addition overflowed i64")
+        self.add(other)
     }
-    /// Negation. Panics on `i64::MIN`, as [`compose`](Self::compose) does.
+    /// Negation.
     fn inverse(&self) -> Self {
-        self.checked_neg().expect("Z: negation overflowed i64")
+        self.neg()
     }
 }
 
@@ -313,26 +334,27 @@ impl Exact for Z {}
 
 impl Entry for Z {
     fn zero() -> Self {
-        Z(0)
+        Z(BigInt::from(0))
     }
     fn one() -> Self {
-        Z(1)
+        Z(BigInt::from(1))
     }
-    fn checked_add(&self, other: &Self) -> Option<Self> {
-        self.0.checked_add(other.0).map(Z)
+    fn add(&self, other: &Self) -> Self {
+        Z(&self.0 + &other.0)
     }
-    fn checked_mul(&self, other: &Self) -> Option<Self> {
-        self.0.checked_mul(other.0).map(Z)
+    fn mul(&self, other: &Self) -> Self {
+        Z(&self.0 * &other.0)
     }
-    fn checked_neg(&self) -> Option<Self> {
-        self.0.checked_neg().map(Z)
+    fn neg(&self) -> Self {
+        Z(-&self.0)
     }
 }
 
 impl Measure for Z {
-    /// Exact up to 2⁵³ in magnitude; beyond, the nearest float.
+    /// Exact up to 2⁵³ in magnitude; beyond, the nearest float, and ±∞ past
+    /// `f64`'s range.
     fn measure(&self) -> f64 {
-        self.0 as f64
+        self.0.to_f64().expect("every BigInt has a float reading")
     }
 }
 
@@ -343,14 +365,14 @@ impl Entry for f64 {
     fn one() -> Self {
         1.0
     }
-    fn checked_add(&self, other: &Self) -> Option<Self> {
-        Some(self + other)
+    fn add(&self, other: &Self) -> Self {
+        self + other
     }
-    fn checked_mul(&self, other: &Self) -> Option<Self> {
-        Some(self * other)
+    fn mul(&self, other: &Self) -> Self {
+        self * other
     }
-    fn checked_neg(&self) -> Option<Self> {
-        Some(-self)
+    fn neg(&self) -> Self {
+        -self
     }
 }
 
@@ -429,10 +451,7 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         let mut y = vec![R::zero(); self.to.dim];
         for (column, xj) in self.columns().zip(x) {
             for (yi, aij) in y.iter_mut().zip(column) {
-                *yi = aij
-                    .checked_mul(xj)
-                    .and_then(|p| yi.checked_add(&p))
-                    .ok_or(RoomError::Overflow)?;
+                *yi = yi.add(&aij.mul(xj));
             }
         }
         Ok(y)
@@ -462,19 +481,14 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
             .entries
             .iter()
             .zip(&other.entries)
-            .map(|(a, b)| a.checked_add(b).ok_or(RoomError::Overflow))
-            .collect::<Result<_, _>>()?;
+            .map(|(a, b)| a.add(b))
+            .collect();
         Ok(self.with(entries))
     }
 
     /// `−self`.
-    pub fn negate(&self) -> Result<Self, RoomError> {
-        let entries = self
-            .entries
-            .iter()
-            .map(|a| a.checked_neg().ok_or(RoomError::Overflow))
-            .collect::<Result<_, _>>()?;
-        Ok(self.with(entries))
+    pub fn negate(&self) -> Self {
+        self.with(self.entries.iter().map(Entry::neg).collect())
     }
 
     /// The door back: the transpose, which for real entries is the adjoint
@@ -664,8 +678,8 @@ pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
     let index: BTreeMap<_, _> = graph.vertices().enumerate().map(|(i, v)| (v, i)).collect();
     let mut delta = Map::zero(&Room::vertices(graph), &Room::edges(graph));
     for (row, (u, v)) in graph.edges().enumerate() {
-        delta.set(row, index[&u], Z(-1));
-        delta.set(row, index[&v], Z(1));
+        delta.set(row, index[&u], Z::one().neg());
+        delta.set(row, index[&v], Z::one());
     }
     delta
 }
@@ -676,14 +690,12 @@ pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
 pub fn dirac(graph: &Graph) -> Map<Sum<Vertices, Edges>, Sum<Vertices, Edges>, Z> {
     let delta = coboundary(graph);
     let room = Room::sum(delta.from(), delta.to()).expect("δ's rooms share its graph");
-    // Entries of ±1 and 0, with at most one non-zero product per entry: no
-    // overflow, and every room below is built from `room`.
+    // Every room below is built from `room`: the compositions can't mismatch.
     let down = Map::project_left(&room)
         .then(&delta)
         .and_then(|m| m.then(&Map::inject_right(&room)));
     let up = Map::project_right(&room)
         .then(&delta.adjoint())
         .and_then(|m| m.then(&Map::inject_left(&room)));
-    down.and_then(|d| d.plus(&up?))
-        .expect("one complex, entries in {-1, 0, 1}")
+    down.and_then(|d| d.plus(&up?)).expect("one complex")
 }

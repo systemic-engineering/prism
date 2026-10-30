@@ -895,6 +895,8 @@ dependencies = [
  "hex",
  "jsonschema",
  "metal",
+ "num-bigint",
+ "num-traits",
  "objc",
  "prismqueer-projections",
  "quote",
