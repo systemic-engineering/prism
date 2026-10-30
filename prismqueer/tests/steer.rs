@@ -176,13 +176,19 @@ fn the_search_stops_moving_when_nothing_new_appears() {
     }
     all.insert(graph_from_edges(&[(0, 1)]).oid());
 
+    // Every run's address, in order: the search's own trace.
+    let mut runs = Vec::new();
     match steer::<Tiny>(
         seeds(0..4),
         Budget(10_000),
         Patience(64),
         |t| quietest(&t.0),
         |t| kernel_is_tonics_plus_commas(&t.0),
-        |t| t.0.graph().oid(),
+        |t| {
+            let a = t.0.graph().oid();
+            runs.push(a.clone());
+            a
+        },
     ) {
         Imperfect::Partial(run, coverage) => {
             assert_eq!(
@@ -196,9 +202,52 @@ fn the_search_stops_moving_when_nothing_new_appears() {
                 "saw {seen} distinct graphs, only {} exist",
                 all.len()
             );
-            assert!(coverage.len().unwrap() < 10_000);
+            assert_eq!(coverage.len(), Some(runs.len()));
+            // It stopped because nothing new appeared, not after a fixed
+            // count: exactly Patience runs follow the last new graph.
+            let mut fresh = BTreeSet::new();
+            let last_new = runs
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| fresh.insert((*a).clone()))
+                .map(|(i, _)| i)
+                .last()
+                .expect("at least one run");
+            assert_eq!(fresh.len(), seen, "the chord is the distinct addresses");
+            assert!(last_new > 0, "more than one graph appeared");
+            assert_eq!(
+                runs.len(),
+                last_new + 1 + 64,
+                "the search ran {} times; the last new graph was run {last_new}",
+                runs.len()
+            );
         }
         other => panic!("expected a saturated Partial, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_search_that_keeps_finding_new_values_runs_out_of_budget() {
+    // Every run is addressed afresh, so something new always appears. It
+    // must never be called Saturated, however small the Patience.
+    let mut fresh = 0u64;
+    match steer::<u64>(
+        seeds(0..4),
+        Budget(40),
+        Patience(2),
+        |_| 0.0,
+        |_| true,
+        |_| {
+            fresh += 1;
+            prismqueer::oid::Oid::hash(&fresh.to_le_bytes())
+        },
+    ) {
+        Imperfect::Partial(run, coverage) => {
+            assert_eq!(run.stop, Stop::Budget, "new values kept appearing");
+            assert_eq!(coverage.len(), Some(40), "every run of the budget ran");
+            assert_eq!(coverage.foata().expect("known")[0].len(), 40);
+        }
+        other => panic!("expected a budget-stopped Partial, got {other:?}"),
     }
 }
 
