@@ -8,6 +8,8 @@
 | `imperfect-vectors.json` | 192 cases generated from terni 0.7.0 by `prismqueer/tests/spec_vectors.rs` |
 | `gate.md` | The convergence gate for review rounds, taken from settle semantics; proven parts vs. modelling choices |
 | `gate-vectors.json` | 9 worked examples, checked against the rule by `prismqueer/tests/gate_vectors.rs` |
+| `identity.md` | Identity is scoped: `address = BLAKE3-keyed(K_scope, content)`, the public scope's derived key, why, and what's out of scope (key management) |
+| `identity-vectors.json` | `K_public` and 11 addresses computed with `b3sum` (cross-checked with Python's `blake3`), checked against prism by `prismqueer/tests/identity_vectors.rs` |
 
 Regenerate the Imperfect vectors after an intended change in terni:
 
