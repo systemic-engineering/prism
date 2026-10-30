@@ -294,6 +294,35 @@ fn exact_arithmetic_refuses_to_wrap() {
     assert_eq!(min.negate(), Err(RoomError::Overflow));
 }
 
+/// `map` composed with itself `k` times (k ≥ 1).
+fn power<K: prismqueer::room::Kind>(map: &Map<K, K, Z>, k: usize) -> Map<K, K, Z> {
+    (1..k).fold(map.clone(), |p, i| {
+        p.then(map)
+            .unwrap_or_else(|e| panic!("power {}: {e:?}", i + 1))
+    })
+}
+
+/// Three times `map`, by addition.
+fn thrice<K: prismqueer::room::Kind>(map: &Map<K, K, Z>) -> Map<K, K, Z> {
+    map.plus(map).and_then(|m| m.plus(map)).expect("one room")
+}
+
+/// δ-built maps compose past i64. On the triangle L₀ = 3I − J, so L₀² = 3L₀
+/// and L₀ᵏ = 3ᵏ⁻¹L₀: at k = 50 its entries are −3⁴⁹ and 2·3⁴⁹, about 10²³.
+/// D's minimal polynomial there is x(x² − 3), so D³ = 3D and D⁸¹ = 3⁴⁰D, with
+/// entries ±3⁴⁰ > 2⁶³. The laws checked are the closed forms, exactly.
+#[test]
+fn delta_built_maps_compose_past_i64() {
+    let delta = coboundary(&triangle());
+    let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
+    let l50 = power(&l0, 50);
+    assert_eq!(l50.then(&l0), Ok(thrice(&l50)), "L₀⁵¹ = 3·L₀⁵⁰");
+
+    let d = dirac(&triangle());
+    let d81 = power(&d, 81);
+    assert_eq!(power(&d, 83), thrice(&d81), "D⁸³ = 3·D⁸¹");
+}
+
 #[test]
 fn identity_and_injections_are_exact_and_lawful() {
     let g = square_with_diagonal();
