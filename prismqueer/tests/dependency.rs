@@ -27,6 +27,48 @@ fn parallel_edges_are_kept_and_reuse_shows_in_the_cycle_rank() {
 }
 
 #[test]
+fn multiplicity_counts_only_edges_matching_both_ends() {
+    // Edges that share only the source, only the target, or both ends
+    // reversed: none of them is an a→b edge.
+    let mut g = DependencyGraph::new();
+    g.add_edge("a", "b", Sign::Positive);
+    g.add_edge("a", "c", Sign::Positive);
+    g.add_edge("c", "b", Sign::Negative);
+    g.add_edge("b", "a", Sign::Positive);
+    assert_eq!(g.multiplicity(&"a", &"b"), 1);
+    assert_eq!(g.multiplicity(&"b", &"a"), 1);
+    assert_eq!(g.multiplicity(&"c", &"a"), 0);
+}
+
+#[test]
+fn cycle_rank_counts_every_independent_cycle() {
+    // b₁ = 0: a path a → b → c and an isolated d, a forest.
+    let mut forest = DependencyGraph::new();
+    forest.add_edge("a", "b", Sign::Positive);
+    forest.add_edge("b", "c", Sign::Negative);
+    forest.add_node("d");
+    assert_eq!(forest.components(), 2);
+    assert_eq!(forest.cycle_rank(), 0, "2 − 4 + 2");
+
+    // b₁ = 2: three rules a → b, two routes a simple graph would lose.
+    let mut reuse = DependencyGraph::new();
+    for _ in 0..3 {
+        reuse.add_edge("a", "b", Sign::Positive);
+    }
+    assert_eq!(reuse.cycle_rank(), 2, "3 − 2 + 1");
+
+    // b₁ = 3: every pair of four nodes, K₄.
+    let mut k4 = DependencyGraph::new();
+    let ns = ["a", "b", "c", "d"];
+    for (i, u) in ns.iter().enumerate() {
+        for v in &ns[i + 1..] {
+            k4.add_edge(*u, *v, Sign::Positive);
+        }
+    }
+    assert_eq!(k4.cycle_rank(), 3, "6 − 4 + 1");
+}
+
+#[test]
 fn a_self_dependency_is_a_cycle() {
     let mut g = DependencyGraph::new();
     g.add_edge("p", "p", Sign::Negative);
