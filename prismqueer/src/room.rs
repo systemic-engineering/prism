@@ -81,8 +81,8 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use num_bigint::BigInt;
-use num_traits::ToPrimitive;
+use num_bigint::{BigInt, Sign};
+use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{Exact, Group};
 use crate::oid::{Addressable, Oid};
@@ -618,7 +618,11 @@ impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, Sum<A, B>, R> {
     /// involution; D anticommutes with it on C⁰ ⊕ C¹, because D only moves
     /// between the summands.
     pub fn grading(room: &Room<Sum<A, B>>) -> Self {
-        Map::identity(room)
+        let mut map = Map::identity(room);
+        for i in room.left().dim..room.dim {
+            map.set(i, i, R::one().neg());
+        }
+        map
     }
 }
 
@@ -645,10 +649,63 @@ impl<A: Kind> Symmetric<A, f64> {
 }
 
 impl<A: Kind> Symmetric<A, Z> {
-    /// The characteristic polynomial det(xI − M), exactly.
+    /// The characteristic polynomial det(xI − M), exactly, by Berkowitz's
+    /// algorithm: no division, so every step stays in Z.
+    ///
+    /// Grow M one leading principal block at a time. With Mᵣ₊₁ =
+    /// [[Mᵣ, s], [r, a]], det(xI − Mᵣ₊₁) is a lower-triangular Toeplitz
+    /// matrix with first column (1, −a, −rs, −rMᵣs, …, −rMᵣʳ⁻¹s) applied to
+    /// det(xI − Mᵣ)'s coefficients. The powers Mᵣᵏs are matrix–vector
+    /// products over M's non-zero entries only, so the cost is about
+    /// n² · nnz(M) multiplications: n⁴/4 dense, far fewer for a graph.
     pub fn charpoly(&self) -> Charpoly {
+        let m = &self.0;
+        let n = m.from.dim;
+        // Each column's non-zero entries, by row: Mᵣ is the rows below r.
+        let columns: Vec<Vec<(usize, &BigInt)>> = (0..n)
+            .map(|j| {
+                (0..n)
+                    .filter_map(|i| {
+                        let x = &m.entries[m.at(i, j)].0;
+                        (x.sign() != Sign::NoSign).then_some((i, x))
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut p = vec![BigInt::one()];
+        for r in 0..n {
+            // t = (1, −a, −rs, −rMᵣs, …): r + 2 entries.
+            let mut t = Vec::with_capacity(r + 2);
+            t.push(BigInt::one());
+            t.push(-&m.entries[m.at(r, r)].0);
+            let mut v: Vec<BigInt> = (0..r).map(|i| m.entries[m.at(i, r)].0.clone()).collect();
+            for k in 0..r {
+                let rv: BigInt = (0..r).map(|j| &m.entries[m.at(r, j)].0 * &v[j]).sum();
+                t.push(-rv);
+                if k + 1 < r {
+                    let mut w = vec![BigInt::zero(); r];
+                    for (j, vj) in v.iter().enumerate() {
+                        if vj.sign() == Sign::NoSign {
+                            continue;
+                        }
+                        for &(i, a) in columns[j].iter().take_while(|(i, _)| *i < r) {
+                            w[i] += a * vj;
+                        }
+                    }
+                    v = w;
+                }
+            }
+            // p ← T·p: (r + 2) × (r + 1), T[i][j] = t[i − j].
+            let mut q = vec![BigInt::zero(); r + 2];
+            for (j, pj) in p.iter().enumerate() {
+                for (i, ti) in t.iter().enumerate().take(r + 2 - j) {
+                    q[i + j] += ti * pj;
+                }
+            }
+            p = q;
+        }
         Charpoly {
-            coefficients: vec![Z::one()],
+            coefficients: p.into_iter().map(Z).collect(),
         }
     }
 }

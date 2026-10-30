@@ -612,7 +612,7 @@ fn root_residual(p: &[Z], x: f64, radius: &BigInt) -> f64 {
     };
     let mut scaled = BigInt::from(0);
     for (i, c) in p.iter().enumerate() {
-        scaled += c.value() * m.pow((n - i) as u32) << (s as usize * i);
+        scaled += (c.value() * m.pow((n - i) as u32)) << (s as usize * i);
     }
     let mut slope = BigInt::from(0);
     for (i, c) in p.iter().enumerate() {
