@@ -208,6 +208,11 @@
                 pname = name;
                 inherit (craneLib.crateNameFromCargoToml { cargoToml = dir + "/Cargo.toml"; }) version;
                 src = memberSrc name ([ dir ] ++ localDeps);
+                # memberSrc is a derivation; reading Cargo.lock out of it at
+                # eval time would be import-from-derivation. Same lock, from
+                # the tree.
+                cargoLock = ./Cargo.lock;
+                cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
                 cargoArtifacts = releaseDeps;
                 cargoExtraArgs = "--locked -p ${name} ${extraArgs}";
                 doInstallCargoArtifacts = true;
