@@ -77,7 +77,11 @@ fn coboundary_is_exact_signed_incidence() {
             assert_eq!((plus, minus), (1, 1), "{name}: edge row {row}");
         }
         assert_eq!(delta.entry(edges.len(), 0), None, "{name}: past the rows");
-        assert_eq!(delta.entry(0, vertices.len()), None, "{name}: past the columns");
+        assert_eq!(
+            delta.entry(0, vertices.len()),
+            None,
+            "{name}: past the columns"
+        );
     }
 }
 
@@ -158,14 +162,20 @@ fn eigenvectors_are_columns() {
 
     let spectrum = modes.spectrum();
     assert_eq!(spectrum.len(), 4);
-    assert!(spectrum.windows(2).all(|w| w[0] <= w[1]), "sorted ascending");
+    assert!(
+        spectrum.windows(2).all(|w| w[0] <= w[1]),
+        "sorted ascending"
+    );
     let trace: f64 = spectrum.iter().sum();
     let scale = spectrum.iter().fold(0.0_f64, |m, x| m.max(x.abs()));
     assert!((trace - 16.0).abs() < 1e-12, "trace is preserved: {trace}");
 
     for (k, &value) in spectrum.iter().enumerate() {
         let v = modes.vector(k).expect("column k");
-        assert!(residual_is_zero(&a, scale, value, v), "A v_{k} = λ_{k} v_{k}");
+        assert!(
+            residual_is_zero(&a, scale, value, v),
+            "A v_{k} = λ_{k} v_{k}"
+        );
     }
     assert!(modes.vector(4).is_none(), "no column past the end");
     assert_eq!(modes.vectors().count(), 4);
@@ -249,7 +259,11 @@ fn wrong_lengths_are_errors() {
         })
     );
     assert_eq!(
-        Map::<Vertices, Vertices, Z>::from_rows(&room, &room, &[vec![Z(1); 3], vec![Z(1); 2], vec![Z(1); 3]]),
+        Map::<Vertices, Vertices, Z>::from_rows(
+            &room,
+            &room,
+            &[vec![Z(1); 3], vec![Z(1); 2], vec![Z(1); 3]]
+        ),
         Err(RoomError::Length {
             expected: 3,
             found: 2
