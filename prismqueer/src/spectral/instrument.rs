@@ -230,16 +230,23 @@ pub struct Rotated {
 /// graph on at most `n_vertices` vertices has λ₂ ≥ 1/(n(n−1)), so the gap
 /// is 1/√(n(n−1)). Disagreement is `Partial(count, the ambiguous
 /// magnitudes)`: the count stands, the measurement doesn't back it.
+///
+/// "Within LAPACK's error" is read through the declared band
+/// [`zeros::instrument`](crate::band::zeros::instrument), never inlined: a
+/// kernel mode is certified when the band reads it `Zero`, and a mode short
+/// of the gap clears it when the band reads its shortfall `Zero`.
 fn certify(
     values: &[f64],
     count: usize,
     n_vertices: usize,
     dim: usize,
 ) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+    use crate::band::{zeros, Verdict};
     let mut magnitudes: Vec<f64> = values.iter().map(|x| x.abs()).collect();
     magnitudes.sort_by(f64::total_cmp);
-    let scale = magnitudes.last().copied().unwrap_or(0.0).max(1.0);
-    let error = 16.0 * f64::EPSILON * scale * dim.max(1) as f64;
+    let scale = magnitudes.last().copied().unwrap_or(0.0);
+    let band = zeros::instrument(dim.max(1));
+    let zero = |m: f64| band.read(m, scale) == Verdict::Zero;
     let gap = if n_vertices >= 2 {
         1.0 / ((n_vertices * (n_vertices - 1)) as f64).sqrt()
     } else {
@@ -250,9 +257,9 @@ fn certify(
         .enumerate()
         .filter(|&(i, &m)| {
             if i < count {
-                m > error
+                !zero(m)
             } else {
-                m < gap - error
+                m < gap && !zero(gap - m)
             }
         })
         .map(|(_, &m)| m)
