@@ -64,7 +64,11 @@ fn a_prism_settling_into_a_field_is_a_field_prism() {
     multi_truth(&Criteria);
     let settled = Criteria.settle(Criteria.project(Criteria.focus(Optic::ok((), vec![7, 3, 9]))));
     let field = settled.result().ok().expect("lit");
-    assert_eq!(field.meet(), Least(3), "multi-truth: the lawful collapse is the meet");
+    assert_eq!(
+        field.meet(),
+        Least(3),
+        "multi-truth: the lawful collapse is the meet"
+    );
 }
 
 #[test]

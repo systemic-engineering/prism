@@ -55,7 +55,11 @@ pub struct Note {
 impl Note {
     /// A derivation.
     pub fn new(head: Atom, rule: Rule, premises: impl IntoIterator<Item = Atom>) -> Self {
-        Note { head, rule, premises: premises.into_iter().collect() }
+        Note {
+            head,
+            rule,
+            premises: premises.into_iter().collect(),
+        }
     }
 }
 
@@ -144,12 +148,18 @@ impl Piece {
 
     /// All atoms on one beat.
     pub fn chord(&self, at: usize) -> BTreeSet<Atom> {
-        self.beats().into_iter().filter(|&(_, t)| t == at).map(|(a, _)| a).collect()
+        self.beats()
+            .into_iter()
+            .filter(|&(_, t)| t == at)
+            .map(|(a, _)| a)
+            .collect()
     }
 
     /// The fixpoint: beats until nothing new is heard.
     pub fn cadence(&self) -> Cadence {
-        Cadence { beats: self.beats().values().max().map_or(0, |m| m + 1) }
+        Cadence {
+            beats: self.beats().values().max().map_or(0, |m| m + 1),
+        }
     }
 }
 
@@ -188,7 +198,10 @@ pub fn ring_true(tuning: &Field<Graph, Ratio>) -> Ringing {
             curved
                 .loops()
                 .iter()
-                .map(|l| Dissonance { notes: l.vertices().to_vec(), comma: l.holonomy().clone() })
+                .map(|l| Dissonance {
+                    notes: l.vertices().to_vec(),
+                    comma: l.holonomy().clone(),
+                })
                 .collect(),
         ),
     }

@@ -8,9 +8,9 @@
 
 #![cfg(feature = "lapack")]
 
+use prismqueer::spectral::graph_from_edges;
 use prismqueer::spectral::instrument::{Cochain, Instrument};
 use prismqueer::spectral::settle::Time;
-use prismqueer::spectral::graph_from_edges;
 
 const EPS: f64 = 1e-10;
 
@@ -33,14 +33,33 @@ fn gradient_plus_harmonic_is_the_input() {
     let split = d.hodge(&x).expect("intervals only");
     let sum = Cochain::new(
         [],
-        [(0, 1), (1, 2), (2, 3), (0, 3)].map(|e| (e, split.gradient().interval(e).unwrap() + split.harmonic().interval(e).unwrap())),
+        [(0, 1), (1, 2), (2, 3), (0, 3)].map(|e| {
+            (
+                e,
+                split.gradient().interval(e).unwrap() + split.harmonic().interval(e).unwrap(),
+            )
+        }),
     );
-    assert!(sum.distance(&x) < EPS, "gradient + harmonic must reconstruct the input");
+    assert!(
+        sum.distance(&x) < EPS,
+        "gradient + harmonic must reconstruct the input"
+    );
 
     // Closed form: the harmonic part is the projection on the circulation.
-    let h: f64 = [3.0, -1.0, 2.0, 0.5].iter().zip(CIRCULATION).map(|(a, b)| a * b).sum::<f64>() / 4.0;
-    for (e, c) in [(0, 1), (1, 2), (2, 3), (0, 3)].into_iter().zip(CIRCULATION) {
-        assert!((split.harmonic().interval(e).unwrap() - h * c).abs() < EPS, "harmonic on {e:?}");
+    let h: f64 = [3.0, -1.0, 2.0, 0.5]
+        .iter()
+        .zip(CIRCULATION)
+        .map(|(a, b)| a * b)
+        .sum::<f64>()
+        / 4.0;
+    for (e, c) in [(0, 1), (1, 2), (2, 3), (0, 3)]
+        .into_iter()
+        .zip(CIRCULATION)
+    {
+        assert!(
+            (split.harmonic().interval(e).unwrap() - h * c).abs() < EPS,
+            "harmonic on {e:?}"
+        );
     }
 }
 
@@ -50,8 +69,14 @@ fn both_parts_are_idempotent_and_orthogonal() {
     let split = d.hodge(&intervals([3.0, -1.0, 2.0, 0.5])).unwrap();
     let again_g = d.hodge(split.gradient()).unwrap();
     let again_h = d.hodge(split.harmonic()).unwrap();
-    assert!(again_g.gradient().distance(split.gradient()) < EPS && again_g.harmonic().norm() < EPS, "gradient is fixed");
-    assert!(again_h.harmonic().distance(split.harmonic()) < EPS && again_h.gradient().norm() < EPS, "harmonic is fixed");
+    assert!(
+        again_g.gradient().distance(split.gradient()) < EPS && again_g.harmonic().norm() < EPS,
+        "gradient is fixed"
+    );
+    assert!(
+        again_h.harmonic().distance(split.harmonic()) < EPS && again_h.gradient().norm() < EPS,
+        "harmonic is fixed"
+    );
     let dot: f64 = [(0, 1), (1, 2), (2, 3), (0, 3)]
         .iter()
         .map(|&e| split.gradient().interval(e).unwrap() * split.harmonic().interval(e).unwrap())
@@ -76,7 +101,10 @@ fn the_harmonic_part_is_what_the_edge_settle_keeps() {
     let x = intervals([3.0, -1.0, 2.0, 0.5]);
     let settled = d.decay(Time(80.0), &x).unwrap();
     let split = d.hodge(&x).unwrap();
-    assert!(settled.distance(split.harmonic()) < 1e-9, "long decay of intervals = their harmonic part");
+    assert!(
+        settled.distance(split.harmonic()) < 1e-9,
+        "long decay of intervals = their harmonic part"
+    );
 }
 
 #[test]
@@ -91,5 +119,8 @@ fn a_tree_has_no_harmonic_part() {
 #[test]
 fn hodge_takes_intervals_only() {
     let d = square();
-    assert!(d.hodge(&Cochain::new([(0, 1.0)], [])).is_err(), "a pitch is not an interval: refused, not dropped");
+    assert!(
+        d.hodge(&Cochain::new([(0, 1.0)], [])).is_err(),
+        "a pitch is not an interval: refused, not dropped"
+    );
 }

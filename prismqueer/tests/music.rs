@@ -21,12 +21,20 @@ fn atom(s: &str) -> Atom {
 }
 
 fn note(head: &str, rule: &str, premises: &[&str]) -> Note {
-    Note::new(atom(head), Rule::new(rule), premises.iter().map(|p| atom(p)))
+    Note::new(
+        atom(head),
+        Rule::new(rule),
+        premises.iter().map(|p| atom(p)),
+    )
 }
 
 /// Mara §10: P = {fact a; r1: b ← a; r2: c ← b}.
 fn p() -> Piece {
-    Piece::from([note("a", "fact", &[]), note("b", "r1", &["a"]), note("c", "r2", &["b"])])
+    Piece::from([
+        note("a", "fact", &[]),
+        note("b", "r1", &["a"]),
+        note("c", "r2", &["b"]),
+    ])
 }
 
 /// Q = {r3: c ← a}.
@@ -49,17 +57,28 @@ fn notes_compose_by_union() {
 fn beats_are_computed_from_the_composed_piece_never_stored() {
     assert_eq!(p().beats(), beats(&[("a", 0), ("b", 1), ("c", 2)]));
     let pq = p().compose(&q());
-    assert_eq!(pq.beats(), beats(&[("a", 0), ("b", 1), ("c", 1)]), "a shorter route from another observer moves c");
+    assert_eq!(
+        pq.beats(),
+        beats(&[("a", 0), ("b", 1), ("c", 1)]),
+        "a shorter route from another observer moves c"
+    );
     // The geodesic projection changes: P's certificate for c is r2, P ∪ Q's is r3.
     assert_eq!(p().geodesic()[&atom("c")], note("c", "r2", &["b"]));
     assert_eq!(pq.geodesic()[&atom("c")], note("c", "r3", &["a"]));
-    assert_eq!(pq.chord(1), BTreeSet::from([atom("b"), atom("c")]), "a chord is all atoms on one beat");
+    assert_eq!(
+        pq.chord(1),
+        BTreeSet::from([atom("b"), atom("c")]),
+        "a chord is all atoms on one beat"
+    );
 }
 
 #[test]
 fn an_atom_nobody_derives_has_no_beat() {
     let piece = Piece::from([note("x", "r", &["missing"])]);
-    assert!(piece.beats().is_empty(), "a premise nobody derives leaves its head dark");
+    assert!(
+        piece.beats().is_empty(),
+        "a premise nobody derives leaves its head dark"
+    );
 }
 
 #[test]
@@ -72,15 +91,42 @@ fn the_cadence_is_the_fixpoint() {
 fn three_major_thirds_ring_false_by_the_lesser_diesis() {
     // Three observers, three circular readings, one loop that belongs to none.
     let triangle = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]);
-    let thirds = Field::transports(&triangle, [((0, 1), Ratio::of(5, 4)), ((1, 2), Ratio::of(5, 4)), ((2, 0), Ratio::of(5, 8))]).unwrap();
+    let thirds = Field::transports(
+        &triangle,
+        [
+            ((0, 1), Ratio::of(5, 4)),
+            ((1, 2), Ratio::of(5, 4)),
+            ((2, 0), Ratio::of(5, 8)),
+        ],
+    )
+    .unwrap();
     match ring_true(&thirds) {
         Ringing::Dissonant(found) => {
             assert_eq!(found.len(), 1);
-            assert_eq!(found[0].notes(), &[0, 1, 2, 0], "located: these readings, this loop");
-            assert_eq!(*found[0].comma(), Ratio::of(125, 128), "exactly the lesser diesis");
+            assert_eq!(
+                found[0].notes(),
+                &[0, 1, 2, 0],
+                "located: these readings, this loop"
+            );
+            assert_eq!(
+                *found[0].comma(),
+                Ratio::of(125, 128),
+                "exactly the lesser diesis"
+            );
         }
         Ringing::True(_) => panic!("(5/4)³ is not an octave"),
     }
-    let just = Field::transports(&triangle, [((0, 1), Ratio::of(5, 4)), ((1, 2), Ratio::of(6, 5)), ((2, 0), Ratio::of(2, 3))]).unwrap();
-    assert!(matches!(ring_true(&just), Ringing::True(_)), "a major third and a minor third make the fifth");
+    let just = Field::transports(
+        &triangle,
+        [
+            ((0, 1), Ratio::of(5, 4)),
+            ((1, 2), Ratio::of(6, 5)),
+            ((2, 0), Ratio::of(2, 3)),
+        ],
+    )
+    .unwrap();
+    assert!(
+        matches!(ring_true(&just), Ringing::True(_)),
+        "a major third and a minor third make the fifth"
+    );
 }

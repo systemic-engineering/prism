@@ -248,7 +248,13 @@ fn certify(
     let ambiguous: Vec<f64> = magnitudes
         .iter()
         .enumerate()
-        .filter(|&(i, &m)| if i < count { m > error } else { m < gap - error })
+        .filter(|&(i, &m)| {
+            if i < count {
+                m > error
+            } else {
+                m < gap - error
+            }
+        })
         .map(|(_, &m)| m)
         .collect();
     if ambiguous.is_empty() {
@@ -454,7 +460,11 @@ impl Instrument {
                 *t += weight * vc;
             }
         }
-        Ok(Restriction { kept: self.sparse(&kept), erased: self.sparse(&erased), lossless })
+        Ok(Restriction {
+            kept: self.sparse(&kept),
+            erased: self.sparse(&erased),
+            lossless,
+        })
     }
 
     /// b₀ + b₁, exactly: components by union-find, then |E| − |V| + b₀.
@@ -471,7 +481,10 @@ impl Instrument {
         }
         let mut b0 = self.vertices.len();
         for &(u, v) in self.edges.keys() {
-            let (ru, rv) = (root(&mut parent, self.vertices[&u]), root(&mut parent, self.vertices[&v]));
+            let (ru, rv) = (
+                root(&mut parent, self.vertices[&u]),
+                root(&mut parent, self.vertices[&v]),
+            );
             if ru != rv {
                 parent[ru] = rv;
                 b0 -= 1;
@@ -532,7 +545,10 @@ mod certify_tests {
     fn a_separated_spectrum_certifies_the_exact_count() {
         // Triangle: b0 + b1 = 2, D's spectrum is {0, 0, ±sqrt3, ±sqrt3}.
         let s = 3f64.sqrt();
-        assert_eq!(certify(&[-s, -s, 0.0, 1e-17, s, s], 2, 3, 6), Imperfect::Success(2));
+        assert_eq!(
+            certify(&[-s, -s, 0.0, 1e-17, s, s], 2, 3, 6),
+            Imperfect::Success(2)
+        );
     }
 
     #[test]

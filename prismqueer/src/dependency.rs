@@ -59,7 +59,10 @@ pub struct DependencyGraph<N: Ord> {
 
 impl<N: Ord> Default for DependencyGraph<N> {
     fn default() -> Self {
-        DependencyGraph { nodes: BTreeSet::new(), edges: Vec::new() }
+        DependencyGraph {
+            nodes: BTreeSet::new(),
+            edges: Vec::new(),
+        }
     }
 }
 
@@ -88,7 +91,10 @@ impl<N: Ord + Clone> DependencyGraph<N> {
 
     /// How many edges run `from → to`, of either sign.
     pub fn multiplicity(&self, from: &N, to: &N) -> usize {
-        self.edges.iter().filter(|e| &e.from == from && &e.to == to).count()
+        self.edges
+            .iter()
+            .filter(|e| &e.from == from && &e.to == to)
+            .count()
     }
 
     /// The edges through a `not`, in insertion order.
@@ -99,7 +105,11 @@ impl<N: Ord + Clone> DependencyGraph<N> {
     /// The seeds and everything reachable from them along edges `through`
     /// allows.
     pub fn reach(&self, seeds: &BTreeSet<N>, through: Through) -> BTreeSet<N> {
-        let mut out: BTreeSet<N> = seeds.iter().filter(|s| self.nodes.contains(s)).cloned().collect();
+        let mut out: BTreeSet<N> = seeds
+            .iter()
+            .filter(|s| self.nodes.contains(s))
+            .cloned()
+            .collect();
         let mut frontier: Vec<N> = out.iter().cloned().collect();
         while let Some(n) = frontier.pop() {
             for e in &self.edges {
@@ -114,7 +124,8 @@ impl<N: Ord + Clone> DependencyGraph<N> {
 
     /// Connected components of the underlying undirected multigraph.
     pub fn components(&self) -> usize {
-        let index: BTreeMap<&N, usize> = self.nodes.iter().enumerate().map(|(i, n)| (n, i)).collect();
+        let index: BTreeMap<&N, usize> =
+            self.nodes.iter().enumerate().map(|(i, n)| (n, i)).collect();
         let mut parent: Vec<usize> = (0..index.len()).collect();
         fn root(p: &mut [usize], i: usize) -> usize {
             if p[i] == i {
@@ -127,7 +138,10 @@ impl<N: Ord + Clone> DependencyGraph<N> {
         }
         let mut count = index.len();
         for e in &self.edges {
-            let (a, b) = (root(&mut parent, index[&e.from]), root(&mut parent, index[&e.to]));
+            let (a, b) = (
+                root(&mut parent, index[&e.from]),
+                root(&mut parent, index[&e.to]),
+            );
             if a != b {
                 parent[a] = b;
                 count -= 1;

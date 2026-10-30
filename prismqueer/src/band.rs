@@ -64,7 +64,11 @@ impl Band {
         if less(&nonzero_from, &zero_below) {
             return Err(Crossed);
         }
-        Ok(Band { zero_below, nonzero_from, scale })
+        Ok(Band {
+            zero_below,
+            nonzero_from,
+            scale,
+        })
     }
 
     /// Read `x` measured against an operator of size `scale`.
@@ -72,7 +76,9 @@ impl Band {
         let unit = match &self.scale {
             ScaleLaw::Absolute => 1.0,
             ScaleLaw::TimesScale { floor } => scale.max(value(floor)),
-            ScaleLaw::EpsilonScaled { k, dim } => *k as f64 * f64::EPSILON * *dim as f64 * scale.max(1.0),
+            ScaleLaw::EpsilonScaled { k, dim } => {
+                *k as f64 * f64::EPSILON * *dim as f64 * scale.max(1.0)
+            }
         };
         let m = x.abs();
         if m <= value(&self.zero_below) * unit {
@@ -91,15 +97,30 @@ impl Band {
         if self.scale != other.scale {
             return Err(Fork);
         }
-        let zero_below = if less(&other.zero_below, &self.zero_below) { &other.zero_below } else { &self.zero_below };
-        let nonzero_from = if less(&self.nonzero_from, &other.nonzero_from) { &other.nonzero_from } else { &self.nonzero_from };
-        Ok(Band { zero_below: zero_below.clone(), nonzero_from: nonzero_from.clone(), scale: self.scale.clone() })
+        let zero_below = if less(&other.zero_below, &self.zero_below) {
+            &other.zero_below
+        } else {
+            &self.zero_below
+        };
+        let nonzero_from = if less(&self.nonzero_from, &other.nonzero_from) {
+            &other.nonzero_from
+        } else {
+            &self.nonzero_from
+        };
+        Ok(Band {
+            zero_below: zero_below.clone(),
+            nonzero_from: nonzero_from.clone(),
+            scale: self.scale.clone(),
+        })
     }
 }
 
 /// The value of a positive ratio as a float.
 fn value(r: &Ratio) -> f64 {
-    r.exponents().iter().map(|(&p, &e)| (p as f64).powi(e as i32)).product()
+    r.exponents()
+        .iter()
+        .map(|(&p, &e)| (p as f64).powi(e as i32))
+        .product()
 }
 
 /// `a < b`, read through the quotient `a / b` so equal ratios compare exactly.
@@ -119,7 +140,12 @@ pub mod zeros {
 
     /// `settle`'s kernel certification: `16 · ε · n · scale`, no don't-know region.
     pub fn settle(n: usize) -> Band {
-        Band::new(Ratio::of(1, 1), Ratio::of(1, 1), ScaleLaw::EpsilonScaled { k: 16, dim: n }).expect("ordered")
+        Band::new(
+            Ratio::of(1, 1),
+            Ratio::of(1, 1),
+            ScaleLaw::EpsilonScaled { k: 16, dim: n },
+        )
+        .expect("ordered")
     }
 
     /// `Instrument::kernel_dimension`: the same rule as [`settle`] (since `c7de979`).
@@ -130,7 +156,14 @@ pub mod zeros {
     /// `Dissonance`: zero below `1e-12`, non-zero from `1e-6`, both times
     /// `max(‖A‖_F · ‖B‖_F, 1)`.
     pub fn commutator() -> Band {
-        Band::new(tenth(12), tenth(6), ScaleLaw::TimesScale { floor: Ratio::of(1, 1) }).expect("ordered")
+        Band::new(
+            tenth(12),
+            tenth(6),
+            ScaleLaw::TimesScale {
+                floor: Ratio::of(1, 1),
+            },
+        )
+        .expect("ordered")
     }
 
     /// `spectrum.rs`: `1e-12`, absolute.

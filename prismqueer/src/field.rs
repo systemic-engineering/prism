@@ -326,7 +326,12 @@ pub enum FieldError {
 impl<V> Field<Point, V> {
     /// A single truth.
     pub fn point(value: V) -> Self {
-        Field { base: Point, faces: Vec::new(), values: vec![value], edges: Vec::new() }
+        Field {
+            base: Point,
+            faces: Vec::new(),
+            values: vec![value],
+            edges: Vec::new(),
+        }
     }
 
     /// The one value of a single truth.
@@ -338,7 +343,12 @@ impl<V> Field<Point, V> {
 impl<V> Field<Discrete, V> {
     /// k unconnected criteria.
     pub fn discrete(values: Vec<V>) -> Self {
-        Field { base: Discrete, faces: Vec::new(), values, edges: Vec::new() }
+        Field {
+            base: Discrete,
+            faces: Vec::new(),
+            values,
+            edges: Vec::new(),
+        }
     }
 }
 
@@ -359,7 +369,11 @@ impl<V: Group> Field<Graph, V> {
     ) -> Result<Self, FieldError> {
         let mut by_edge: BTreeMap<EdgeKey, V> = BTreeMap::new();
         for ((a, b), t) in given {
-            let (key, t) = if a <= b { ((a, b), t) } else { ((b, a), t.inverse()) };
+            let (key, t) = if a <= b {
+                ((a, b), t)
+            } else {
+                ((b, a), t.inverse())
+            };
             if !graph.contains_edge(key) {
                 return Err(FieldError::Outside(key));
             }
@@ -370,13 +384,21 @@ impl<V: Group> Field<Graph, V> {
         for e in &edges {
             values.push(by_edge.remove(e).ok_or(FieldError::Missing(*e))?);
         }
-        Ok(Field { base: Graph(graph.clone()), faces: Vec::new(), values, edges })
+        Ok(Field {
+            base: Graph(graph.clone()),
+            faces: Vec::new(),
+            values,
+            edges,
+        })
     }
 
     /// Declare filled triangles (2-cells). A loop that bounds faces is no
     /// longer a hole; a face that doesn't close is curvature on that face.
     /// Refused if a face's edge isn't in the graph.
-    pub fn with_faces(mut self, faces: impl IntoIterator<Item = [VertexId; 3]>) -> Result<Self, FieldError> {
+    pub fn with_faces(
+        mut self,
+        faces: impl IntoIterator<Item = [VertexId; 3]>,
+    ) -> Result<Self, FieldError> {
         for [a, b, c] in faces {
             for (x, y) in [(a, b), (b, c), (a, c)] {
                 let key = if x <= y { (x, y) } else { (y, x) };
@@ -392,8 +414,15 @@ impl<V: Group> Field<Graph, V> {
     /// The transport from `a` to `b` along an edge of the graph.
     fn transport(&self, a: VertexId, b: VertexId) -> V {
         let key = if a <= b { (a, b) } else { (b, a) };
-        let i = self.edges.binary_search(&key).expect("an edge of the field");
-        if a <= b { self.values[i].clone() } else { self.values[i].inverse() }
+        let i = self
+            .edges
+            .binary_search(&key)
+            .expect("an edge of the field");
+        if a <= b {
+            self.values[i].clone()
+        } else {
+            self.values[i].inverse()
+        }
     }
 }
 
@@ -405,7 +434,8 @@ impl<V: Group> Field<Graph, V> {
 /// carries a `Field<B, V>` is one, by what it settles into.
 pub trait FieldPrism<B, V>: crate::Prism<Refracted: crate::Beam<Out = Field<B, V>>> {}
 
-impl<P, B, V> FieldPrism<B, V> for P where P: crate::Prism<Refracted: crate::Beam<Out = Field<B, V>>> {}
+impl<P, B, V> FieldPrism<B, V> for P where P: crate::Prism<Refracted: crate::Beam<Out = Field<B, V>>>
+{}
 
 /// A field prism over a point: a single truth.
 pub trait ScalarPrism<V>: FieldPrism<Point, V> {}
@@ -514,7 +544,8 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
             r
         }
     }
-    let mut tree: BTreeMap<VertexId, Vec<VertexId>> = vertices.iter().map(|&v| (v, Vec::new())).collect();
+    let mut tree: BTreeMap<VertexId, Vec<VertexId>> =
+        vertices.iter().map(|&v| (v, Vec::new())).collect();
     let mut chords = Vec::new();
     for &(u, v) in &field.edges {
         let (ru, rv) = (root(&mut parent, u), root(&mut parent, v));
@@ -549,16 +580,23 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
     }
 
     let around = |vertices: Vec<VertexId>| {
-        let holonomy = vertices
-            .windows(2)
-            .fold(V::identity(), |h, w| h.compose(&field.transport(w[0], w[1])));
+        let holonomy = vertices.windows(2).fold(V::identity(), |h, w| {
+            h.compose(&field.transport(w[0], w[1]))
+        });
         Loop { vertices, holonomy }
     };
     let edge_set = |walk: &[VertexId]| -> BTreeSet<usize> {
         let mut set = BTreeSet::new();
         for w in walk.windows(2) {
-            let key = if w[0] <= w[1] { (w[0], w[1]) } else { (w[1], w[0]) };
-            let i = field.edges.binary_search(&key).expect("an edge of the field");
+            let key = if w[0] <= w[1] {
+                (w[0], w[1])
+            } else {
+                (w[1], w[0])
+            };
+            let i = field
+                .edges
+                .binary_search(&key)
+                .expect("an edge of the field");
             if !set.remove(&i) {
                 set.insert(i);
             }
@@ -628,7 +666,11 @@ impl Gf2 {
 
 /// The cycle closed by chord `(u, v)`: the tree path from `u` to `v`, then
 /// the chord back to `u`.
-fn fundamental_cycle(back: &BTreeMap<VertexId, VertexId>, u: VertexId, v: VertexId) -> Vec<VertexId> {
+fn fundamental_cycle(
+    back: &BTreeMap<VertexId, VertexId>,
+    u: VertexId,
+    v: VertexId,
+) -> Vec<VertexId> {
     let ancestors = |mut x: VertexId| {
         let mut path = vec![x];
         while let Some(&p) = back.get(&x) {
@@ -639,7 +681,10 @@ fn fundamental_cycle(back: &BTreeMap<VertexId, VertexId>, u: VertexId, v: Vertex
     };
     let (up, vp) = (ancestors(u), ancestors(v));
     let on_v: BTreeSet<VertexId> = vp.iter().copied().collect();
-    let meet = *up.iter().find(|x| on_v.contains(x)).expect("same component");
+    let meet = *up
+        .iter()
+        .find(|x| on_v.contains(x))
+        .expect("same component");
     let mut cycle: Vec<VertexId> = up.iter().copied().take_while(|&x| x != meet).collect();
     cycle.push(meet);
     let down: Vec<VertexId> = vp.iter().copied().take_while(|&x| x != meet).collect();

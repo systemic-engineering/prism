@@ -183,7 +183,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 // LOAD-BEARING. The empirical verification of Alex's claim.
 // ---------------------------------------------------------------------
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_rank_of_battery_matrix_is_five() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_rank_of_battery_matrix_is_five() {
     // Under Ricci flow parameterization K_{1,n-1} → K_n, the 8×N matrix
     // M[i, k] = test_i(G_k) where G_k is the k-th graph on the flow has
     // rank exactly 5. SVD verifies: σ_6, σ_7, σ_8 ≈ 0 relative to σ_1..σ_5.
@@ -205,7 +206,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 // The specific 3-way linear dependency Alex named.
 // ---------------------------------------------------------------------
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_three_way_collapse_of_focus_axis() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_three_way_collapse_of_focus_axis() {
     // Tests {Betweenness centralization, Degree Gini, Single-node
     // fragility} are mutually linearly dependent under Ricci flow.
     // Verification: correlation matrix restricted to these three has
@@ -228,7 +230,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 // Property 3: orthogonality_of_five_op_basis_projections
 // ---------------------------------------------------------------------
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_orthogonality_of_five_op_basis_projections() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_orthogonality_of_five_op_basis_projections() {
     // The 5 Void-basis axes (focus / project / split / shift / settle)
     // are mutually orthogonal when computed on graph-Laplacian carriers.
     // Verification: dot product of any two distinct axis-projections
@@ -248,7 +251,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 // Property 4a-e: each Void axis has the correct tests projecting onto it
 // ---------------------------------------------------------------------
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_focus_axis_carries_tests_1_2_7() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_focus_axis_carries_tests_1_2_7() {
     // focus ← {Betweenness centralization (#1), Degree Gini (#2),
     // Single-node fragility (#7)}. Three tests. All measure "how
     // concentrated is graph mass at center."
@@ -264,7 +268,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 }
 
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_project_axis_carries_tests_3_4() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_project_axis_carries_tests_3_4() {
     // project ← {Spectral ratio λ_max/λ_2 (#3), Von Neumann entropy (#4)}.
     // Two tests on distinct moments of the spectral distribution.
     // NOT collinear — max/min ratio vs entropy measure different moments.
@@ -279,7 +284,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 }
 
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_split_axis_carries_test_6() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_split_axis_carries_test_6() {
     // split ← {Peripheral conductance (#6)}. Measures whether the graph
     // can be partitioned along non-hub cuts.
     let v = forall::<BatteryTest, _>(30, |_test| {
@@ -292,7 +298,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 }
 
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_shift_axis_carries_test_8() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_shift_axis_carries_test_8() {
     // shift ← {Permeability index (#8)}. Measures openness to external
     // perturbation.
     let v = forall::<BatteryTest, _>(30, |_test| {
@@ -305,7 +312,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 }
 
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_settle_axis_carries_test_5() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_settle_axis_carries_test_5() {
     // settle ← {Clustering coefficient (#5)}. Measures local steady-state
     // triangle density.
     let v = forall::<BatteryTest, _>(30, |_test| {
@@ -322,7 +330,8 @@ fn defer(property_name: &str, authorship_boundary: &str) -> PropertyVerdict {
 // The ouroboros closure. What the recognition CLAIMS at math altitude.
 // ---------------------------------------------------------------------
 #[test]
-#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]fn red_pillar_narcissus_detection_battery_is_void_basis_measurement() {
+#[ignore = "RED by design: the Narcissus battery waits on the five-op basis collapse (op semantics in prismqueer, prism-004)"]
+fn red_pillar_narcissus_detection_battery_is_void_basis_measurement() {
     // The load-bearing Recognition-witness property. If verified:
     // every mirror invocation implicitly runs the Narcissus Detection
     // Battery through its Void-basis measurements. No separate
