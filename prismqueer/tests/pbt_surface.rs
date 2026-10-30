@@ -220,21 +220,76 @@ fn forall_contradiction_returns_fail() {
     );
 }
 
+/// `forall`'s documented derivation, rebuilt by hand: draw `i` is read from
+/// `Sample::from_bytes(sha256(seed || i as u64 little-endian))`.
+fn derived<T: Arbitrary>(seed: &[u8], n: u64) -> Vec<T> {
+    use sha2::{Digest, Sha256};
+    (0..n)
+        .map(|i| {
+            let mut h = Sha256::new();
+            h.update(seed);
+            h.update(i.to_le_bytes());
+            T::arbitrary(&mut Sample::from_bytes(h.finalize().to_vec()))
+        })
+        .collect()
+}
+
+/// What `forall` actually hands its property, in order.
+fn drawn<T: Arbitrary>(seed: &[u8], n: usize) -> Vec<T> {
+    let mut seen = Vec::new();
+    forall::<T, _>(seed, n, |x| {
+        seen.push(x);
+        PropertyVerdict::Pass
+    });
+    seen
+}
+
+#[test]
+fn forall_draws_are_a_function_of_the_seed() {
+    let a = drawn::<i32>(b"seed a", 16);
+    let b = drawn::<i32>(b"seed b", 16);
+    assert_eq!(a, drawn::<i32>(b"seed a", 16), "same seed, same draws");
+    assert_eq!(a, derived::<i32>(b"seed a", 16), "sha256(seed || i)");
+    assert_eq!(b, derived::<i32>(b"seed b", 16), "sha256(seed || i)");
+    for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+        assert_ne!(x, y, "draw {i}: a different seed must draw differently");
+    }
+    let mut distinct = a.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
+    assert_eq!(distinct.len(), a.len(), "each index draws its own value");
+}
+
 #[test]
 fn forall_partial_when_property_sometimes_holds() {
-    // Property: half of bools satisfy (bool == true).
-    // Fold: any Fail dominates. Bool sampling ~50/50 → some fail → overall Fail.
-    let v = forall::<bool, _>(b"forall_partial_when_property_sometimes_holds", 20, |b| {
+    // Property: half of bools satisfy (bool == true). Fail dominates the
+    // fold, and the first Fail is the one kept. The seed is fixed, so the
+    // draws are too: this is not a 50/50 bet but one exact outcome.
+    let seed = b"forall_partial_when_property_sometimes_holds";
+    let draws = derived::<bool>(seed, 20);
+    assert_eq!(
+        draws.iter().filter(|b| **b).count(),
+        12,
+        "trues among the 20"
+    );
+    let first_false = draws.iter().position(|b| !b);
+    assert_eq!(first_false, Some(0), "the first counterexample");
+
+    let mut at = 0;
+    let v = forall::<bool, _>(seed, 20, |b| {
+        at += 1;
         if b {
             PropertyVerdict::Pass
         } else {
-            PropertyVerdict::Fail(terni::Diagnostic::new("was false"))
+            PropertyVerdict::Fail(terni::Diagnostic::new(format!("false at draw {}", at - 1)))
         }
     });
-    // With enough draws, at least one false hit → Fail.
-    assert!(
-        matches!(v, PropertyVerdict::Fail(_)),
-        "expected Fail (any false is a counterexample), got {v:?}"
+    assert_eq!(
+        v,
+        PropertyVerdict::Fail(terni::Diagnostic::new(format!(
+            "false at draw {}",
+            first_false.unwrap()
+        ))),
     );
 }
 
