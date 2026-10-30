@@ -2,7 +2,7 @@
 
 **Author:** Mara
 **Date:** 2026-04-14
-**Status:** Proposal
+**Status:** Superseded (2026-10-30) for identity. `Oid::hash` is now scoped BLAKE3 (`docs/spec/identity.md`). The coincidence detector stays, as a measurement (`coincidence::detect`), not as an address.
 
 ## Problem
 
