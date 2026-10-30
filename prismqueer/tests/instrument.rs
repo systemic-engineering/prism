@@ -305,6 +305,48 @@ fn bleed_lives_exactly_on_the_solo_boundary() {
     assert_eq!(m[v2 * n + e12], 0.5);
 }
 
+// --- Orientation: a value on (v, u) is the negative of the one on (u, v) ---
+
+#[test]
+fn a_reversed_edge_flips_the_comma_and_the_circulation() {
+    // The circulation 0 → 1 → 2 → 0 on a triangle, its last leg written as
+    // given, (2, 0), and canonically, (0, 2) with the sign flipped.
+    let reversed = Cochain::new([], [((0, 1), 1.0), ((1, 2), 1.0), ((2, 0), 1.0)]);
+    let canonical = Cochain::new([], [((0, 1), 1.0), ((1, 2), 1.0), ((0, 2), -1.0)]);
+    assert_eq!(reversed, canonical, "one circulation, two spellings");
+    assert_eq!(reversed.interval((0, 2)), Some(-1.0));
+    assert_eq!(reversed.interval((2, 0)), Some(1.0));
+
+    // The circulation is wholly a comma: harmonic, no gradient.
+    let (_, d) = instrument(&[(0, 1), (1, 2), (0, 2)]);
+    let split = d.hodge(&reversed).expect("intervals only");
+    for (e, h) in [((0, 1), 1.0), ((1, 2), 1.0), ((0, 2), -1.0)] {
+        assert!(
+            close(split.harmonic().interval(e).unwrap(), h),
+            "comma on {e:?}"
+        );
+        assert!(
+            close(split.gradient().interval(e).unwrap(), 0.0),
+            "gradient on {e:?}"
+        );
+    }
+
+    // One unit on (2, 0) is minus one on (0, 2): its comma, the projection
+    // on h = (1, 1, −1), is +h/3, and the canonical spelling's is −h/3.
+    let back = d.hodge(&Cochain::new([], [((2, 0), 1.0)])).unwrap();
+    let forth = d.hodge(&Cochain::new([], [((0, 2), 1.0)])).unwrap();
+    for (e, h) in [((0, 1), 1.0), ((1, 2), 1.0), ((0, 2), -1.0)] {
+        assert!(
+            close(back.harmonic().interval(e).unwrap(), h / 3.0),
+            "on {e:?}"
+        );
+        assert!(
+            close(forth.harmonic().interval(e).unwrap(), -h / 3.0),
+            "on {e:?}"
+        );
+    }
+}
+
 #[test]
 fn soloing_everything_or_nothing_does_not_bleed() {
     let (_, d) = instrument(&[(0, 1), (1, 2), (0, 2), (2, 3)]);
