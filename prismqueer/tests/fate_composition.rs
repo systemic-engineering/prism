@@ -158,7 +158,7 @@ fn boundary_just_above_over_cutting_yields_fail() {
 /// verdicts → folded unified verdict. Any OverCutting in the run
 /// forces Fail per Beer audit-channel semantics (iter 8 witnesses).
 fn folded_training_run_with_over_cutting_yields_fail() {
-    let losses = vec![
+    let losses = [
         BERRY_PHASE,        // Healthy → Pass
         BERRY_PHASE * 2.0,  // Healthy → Pass
         BERRY_PHASE * 15.0, // OverCutting → Fail
@@ -178,7 +178,7 @@ fn folded_training_run_with_over_cutting_yields_fail() {
 #[test]
 /// All-Healthy training run folds to Pass.
 fn folded_training_run_all_healthy_yields_pass() {
-    let losses = vec![BERRY_PHASE, BERRY_PHASE * 2.0, BERRY_PHASE * 5.0];
+    let losses = [BERRY_PHASE, BERRY_PHASE * 2.0, BERRY_PHASE * 5.0];
     let verdicts: Vec<PropertyVerdict> = losses
         .iter()
         .map(|&loss| pillar::of_health(&holonomy_health(loss)))

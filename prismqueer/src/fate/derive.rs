@@ -441,13 +441,13 @@ mod tests {
     fn extract_dark_coupling_respects_indices() {
         // Set specific dark dimension couplings and verify extraction
         let mut state = manifold::manifold_zero();
-        state[feature::CREATIVITY][feature::INNOVATION] = 3.14;
-        state[feature::INNOVATION][feature::CREATIVITY] = 3.14;
+        state[feature::CREATIVITY][feature::INNOVATION] = 2.5;
+        state[feature::INNOVATION][feature::CREATIVITY] = 2.5;
 
         let dark = extract_dark_coupling(&state);
         // CREATIVITY is DARK[0], INNOVATION is DARK[7]
-        assert!((dark[0][7] - 3.14).abs() < 1e-12);
-        assert!((dark[7][0] - 3.14).abs() < 1e-12);
+        assert!((dark[0][7] - 2.5).abs() < 1e-12);
+        assert!((dark[7][0] - 2.5).abs() < 1e-12);
     }
 
     #[test]

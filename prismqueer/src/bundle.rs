@@ -724,7 +724,6 @@ pub mod examples {
 mod tests {
     use super::examples::*;
     use super::*;
-    use crate::ScalarLoss;
 
     // Local wrapper so existing tests keep their call-sites unchanged.
     fn make_bundle(strategy_shift: u8, kernel: bool) -> TestBundle {

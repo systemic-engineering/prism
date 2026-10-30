@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn instruction_count_for_fate() {
         // The full Fate selector in Metal (without BF overhead):
-        let program = vec![
+        let program = [
             Instruction::Focus(22),  // 1 instruction
             Instruction::Zoom(0, 0), // feature contribution (placeholder)
             Instruction::Split(5),   // argmax

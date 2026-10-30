@@ -249,17 +249,18 @@ mod tests {
         // Path 0-1-2: degrees 1,2,1. Row sums of L must vanish (L·1 = 0).
         let (n, edges) = (3, vec![(0_usize, 1_usize), (1, 2)]);
         let l = laplacian_from_edges(n, &edges);
+        let at = |i: usize, j: usize| l[i * n + j];
         for i in 0..n {
-            let row_sum: f64 = (0..n).map(|j| l[i * n + j]).sum();
+            let row_sum: f64 = (0..n).map(|j| at(i, j)).sum();
             assert!(row_sum.abs() < 1e-12, "row {i} sums to {row_sum}");
             for j in 0..n {
-                assert_eq!(l[i * n + j], l[j * n + i], "asymmetry at ({i},{j})");
+                assert_eq!(at(i, j), at(j, i), "asymmetry at ({i},{j})");
             }
         }
         // Diagonal = degree.
-        assert_eq!(l[0], 1.0);
-        assert_eq!(l[1 * n + 1], 2.0);
-        assert_eq!(l[2 * n + 2], 1.0);
+        assert_eq!(at(0, 0), 1.0);
+        assert_eq!(at(1, 1), 2.0);
+        assert_eq!(at(2, 2), 1.0);
     }
 
     // --- known-answer dimension recovery (LAPACK) ---

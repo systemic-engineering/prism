@@ -102,6 +102,11 @@ impl KernelSpec {
 mod tests {
     use super::*;
 
+    /// Row-major index of `(r, c)` in a 4×4 matrix.
+    fn at(r: usize, c: usize) -> usize {
+        r * 4 + c
+    }
+
     #[test]
     fn kernel_spec_from_dimensions() {
         let spec = KernelSpec::new(
@@ -146,10 +151,10 @@ mod tests {
         let spec = KernelSpec::new(vec![0, 2], Decomposition::MatVec, Precision::new(0.01));
         let matrix = spec.projection_matrix(4);
         // 4×4 matrix, 1s at (0,0) and (2,2)
-        assert_eq!(matrix[0 * 4 + 0], 1.0); // (0,0)
-        assert_eq!(matrix[1 * 4 + 1], 0.0); // (1,1) not preserved
-        assert_eq!(matrix[2 * 4 + 2], 1.0); // (2,2)
-        assert_eq!(matrix[3 * 4 + 3], 0.0); // (3,3) not preserved
+        assert_eq!(matrix[at(0, 0)], 1.0);
+        assert_eq!(matrix[at(1, 1)], 0.0); // not preserved
+        assert_eq!(matrix[at(2, 2)], 1.0);
+        assert_eq!(matrix[at(3, 3)], 0.0); // not preserved
     }
 
     #[test]
@@ -160,7 +165,7 @@ mod tests {
             Precision::new(0.01),
         );
         let matrix = spec.projection_matrix(4);
-        assert_eq!(matrix[0 * 4 + 0], 1.0);
+        assert_eq!(matrix[at(0, 0)], 1.0);
         // Index 5 silently ignored (d < n check)
         let sum: f64 = matrix.iter().sum();
         assert_eq!(sum, 1.0); // Only one 1.0 in the matrix

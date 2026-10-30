@@ -328,8 +328,8 @@ mod tests {
             value: f64,
         }
         assert_eq!(IsoTest::optic_fields()[0].kind, crate::OpticKind::Iso);
-        let mut t = IsoTest { value: 3.14 };
-        assert_eq!(*ValueIso::forward(&t), 3.14);
+        let mut t = IsoTest { value: 2.5 };
+        assert_eq!(*ValueIso::forward(&t), 2.5);
         ValueIso::backward(&mut t, 2.72);
         assert_eq!(t.value, 2.72);
     }

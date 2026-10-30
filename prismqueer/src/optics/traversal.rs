@@ -142,9 +142,11 @@ mod tests {
     #[test]
     fn traversal_is_clone_and_copy() {
         let t: Traversal<i32, i32> = Traversal::new(double);
+        fn is_clone<T: Clone>() {}
+        is_clone::<Traversal<i32, i32>>();
         let t2 = t; // Copy
-        let t3 = t2.clone(); // Clone
-        assert_eq!(t3.traverse(vec![1]), vec![2]);
+        assert_eq!(t.traverse(vec![1]), t2.traverse(vec![1]));
+        assert_eq!(t2.traverse(vec![1]), vec![2]);
     }
 
     /// Traversal's multi-focus split is expressed via smap in the new API.

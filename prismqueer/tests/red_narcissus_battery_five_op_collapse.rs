@@ -107,15 +107,6 @@ struct ConnectedGraph {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum VoidBasisAxis {
-    Focus,   // attention-concentration; where mass points
-    Project, // spectral-decomposition; eigenvalue arrangement
-    Split,   // partition/connectivity; cut detectability
-    Shift,   // perturbation-response; sensitivity to change
-    Settle,  // steady-state; equilibrium distribution
-}
-
-#[derive(Clone, Debug, PartialEq)]
 enum BatteryTest {
     BetweennessCentralization, // #1 → focus
     DegreeGini,                // #2 → focus

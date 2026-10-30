@@ -40,7 +40,7 @@ fn sample_draw_integer_stays_within_bounds() {
         let mut s = Sample::from_bytes(vec![seed; 32]);
         for _ in 0..10 {
             let v = s.draw_integer(-100, 100);
-            assert!(v >= -100 && v <= 100, "draw_integer out of range: {v}");
+            assert!((-100..=100).contains(&v), "draw_integer out of range: {v}");
         }
     }
 }

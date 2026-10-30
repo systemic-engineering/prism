@@ -235,7 +235,9 @@ fn boundary(g: &Graph, solo: &[u64]) -> std::collections::BTreeSet<(u64, u64)> {
 
 #[test]
 fn bleed_lives_exactly_on_the_solo_boundary() {
-    let cases: [(&[(u64, u64)], &[u64]); 3] = [
+    /// A graph's edges and the vertices that run solo.
+    type Case = (&'static [(u64, u64)], &'static [u64]);
+    let cases: [Case; 3] = [
         (&[(0, 1), (1, 2), (2, 3)], &[0, 1]),
         (
             &[(0, 1), (1, 2), (0, 2), (2, 3), (3, 4), (2, 4)],

@@ -58,9 +58,9 @@ impl Transport for Spectral {
         // Compress: keep first 8, zero last 8
         let mut compressed = *state;
         let mut loss = 0.0;
-        for i in 8..16 {
-            loss += compressed[i].abs();
-            compressed[i] = 0.0;
+        for x in &mut compressed[8..16] {
+            loss += x.abs();
+            *x = 0.0;
         }
         if loss == 0.0 {
             Imperfect::Success(compressed)

@@ -17,117 +17,6 @@ pub struct Weights {
 }
 
 // ---------------------------------------------------------------------------
-// Tests (written first — red before green)
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_weights_produce_cycle() {
-        // Abyss→Path→Cart→Expl→Fate→Abyss
-        // For context i, the highest bias should be at index (i+1) % 5.
-        let w = Weights::default_cycle();
-
-        // context 0 (Abyss): bias peak at index 1 (Introject)
-        let b0 = w.sets[0].bias;
-        assert!(
-            b0[1] > b0[0],
-            "Abyss context: Introject bias should beat Abyss"
-        );
-        assert!(
-            b0[1] > b0[2],
-            "Abyss context: Introject bias should beat Cartographer"
-        );
-        assert!(
-            b0[1] > b0[3],
-            "Abyss context: Introject bias should beat Explorer"
-        );
-        assert!(
-            b0[1] > b0[4],
-            "Abyss context: Introject bias should beat Fate"
-        );
-
-        // context 1 (Introject): bias peak at index 2 (Cartographer)
-        let b1 = w.sets[1].bias;
-        assert!(b1[2] > b1[0]);
-        assert!(b1[2] > b1[1]);
-        assert!(b1[2] > b1[3]);
-        assert!(b1[2] > b1[4]);
-
-        // context 2 (Cartographer): bias peak at index 3 (Explorer)
-        let b2 = w.sets[2].bias;
-        assert!(b2[3] > b2[0]);
-        assert!(b2[3] > b2[1]);
-        assert!(b2[3] > b2[2]);
-        assert!(b2[3] > b2[4]);
-
-        // context 3 (Explorer): bias peak at index 4 (Fate)
-        let b3 = w.sets[3].bias;
-        assert!(b3[4] > b3[0]);
-        assert!(b3[4] > b3[1]);
-        assert!(b3[4] > b3[2]);
-        assert!(b3[4] > b3[3]);
-
-        // context 4 (Fate): bias peak at index 0 (Abyss)
-        let b4 = w.sets[4].bias;
-        assert!(b4[0] > b4[1]);
-        assert!(b4[0] > b4[2]);
-        assert!(b4[0] > b4[3]);
-        assert!(b4[0] > b4[4]);
-    }
-
-    #[test]
-    fn weights_serialize_roundtrip() {
-        let original = Weights::default_cycle();
-        let bytes = original.to_bytes();
-        let recovered = Weights::from_bytes(&bytes).expect("from_bytes should succeed");
-
-        for s in 0..5 {
-            assert_eq!(
-                original.sets[s].bias, recovered.sets[s].bias,
-                "bias mismatch at set {s}"
-            );
-            for r in 0..5 {
-                assert_eq!(
-                    original.sets[s].feature_weights[r], recovered.sets[s].feature_weights[r],
-                    "feature_weights mismatch at set {s} row {r}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn weights_param_count() {
-        let w = Weights::default_cycle();
-        let count = w.param_count();
-        assert_eq!(count, 425, "param_count should be 425");
-        assert_eq!(
-            w.to_bytes().len(),
-            count,
-            "to_bytes().len() should match param_count"
-        );
-    }
-
-    #[test]
-    fn from_bytes_wrong_length_returns_none() {
-        assert!(
-            Weights::from_bytes(&[]).is_none(),
-            "empty slice should return None"
-        );
-        assert!(
-            Weights::from_bytes(&[0u8; 424]).is_none(),
-            "one byte short should return None"
-        );
-        assert!(
-            Weights::from_bytes(&[0u8; 426]).is_none(),
-            "one byte over should return None"
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
 
@@ -242,5 +131,116 @@ impl Weights {
         }
 
         Some(Weights { sets })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests (written first — red before green)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_weights_produce_cycle() {
+        // Abyss→Path→Cart→Expl→Fate→Abyss
+        // For context i, the highest bias should be at index (i+1) % 5.
+        let w = Weights::default_cycle();
+
+        // context 0 (Abyss): bias peak at index 1 (Introject)
+        let b0 = w.sets[0].bias;
+        assert!(
+            b0[1] > b0[0],
+            "Abyss context: Introject bias should beat Abyss"
+        );
+        assert!(
+            b0[1] > b0[2],
+            "Abyss context: Introject bias should beat Cartographer"
+        );
+        assert!(
+            b0[1] > b0[3],
+            "Abyss context: Introject bias should beat Explorer"
+        );
+        assert!(
+            b0[1] > b0[4],
+            "Abyss context: Introject bias should beat Fate"
+        );
+
+        // context 1 (Introject): bias peak at index 2 (Cartographer)
+        let b1 = w.sets[1].bias;
+        assert!(b1[2] > b1[0]);
+        assert!(b1[2] > b1[1]);
+        assert!(b1[2] > b1[3]);
+        assert!(b1[2] > b1[4]);
+
+        // context 2 (Cartographer): bias peak at index 3 (Explorer)
+        let b2 = w.sets[2].bias;
+        assert!(b2[3] > b2[0]);
+        assert!(b2[3] > b2[1]);
+        assert!(b2[3] > b2[2]);
+        assert!(b2[3] > b2[4]);
+
+        // context 3 (Explorer): bias peak at index 4 (Fate)
+        let b3 = w.sets[3].bias;
+        assert!(b3[4] > b3[0]);
+        assert!(b3[4] > b3[1]);
+        assert!(b3[4] > b3[2]);
+        assert!(b3[4] > b3[3]);
+
+        // context 4 (Fate): bias peak at index 0 (Abyss)
+        let b4 = w.sets[4].bias;
+        assert!(b4[0] > b4[1]);
+        assert!(b4[0] > b4[2]);
+        assert!(b4[0] > b4[3]);
+        assert!(b4[0] > b4[4]);
+    }
+
+    #[test]
+    fn weights_serialize_roundtrip() {
+        let original = Weights::default_cycle();
+        let bytes = original.to_bytes();
+        let recovered = Weights::from_bytes(&bytes).expect("from_bytes should succeed");
+
+        for s in 0..5 {
+            assert_eq!(
+                original.sets[s].bias, recovered.sets[s].bias,
+                "bias mismatch at set {s}"
+            );
+            for r in 0..5 {
+                assert_eq!(
+                    original.sets[s].feature_weights[r], recovered.sets[s].feature_weights[r],
+                    "feature_weights mismatch at set {s} row {r}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn weights_param_count() {
+        let w = Weights::default_cycle();
+        let count = w.param_count();
+        assert_eq!(count, 425, "param_count should be 425");
+        assert_eq!(
+            w.to_bytes().len(),
+            count,
+            "to_bytes().len() should match param_count"
+        );
+    }
+
+    #[test]
+    fn from_bytes_wrong_length_returns_none() {
+        assert!(
+            Weights::from_bytes(&[]).is_none(),
+            "empty slice should return None"
+        );
+        assert!(
+            Weights::from_bytes(&[0u8; 424]).is_none(),
+            "one byte short should return None"
+        );
+        assert!(
+            Weights::from_bytes(&[0u8; 426]).is_none(),
+            "one byte over should return None"
+        );
     }
 }

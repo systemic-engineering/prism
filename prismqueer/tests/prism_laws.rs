@@ -27,7 +27,7 @@
 #![cfg(feature = "bundle")]
 
 use prismqueer::bundle::IdentityPrism;
-use prismqueer::{apply, apply_h, Beam, Focus, Optic, Prism, Project, Settle};
+use prismqueer::{apply, apply_h, Beam, Focus, Optic, Project, Settle};
 use terni::{Diagnostic, PropertyVerdict};
 
 // ──────────────────────────────────────────────────────────────────
