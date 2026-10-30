@@ -41,6 +41,8 @@ pub mod trace;
 
 pub mod time;
 
+pub mod dependency;
+
 pub mod connection;
 pub mod content;
 pub mod kernel;
