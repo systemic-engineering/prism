@@ -177,12 +177,16 @@ fn red_pillar_chain_monotonicity_of_trust() {
     // For any two chain states s_n, s_m with n < m: s_n is a strict
     // prefix of s_m. The chain grows; it does not rewrite. Categorically
     // a monotone map from ℕ into the identity-provenance chain.
-    let v = forall::<TrustChainStep<SshSignature>, _>(30, |_step| {
-        defer(
-            "chain_monotonicity_of_trust",
-            "@peer/registry.append action + @trust chain history storage",
-        )
-    });
+    let v = forall::<TrustChainStep<SshSignature>, _>(
+        b"red_pillar_chain_monotonicity_of_trust",
+        30,
+        |_step| {
+            defer(
+                "chain_monotonicity_of_trust",
+                "@peer/registry.append action + @trust chain history storage",
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 1/8): {v:?}"
@@ -200,13 +204,17 @@ fn red_pillar_content_address_injectivity_of_subject() {
     // distinct #[oid] prefixes: subject.as_author().oid() !=
     // subject.as_committer().oid() even when the underlying Subject is
     // the same. Property-testable via injectivity of the oid() projection.
-    let v = forall::<Oid, _>(30, |_oid_a| {
-        defer(
-            "content_address_injectivity_of_subject",
-            "fractal::Subject::oid() lifted to real hash + injective test \
+    let v = forall::<Oid, _>(
+        b"red_pillar_content_address_injectivity_of_subject",
+        30,
+        |_oid_a| {
+            defer(
+                "content_address_injectivity_of_subject",
+                "fractal::Subject::oid() lifted to real hash + injective test \
              against paired distinct-Subject sampling",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 2/8): {v:?}"
@@ -224,13 +232,17 @@ fn red_pillar_chain_terminates_at_root_of_trust() {
     // Mara Q1 asks whether `chain_terminates_at_root` gets a naming
     // exemption from composition-primitive convention (chain-property,
     // not value-type generalization). Mara lean: EXEMPTION.
-    let v = forall::<TrustChainStep<SshSignature>, _>(30, |_step| {
-        defer(
-            "chain_terminates_at_root_of_trust",
-            "@peer/registry.resolve action + @trust chain walk terminating \
+    let v = forall::<TrustChainStep<SshSignature>, _>(
+        b"red_pillar_chain_terminates_at_root_of_trust",
+        30,
+        |_step| {
+            defer(
+                "chain_terminates_at_root_of_trust",
+                "@peer/registry.resolve action + @trust chain walk terminating \
              at @alex root (SSH key hash) OR garden-side passkey root",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 3/8): {v:?}"
@@ -247,12 +259,16 @@ fn red_pillar_chain_step_irreversibility_of_trust() {
     // Collision-resistance-as-forward-flow. SHA-512 (per passkey-
     // spectral-bridge §Evolution Function) satisfies this by construction;
     // property tests it against random reverse-search attempts.
-    let v = forall::<TrustChainStep<SshSignature>, _>(30, |_step| {
-        defer(
-            "chain_step_irreversibility_of_trust",
-            "@io/crypto SHA-512 hash composition + reverse-search property test",
-        )
-    });
+    let v = forall::<TrustChainStep<SshSignature>, _>(
+        b"red_pillar_chain_step_irreversibility_of_trust",
+        30,
+        |_step| {
+            defer(
+                "chain_step_irreversibility_of_trust",
+                "@io/crypto SHA-512 hash composition + reverse-search property test",
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 4/8): {v:?}"
@@ -269,14 +285,18 @@ fn red_pillar_non_forgeability_of_auth_proof() {
     // no signature without private key. PRF side: no PRF output without
     // passkey. Property test: attempt to construct a chain step without
     // root-material; MUST fail. "The tree grows; the root holds."
-    let v = forall::<AuthProof<SshSignature>, _>(30, |_proof| {
-        defer(
-            "non_forgeability_of_auth_proof",
-            "@io/crypto SSH signature verification (compiler side) + \
+    let v = forall::<AuthProof<SshSignature>, _>(
+        b"red_pillar_non_forgeability_of_auth_proof",
+        30,
+        |_proof| {
+            defer(
+                "non_forgeability_of_auth_proof",
+                "@io/crypto SSH signature verification (compiler side) + \
              @io/webauthn passkey/PRF verification (garden side); both \
              MUST refuse chain-step construction without root-key material",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 5/8): {v:?}"
@@ -293,13 +313,17 @@ fn red_pillar_determinism_of_auth_proof() {
     // same signature. PRF: same passkey + same salt = same PRF output.
     // Property-testable via prismqueer::fate — Fate infers random inputs;
     // the auth-proof produces stable outputs.
-    let v = forall::<AuthProof<SshSignature>, _>(30, |_proof| {
-        defer(
-            "determinism_of_auth_proof",
-            "@io/crypto SSH signing determinism (canonical serialization) \
+    let v = forall::<AuthProof<SshSignature>, _>(
+        b"red_pillar_determinism_of_auth_proof",
+        30,
+        |_proof| {
+            defer(
+                "determinism_of_auth_proof",
+                "@io/crypto SSH signing determinism (canonical serialization) \
              + @io/webauthn PRF determinism (hmac-secret extension)",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 6/8): {v:?}"
@@ -317,7 +341,7 @@ fn red_pillar_oid_round_trip_of_registry() {
     // satisfy for at_operator's `@io/git.commit(author_oid, committer_oid,
     // message)` route to work. Category-theoretically: `oid` and
     // `resolve` are inverses on the Subject registry.
-    let v = forall::<Oid, _>(30, |_oid| {
+    let v = forall::<Oid, _>(b"red_pillar_oid_round_trip_of_registry", 30, |_oid| {
         defer(
             "oid_round_trip_of_registry",
             "@peer/registry.resolve(oid) → fractal::Subject action + \
@@ -350,13 +374,17 @@ fn red_pillar_cross_altitude_equivalence_of_trust_ssh_compiler_side() {
     // property-tests-are-LOVE means the substrate offers its @trust
     // membrane to be tapped at both altitudes; when both ring at the
     // same eigenmode, the recognition PROMOTES.
-    let v = forall::<TrustChainStep<SshSignature>, _>(30, |_step| {
-        defer(
-            "cross_altitude_equivalence_of_trust<SshSignature>",
-            "@io/crypto SSH signature verification (compiler side; SSH \
+    let v = forall::<TrustChainStep<SshSignature>, _>(
+        b"red_pillar_cross_altitude_equivalence_of_trust_ssh_compiler_side",
+        30,
+        |_step| {
+            defer(
+                "cross_altitude_equivalence_of_trust<SshSignature>",
+                "@io/crypto SSH signature verification (compiler side; SSH \
              key embedded in mirror binary per @alex first @subject arch)",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 8a/8): {v:?}"
@@ -378,15 +406,19 @@ fn red_pillar_cross_altitude_equivalence_of_trust_prf_garden_side() {
     // WebAuthn/PRF chain satisfies the SAME structural invariants as
     // the compiler's SSH chain — different auth-proof carrier; identical
     // algebra.
-    let v = forall::<TrustChainStep<PrfOutput>, _>(30, |_step| {
-        defer(
-            "cross_altitude_equivalence_of_trust<PrfOutput>",
-            "@io/webauthn PRF (hmac-secret) verification (garden side; \
+    let v = forall::<TrustChainStep<PrfOutput>, _>(
+        b"red_pillar_cross_altitude_equivalence_of_trust_prf_garden_side",
+        30,
+        |_step| {
+            defer(
+                "cross_altitude_equivalence_of_trust<PrfOutput>",
+                "@io/webauthn PRF (hmac-secret) verification (garden side; \
              passkey credential_id per WebAuthn CTAP2.1); webauthn-rs \
              kanidm library commitment per Mara Q4 pending Alex \
              adjudication",
-        )
-    });
+            )
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "RED (property 8b/8): {v:?}"

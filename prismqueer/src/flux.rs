@@ -853,9 +853,14 @@ pub mod pillar {
 
     /// The property-based-testing runner.
     ///
-    /// Draws `n` independent samples of `T`, applies `f` to each, and
-    /// folds the resulting verdicts via [`PropertyVerdict::merge_with`]
-    /// starting from `Pass`.
+    /// Draws `n` samples of `T`, applies `f` to each, and folds the
+    /// resulting verdicts via [`PropertyVerdict::merge_with`] starting
+    /// from `Pass`.
+    ///
+    /// Deterministic: iteration `i` draws from
+    /// [`Sample::from_bytes`]`(sha256(seed || i))`. The same seed gives
+    /// the same draws, so the same verdict and the same counterexample;
+    /// a failure replays from the seed that produced it.
     ///
     /// Semantics (inherited from `merge_with`):
     /// - `Fail` dominates: any counterexample → unified `Fail`
@@ -874,14 +879,17 @@ pub mod pillar {
     /// Per Mara witnessed-property-inference spec (mirror repo)
     /// §7.3 + §9.2 Arc 2. First liquid floor board for Void's default
     /// @peer to stand on at rust/ altitude.
-    pub fn forall<T, F>(n: usize, mut f: F) -> PropertyVerdict
+    pub fn forall<T, F>(seed: &[u8], n: usize, mut f: F) -> PropertyVerdict
     where
         T: Arbitrary,
         F: FnMut(T) -> PropertyVerdict,
     {
         let mut unified = PropertyVerdict::Pass;
-        for _ in 0..n {
-            let mut sample = Sample::new();
+        for i in 0..n as u64 {
+            let mut hasher = Sha256::new();
+            hasher.update(seed);
+            hasher.update(i.to_le_bytes());
+            let mut sample = Sample::from_bytes(hasher.finalize().to_vec());
             let value = T::arbitrary(&mut sample);
             let verdict = f(value);
             unified.merge_with(&verdict);

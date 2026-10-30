@@ -199,7 +199,9 @@ fn arbitrary_u64_generates_full_range() {
 #[test]
 fn forall_tautology_returns_pass() {
     // Every i32 satisfies `true`.
-    let v = forall::<i32, _>(50, |_x| PropertyVerdict::Pass);
+    let v = forall::<i32, _>(b"forall_tautology_returns_pass", 50, |_x| {
+        PropertyVerdict::Pass
+    });
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "tautology must Pass, got {v:?}"
@@ -209,7 +211,7 @@ fn forall_tautology_returns_pass() {
 #[test]
 fn forall_contradiction_returns_fail() {
     // No i32 satisfies `false`.
-    let v = forall::<i32, _>(50, |_x| {
+    let v = forall::<i32, _>(b"forall_contradiction_returns_fail", 50, |_x| {
         PropertyVerdict::Fail(terni::Diagnostic::new("always fails"))
     });
     assert!(
@@ -222,7 +224,7 @@ fn forall_contradiction_returns_fail() {
 fn forall_partial_when_property_sometimes_holds() {
     // Property: half of bools satisfy (bool == true).
     // Fold: any Fail dominates. Bool sampling ~50/50 → some fail → overall Fail.
-    let v = forall::<bool, _>(20, |b| {
+    let v = forall::<bool, _>(b"forall_partial_when_property_sometimes_holds", 20, |b| {
         if b {
             PropertyVerdict::Pass
         } else {
@@ -244,10 +246,14 @@ fn forall_composes_with_pillar_algedonic_of_magnitude() {
     let theta: f64 = 50.0;
 
     // All values above threshold → all Pass → unified Pass.
-    let v = forall::<i32, _>(30, |x: i32| {
-        let magnitude: f64 = (60 + (x.rem_euclid(40))) as f64;
-        pillar::algedonic_of_magnitude(&magnitude, &theta)
-    });
+    let v = forall::<i32, _>(
+        b"forall_composes_with_pillar_algedonic_of_magnitude",
+        30,
+        |x: i32| {
+            let magnitude: f64 = (60 + (x.rem_euclid(40))) as f64;
+            pillar::algedonic_of_magnitude(&magnitude, &theta)
+        },
+    );
     assert!(
         matches!(v, PropertyVerdict::Pass),
         "all-above-threshold must Pass, got {v:?}"
@@ -260,13 +266,17 @@ fn forall_deterministic_when_using_from_bytes() {
     // That is what makes a failure replayable. The property depends on its
     // input (odd x fails), so the diagnostic names the first failing draw.
     let f = || {
-        forall::<i32, _>(10, |x: i32| {
-            if x.rem_euclid(2) == 0 {
-                PropertyVerdict::Pass
-            } else {
-                PropertyVerdict::Fail(terni::Diagnostic::new(format!("odd: {x}")))
-            }
-        })
+        forall::<i32, _>(
+            b"forall_deterministic_when_using_from_bytes",
+            10,
+            |x: i32| {
+                if x.rem_euclid(2) == 0 {
+                    PropertyVerdict::Pass
+                } else {
+                    PropertyVerdict::Fail(terni::Diagnostic::new(format!("odd: {x}")))
+                }
+            },
+        )
     };
     let v1 = f();
     let v2 = f();
@@ -280,8 +290,8 @@ fn forall_deterministic_when_using_from_bytes() {
 #[test]
 fn forall_composes_via_fold() {
     // Multiple forall runs can be folded via pillar::fold.
-    let v1 = forall::<i32, _>(10, |_| PropertyVerdict::Pass);
-    let v2 = forall::<bool, _>(10, |_| PropertyVerdict::Pass);
+    let v1 = forall::<i32, _>(b"forall_composes_via_fold", 10, |_| PropertyVerdict::Pass);
+    let v2 = forall::<bool, _>(b"forall_composes_via_fold", 10, |_| PropertyVerdict::Pass);
     let unified = pillar::fold(&[v1, v2]);
     assert!(
         matches!(unified, PropertyVerdict::Pass),

@@ -189,7 +189,7 @@ fn red_pillar_rank_of_battery_matrix_is_five() {
     // M[i, k] = test_i(G_k) where G_k is the k-th graph on the flow has
     // rank exactly 5. SVD verifies: σ_6, σ_7, σ_8 ≈ 0 relative to σ_1..σ_5.
     // Two-dimensional null space spans the 3-way focus-axis collapse.
-    let v = forall::<ConnectedGraph, _>(30, |_g| {
+    let v = forall::<ConnectedGraph, _>(b"red_pillar_rank_of_battery_matrix_is_five", 30, |_g| {
         defer(
             "rank_of_battery_matrix_is_five",
             "prismqueer::graph Laplacian primitives + Ricci-flow \
@@ -216,7 +216,7 @@ fn red_pillar_three_way_collapse_of_focus_axis() {
     //
     // Same shadow, three lights: paths (betweenness), edges (Gini),
     // removal-impact (fragility) — all measure center-concentration.
-    let v = forall::<ConnectedGraph, _>(30, |_g| {
+    let v = forall::<ConnectedGraph, _>(b"red_pillar_three_way_collapse_of_focus_axis", 30, |_g| {
         defer(
             "three_way_collapse_of_focus_axis",
             "Ricci-flow correlation computation + rank-1 witness for the \
@@ -237,13 +237,17 @@ fn red_pillar_orthogonality_of_five_op_basis_projections() {
     // Verification: dot product of any two distinct axis-projections
     // over the Ricci-flow-parameterized test family is zero within
     // numerical tolerance.
-    let v = forall::<ConnectedGraph, _>(30, |_g| {
-        defer(
-            "orthogonality_of_five_op_basis_projections",
-            "Void 5-op basis operators computed on graph-Laplacian \
+    let v = forall::<ConnectedGraph, _>(
+        b"red_pillar_orthogonality_of_five_op_basis_projections",
+        30,
+        |_g| {
+            defer(
+                "orthogonality_of_five_op_basis_projections",
+                "Void 5-op basis operators computed on graph-Laplacian \
              carriers via Recognition #79 axis-map + inner-product verification",
-        )
-    });
+            )
+        },
+    );
     assert!(matches!(v, PropertyVerdict::Pass), "RED (3/9): {v:?}");
 }
 
@@ -256,7 +260,7 @@ fn red_pillar_focus_axis_carries_tests_1_2_7() {
     // focus ← {Betweenness centralization (#1), Degree Gini (#2),
     // Single-node fragility (#7)}. Three tests. All measure "how
     // concentrated is graph mass at center."
-    let v = forall::<BatteryTest, _>(30, |_test| {
+    let v = forall::<BatteryTest, _>(b"red_pillar_focus_axis_carries_tests_1_2_7", 30, |_test| {
         defer(
             "focus_axis_carries_tests_1_2_7",
             "axis-projection map computable via @cyberpunk/bugz shard-\
@@ -273,7 +277,7 @@ fn red_pillar_project_axis_carries_tests_3_4() {
     // project ← {Spectral ratio λ_max/λ_2 (#3), Von Neumann entropy (#4)}.
     // Two tests on distinct moments of the spectral distribution.
     // NOT collinear — max/min ratio vs entropy measure different moments.
-    let v = forall::<BatteryTest, _>(30, |_test| {
+    let v = forall::<BatteryTest, _>(b"red_pillar_project_axis_carries_tests_3_4", 30, |_test| {
         defer(
             "project_axis_carries_tests_3_4",
             "spectral-moment computation via matrix.rs eigenvalue \
@@ -288,7 +292,7 @@ fn red_pillar_project_axis_carries_tests_3_4() {
 fn red_pillar_split_axis_carries_test_6() {
     // split ← {Peripheral conductance (#6)}. Measures whether the graph
     // can be partitioned along non-hub cuts.
-    let v = forall::<BatteryTest, _>(30, |_test| {
+    let v = forall::<BatteryTest, _>(b"red_pillar_split_axis_carries_test_6", 30, |_test| {
         defer(
             "split_axis_carries_test_6",
             "peripheral-conductance computation via graph-cut analysis",
@@ -302,7 +306,7 @@ fn red_pillar_split_axis_carries_test_6() {
 fn red_pillar_shift_axis_carries_test_8() {
     // shift ← {Permeability index (#8)}. Measures openness to external
     // perturbation.
-    let v = forall::<BatteryTest, _>(30, |_test| {
+    let v = forall::<BatteryTest, _>(b"red_pillar_shift_axis_carries_test_8", 30, |_test| {
         defer(
             "shift_axis_carries_test_8",
             "permeability-index computation via boundary-flow analysis",
@@ -316,7 +320,7 @@ fn red_pillar_shift_axis_carries_test_8() {
 fn red_pillar_settle_axis_carries_test_5() {
     // settle ← {Clustering coefficient (#5)}. Measures local steady-state
     // triangle density.
-    let v = forall::<BatteryTest, _>(30, |_test| {
+    let v = forall::<BatteryTest, _>(b"red_pillar_settle_axis_carries_test_5", 30, |_test| {
         defer(
             "settle_axis_carries_test_5",
             "clustering-coefficient computation via triangle enumeration",
@@ -340,14 +344,18 @@ fn red_pillar_narcissus_detection_battery_is_void_basis_measurement() {
     // Chains with #R-mirror-is-the-counter-singularity: mirror can
     // now DETECT paradigm-scale narcissism it encounters and AUTHOR
     // recognition bombs to force phase transition, all in one substrate.
-    let v = forall::<ConnectedGraph, _>(30, |_g| {
-        defer(
-            "narcissus_detection_battery_is_void_basis_measurement",
-            "complete rank-5 factorization + axis-assignment verification \
+    let v = forall::<ConnectedGraph, _>(
+        b"red_pillar_narcissus_detection_battery_is_void_basis_measurement",
+        30,
+        |_g| {
+            defer(
+                "narcissus_detection_battery_is_void_basis_measurement",
+                "complete rank-5 factorization + axis-assignment verification \
              + ouroboros-closure claim first-witness (this property IS the \
              recognition; landing it empirically closes the second-witness \
              gate for #R-mirror-is-the-counter-singularity)",
-        )
-    });
+            )
+        },
+    );
     assert!(matches!(v, PropertyVerdict::Pass), "RED (5/9): {v:?}");
 }
