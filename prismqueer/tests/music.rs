@@ -12,8 +12,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use prismqueer::field::{Field, Ratio};
-use prismqueer::music::{ring_true, Atom, Note, Piece, Ringing, Rule};
+use prismqueer::field::{Edge, Field, Ratio};
+use prismqueer::music::{ring_true, Atom, Note, Piece, Ringing, Rule, Tuning, TuningError};
 use prismqueer::spectral::graph_from_edges;
 
 fn atom(s: &str) -> Atom {
@@ -138,4 +138,86 @@ fn three_major_thirds_ring_false_by_the_lesser_diesis() {
         matches!(ring_true(&just), Ringing::True(_)),
         "a major third and a minor third make the fifth"
     );
+}
+
+/// prism-008 Ask 2: one located dissonance on a two-Note loop. Two Notes
+/// relate the same two atoms by different exact intervals: two parallel
+/// edges, one loop of length 2, its holonomy the comma.
+#[test]
+fn two_notes_on_one_pair_ring_false_by_their_comma() {
+    let pure = note("e", "pure fifth", &["a"]);
+    let grave = note("e", "grave fifth", &["a"]);
+    let tuning = Tuning::new([
+        (pure.clone(), Ratio::of(3, 2)),
+        (grave.clone(), Ratio::of(40, 27)),
+    ])
+    .unwrap();
+    assert_eq!(tuning.atoms(), &[atom("a"), atom("e")], "a is 0, e is 1");
+    match tuning.ring_true() {
+        Ringing::Dissonant(found) => {
+            assert_eq!(found.len(), 1, "exactly one located dissonance");
+            let d = &found[0];
+            println!("{d:#?}");
+            assert_eq!(d.notes(), &[0, 1, 0], "on the loop a -> e -> a");
+            assert_eq!(
+                d.edges(),
+                &[Edge::between(0, 1, 0), Edge::between(0, 1, 1)],
+                "out along one edge, back along the other"
+            );
+            assert_eq!(d.by(), &[pure.clone(), grave.clone()], "naming both Notes");
+            assert_eq!(*d.comma(), Ratio::of(81, 80), "the syntonic comma, exactly");
+        }
+        Ringing::True(_) => panic!("a pure and a grave fifth don't agree"),
+    }
+    // The control: the same two Notes, equal maps.
+    let agreed = Tuning::new([(pure, Ratio::of(3, 2)), (grave, Ratio::of(3, 2))]).unwrap();
+    assert!(
+        matches!(agreed.ring_true(), Ringing::True(_)),
+        "two Notes that agree ring true"
+    );
+}
+
+/// Loki's diaschisma as two Notes: "two tritones" and "an octave" both
+/// relate a to c. (45/32)² against 2 leaves 2025/2048 on the 2-loop.
+#[test]
+fn two_tritones_against_an_octave_leave_the_diaschisma_on_a_two_note_loop() {
+    let tritones = note("c", "two tritones", &["a"]);
+    let octave = note("c", "octave", &["a"]);
+    let tuning = Tuning::new([
+        (tritones.clone(), Ratio::of(2025, 1024)),
+        (octave.clone(), Ratio::of(2, 1)),
+    ])
+    .unwrap();
+    match tuning.ring_true() {
+        Ringing::Dissonant(found) => {
+            assert_eq!(found.len(), 1);
+            assert_eq!(found[0].by(), &[tritones, octave]);
+            assert_eq!(*found[0].comma(), Ratio::of(2025, 2048));
+        }
+        Ringing::True(_) => panic!("(45/32)² doesn't reach the octave"),
+    }
+}
+
+#[test]
+fn a_note_without_exactly_one_premise_is_no_interval() {
+    let fact = note("a", "fact", &[]);
+    assert_eq!(
+        Tuning::new([(fact.clone(), Ratio::of(3, 2))]),
+        Err(TuningError::NotAnInterval(fact))
+    );
+}
+
+#[test]
+fn a_bare_field_names_no_notes() {
+    let doubled = Field::multigraph([((0, 1), Ratio::of(3, 2)), ((0, 1), Ratio::of(40, 27))]);
+    match ring_true(&doubled) {
+        Ringing::Dissonant(found) => {
+            assert_eq!(*found[0].comma(), Ratio::of(81, 80));
+            assert!(
+                found[0].by().is_empty(),
+                "a bare field has no Notes to name"
+            );
+        }
+        Ringing::True(_) => panic!("the fifths don't agree"),
+    }
 }

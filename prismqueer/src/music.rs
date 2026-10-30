@@ -18,7 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::field::{check_flat, Field, Flat, Flatness, Graph, Ratio};
+use crate::field::{check_flat, Edge, Field, Flat, Flatness, Graph, Ratio};
 use crate::spectral::kleinos::VertexId;
 
 /// A fact or a derived atom, by name.
@@ -178,6 +178,56 @@ impl Dissonance {
     /// How far it falls short of closing, exactly.
     pub fn comma(&self) -> &Ratio {
         &self.comma
+    }
+    /// The edges around the loop.
+    pub fn edges(&self) -> &[Edge] {
+        &[]
+    }
+    /// The Notes around the loop.
+    pub fn by(&self) -> &[Note] {
+        &[]
+    }
+}
+
+/// Notes with exact intervals.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tuning {
+    atoms: Vec<Atom>,
+    field: Field<Graph, Ratio>,
+}
+
+/// Why a tuning couldn't be built.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TuningError {
+    /// This Note doesn't have exactly one premise.
+    NotAnInterval(Note),
+}
+
+impl Tuning {
+    /// A tuning from Notes and their intervals.
+    pub fn new(intervals: impl IntoIterator<Item = (Note, Ratio)>) -> Result<Self, TuningError> {
+        let intervals: Vec<(Note, Ratio)> = intervals.into_iter().collect();
+        let atoms: Vec<Atom> = intervals
+            .iter()
+            .flat_map(|(n, _)| n.premises.iter().chain([&n.head]).cloned())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let id = |a: &Atom| atoms.binary_search(a).expect("collected") as VertexId;
+        let field = Field::multigraph(intervals.iter().filter_map(|(n, r)| {
+            n.premises
+                .first()
+                .map(|p| ((id(p), id(&n.head)), r.clone()))
+        }));
+        Ok(Tuning { atoms, field })
+    }
+    /// The atoms.
+    pub fn atoms(&self) -> &[Atom] {
+        &self.atoms
+    }
+    /// Does it ring true?
+    pub fn ring_true(&self) -> Ringing {
+        ring_true(&self.field)
     }
 }
 

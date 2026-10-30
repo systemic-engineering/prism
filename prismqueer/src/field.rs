@@ -321,6 +321,53 @@ pub enum FieldError {
     Missing(EdgeKey),
     /// This edge isn't in the graph.
     Outside(EdgeKey),
+    /// A face names this pair by its ends, but it has parallel edges.
+    Parallel(EdgeKey),
+    /// A bigon's two edges don't join the same pair.
+    Apart(EdgeKey, EdgeKey),
+}
+
+/// One edge of a graph base: its ends, and which of the parallel edges
+/// between them it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Edge {
+    ends: EdgeKey,
+    nth: usize,
+}
+
+impl Edge {
+    /// The `nth` edge between `a` and `b`.
+    pub fn between(a: VertexId, b: VertexId, nth: usize) -> Self {
+        let ends = if a <= b { (a, b) } else { (b, a) };
+        Edge { ends, nth }
+    }
+    /// Its ends, smaller first.
+    pub fn ends(&self) -> EdgeKey {
+        self.ends
+    }
+    /// Which of the parallel edges between its ends.
+    pub fn nth(&self) -> usize {
+        self.nth
+    }
+}
+
+impl Graph {
+    /// The vertices.
+    pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
+        self.0.vertices()
+    }
+    /// The edges.
+    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.0.edges().map(|(a, b)| Edge::between(a, b, 0))
+    }
+    /// How many edges join this pair.
+    pub fn multiplicity(&self, ends: EdgeKey) -> usize {
+        usize::from(self.0.contains_edge(ends))
+    }
+    /// b₁.
+    pub fn cycle_rank(&self) -> usize {
+        0
+    }
 }
 
 impl<V> Field<Point, V> {
@@ -360,7 +407,30 @@ impl<B, V: Lattice> Field<B, V> {
     }
 }
 
+impl<V> Field<Graph, V> {
+    /// The graph base.
+    pub fn graph(&self) -> &Graph {
+        &self.base
+    }
+}
+
 impl<V: Group> Field<Graph, V> {
+    /// A connection on a multigraph: every given transport is its own edge.
+    pub fn multigraph(given: impl IntoIterator<Item = (EdgeKey, V)>) -> Self {
+        let given: Vec<(EdgeKey, V)> = given.into_iter().collect();
+        let keys: Vec<EdgeKey> = given.iter().map(|&(k, _)| k).collect();
+        let shape = crate::spectral::kleinos::graph_from_edges(&keys);
+        Self::transports(&shape, given).expect("every edge given")
+    }
+
+    /// Declare filled bigons.
+    pub fn with_bigons(
+        self,
+        _bigons: impl IntoIterator<Item = [Edge; 2]>,
+    ) -> Result<Self, FieldError> {
+        Ok(self)
+    }
+
     /// A connection: one transport per edge, given in either orientation (a
     /// transport given on `(v, u)` is stored inverted on `(u, v)`).
     pub fn transports(
@@ -476,6 +546,10 @@ impl<V> Loop<V> {
     /// The transport around the loop, composed in path order.
     pub fn holonomy(&self) -> &V {
         &self.holonomy
+    }
+    /// The edges around the loop.
+    pub fn edges(&self) -> &[Edge] {
+        &[]
     }
 }
 
