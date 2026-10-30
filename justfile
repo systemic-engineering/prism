@@ -8,14 +8,19 @@ export CARGO_TARGET_DIR := justfile_directory() / "target"
 # Static analysis only: formatting + clippy. Fast; runs no tests.
 check: fmt-check lint
 
-# mode=coverage runs the suite once, instrumented, gated on line coverage,
-# then the doctests (llvm-cov skips them).
+# mode=plain is the dev loop: cargo, incremental, in target/.
 #
-# Ratchet: 94.08% of lines measured 2026-10-29 under lapack,fate. Raise it as
+# mode=coverage is the push gate: the flake's checks.coverage (the suite once,
+# instrumented, gated on line coverage) and checks.doctest (llvm-cov skips
+# doctests). They are nix derivations over the tracked sources, so a push whose
+# crate sources were already gated (a docs edit, a merge of a tested branch)
+# is a cache hit: about 5s instead of a full run. The ratchet and the feature
+# set live in flake.nix (coverageFloor, features). Raise the ratchet as
 # coverage rises; never lower it.
 #
 # OPENBLAS_NUM_THREADS=1: tests already run in parallel; OpenBLAS threading
-# inside each dsyev oversubscribes the cores and made the suite slower.
+# inside each dsyev oversubscribes the cores and made the suite slower. The
+# flake sets the same for its checks.
 #
 # Run the suite: mode=plain (cargo test) or mode=coverage (the push gate)
 test mode="plain":
@@ -26,8 +31,8 @@ test mode="plain":
       plain)
         nix develop -c cargo test --workspace --features lapack,fate ;;
       coverage)
-        nix develop -c cargo llvm-cov --workspace --features lapack,fate --fail-under-lines 94
-        nix develop -c cargo test --doc --workspace --features lapack,fate ;;
+        sys=$(nix eval --impure --raw --expr builtins.currentSystem)
+        nix build --no-link -L ".#checks.$sys.coverage" ".#checks.$sys.doctest" ;;
       *)
         echo "✖ unknown test mode '{{mode}}' (plain | coverage)" >&2
         exit 2 ;;
@@ -35,6 +40,15 @@ test mode="plain":
 
 # What the push hook runs: the suite once, under coverage.
 pre-push: (test "coverage")
+
+# Every check the flake defines (fmt, clippy, test, coverage, doctest,
+# invariance): what CI runs.
+flake-check:
+    nix flake check -L
+
+# Docs, the justfile and tests stay outside the packages' sources (prism-009).
+invariance:
+    nix/invariance.sh
 
 # Build workspace
 build:
