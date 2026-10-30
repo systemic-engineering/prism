@@ -37,6 +37,15 @@ fn p() -> Piece {
     ])
 }
 
+#[test]
+fn a_piece_is_empty_only_without_notes() {
+    let silence = Piece::from([] as [Note; 0]);
+    assert!(silence.is_empty());
+    assert_eq!(silence.len(), 0);
+    assert!(!p().is_empty());
+    assert!(!silence.compose(&p()).is_empty());
+}
+
 /// Q = {r3: c ← a}.
 fn q() -> Piece {
     Piece::from([note("c", "r3", &["a"])])

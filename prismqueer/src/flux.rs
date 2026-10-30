@@ -896,6 +896,26 @@ pub mod pillar {
         }
         unified
     }
+
+    #[cfg(test)]
+    mod engine_tests {
+        use super::{mutate, Sample};
+
+        #[test]
+        fn a_mutation_flips_exactly_one_bit_and_not_only_the_low_one() {
+            let buffer = [0u8; 8];
+            let mut rng = Sample::from_bytes(b"engine_tests::mutate".to_vec());
+            let mut bits = std::collections::BTreeSet::new();
+            for _ in 0..64 {
+                let m = mutate(&buffer, &mut rng);
+                assert_eq!(m.len(), buffer.len());
+                let flipped: u32 = m.iter().map(|b| b.count_ones()).sum();
+                assert_eq!(flipped, 1, "one bit flipped in {m:?}");
+                bits.extend(m.iter().filter(|b| **b != 0).map(|b| b.trailing_zeros()));
+            }
+            assert!(bits.len() > 1, "only bits {bits:?} were ever flipped");
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────

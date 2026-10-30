@@ -63,6 +63,24 @@ fn exact_groups_keep_the_group_laws() {
 }
 
 #[test]
+fn a_residue_is_read_mod_n() {
+    assert_eq!(Zn::<12>::new(19).value(), 7);
+    assert_eq!(Zn::<12>::new(12).value(), 0);
+    assert_eq!(Zn::<12>::new(7).inverse().value(), 5);
+}
+
+#[test]
+fn bool_is_the_lattice_of_and() {
+    assert!(bool::top());
+    for a in [false, true] {
+        assert_eq!(a.meet(&bool::top()), a, "top is the unit of meet");
+        for b in [false, true] {
+            assert_eq!(a.meet(&b), a && b);
+        }
+    }
+}
+
+#[test]
 fn permutations_do_not_commute() {
     let a = Perm::new(vec![1, 0, 2]);
     let b = Perm::new(vec![0, 2, 1]);

@@ -227,6 +227,26 @@ fn the_search_stops_moving_when_nothing_new_appears() {
 }
 
 #[test]
+fn among_tied_scores_the_first_seen_is_kept() {
+    // A constant measure ties every run: the best stays the first seed.
+    match steer::<u64>(
+        seeds(0..5),
+        Budget(5),
+        Patience(10),
+        |_| 1.0,
+        |_| true,
+        |x| prismqueer::oid::Oid::hash(&x.to_le_bytes()),
+    ) {
+        Imperfect::Partial(run, _) => {
+            assert_eq!(run.best, Some(0u64.to_le_bytes().to_vec()));
+            assert_eq!(run.best_score, Some(1.0));
+            assert_eq!(run.stop, Stop::Budget);
+        }
+        other => panic!("expected a clean Partial, got {other:?}"),
+    }
+}
+
+#[test]
 fn a_search_that_keeps_finding_new_values_runs_out_of_budget() {
     // Every run is addressed afresh, so something new always appears. It
     // must never be called Saturated, however small the Patience.

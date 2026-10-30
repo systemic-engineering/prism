@@ -220,6 +220,25 @@ fn forall_contradiction_returns_fail() {
     );
 }
 
+#[test]
+fn arbitrary_i64_and_u32_read_the_buffer_little_endian() {
+    let bytes = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x88];
+    let mut s = Sample::from_bytes(bytes.clone());
+    assert_eq!(i64::arbitrary(&mut s), -0x77f8_f9fa_fbfc_fdff);
+    let mut s = Sample::from_bytes(bytes);
+    assert_eq!(u32::arbitrary(&mut s), 0x0403_0201);
+    assert_eq!(u32::arbitrary(&mut s), 0x8807_0605);
+}
+
+/// SplitMix64's known answer (Steele, Lea, Flood 2014): from state 0 the
+/// first output is 0xE220A8397B1DCDAF, the second 0x6E789E6AA1B965F4. An
+/// empty buffer seeds 0, so the first draw past it is that first output.
+#[test]
+fn an_exhausted_sample_extends_with_splitmix64() {
+    let mut s = Sample::from_bytes(Vec::new());
+    assert_eq!(u64::arbitrary(&mut s), 0xE220_A839_7B1D_CDAF);
+}
+
 /// `forall`'s documented derivation, rebuilt by hand: draw `i` is read from
 /// `Sample::from_bytes(sha256(seed || i as u64 little-endian))`.
 fn derived<T: Arbitrary>(seed: &[u8], n: u64) -> Vec<T> {
