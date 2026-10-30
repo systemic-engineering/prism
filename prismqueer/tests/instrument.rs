@@ -255,13 +255,54 @@ fn bleed_lives_exactly_on_the_solo_boundary() {
             boundary(&g, region),
             "bleed off the boundary for {edges:?}"
         );
-        for x in bleed.matrix() {
+        // Independently: [D, S]_ij = D_ij (w_j − w_i), with w the indicator
+        // on pitches and the endpoint mean on intervals.
+        let vertices: Vec<u64> = g.vertices().collect();
+        let mut w: Vec<f64> = vertices
+            .iter()
+            .map(|v| if region.contains(v) { 1.0 } else { 0.0 })
+            .collect();
+        let at = |v: u64| vertices.iter().position(|&x| x == v).unwrap();
+        let mean: Vec<f64> = g
+            .edges()
+            .map(|(u, v)| (w[at(u)] + w[at(v)]) / 2.0)
+            .collect();
+        w.extend(mean);
+        let n = w.len();
+        let m = bleed.matrix();
+        assert_eq!(m.len(), n * n, "bleed is n × n for {edges:?}");
+        for i in 0..n {
+            for j in 0..n {
+                assert_eq!(
+                    m[i * n + j],
+                    d.matrix()[i * n + j] * (w[j] - w[i]),
+                    "bleed[{i}][{j}] for {edges:?}"
+                );
+            }
+        }
+        for x in m {
             assert!(
                 [0.0, 0.5, -0.5].contains(x),
                 "bleed entry {x} is not exactly 0 or ±1/2"
             );
         }
+        // Each crossing interval bleeds into both its endpoints, both ways.
+        let nonzero = m.iter().filter(|x| **x != 0.0).count();
+        assert_eq!(nonzero, 4 * boundary(&g, region).len(), "for {edges:?}");
     }
+
+    // By hand, on the path 0–1–2–3 with {0, 1} solo: the basis is
+    // 0, 1, 2, 3, (0,1), (1,2), (2,3). Row (1,2) = 5 reads D = −1 at vertex 1,
+    // where w = 1 against the interval's ½: −1 · (1 − ½) = −½.
+    let (_, d) = instrument(&[(0, 1), (1, 2), (2, 3)]);
+    let bleed = d.bleed(&Solo::new([0, 1])).expect("on the complex");
+    let m = bleed.matrix();
+    let (n, v1, v2, e12) = (7, 1, 2, 5);
+    assert_eq!(m.len(), n * n);
+    assert_eq!(m[e12 * n + v1], -0.5);
+    assert_eq!(m[v1 * n + e12], 0.5);
+    assert_eq!(m[e12 * n + v2], -0.5);
+    assert_eq!(m[v2 * n + e12], 0.5);
 }
 
 #[test]
