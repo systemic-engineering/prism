@@ -20,6 +20,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::room::{self, Edges, Map, Modes, RoomError, Sum, Vertices};
 use crate::spectral::commutator::Unmeasured;
 use crate::spectral::kleinos::{EdgeKey, Graph, VertexId};
 use crate::spectral::settle::Time;
@@ -271,15 +272,22 @@ fn certify(
     }
 }
 
+/// C⁰ ⊕ C¹: where D lives.
+type Chains = Sum<Vertices, Edges>;
+
 /// The Hodge–Dirac operator of a graph, with its eigensystem.
+///
+/// D is [`room::dirac`], measured once; its modes come from
+/// [`Symmetric::decompose`](crate::room::Symmetric::decompose) and are read
+/// only through [`Modes::vector`]. The coordinate maps below are the room's
+/// basis order: vertices first, then edges in canonical order.
 pub struct Instrument {
     vertices: BTreeMap<VertexId, usize>,
     edges: BTreeMap<EdgeKey, usize>,
+    dirac: Map<Chains, Chains, f64>,
+    /// D row-major, for [`Instrument::matrix`] only: nothing inside reads it.
     matrix: Vec<f64>,
-    values: Vec<f64>,
-    /// Eigenvectors as columns: component c of eigenvector k is
-    /// `vectors[c * n + k]` (per `ffi::eigensystem`).
-    vectors: Vec<f64>,
+    modes: Modes<Chains>,
 }
 
 impl Instrument {
@@ -295,28 +303,47 @@ impl Instrument {
             .enumerate()
             .map(|(k, e)| (e, n0 + k))
             .collect();
-        let n = n0 + edges.len();
-        let mut matrix = vec![0.0_f64; n * n];
-        for (&(u, v), &k) in &edges {
-            // (δs)(u, v) = s(v) − s(u); D holds δ below and δ* above.
-            for (w, sign) in [(u, -1.0), (v, 1.0)] {
-                let i = vertices[&w];
-                matrix[k * n + i] = sign;
-                matrix[i * n + k] = sign;
-            }
-        }
-        let (values, vectors) = crate::ffi::eigensystem(n, &matrix).map_err(Unmeasured)?;
+        // (δs)(u, v) = s(v) − s(u); D holds δ below and δ* above.
+        let dirac = room::dirac(graph).measure();
+        let modes = dirac
+            .clone()
+            .symmetric()
+            .expect("D = δ + δ* is self-adjoint")
+            .decompose()
+            .map_err(|e| match e {
+                RoomError::Unmeasured(info) => Unmeasured(info),
+                other => unreachable!("decompose only fails to measure: {other:?}"),
+            })?;
+        let n = dirac.to().dim();
+        let matrix = (0..n)
+            .flat_map(|i| (0..n).map(move |j| (i, j)))
+            .map(|(i, j)| *dirac.entry(i, j).expect("inside D"))
+            .collect();
         Ok(Self {
             vertices,
             edges,
+            dirac,
             matrix,
-            values,
-            vectors,
+            modes,
         })
     }
 
     fn dim(&self) -> usize {
         self.vertices.len() + self.edges.len()
+    }
+
+    /// Entry `(row, col)` of D.
+    fn d(&self, row: usize, col: usize) -> f64 {
+        *self.dirac.entry(row, col).expect("inside D")
+    }
+
+    /// The modes as (eigenvalue, eigenvector), in spectrum order.
+    fn modes(&self) -> impl Iterator<Item = (f64, &[f64])> {
+        self.modes
+            .spectrum()
+            .iter()
+            .copied()
+            .zip(self.modes.vectors())
     }
 
     /// D, row-major, vertices first, then edges in canonical order.
@@ -326,7 +353,7 @@ impl Instrument {
 
     /// The spectrum of D.
     pub fn eigenvalues(&self) -> &[f64] {
-        &self.values
+        self.modes.spectrum()
     }
 
     /// dim ker D = b₀ + b₁: components plus independent cycles.
@@ -335,17 +362,19 @@ impl Instrument {
     /// measured spectrum separates at the proven gap, `Partial(count,
     /// ambiguous magnitudes)` when it doesn't. Never a count from a threshold.
     pub fn kernel_dimension(&self) -> terni::Imperfect<usize, std::convert::Infallible, Vec<f64>> {
-        certify(&self.values, self.betti(), self.vertices.len(), self.dim())
+        certify(
+            self.modes.spectrum(),
+            self.betti(),
+            self.vertices.len(),
+            self.dim(),
+        )
     }
 
     /// D x, exactly: an assertion's question lands on the edges, an edge
     /// cochain's answer lands on the vertices.
     pub fn question(&self, x: &Cochain) -> Result<Cochain, Outside> {
         let x = self.dense(x)?;
-        let n = self.dim();
-        let y: Vec<f64> = (0..n)
-            .map(|i| (0..n).map(|j| self.matrix[i * n + j] * x[j]).sum())
-            .collect();
+        let y = self.dirac.apply(&x).expect("dense is D's dimension");
         Ok(self.sparse(&y))
     }
 
@@ -376,15 +405,18 @@ impl Instrument {
     pub fn bleed(&self, solo: &Solo) -> Result<Bleed, Outside> {
         let w = self.weights(solo)?;
         let n = self.dim();
-        let matrix: Vec<f64> = (0..n * n)
-            .map(|ij| self.matrix[ij] * (w[ij % n] - w[ij / n]))
+        // [D, W]_ij = D_ij (w_j − w_i), one row per dimension of the room.
+        let rows: Vec<Vec<f64>> = (0..n)
+            .map(|i| (0..n).map(|j| self.d(i, j) * (w[j] - w[i])).collect())
             .collect();
         let edges = self
             .edges
             .iter()
-            .filter(|(_, &k)| (0..n).any(|j| matrix[k * n + j] != 0.0))
+            .filter(|(_, &k)| rows[k].iter().any(|&b| b != 0.0))
             .map(|(&e, _)| e)
             .collect();
+        // Bleed's public matrix is row-major.
+        let matrix = rows.into_iter().flatten().collect();
         Ok(Bleed { matrix, edges })
     }
 
@@ -415,14 +447,12 @@ impl Instrument {
             return Err(Outside::NotAnInterval(v));
         }
         let dense = self.dense(x)?;
-        let n = self.dim();
-        let mut by_size: Vec<usize> = (0..self.values.len()).collect();
-        by_size.sort_by(|&a, &b| self.values[a].abs().total_cmp(&self.values[b].abs()));
-        let mut harmonic = vec![0.0_f64; n];
-        for &k in by_size.iter().take(self.betti()) {
-            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
+        let mut by_size: Vec<(f64, &[f64])> = self.modes().collect();
+        by_size.sort_by(|a, b| a.0.abs().total_cmp(&b.0.abs()));
+        let mut harmonic = vec![0.0_f64; self.dim()];
+        for &(_, v) in by_size.iter().take(self.betti()) {
             let weight: f64 = v.iter().zip(&dense).map(|(a, b)| a * b).sum();
-            for (h, vc) in harmonic.iter_mut().zip(&v) {
+            for (h, vc) in harmonic.iter_mut().zip(v) {
                 *h += weight * vc;
             }
         }
@@ -447,23 +477,26 @@ impl Instrument {
     pub fn restrict(&self, window: &Window, x: &Cochain) -> Result<Restriction, Outside> {
         let dense = self.dense(x)?;
         let n = self.dim();
-        let scale = self.values.iter().fold(1.0_f64, |m, v| m.max(v.abs()));
+        let scale = self
+            .modes
+            .spectrum()
+            .iter()
+            .fold(1.0_f64, |m, v| m.max(v.abs()));
         let error = 16.0 * f64::EPSILON * n as f64 * scale;
         let mut kept = vec![0.0_f64; n];
         let mut erased = vec![0.0_f64; n];
         let mut lossless = true;
-        for (k, &l) in self.values.iter().enumerate() {
+        for (l, v) in self.modes() {
             if (l - window.low).abs() <= error || (l - window.high).abs() <= error {
                 return Err(Outside::Straddles(l));
             }
-            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
             let weight: f64 = v.iter().zip(&dense).map(|(a, b)| a * b).sum();
             let inside = window.low <= l && l <= window.high;
             if !inside && weight != 0.0 {
                 lossless = false;
             }
             let target = if inside { &mut kept } else { &mut erased };
-            for (t, vc) in target.iter_mut().zip(&v) {
+            for (t, vc) in target.iter_mut().zip(v) {
                 *t += weight * vc;
             }
         }
@@ -510,12 +543,10 @@ impl Instrument {
 
     /// f(D) x through the eigenbasis.
     fn apply(&self, x: &[f64], f: impl Fn(f64) -> f64) -> Vec<f64> {
-        let n = self.dim();
-        let mut y = vec![0.0_f64; n];
-        for (k, &l) in self.values.iter().enumerate() {
-            let v: Vec<f64> = (0..n).map(|c| self.vectors[c * n + k]).collect();
+        let mut y = vec![0.0_f64; self.dim()];
+        for (l, v) in self.modes() {
             let weight = f(l) * v.iter().zip(x).map(|(a, b)| a * b).sum::<f64>();
-            for (yc, vc) in y.iter_mut().zip(&v) {
+            for (yc, vc) in y.iter_mut().zip(v) {
                 *yc += weight * vc;
             }
         }
