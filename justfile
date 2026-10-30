@@ -9,10 +9,14 @@ check: fmt-check lint
 # Ratchet: 94.08% of lines measured 2026-10-29 under lapack,fate. Raise it as
 # coverage rises; never lower it.
 #
+# OPENBLAS_NUM_THREADS=1: tests already run in parallel; OpenBLAS threading
+# inside each dsyev oversubscribes the cores and made the suite slower.
+#
 # Run the suite: mode=plain (cargo test) or mode=coverage (the push gate)
 test mode="plain":
     #!/usr/bin/env bash
     set -euo pipefail
+    export OPENBLAS_NUM_THREADS=1
     case "{{mode}}" in
       plain)
         nix develop -c cargo test --workspace --features lapack,fate ;;
