@@ -568,4 +568,112 @@ mod certify_tests {
             other => panic!("expected Partial(2, [0.01]), got {other:?}"),
         }
     }
+
+    // The fixtures below sit on the thresholds, not far from them. Scale and
+    // dim are powers of two, so the error bound 16 · ε · scale · dim is exact
+    // in any association order, and so is `gap - error`: a reading can sit
+    // exactly on the bound, and one ulp past it.
+    const SCALE: f64 = 2.0;
+    const DIM: usize = 4;
+
+    /// 16 · 2⁻⁵² · 2 · 4 = 2⁻⁴⁵.
+    fn error() -> f64 {
+        2f64.powi(-45)
+    }
+
+    /// One kernel mode `m` beside an exact zero, two modes far past any gap.
+    fn kernel_reading(m: f64) -> Imperfect<usize, std::convert::Infallible, Vec<f64>> {
+        certify(&[0.0, m, SCALE, SCALE], 2, 2, DIM)
+    }
+
+    #[test]
+    fn a_kernel_mode_at_the_error_bound_is_zero_and_one_ulp_past_it_is_not() {
+        let e = error();
+        assert_eq!(e, 16.0 * f64::EPSILON * SCALE * DIM as f64);
+        assert_eq!(kernel_reading(e / 2.0), Imperfect::Success(2));
+        assert_eq!(kernel_reading(e), Imperfect::Success(2), "the bound is in");
+        assert_eq!(
+            kernel_reading(e.next_up()),
+            Imperfect::Partial(2, vec![e.next_up()]),
+            "one ulp past the bound is out"
+        );
+        assert_eq!(
+            kernel_reading(2.0 * e),
+            Imperfect::Partial(2, vec![2.0 * e])
+        );
+    }
+
+    #[test]
+    fn the_error_bound_scales_from_a_floor_of_one() {
+        // Largest magnitude 0.5: the scale is max(0.5, 1) = 1, the bound 2⁻⁴⁶.
+        // n = 100 puts the gap (≈ 0.01) below the 0.5 modes.
+        let e = 2f64.powi(-46);
+        let read = |m: f64| certify(&[0.0, m, 0.5, 0.5], 2, 100, DIM);
+        assert_eq!(read(e), Imperfect::Success(2));
+        assert_eq!(read(e.next_up()), Imperfect::Partial(2, vec![e.next_up()]));
+    }
+
+    /// The proven gap for n vertices, from n(n−1) given as a literal.
+    const GAPS: [(usize, f64); 5] = [(2, 2.0), (3, 6.0), (4, 12.0), (5, 20.0), (10, 90.0)];
+
+    #[test]
+    fn the_gap_is_one_over_root_n_times_n_minus_one() {
+        for (n, n_n_minus_1) in GAPS {
+            let gap = 1.0 / f64::sqrt(n_n_minus_1);
+            let read = |m: f64| certify(&[0.0, m, SCALE, SCALE], 1, n, DIM);
+            assert_eq!(
+                read(gap * 0.99),
+                Imperfect::Partial(1, vec![gap * 0.99]),
+                "n = {n}: 1% inside the gap is ambiguous"
+            );
+            assert_eq!(
+                read(gap * 1.01),
+                Imperfect::Success(1),
+                "n = {n}: 1% past the gap clears it"
+            );
+        }
+    }
+
+    #[test]
+    fn the_error_margin_widens_what_clears_the_gap() {
+        // A mode within LAPACK's error below the gap may be a mode on the gap:
+        // it clears. One ulp further in, it doesn't.
+        let e = error();
+        for (n, n_n_minus_1) in GAPS {
+            let gap = 1.0 / f64::sqrt(n_n_minus_1);
+            let read = |m: f64| certify(&[0.0, m, SCALE, SCALE], 1, n, DIM);
+            let edge = gap - e;
+            assert_eq!(gap - edge, e, "n = {n}: the margin is exact");
+            assert_eq!(read(gap - e / 2.0), Imperfect::Success(1), "n = {n}");
+            assert_eq!(read(edge), Imperfect::Success(1), "n = {n}: on the margin");
+            assert_eq!(
+                read(edge.next_down()),
+                Imperfect::Partial(1, vec![edge.next_down()]),
+                "n = {n}: one ulp inside the margin"
+            );
+            assert_eq!(
+                read(gap - 2.0 * e),
+                Imperfect::Partial(1, vec![gap - 2.0 * e]),
+                "n = {n}"
+            );
+        }
+    }
+
+    /// The one rule, against what runs: wherever certify reads a kernel mode,
+    /// its verdict is the declared `zeros::instrument` band's, and that band
+    /// is `zeros::settle`'s.
+    #[test]
+    fn certify_reads_the_declared_instrument_band() {
+        use crate::band::{zeros, Verdict};
+        let band = zeros::instrument(DIM);
+        assert_eq!(band, zeros::settle(DIM), "one rule since c7de979");
+        let e = error();
+        for m in [0.0, e / 2.0, e, e.next_up(), 2.0 * e, 1e-3] {
+            assert_eq!(
+                kernel_reading(m) == Imperfect::Success(2),
+                band.read(m, SCALE) == Verdict::Zero,
+                "certify and the declared band disagree at {m:e}"
+            );
+        }
+    }
 }
