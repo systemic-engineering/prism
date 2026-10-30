@@ -687,6 +687,11 @@ pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge
 /// summand, δ* back. The same matrix, in the same basis, as
 /// [`Instrument`](crate::spectral::instrument::Instrument)'s.
+///
+/// D² = L₀ ⊕ L₁↓: the graph Laplacian L₀ = δ*δ on C⁰ and the
+/// down-Laplacian L₁↓ = δδ* on C¹. A graph is a 1-complex, with no 2-cells,
+/// so the up part of the Hodge Laplacian on C¹ is absent and the lower block
+/// is exactly L₁↓.
 pub fn dirac(graph: &Graph) -> Map<Sum<Vertices, Edges>, Sum<Vertices, Edges>, Z> {
     let delta = coboundary(graph);
     let room = Room::sum(delta.from(), delta.to()).expect("δ's rooms share its graph");

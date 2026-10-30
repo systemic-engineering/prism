@@ -4,7 +4,9 @@
 //! C⁰ ⊕ C¹; δ is a door from C⁰ into C¹ and δ* the door back. The laws:
 //!
 //! 1. δ is exact: entries ±1 or 0, one +1 and one −1 per edge row.
-//! 2. D² = L₀ ⊕ L₁ exactly, and L₀ is the Laplacian prism already builds.
+//! 2. D² = L₀ ⊕ L₁↓ exactly, and L₀ is the Laplacian prism already builds.
+//!    L₁↓ = δδ* is the down-Laplacian: a graph has no 2-cells, so C¹ has no
+//!    up part, and the lower block is L₁↓, not the full Hodge L₁.
 //! 3. An eigenbasis is read by columns, and every column is an eigenvector.
 //! 4. A room-built D has `Instrument`'s spectrum.
 //!
@@ -86,20 +88,20 @@ fn coboundary_is_exact_signed_incidence() {
     }
 }
 
-// --- Law 2: D² = L₀ ⊕ L₁, exactly ------------------------------------------
+// --- Law 2: D² = L₀ ⊕ L₁↓, exactly -----------------------------------------
 
 #[test]
-fn dirac_squared_is_the_laplacians() {
+fn dirac_squared_is_l0_plus_the_down_laplacian() {
     for (name, g) in graphs() {
         let delta = coboundary(&g);
         let star = delta.adjoint();
         let l0 = delta.then(&star).expect("δ then δ*: C⁰ → C⁰");
-        let l1 = star.then(&delta).expect("δ* then δ: C¹ → C¹");
+        let l1_down = star.then(&delta).expect("δ* then δ: C¹ → C¹");
 
         let d = dirac(&g);
         let d2 = d.then(&d).expect("D then D");
-        let blocks = Map::diagonal(&l0, &l1).expect("one complex");
-        assert_eq!(d2, blocks, "{name}: D² = L₀ ⊕ L₁");
+        let blocks = Map::diagonal(&l0, &l1_down).expect("one complex");
+        assert_eq!(d2, blocks, "{name}: D² = L₀ ⊕ L₁↓");
 
         // And D is δ below the diagonal, δ* above it.
         let room = d.from().clone();
