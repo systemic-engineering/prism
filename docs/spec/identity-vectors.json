@@ -1,0 +1,81 @@
+{
+  "spec": "docs/spec/identity.md",
+  "source": "computed with the b3sum CLI 1.8.7 (BLAKE3 reference Rust implementation, not prism) and cross-checked with Python's blake3 package; checked against prism by prismqueer/tests/identity_vectors.rs",
+  "function": "address(scope, content) = BLAKE3-keyed(K_scope, content), 32 bytes, lowercase hex",
+  "k_public": {
+    "context": "systemic.engineering://visibility/public/v1",
+    "key_material_hex": "",
+    "key": "18d4e1ec48377a474bd2709f1a5705ae2c95c11e00b1b490cf1af92a86258ba0"
+  },
+  "cases": [
+    {
+      "name": "public, empty input",
+      "scope": "public",
+      "input_utf8": "",
+      "input_hex": "",
+      "address": "94e0d0c71473d0a495f0984d2e7875494d0715c723d0acd4e987d0fe1078b480"
+    },
+    {
+      "name": "public, hello",
+      "scope": "public",
+      "input_utf8": "hello",
+      "input_hex": "68656c6c6f",
+      "address": "f4ad08bf043d8b08445cc0531144bc8aeb7f1c59625137c5d3f275f3face2048"
+    },
+    {
+      "name": "public, prism",
+      "scope": "public",
+      "input_utf8": "prism",
+      "input_hex": "707269736d",
+      "address": "89514bceb709fad516e0273864a6f07b302d7142d7c6d53c4640e73b8d40b403"
+    },
+    {
+      "name": "public, multi-byte UTF-8",
+      "scope": "public",
+      "input_utf8": "Grüße, 世界 🌈",
+      "input_hex": "4772c3bcc39f652c20e4b896e7958c20f09f8c88",
+      "address": "1334b063132469fd233e850a730e2c30eead947daea2a4ff774ded72c792b8fa"
+    },
+    {
+      "name": "keyed 0x01 x 32, empty input",
+      "scope": "0101010101010101010101010101010101010101010101010101010101010101",
+      "input_utf8": "",
+      "input_hex": "",
+      "address": "5dc76cbd474e91b7e85a02bcba29892273ebf93f20bab06b2f352313a5050c05"
+    },
+    {
+      "name": "keyed 0x01 x 32, hello",
+      "scope": "0101010101010101010101010101010101010101010101010101010101010101",
+      "input_utf8": "hello",
+      "input_hex": "68656c6c6f",
+      "address": "acc938a1d8801c7def1b72b9940b4df68c61b0071961a164ae1a38ad6cf954af"
+    },
+    {
+      "name": "keyed 0x01 x 32, multi-byte UTF-8",
+      "scope": "0101010101010101010101010101010101010101010101010101010101010101",
+      "input_utf8": "Grüße, 世界 🌈",
+      "input_hex": "4772c3bcc39f652c20e4b896e7958c20f09f8c88",
+      "address": "ad9a731935c4bf4a1fca1970893ff4bd6f5344b9036797fbfd26899b37a79949"
+    }
+  ],
+  "scopes_separate": [
+    {
+      "name": "a low-entropy statement: public vs. held scope",
+      "input_utf8": "X said yes",
+      "input_hex": "58207361696420796573",
+      "under": [
+        { "scope": "public", "address": "86b9a782fe1c94785691bf1f103ab61c90a49965a63616e55dab98a0d5315687" },
+        { "scope": "0101010101010101010101010101010101010101010101010101010101010101", "address": "3dcaba0d155cb4fe3d4a54231f11e7e494241efa86e650064e636d05b6557ece" }
+      ]
+    },
+    {
+      "name": "the same content under two held scopes",
+      "input_utf8": "X said yes",
+      "input_hex": "58207361696420796573",
+      "under": [
+        { "scope": "0101010101010101010101010101010101010101010101010101010101010101", "address": "3dcaba0d155cb4fe3d4a54231f11e7e494241efa86e650064e636d05b6557ece" },
+        { "scope": "0202020202020202020202020202020202020202020202020202020202020202", "address": "b6df5405680c3d0523f8b536d72b03e00b12954c28e8c309a8135c5de038be71" }
+      ]
+    }
+  ]
+}
