@@ -256,6 +256,18 @@
 
             doctest = craneLib.cargoDocTest (gate // { cargoArtifacts = gateDeps; });
 
+            # One ratchet: the CI workflow repeats coverageFloor as its own
+            # `coverage_threshold`. The two must be the same number, or CI
+            # fails a push the local gate passed (it did: '99' against 94).
+            ratchet =
+              let
+                m = builtins.match ".*coverage_threshold: '([0-9]+)'.*" (builtins.readFile ./.github/workflows/ci.yml);
+              in
+              if m != [ coverageFloor ] then
+                throw "ratchet: .github/workflows/ci.yml coverage_threshold is ${toString m}, flake.nix coverageFloor is ${coverageFloor}"
+              else
+                pkgs.runCommand "prism-ratchet" { } "touch $out";
+
             # The package fileset excludes what the push of a doc or a test
             # must not rebuild. nix/invariance.sh checks it end to end.
             invariance =
