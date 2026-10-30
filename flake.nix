@@ -239,7 +239,8 @@
               gate
               // {
                 cargoArtifacts = gateDeps;
-                cargoClippyExtraArgs = "-- --deny warnings";
+                # Same scope as `just lint`: every target, tests and benches too.
+                cargoClippyExtraArgs = "--all-targets -- --deny warnings";
               }
             );
 

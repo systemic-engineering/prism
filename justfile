@@ -54,9 +54,10 @@ invariance:
 build:
     nix develop -c cargo build --workspace --features lapack,fate
 
-# Clippy lint
+# Clippy lint: every target (lib, tests, benches, examples), as the flake's
+# checks.clippy does.
 lint:
-    nix develop -c cargo clippy --workspace --features lapack,fate -- -D warnings
+    nix develop -c cargo clippy --workspace --all-targets --features lapack,fate -- --deny warnings
 
 # Format check
 fmt-check:
