@@ -163,11 +163,15 @@ impl Piece {
     }
 }
 
-/// A located dissonance: the readings around one loop and its exact comma.
+/// A located dissonance: the readings around one loop, the edges it runs
+/// along, and its exact comma. Read from a [`Tuning`], it also names the
+/// Notes on those edges.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Dissonance {
     notes: Vec<VertexId>,
+    edges: Vec<Edge>,
     comma: Ratio,
+    by: Vec<Note>,
 }
 
 impl Dissonance {
@@ -175,59 +179,99 @@ impl Dissonance {
     pub fn notes(&self) -> &[VertexId] {
         &self.notes
     }
+    /// The edges around the loop, in path order. On a two-Note loop these
+    /// are the two parallel edges: out along one, back along the other.
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
     /// How far it falls short of closing, exactly.
     pub fn comma(&self) -> &Ratio {
         &self.comma
     }
-    /// The edges around the loop.
-    pub fn edges(&self) -> &[Edge] {
-        &[]
-    }
-    /// The Notes around the loop.
+    /// The Notes on [`edges`](Self::edges), in path order. Empty when read
+    /// from a bare field ([`ring_true`]), which has no Notes to name.
     pub fn by(&self) -> &[Note] {
-        &[]
+        &self.by
     }
 }
 
-/// Notes with exact intervals.
+/// A tuning made of Notes: each Note relates its one premise to its head by
+/// an exact interval, and is its own edge. Two Notes on the same pair of
+/// atoms are two parallel edges, never one: if their intervals differ, the
+/// 2-loop between them holds the comma. Atoms are numbered in order
+/// ([`Tuning::atoms`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tuning {
     atoms: Vec<Atom>,
+    notes: BTreeMap<Edge, Note>,
     field: Field<Graph, Ratio>,
 }
 
 /// Why a tuning couldn't be built.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TuningError {
-    /// This Note doesn't have exactly one premise.
+    /// This Note doesn't have exactly one premise, so it relates no pair.
     NotAnInterval(Note),
 }
 
 impl Tuning {
-    /// A tuning from Notes and their intervals.
+    /// A tuning from Notes and their intervals, premise to head. Refused if
+    /// a Note is a fact or has several premises.
     pub fn new(intervals: impl IntoIterator<Item = (Note, Ratio)>) -> Result<Self, TuningError> {
         let intervals: Vec<(Note, Ratio)> = intervals.into_iter().collect();
+        if let Some((n, _)) = intervals.iter().find(|(n, _)| n.premises.len() != 1) {
+            return Err(TuningError::NotAnInterval(n.clone()));
+        }
         let atoms: Vec<Atom> = intervals
             .iter()
-            .flat_map(|(n, _)| n.premises.iter().chain([&n.head]).cloned())
+            .flat_map(|(n, _)| [n.premises[0].clone(), n.head.clone()])
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
         let id = |a: &Atom| atoms.binary_search(a).expect("collected") as VertexId;
-        let field = Field::multigraph(intervals.iter().filter_map(|(n, r)| {
-            n.premises
-                .first()
-                .map(|p| ((id(p), id(&n.head)), r.clone()))
-        }));
-        Ok(Tuning { atoms, field })
+        // Edge identities as Field::multigraph numbers them: per pair, in order.
+        let mut seen: BTreeMap<(VertexId, VertexId), usize> = BTreeMap::new();
+        let mut notes = BTreeMap::new();
+        let mut given = Vec::with_capacity(intervals.len());
+        for (n, r) in intervals {
+            let (from, to) = (id(&n.premises[0]), id(&n.head));
+            let edge = Edge::between(from, to, 0);
+            let nth = seen.entry(edge.ends()).or_insert(0);
+            notes.insert(Edge::between(from, to, *nth), n);
+            *nth += 1;
+            given.push(((from, to), r));
+        }
+        Ok(Tuning {
+            atoms,
+            notes,
+            field: Field::multigraph(given),
+        })
     }
-    /// The atoms.
+
+    /// The atoms; atom `i` is reading (vertex) `i`.
     pub fn atoms(&self) -> &[Atom] {
         &self.atoms
     }
-    /// Does it ring true?
+
+    /// The tuning as a ratio-valued field on its multigraph.
+    pub fn field(&self) -> &Field<Graph, Ratio> {
+        &self.field
+    }
+
+    /// "Does it ring true?", with each dissonance naming its Notes.
     pub fn ring_true(&self) -> Ringing {
-        ring_true(&self.field)
+        match ring_true(&self.field) {
+            Ringing::Dissonant(found) => Ringing::Dissonant(
+                found
+                    .into_iter()
+                    .map(|d| Dissonance {
+                        by: d.edges.iter().map(|e| self.notes[e].clone()).collect(),
+                        ..d
+                    })
+                    .collect(),
+            ),
+            consonant => consonant,
+        }
     }
 }
 
@@ -241,6 +285,8 @@ pub enum Ringing {
 }
 
 /// "Does it ring true?": consonance, or where the dissonance is and how far.
+/// A bare field has no Notes, so its dissonances name none
+/// ([`Tuning::ring_true`] does).
 pub fn ring_true(tuning: &Field<Graph, Ratio>) -> Ringing {
     match check_flat(tuning) {
         Flatness::Flat(flat) => Ringing::True(flat),
@@ -250,7 +296,9 @@ pub fn ring_true(tuning: &Field<Graph, Ratio>) -> Ringing {
                 .iter()
                 .map(|l| Dissonance {
                     notes: l.vertices().to_vec(),
+                    edges: l.edges().to_vec(),
                     comma: l.holonomy().clone(),
+                    by: Vec::new(),
                 })
                 .collect(),
         ),

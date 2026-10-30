@@ -59,12 +59,13 @@ fn a_two_loop_holds_the_first_map_times_the_inverse_of_the_second() {
 
 #[test]
 fn in_a_group_that_does_not_commute_the_residue_is_g_then_h_inverse() {
-    let g = Perm::new(vec![1, 0, 2]);
-    let h = Perm::new(vec![2, 0, 1]);
+    let g = Perm::new(vec![0, 1, 3, 2]);
+    let h = Perm::new(vec![1, 2, 0, 3]);
     let field = Field::multigraph([((0, 1), g.clone()), ((0, 1), h.clone())]);
     let want = g.compose(&h.inverse());
     assert_ne!(want, h.inverse().compose(&g), "the order is visible");
     assert_ne!(want, g.compose(&h), "the inverse is visible");
+    assert_ne!(want, want.inverse(), "the direction is visible");
     match check_flat(&field) {
         Flatness::Curved(c) => assert_eq!(*c.loops()[0].holonomy(), want),
         Flatness::Flat(_) => panic!("two different permutations on one pair"),

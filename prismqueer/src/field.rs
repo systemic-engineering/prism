@@ -3,7 +3,11 @@
 //! A `settle` can end in one value or in many related values. Both are fields:
 //! a scalar is a field on a [`Point`], a vector of criteria is a field on k
 //! unconnected points ([`Discrete`]), and an intonation is a group-valued field
-//! on a [`Graph`]: one transport per edge, a connection.
+//! on a [`Graph`]: one transport per edge, a connection. The graph may have
+//! parallel edges ([`Field::multigraph`]): two edges on one pair are two
+//! transports, and the 2-loop between them holds `g·h⁻¹`. A loop is a hole;
+//! filled by a face (a triangle, or a bigon on two parallel edges) it is
+//! curvature on that face.
 //!
 //! Whether a field can be collapsed is decided by its value algebra and its
 //! curvature (Mara, `ruler-and-pact` §10–§11, on mirror):
@@ -301,17 +305,131 @@ pub struct Point;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Discrete;
 
-/// The base of a connection: a graph, with a value on every edge.
+/// The base of a connection: a multigraph, with a value on every edge.
+///
+/// Two edges between the same pair are two edges ([`Edge::nth`] tells them
+/// apart), each with its own transport. Cycle space and b₁ count them both,
+/// so a doubled pair is one independent loop, of length 2.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Graph(Shape);
+pub struct Graph {
+    vertices: BTreeSet<VertexId>,
+    /// Sorted: by ends, then by `nth`.
+    edges: Vec<Edge>,
+}
+
+/// One edge of a graph base: its ends, and which of the parallel edges
+/// between them it is (0 for the first given, then 1, ...). A simple graph's
+/// edges are all `nth` 0.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Edge {
+    ends: EdgeKey,
+    nth: usize,
+}
+
+impl Edge {
+    /// The `nth` edge between `a` and `b` (in either order).
+    pub fn between(a: VertexId, b: VertexId, nth: usize) -> Self {
+        Edge {
+            ends: ordered(a, b),
+            nth,
+        }
+    }
+    /// Its ends, smaller first.
+    pub fn ends(&self) -> EdgeKey {
+        self.ends
+    }
+    /// Which of the parallel edges between its ends, counting from 0 in the
+    /// order they were given.
+    pub fn nth(&self) -> usize {
+        self.nth
+    }
+}
+
+fn ordered(a: VertexId, b: VertexId) -> EdgeKey {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+/// A spanning forest of a graph: tree neighbours (with the edge's index) and
+/// the chords, the edges that close a cycle.
+type Forest = (BTreeMap<VertexId, Vec<(VertexId, usize)>>, Vec<usize>);
+
+impl Graph {
+    /// The vertices, in order.
+    pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
+        self.vertices.iter().copied()
+    }
+
+    /// The edges, by ends and then by `nth`.
+    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
+        self.edges.iter().copied()
+    }
+
+    /// How many edges join this pair (given in either order).
+    pub fn multiplicity(&self, ends: EdgeKey) -> usize {
+        let ends = ordered(ends.0, ends.1);
+        self.edges.iter().filter(|e| e.ends == ends).count()
+    }
+
+    /// b₁, the number of independent loops: edges − vertices + components.
+    /// Every parallel edge counts.
+    pub fn cycle_rank(&self) -> usize {
+        self.spanning().1.len()
+    }
+
+    fn index(&self, edge: Edge) -> Option<usize> {
+        self.edges.binary_search(&edge).ok()
+    }
+
+    /// Spanning forest by union-find, edges in order.
+    fn spanning(&self) -> Forest {
+        let mut parent: BTreeMap<VertexId, VertexId> =
+            self.vertices.iter().map(|&v| (v, v)).collect();
+        fn root(p: &mut BTreeMap<VertexId, VertexId>, v: VertexId) -> VertexId {
+            let up = p[&v];
+            if up == v {
+                v
+            } else {
+                let r = root(p, up);
+                p.insert(v, r);
+                r
+            }
+        }
+        let mut tree: BTreeMap<VertexId, Vec<(VertexId, usize)>> =
+            self.vertices.iter().map(|&v| (v, Vec::new())).collect();
+        let mut chords = Vec::new();
+        for (i, e) in self.edges.iter().enumerate() {
+            let (u, v) = e.ends;
+            let (ru, rv) = (root(&mut parent, u), root(&mut parent, v));
+            if ru == rv {
+                chords.push(i);
+            } else {
+                parent.insert(ru, rv);
+                tree.get_mut(&u).unwrap().push((v, i));
+                tree.get_mut(&v).unwrap().push((u, i));
+            }
+        }
+        (tree, chords)
+    }
+}
+
+/// A closed walk: `vertices[k]` to `vertices[k + 1]` along the edge with
+/// index `edges[k]`.
+#[derive(Clone, Debug, PartialEq)]
+struct Walk {
+    vertices: Vec<VertexId>,
+    edges: Vec<usize>,
+}
 
 /// A field: values over a base.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Field<B, V> {
     base: B,
-    faces: Vec<[VertexId; 3]>,
+    faces: Vec<Walk>,
     values: Vec<V>,
-    edges: Vec<EdgeKey>,
 }
 
 /// Why a graph field couldn't be built.
@@ -321,53 +439,11 @@ pub enum FieldError {
     Missing(EdgeKey),
     /// This edge isn't in the graph.
     Outside(EdgeKey),
-    /// A face names this pair by its ends, but it has parallel edges.
+    /// A face names this pair by its ends, but it has parallel edges: which
+    /// one is meant? Name the edges ([`Field::with_bigons`]) instead.
     Parallel(EdgeKey),
     /// A bigon's two edges don't join the same pair.
     Apart(EdgeKey, EdgeKey),
-}
-
-/// One edge of a graph base: its ends, and which of the parallel edges
-/// between them it is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Edge {
-    ends: EdgeKey,
-    nth: usize,
-}
-
-impl Edge {
-    /// The `nth` edge between `a` and `b`.
-    pub fn between(a: VertexId, b: VertexId, nth: usize) -> Self {
-        let ends = if a <= b { (a, b) } else { (b, a) };
-        Edge { ends, nth }
-    }
-    /// Its ends, smaller first.
-    pub fn ends(&self) -> EdgeKey {
-        self.ends
-    }
-    /// Which of the parallel edges between its ends.
-    pub fn nth(&self) -> usize {
-        self.nth
-    }
-}
-
-impl Graph {
-    /// The vertices.
-    pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
-        self.0.vertices()
-    }
-    /// The edges.
-    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
-        self.0.edges().map(|(a, b)| Edge::between(a, b, 0))
-    }
-    /// How many edges join this pair.
-    pub fn multiplicity(&self, ends: EdgeKey) -> usize {
-        usize::from(self.0.contains_edge(ends))
-    }
-    /// b₁.
-    pub fn cycle_rank(&self) -> usize {
-        0
-    }
 }
 
 impl<V> Field<Point, V> {
@@ -377,7 +453,6 @@ impl<V> Field<Point, V> {
             base: Point,
             faces: Vec::new(),
             values: vec![value],
-            edges: Vec::new(),
         }
     }
 
@@ -394,7 +469,6 @@ impl<V> Field<Discrete, V> {
             base: Discrete,
             faces: Vec::new(),
             values,
-            edges: Vec::new(),
         }
     }
 }
@@ -415,24 +489,10 @@ impl<V> Field<Graph, V> {
 }
 
 impl<V: Group> Field<Graph, V> {
-    /// A connection on a multigraph: every given transport is its own edge.
-    pub fn multigraph(given: impl IntoIterator<Item = (EdgeKey, V)>) -> Self {
-        let given: Vec<(EdgeKey, V)> = given.into_iter().collect();
-        let keys: Vec<EdgeKey> = given.iter().map(|&(k, _)| k).collect();
-        let shape = crate::spectral::kleinos::graph_from_edges(&keys);
-        Self::transports(&shape, given).expect("every edge given")
-    }
-
-    /// Declare filled bigons.
-    pub fn with_bigons(
-        self,
-        _bigons: impl IntoIterator<Item = [Edge; 2]>,
-    ) -> Result<Self, FieldError> {
-        Ok(self)
-    }
-
-    /// A connection: one transport per edge, given in either orientation (a
-    /// transport given on `(v, u)` is stored inverted on `(u, v)`).
+    /// A connection on a simple graph: one transport per edge, given in
+    /// either orientation (a transport given on `(v, u)` is stored inverted
+    /// on `(u, v)`). Every edge is `nth` 0; a pair given twice keeps the
+    /// last. For parallel edges, use [`Field::multigraph`].
     pub fn transports(
         graph: &Shape,
         given: impl IntoIterator<Item = (EdgeKey, V)>,
@@ -449,46 +509,98 @@ impl<V: Group> Field<Graph, V> {
             }
             by_edge.insert(key, t);
         }
-        let edges: Vec<EdgeKey> = graph.edges().collect();
+        let edges: Vec<Edge> = graph.edges().map(|(a, b)| Edge::between(a, b, 0)).collect();
         let mut values = Vec::with_capacity(edges.len());
         for e in &edges {
-            values.push(by_edge.remove(e).ok_or(FieldError::Missing(*e))?);
+            values.push(by_edge.remove(&e.ends).ok_or(FieldError::Missing(e.ends))?);
         }
         Ok(Field {
-            base: Graph(graph.clone()),
+            base: Graph {
+                vertices: graph.vertices().collect(),
+                edges,
+            },
             faces: Vec::new(),
             values,
-            edges,
         })
     }
 
-    /// Declare filled triangles (2-cells). A loop that bounds faces is no
-    /// longer a hole; a face that doesn't close is curvature on that face.
-    /// Refused if a face's edge isn't in the graph.
+    /// A connection on a multigraph: every given transport is its own edge,
+    /// so a pair given twice is two parallel edges, numbered by `nth` in the
+    /// order given. Either orientation, as in [`Field::transports`]. The
+    /// vertices are the edges' ends.
+    pub fn multigraph(given: impl IntoIterator<Item = (EdgeKey, V)>) -> Self {
+        let mut vertices = BTreeSet::new();
+        let mut seen: BTreeMap<EdgeKey, usize> = BTreeMap::new();
+        let mut by_edge: BTreeMap<Edge, V> = BTreeMap::new();
+        for ((a, b), t) in given {
+            let t = if a <= b { t } else { t.inverse() };
+            let ends = ordered(a, b);
+            let nth = seen.entry(ends).or_insert(0);
+            by_edge.insert(Edge { ends, nth: *nth }, t);
+            *nth += 1;
+            vertices.extend([a, b]);
+        }
+        let (edges, values) = by_edge.into_iter().unzip();
+        Field {
+            base: Graph { vertices, edges },
+            faces: Vec::new(),
+            values,
+        }
+    }
+
+    /// Declare filled triangles (2-cells), named by their corners. A loop
+    /// that bounds faces is no longer a hole; a face that doesn't close is
+    /// curvature on that face. Refused if a side isn't in the graph, or has
+    /// parallel edges (name those with [`Field::with_bigons`]).
     pub fn with_faces(
         mut self,
         faces: impl IntoIterator<Item = [VertexId; 3]>,
     ) -> Result<Self, FieldError> {
         for [a, b, c] in faces {
-            for (x, y) in [(a, b), (b, c), (a, c)] {
-                let key = if x <= y { (x, y) } else { (y, x) };
-                if self.edges.binary_search(&key).is_err() {
-                    return Err(FieldError::Missing(key));
+            let mut edges = Vec::with_capacity(3);
+            for (x, y) in [(a, b), (b, c), (c, a)] {
+                let ends = ordered(x, y);
+                match self.base.multiplicity(ends) {
+                    0 => return Err(FieldError::Missing(ends)),
+                    1 => {}
+                    _ => return Err(FieldError::Parallel(ends)),
                 }
+                edges.extend(self.base.index(Edge { ends, nth: 0 }));
             }
-            self.faces.push([a, b, c]);
+            self.faces.push(Walk {
+                vertices: vec![a, b, c, a],
+                edges,
+            });
         }
         Ok(self)
     }
 
-    /// The transport from `a` to `b` along an edge of the graph.
-    fn transport(&self, a: VertexId, b: VertexId) -> V {
-        let key = if a <= b { (a, b) } else { (b, a) };
-        let i = self
-            .edges
-            .binary_search(&key)
-            .expect("an edge of the field");
-        if a <= b {
+    /// Declare filled bigons: 2-cells bounded by two parallel edges. A 2-loop
+    /// that bounds one is no longer a hole; a bigon that doesn't close is
+    /// curvature on that face. Refused if an edge isn't in the graph, or the
+    /// two don't join the same pair.
+    pub fn with_bigons(
+        mut self,
+        bigons: impl IntoIterator<Item = [Edge; 2]>,
+    ) -> Result<Self, FieldError> {
+        for [e, f] in bigons {
+            let i = self.base.index(e).ok_or(FieldError::Missing(e.ends))?;
+            let j = self.base.index(f).ok_or(FieldError::Missing(f.ends))?;
+            if e.ends != f.ends {
+                return Err(FieldError::Apart(e.ends, f.ends));
+            }
+            let (u, v) = e.ends;
+            self.faces.push(Walk {
+                vertices: vec![u, v, u],
+                edges: vec![i, j],
+            });
+        }
+        Ok(self)
+    }
+
+    /// The transport along edge `i`, leaving from its end `from`.
+    fn step(&self, i: usize, from: VertexId) -> V {
+        if self.base.edges[i].ends.0 == from {
             self.values[i].clone()
         } else {
             self.values[i].inverse()
@@ -534,22 +646,27 @@ impl<V> Flat<V> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Loop<V> {
     vertices: Vec<VertexId>,
+    edges: Vec<Edge>,
     holonomy: V,
 }
 
 impl<V> Loop<V> {
     /// The loop, starting and ending at its smallest vertex, heading first
-    /// toward the smaller of that vertex's two neighbours on the loop.
+    /// toward the smaller of that vertex's two neighbours on the loop. On a
+    /// 2-loop both neighbours are the same vertex: it heads out along the
+    /// smaller edge and comes back along the other.
     pub fn vertices(&self) -> &[VertexId] {
         &self.vertices
+    }
+    /// The edges around the loop, in path order: `edges()[k]` joins
+    /// `vertices()[k]` and `vertices()[k + 1]`. This is what tells two
+    /// parallel edges apart.
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
     }
     /// The transport around the loop, composed in path order.
     pub fn holonomy(&self) -> &V {
         &self.holonomy
-    }
-    /// The edges around the loop.
-    pub fn edges(&self) -> &[Edge] {
-        &[]
     }
 }
 
@@ -603,74 +720,48 @@ pub fn check_flat_within<V: Measured>(field: &Field<Graph, V>, noise: Noise) -> 
 }
 
 fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> Flatness<V> {
-    let shape = &field.base.0;
-    let vertices: Vec<VertexId> = shape.vertices().collect();
-
-    // Spanning forest by union-find, edges in canonical order.
-    let mut parent: BTreeMap<VertexId, VertexId> = vertices.iter().map(|&v| (v, v)).collect();
-    fn root(p: &mut BTreeMap<VertexId, VertexId>, v: VertexId) -> VertexId {
-        let up = p[&v];
-        if up == v {
-            v
-        } else {
-            let r = root(p, up);
-            p.insert(v, r);
-            r
-        }
-    }
-    let mut tree: BTreeMap<VertexId, Vec<VertexId>> =
-        vertices.iter().map(|&v| (v, Vec::new())).collect();
-    let mut chords = Vec::new();
-    for &(u, v) in &field.edges {
-        let (ru, rv) = (root(&mut parent, u), root(&mut parent, v));
-        if ru == rv {
-            chords.push((u, v));
-        } else {
-            parent.insert(ru, rv);
-            tree.get_mut(&u).unwrap().push(v);
-            tree.get_mut(&v).unwrap().push(u);
-        }
-    }
+    let graph = &field.base;
+    let (tree, chords) = graph.spanning();
 
     // Potential: breadth-first from each component's smallest vertex.
     let mut potential: BTreeMap<VertexId, V> = BTreeMap::new();
-    let mut back: BTreeMap<VertexId, VertexId> = BTreeMap::new();
-    for &start in &vertices {
+    let mut back: BTreeMap<VertexId, (VertexId, usize)> = BTreeMap::new();
+    for start in graph.vertices() {
         if potential.contains_key(&start) {
             continue;
         }
         potential.insert(start, V::identity());
         let mut queue = VecDeque::from([start]);
         while let Some(u) = queue.pop_front() {
-            for &w in &tree[&u] {
+            for &(w, i) in &tree[&u] {
                 if !potential.contains_key(&w) {
-                    let p = potential[&u].compose(&field.transport(u, w));
+                    let p = potential[&u].compose(&field.step(i, u));
                     potential.insert(w, p);
-                    back.insert(w, u);
+                    back.insert(w, (u, i));
                     queue.push_back(w);
                 }
             }
         }
     }
 
-    let around = |vertices: Vec<VertexId>| {
-        let holonomy = vertices.windows(2).fold(V::identity(), |h, w| {
-            h.compose(&field.transport(w[0], w[1]))
-        });
-        Loop { vertices, holonomy }
+    let around = |walk: Walk| {
+        let holonomy = walk
+            .vertices
+            .iter()
+            .zip(&walk.edges)
+            .fold(V::identity(), |h, (&from, &i)| {
+                h.compose(&field.step(i, from))
+            });
+        Loop {
+            edges: walk.edges.iter().map(|&i| graph.edges[i]).collect(),
+            vertices: walk.vertices,
+            holonomy,
+        }
     };
-    let edge_set = |walk: &[VertexId]| -> BTreeSet<usize> {
+    // Over GF(2): an edge walked twice cancels.
+    let edge_set = |walk: &Walk| -> BTreeSet<usize> {
         let mut set = BTreeSet::new();
-        for w in walk.windows(2) {
-            let key = if w[0] <= w[1] {
-                (w[0], w[1])
-            } else {
-                (w[1], w[0])
-            };
-            let i = field
-                .edges
-                .binary_search(&key)
-                .expect("an edge of the field");
+        for &i in &walk.edges {
             if !set.remove(&i) {
                 set.insert(i);
             }
@@ -682,8 +773,8 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
     // unless H₁ of the complex has torsion).
     let mut span = Gf2::default();
     let mut faces = Vec::new();
-    for &[a, b, c] in &field.faces {
-        let walk = canonical_loop(vec![a, b, c, a]);
+    for face in &field.faces {
+        let walk = canonical_loop(face.clone());
         span.insert(edge_set(&walk));
         let face = around(walk);
         if !closes(&face.holonomy) {
@@ -692,8 +783,8 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
     }
 
     let mut loops = Vec::new();
-    for (u, v) in chords {
-        let walk = canonical_loop(fundamental_cycle(&back, u, v));
+    for chord in chords {
+        let walk = canonical_loop(fundamental_cycle(&back, graph.edges[chord].ends, chord));
         if span.contains(edge_set(&walk)) {
             continue;
         }
@@ -738,16 +829,16 @@ impl Gf2 {
     }
 }
 
-/// The cycle closed by chord `(u, v)`: the tree path from `u` to `v`, then
-/// the chord back to `u`.
+/// The cycle closed by chord `(u, v)` (edge index `chord`): the tree path
+/// from `u` to `v`, then the chord back to `u`.
 fn fundamental_cycle(
-    back: &BTreeMap<VertexId, VertexId>,
-    u: VertexId,
-    v: VertexId,
-) -> Vec<VertexId> {
+    back: &BTreeMap<VertexId, (VertexId, usize)>,
+    (u, v): EdgeKey,
+    chord: usize,
+) -> Walk {
     let ancestors = |mut x: VertexId| {
         let mut path = vec![x];
-        while let Some(&p) = back.get(&x) {
+        while let Some(&(p, _)) = back.get(&x) {
             path.push(p);
             x = p;
         }
@@ -759,26 +850,44 @@ fn fundamental_cycle(
         .iter()
         .find(|x| on_v.contains(x))
         .expect("same component");
-    let mut cycle: Vec<VertexId> = up.iter().copied().take_while(|&x| x != meet).collect();
-    cycle.push(meet);
+    let mut vertices = Vec::new();
+    let mut edges = Vec::new();
+    for &x in up.iter().take_while(|&&x| x != meet) {
+        vertices.push(x);
+        edges.push(back[&x].1);
+    }
+    vertices.push(meet);
     let down: Vec<VertexId> = vp.iter().copied().take_while(|&x| x != meet).collect();
-    cycle.extend(down.into_iter().rev());
-    cycle.push(u);
-    cycle
+    for &x in down.iter().rev() {
+        edges.push(back[&x].1);
+        vertices.push(x);
+    }
+    edges.push(chord);
+    vertices.push(u);
+    Walk { vertices, edges }
 }
 
-/// Rotate a closed vertex walk to start at its smallest vertex and orient it
-/// toward that vertex's smaller neighbour.
-fn canonical_loop(closed: Vec<VertexId>) -> Vec<VertexId> {
-    let ring = &closed[..closed.len() - 1];
-    let n = ring.len();
+/// Rotate a closed walk to start at its smallest vertex and orient it toward
+/// that vertex's smaller neighbour; when both neighbours are the same vertex
+/// (a 2-loop), out along the smaller edge.
+fn canonical_loop(walk: Walk) -> Walk {
+    let n = walk.edges.len();
+    let ring = &walk.vertices[..n];
     let start = (0..n).min_by_key(|&i| ring[i]).expect("non-empty loop");
-    let next = ring[(start + 1) % n];
-    let prev = ring[(start + n - 1) % n];
-    let step: Box<dyn Fn(usize) -> usize> = if next <= prev {
-        Box::new(move |k| (start + k) % n)
+    let ahead = (ring[(start + 1) % n], walk.edges[start]);
+    let behind = (ring[(start + n - 1) % n], walk.edges[(start + n - 1) % n]);
+    let (vertices, edges) = if ahead <= behind {
+        (
+            (0..=n).map(|k| ring[(start + k) % n]).collect(),
+            (0..n).map(|k| walk.edges[(start + k) % n]).collect(),
+        )
     } else {
-        Box::new(move |k| (start + n - k) % n)
+        (
+            (0..=n).map(|k| ring[(start + n - k) % n]).collect(),
+            (0..n)
+                .map(|k| walk.edges[(start + n - k - 1) % n])
+                .collect(),
+        )
     };
-    (0..=n).map(|k| ring[step(k)]).collect()
+    Walk { vertices, edges }
 }
