@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use prismqueer::oid::{Addressable, Oid};
+use prismqueer::oid::{Addressable, Oid, Scope};
 use prismqueer::time::{Polyphony, Progression, Touches};
 use terni::Loss;
 
@@ -19,7 +19,7 @@ struct Step {
 
 impl Addressable for Step {
     fn oid(&self) -> Oid {
-        Oid::hash(self.name.as_bytes())
+        Oid::hash(&Scope::public(), self.name.as_bytes())
     }
 }
 
@@ -33,7 +33,11 @@ impl Touches for Step {
 }
 
 fn step(name: &'static str, reads: &[&str], writes: &[&str]) -> Step {
-    let set = |s: &[&str]| s.iter().map(|x| Oid::hash(x.as_bytes())).collect();
+    let set = |s: &[&str]| {
+        s.iter()
+            .map(|x| Oid::hash(&Scope::public(), x.as_bytes()))
+            .collect()
+    };
     Step {
         name,
         reads: set(reads),

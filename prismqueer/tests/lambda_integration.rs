@@ -7,7 +7,7 @@ mod tests {
     use prismqueer::lambda::{Composable, Lambda};
     use prismqueer::oid::Addressable;
     use prismqueer::DeriveLambda;
-    use prismqueer::Oid;
+    use prismqueer::{Oid, Scope};
 
     #[derive(DeriveLambda)]
     #[oid("@parse")]
@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn parse_oid_from_derive() {
-        assert_eq!(Parse.oid(), Oid::hash(b"@parse"));
+        assert_eq!(Parse.oid(), Oid::hash(&Scope::public(), b"@parse"));
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn apply_to_wraps_in_apply() {
-        let input = Lambda::<String>::bind(Oid::hash(b"source"));
+        let input = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"source"));
         let applied = Parse.apply_to(input);
         assert!(matches!(applied, Lambda::Apply(_)));
     }
@@ -98,9 +98,9 @@ mod tests {
         let lambda: Lambda<String> = Parse.into();
         // Should be Abs(@parse, Bind(@parse))
         if let Lambda::Abs(a) = &lambda {
-            assert_eq!(a.param, Oid::hash(b"@parse"));
+            assert_eq!(a.param, Oid::hash(&Scope::public(), b"@parse"));
             if let Lambda::Bind(b) = a.body.as_ref() {
-                assert_eq!(b.name, Oid::hash(b"@parse"));
+                assert_eq!(b.name, Oid::hash(&Scope::public(), b"@parse"));
             } else {
                 panic!("expected Bind body");
             }

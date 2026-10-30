@@ -15,7 +15,7 @@
 
 use std::collections::BTreeSet;
 
-use prismqueer::oid::{Addressable, Oid};
+use prismqueer::oid::{Addressable, Oid, Scope};
 use prismqueer::time::{Independence, Monophony, Polyphony, Progression, Touches};
 
 /// A step that touches named sites.
@@ -27,7 +27,7 @@ struct Step {
 }
 
 fn site(name: &str) -> Oid {
-    Oid::hash(name.as_bytes())
+    Oid::hash(&Scope::public(), name.as_bytes())
 }
 
 fn step(name: &'static str, reads: &[&str], writes: &[&str]) -> Step {
@@ -42,7 +42,10 @@ impl Addressable for Step {
     fn oid(&self) -> Oid {
         let reads: Vec<&str> = self.reads.iter().map(Oid::as_str).collect();
         let writes: Vec<&str> = self.writes.iter().map(Oid::as_str).collect();
-        Oid::hash(format!("{}|r:{}|w:{}", self.name, reads.join(","), writes.join(",")).as_bytes())
+        Oid::hash(
+            &Scope::public(),
+            format!("{}|r:{}|w:{}", self.name, reads.join(","), writes.join(",")).as_bytes(),
+        )
     }
 }
 

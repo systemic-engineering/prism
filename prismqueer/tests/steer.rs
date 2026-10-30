@@ -235,7 +235,7 @@ fn among_tied_scores_the_first_seen_is_kept() {
         Patience(10),
         |_| 1.0,
         |_| true,
-        |x| prismqueer::oid::Oid::hash(&x.to_le_bytes()),
+        |x| prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), &x.to_le_bytes()),
     ) {
         Imperfect::Partial(run, _) => {
             assert_eq!(run.best, Some(0u64.to_le_bytes().to_vec()));
@@ -259,7 +259,7 @@ fn a_search_that_keeps_finding_new_values_runs_out_of_budget() {
         |_| true,
         |_| {
             fresh += 1;
-            prismqueer::oid::Oid::hash(&fresh.to_le_bytes())
+            prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), &fresh.to_le_bytes())
         },
     ) {
         Imperfect::Partial(run, coverage) => {

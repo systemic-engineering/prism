@@ -64,7 +64,7 @@
 //! the witness that the shim emission is a fixed point of the
 //! Rust-altitude parse cycle.
 
-use prismqueer::{declaration, Oid};
+use prismqueer::{declaration, Oid, Scope};
 use quote::ToTokens;
 
 /// The canonical form of a Rust item: parse through syn, render
@@ -77,11 +77,10 @@ fn canonical(item: &syn::Item) -> String {
 }
 
 /// Compute the OID of a Rust item's canonical form. Uses the
-/// substrate's standard Oid::hash (CoincidenceHash<3> compressed to
-/// 64-hex). Two items with the same canonical form get the same OID;
+/// substrate's standard Oid::hash (scoped BLAKE3, 64-hex). Two items with the same canonical form get the same OID;
 /// the OID is the content-address at the @code/rust altitude.
 fn oid_of(item: &syn::Item) -> Oid {
-    Oid::hash(canonical(item).as_bytes())
+    Oid::hash(&Scope::public(), canonical(item).as_bytes())
 }
 
 /// The load-bearing witness for the cascade tick: round-trip OID
@@ -175,7 +174,7 @@ fn shim_is_a_function_of_substrate_oid() {
     );
 
     // The OID is deterministic and stable across calls (the
-    // substrate's standard Oid::hash via CoincidenceHash<3>).
+    // substrate's standard Oid::hash, scoped BLAKE3).
     assert_eq!(
         expected_oid,
         oid_of(&expected),
@@ -330,7 +329,7 @@ fn bare_prism_emits_unit_struct_with_oid_attribute() {
     let parse_addressable: prismqueer::Oid = <Parse as prismqueer::Addressable>::oid(&Parse);
     assert_eq!(
         parse_addressable,
-        Oid::hash("@parse".as_bytes()),
+        Oid::hash(&Scope::public(), "@parse".as_bytes()),
         "OID law (spec §5 law 3): substrate path is the runtime address"
     );
 }
@@ -381,7 +380,7 @@ fn prism_with_five_op_block_emits_same_unit_struct() {
     let kernel_addressable: prismqueer::Oid = <Kernel as prismqueer::Addressable>::oid(&Kernel);
     assert_eq!(
         kernel_addressable,
-        Oid::hash("@kernel".as_bytes()),
+        Oid::hash(&Scope::public(), "@kernel".as_bytes()),
         "OID law: substrate path `@kernel` is the runtime address"
     );
 }
@@ -408,8 +407,11 @@ fn distinct_prism_paths_produce_distinct_oids() {
         "distinct substrate paths must produce distinct runtime OIDs (the address discriminates)"
     );
 
-    assert_eq!(observer_oid, Oid::hash("@observer".as_bytes()));
-    assert_eq!(actor_oid, Oid::hash("@actor".as_bytes()));
+    assert_eq!(
+        observer_oid,
+        Oid::hash(&Scope::public(), "@observer".as_bytes())
+    );
+    assert_eq!(actor_oid, Oid::hash(&Scope::public(), "@actor".as_bytes()));
 }
 
 // ---------------------------------------------------------------------------
@@ -711,7 +713,7 @@ fn bare_grammar_emits_unit_struct_with_oid_attribute() {
     let addr: prismqueer::Oid = <ParseSpec as prismqueer::Addressable>::oid(&ParseSpec);
     assert_eq!(
         addr,
-        Oid::hash("@parse_spec".as_bytes()),
+        Oid::hash(&Scope::public(), "@parse_spec".as_bytes()),
         "OID law (spec §5 law 3): substrate grammar path is the runtime address"
     );
 }
@@ -753,7 +755,7 @@ fn grammar_with_extension_and_body_emits_unit_struct_with_oid() {
     let addr: prismqueer::Oid = <MirrorSpec as prismqueer::Addressable>::oid(&MirrorSpec);
     assert_eq!(
         addr,
-        Oid::hash("@mirror_spec".as_bytes()),
+        Oid::hash(&Scope::public(), "@mirror_spec".as_bytes()),
         "OID law: substrate path `@mirror_spec` is the runtime address"
     );
 }
@@ -775,8 +777,8 @@ fn distinct_grammar_paths_produce_distinct_oids() {
         "distinct substrate paths must produce distinct runtime OIDs (the address discriminates)"
     );
 
-    assert_eq!(a_addr, Oid::hash("@grammar_a".as_bytes()));
-    assert_eq!(b_addr, Oid::hash("@grammar_b".as_bytes()));
+    assert_eq!(a_addr, Oid::hash(&Scope::public(), "@grammar_a".as_bytes()));
+    assert_eq!(b_addr, Oid::hash(&Scope::public(), "@grammar_b".as_bytes()));
 }
 
 /// Type-soundness witness (spec §5 law 1) for `grammar` declarations:
