@@ -41,6 +41,8 @@ pub mod trace;
 
 pub mod time;
 
+pub mod dependency;
+
 pub mod connection;
 pub mod content;
 pub mod kernel;
@@ -93,6 +95,9 @@ pub mod field;
 
 #[cfg(feature = "lapack")]
 pub mod band;
+
+#[cfg(feature = "lapack")]
+pub mod music;
 
 #[cfg(feature = "lapack")]
 pub mod shard;
