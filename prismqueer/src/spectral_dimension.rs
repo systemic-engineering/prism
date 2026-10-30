@@ -264,6 +264,27 @@ mod tests {
 
     // --- known-answer dimension recovery (LAPACK) ---
 
+    /// Characterization: `ffi::eigenvalues` (dsyev 'N') returns the same
+    /// spectrum as `ffi::eigensystem` (dsyev 'V'), in the same ascending
+    /// order. The dimension-recovery tests below read only eigenvalues, so
+    /// they may use the cheaper call. A 6³ torus (N=216) has a heavily
+    /// degenerate spectrum, the case most likely to diverge.
+    #[test]
+    fn eigenvalues_match_eigensystem_on_a_small_torus() {
+        let (n, edges) = torus_3d(6);
+        let lap = laplacian_from_edges(n, &edges);
+        let values = ffi::eigenvalues(n, &lap).expect("dsyev 'N' converges");
+        let (system, _) = ffi::eigensystem(n, &lap).expect("dsyev 'V' converges");
+        assert_eq!(values.len(), n);
+        assert_eq!(system.len(), n);
+        for (k, (a, b)) in values.iter().zip(&system).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-10,
+                "eigenvalue {k}: eigenvalues() gives {a}, eigensystem() gives {b}",
+            );
+        }
+    }
+
     /// d_s should recover 2.0 on a 2D torus, read in the scaling window.
     ///
     /// Window: a log-spaced σ grid where the zero mode hasn't yet swamped the
