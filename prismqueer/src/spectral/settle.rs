@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 
 use terni::{Imperfect, Loss};
 
-use crate::spectral::commutator::build_laplacian;
+use crate::room::{coboundary, Modes, RoomError, Vertices};
 use crate::spectral::kleinos::{Graph, VertexId};
 
 /// A value per vertex. Keyed by vertex, not by position.
@@ -181,12 +181,12 @@ fn kernel(values: &[f64], components: usize, n: usize) -> Result<usize, Wall> {
     Ok(components)
 }
 
-/// A graph's Laplacian eigensystem: vertices in canonical order, eigenvalues
-/// ascending, eigenvectors as columns (`vectors[c * n + k]`, per `ffi`).
+/// A graph's Laplacian eigensystem: vertices in canonical order, and the
+/// [`Modes`] of L₀ = δ*δ on C⁰, built exactly in [`room`](crate::room) and
+/// measured once. Eigenvectors are read only through [`Modes::vector`].
 struct Eigen {
     vertices: Vec<VertexId>,
-    values: Vec<f64>,
-    vectors: Vec<f64>,
+    modes: Modes<Vertices>,
     /// The first `harmonic` eigenvalues are the kernel, certified.
     harmonic: usize,
 }
@@ -197,16 +197,30 @@ impl Eigen {
         let n = vertices.len();
         let index: BTreeMap<VertexId, usize> =
             vertices.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-        let laplacian = build_laplacian(graph, &index, n);
-        let (values, vectors) =
-            crate::ffi::eigensystem(n, &laplacian).map_err(Wall::Eigensystem)?;
-        let harmonic = kernel(&values, components(graph, &index), n)?;
+        let delta = coboundary(graph);
+        let laplacian = delta
+            .then(&delta.adjoint())
+            .expect("δ then δ*: C⁰ → C¹ → C⁰ of one graph");
+        let modes = laplacian
+            .measure()
+            .symmetric()
+            .expect("δ*δ is symmetric, exactly")
+            .decompose()
+            .map_err(|e| match e {
+                RoomError::Unmeasured(info) => Wall::Eigensystem(info),
+                other => unreachable!("decompose fails only unmeasured: {other:?}"),
+            })?;
+        let harmonic = kernel(modes.spectrum(), components(graph, &index), n)?;
         Ok(Self {
             vertices,
-            values,
-            vectors,
+            modes,
             harmonic,
         })
+    }
+
+    /// The eigenvalues, ascending.
+    fn values(&self) -> &[f64] {
+        self.modes.spectrum()
     }
 
     /// Whether mode `k` is in the kernel. Decided by index, not by threshold.
@@ -214,9 +228,11 @@ impl Eigen {
         k < self.harmonic
     }
 
-    fn vector(&self, k: usize) -> Vec<f64> {
-        let n = self.vertices.len();
-        (0..n).map(|c| self.vectors[c * n + k]).collect()
+    /// Eigenvector `k`, a vector of C⁰.
+    fn vector(&self, k: usize) -> &[f64] {
+        self.modes
+            .vector(k)
+            .expect("one eigenvector per eigenvalue")
     }
 }
 
@@ -247,7 +263,7 @@ pub fn settle(
     let n = psi.len();
     let mut out = vec![0.0_f64; n];
     let mut motion = Tail::zero();
-    for (k, &eigenvalue) in eigen.values.iter().enumerate() {
+    for (k, &eigenvalue) in eigen.values().iter().enumerate() {
         let v = eigen.vector(k);
         let was: f64 = v.iter().zip(&psi).map(|(a, b)| a * b).sum();
         let harmonic = eigen.is_harmonic(k);
@@ -256,7 +272,7 @@ pub fn settle(
         } else {
             was * (-eigenvalue * t.0).exp()
         };
-        for (o, &vi) in out.iter_mut().zip(&v) {
+        for (o, &vi) in out.iter_mut().zip(v) {
             *o += now * vi;
         }
         if harmonic {
