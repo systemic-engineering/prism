@@ -34,7 +34,7 @@ use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use prismqueer::band::{zeros, Verdict};
 use prismqueer::room::{
-    coboundary, coboundary_over, dirac, Edges, Map, Room, RoomError, Sum, Vertices, Z,
+    coboundary, coboundary_over, dirac, laplacian, Edges, Map, Room, RoomError, Sum, Vertices, Z,
 };
 use prismqueer::spectral::instrument::Instrument;
 use prismqueer::spectral::{graph_from_edges, Graph};
@@ -1014,4 +1014,17 @@ fn composing_across_vertex_sets_is_still_an_error() {
         ),
         "an edge room over another 0-skeleton"
     );
+}
+
+/// `laplacian(g)` is δ*δ composed by hand (law 2 holds that one to the
+/// independent flat build), already checked symmetric, and measures to it.
+#[test]
+fn the_laplacian_is_delta_star_delta_symmetric_by_construction() {
+    for (name, g) in more_graphs() {
+        let (l0, _) = laplacians(&g);
+        let measured = l0.measure().symmetric().expect("δ*δ is symmetric");
+        let l0 = l0.symmetric().expect("δ*δ is symmetric");
+        assert_eq!(laplacian(&g), l0, "{name}: L₀ = δ*δ, exactly");
+        assert_eq!(laplacian(&g).measure(), measured, "{name}: measured");
+    }
 }

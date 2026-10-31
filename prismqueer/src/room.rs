@@ -702,6 +702,13 @@ impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, Sum<A, B>, R> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Symmetric<A: Kind, R>(Map<A, A, R>);
 
+impl<A: Kind, R: Measure> Symmetric<A, R> {
+    /// Measured: every entry as `f64`. A mirror stays a mirror.
+    pub fn measure(&self) -> Symmetric<A, f64> {
+        Symmetric(self.0.measure())
+    }
+}
+
 impl<A: Kind> Symmetric<A, f64> {
     /// The room's resonances: eigenvalues and eigenvectors, by LAPACK's dsyev.
     /// The matrix goes over as stored (column-major), without a copy.
@@ -885,6 +892,12 @@ fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
         }
     }
     delta
+}
+
+/// L₀ = δ*δ on C⁰ of `graph`, exactly: symmetric by construction.
+pub fn laplacian(graph: &Graph) -> Symmetric<Vertices, Z> {
+    let room = Room::vertices(graph);
+    Symmetric(Map::zero(&room, &room))
 }
 
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge
