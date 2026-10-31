@@ -58,6 +58,19 @@ The observer appears in identity **only through its boundary, never through its 
 
 **Identity is content, modulo the observer's lossless re-readings, keyed by how far the observer lets itself be known.** Every other frame (type, position, chart, time within an epoch) is a reading kept beside the address, never fused into it.
 
+### Address and identity (signed by Alex, 2026-10-31; prism-013 §2)
+
+- **An address is not an identity.** An address is f(bytes, key material). Any holder of the key can compute it, and it never depends on receipt or on a gate. "From bytes alone" holds only in the public scope.
+- **An identity is an address held in a relation.** Alex: *"An identity only exists in relation to other observers."* A seal by one observer alone is an offer, not yet an identity.
+- **The identity root is no exception.** Its body is a binding, such as `@mirror` ↔ `addr(mirror.mirror)`. The signer goes beside it, as the seal at the first Drop. Two signers of one binding share one root identity.
+- **A share is an identity event:** it moves a crystal across a relation.
+
+### Two keys, and which one this is (Mara; prism-013 §1)
+
+- **`K_id`** keys addresses. It changes only at consent events: widening, narrowing, or erasure. Revoking a `K_id` epoch is erasure.
+- **`K_enc`** keys the encrypted envelopes. It rotates freely and never moves an address. Deleting it erases readability only.
+- **prism's `Scope` is `K_id`, and only `K_id`.** `Oid::hash` keys addresses with it and nothing else. Envelopes (AEAD, sync) belong to mirror and spectral, so prism doesn't carry `K_enc`. If prism ever seals envelopes, `K_enc` will be a separate type, never a field of `Scope`, so that an address can't be computed with an encryption key by accident.
+
 ## Out of scope
 
 **Key management.** Where held keys come from (the key hierarchy, sharing, rotation by key epochs, revocation, and whether a scope is deterministic or per-crystal) is designed outside prism (Mara's design, in mirror). prism takes a key as 32 bytes and never stores, derives, prints or rotates it. In prism, `Scope`'s `Debug` doesn't print the key.
