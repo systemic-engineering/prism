@@ -60,6 +60,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::field::{complex_oid, Graph as Multigraph};
 use crate::oid::{Addressable, Oid, Scope};
 use crate::room::RoomError;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
@@ -143,37 +144,55 @@ pub type Green = Composition;
 /// Laplacian per Hansen-Ghrist 2019 §3 Remark). Phase 2+ adds non-trivial
 /// `Stalker` newtype (Q-Mara-ϑ Alex ratification) + explicit sheaf-morphism
 /// restriction maps.
+///
+/// A simple graph: a [`field::Graph`](crate::field::Graph) multigraph whose
+/// every pair has at most one edge (self-loops allowed). That multigraph is
+/// what [`room`](crate::room) and [`field`](crate::field) are built on
+/// ([`Graph::multigraph`]); this type only guarantees the simplicity that
+/// [`Instrument`](crate::spectral::instrument::Instrument), `settle` and
+/// `kleinos` read edges by, as [`EdgeKey`]s.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Graph {
-    vertices: BTreeSet<VertexId>,
-    edges: BTreeSet<EdgeKey>,
+    multigraph: Multigraph,
 }
 
 impl Graph {
+    /// The simple graph on `vertices` and `edges` (canonical keys), whose
+    /// ends are among the vertices.
+    fn simple(vertices: BTreeSet<VertexId>, edges: BTreeSet<EdgeKey>) -> Self {
+        Graph {
+            multigraph: Multigraph::new(vertices, edges),
+        }
+    }
+
+    /// This graph as the multigraph it is: every multiplicity at most 1.
+    pub fn multigraph(&self) -> &Multigraph {
+        &self.multigraph
+    }
+
     /// Iterate over vertices in canonical order.
     pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
-        self.vertices.iter().copied()
+        self.multigraph.vertices()
     }
 
     /// Iterate over edges in canonical order.
     pub fn edges(&self) -> impl Iterator<Item = EdgeKey> + '_ {
-        self.edges.iter().copied()
+        self.multigraph.edges().map(|e| e.ends())
     }
 
     /// Sovereignty accessor: does this sheaf contain vertex `v`?
     pub fn contains_vertex(&self, v: VertexId) -> bool {
-        self.vertices.contains(&v)
+        self.multigraph.contains_vertex(v)
     }
 
     /// Sovereignty accessor: does this sheaf contain edge `e`?
     pub fn contains_edge(&self, e: EdgeKey) -> bool {
-        let canonical = edge_key(e.0, e.1);
-        self.edges.contains(&canonical)
+        self.multigraph.multiplicity(e) > 0
     }
 
     /// Vertex count (for content-address determinism).
     pub fn vertex_count(&self) -> usize {
-        self.vertices.len()
+        self.multigraph.vertex_count()
     }
 }
 
@@ -181,27 +200,6 @@ impl Addressable for Graph {
     fn oid(&self) -> Oid {
         complex_oid(self.vertices(), self.edges())
     }
-}
-
-/// The content address of the 1-complex with these vertices and edges, both
-/// given ascending. Canonical serialization: vertices, a separator, edges.
-/// Content-address per Rec #82 β-normal AST OID. With no edges it is the
-/// address of a 0-skeleton, which is how [`room`](crate::room) addresses a
-/// vertex room by its vertex set alone.
-pub(crate) fn complex_oid(
-    vertices: impl Iterator<Item = VertexId>,
-    edges: impl Iterator<Item = EdgeKey>,
-) -> Oid {
-    let mut bytes = Vec::new();
-    for v in vertices {
-        bytes.extend_from_slice(&v.to_le_bytes());
-    }
-    bytes.push(0xFF); // separator
-    for e in edges {
-        bytes.extend_from_slice(&e.0.to_le_bytes());
-        bytes.extend_from_slice(&e.1.to_le_bytes());
-    }
-    Oid::hash(&Scope::public(), &bytes)
 }
 
 /// The composed sheaf carries the K_3-composed structure with accessor
@@ -289,10 +287,7 @@ pub fn graph_from_edges(edges: &[(VertexId, VertexId)]) -> Graph {
         vertices.insert(b);
         edge_set.insert(edge_key(a, b));
     }
-    Graph {
-        vertices,
-        edges: edge_set,
-    }
+    Graph::simple(vertices, edge_set)
 }
 
 /// Construct a complete-graph shard-sheaf K_n of order n (vertices 0..n).
@@ -476,24 +471,20 @@ pub fn kleinos(sheaf_a: &Graph, sheaf_b: &Graph) -> Imperfect<Green, Red, Conver
 fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
     let emergent_third = compute_emergent_third_id(a, b);
 
-    let mut vertices: BTreeSet<VertexId> = a.vertices.iter().copied().collect();
-    for v in b.vertices.iter() {
-        vertices.insert(*v);
-    }
+    let mut vertices: BTreeSet<VertexId> = a.vertices().collect();
+    vertices.extend(b.vertices());
     vertices.insert(emergent_third);
 
-    let mut edges: BTreeSet<EdgeKey> = a.edges.iter().copied().collect();
-    for e in b.edges.iter() {
-        edges.insert(*e);
-    }
+    let mut edges: BTreeSet<EdgeKey> = a.edges().collect();
+    edges.extend(b.edges());
 
     // THE RING: complete bipartite bridging between a-vertices and
     // b-vertices creates |V(a)| * |V(b)| cycles = new H¹ cohomology
     // classes = the topological hole that IS the emergent third.
     // Softmax lives in conv(Training); compose CREATES cohomology
     // classes softmax cannot reach.
-    for &u in a.vertices.iter() {
-        for &v in b.vertices.iter() {
+    for u in a.vertices() {
+        for v in b.vertices() {
             edges.insert(edge_key(u, v));
         }
     }
@@ -510,15 +501,12 @@ fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
     // inputs the composed graph IS K_{2n+1} (λ₂ = 2n+1 > n). For sparse
     // inputs the composed graph is K_{|V|} minus the missing internal
     // edges (λ₂ still strictly > max component connectivity).
-    for &v in a.vertices.iter() {
-        edges.insert(edge_key(emergent_third, v));
-    }
-    for &v in b.vertices.iter() {
+    for v in a.vertices().chain(b.vertices()) {
         edges.insert(edge_key(emergent_third, v));
     }
 
     Composition {
-        underlying: Graph { vertices, edges },
+        underlying: Graph::simple(vertices, edges),
         emergent_third,
         fiedler_lambda_2_cached: 0.0, // filled at into_result
     }
@@ -528,13 +516,7 @@ fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
 /// discipline. Guaranteed to not collide with any vertex in a or b via
 /// max(a.vertices ∪ b.vertices) + 1 fallback.
 fn compute_emergent_third_id(a: &Graph, b: &Graph) -> VertexId {
-    let max_existing = a
-        .vertices
-        .iter()
-        .chain(b.vertices.iter())
-        .copied()
-        .max()
-        .unwrap_or(0);
+    let max_existing = a.vertices().chain(b.vertices()).max().unwrap_or(0);
     max_existing + 1
 }
 

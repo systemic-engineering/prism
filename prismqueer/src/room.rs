@@ -89,9 +89,9 @@ use std::marker::PhantomData;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{Exact, Group};
+use crate::field::{complex_oid, Exact, Group};
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::{complex_oid, Graph, VertexId};
+use crate::spectral::kleinos::{Graph, VertexId};
 
 // --- Kinds of room -----------------------------------------------------------
 

@@ -50,6 +50,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 
+use crate::oid::{Oid, Scope};
 use crate::spectral::kleinos::{EdgeKey, Graph as Shape, VertexId};
 use crate::spectral::settle::Noise;
 
@@ -305,11 +306,15 @@ pub struct Point;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Discrete;
 
-/// The base of a connection: a multigraph, with a value on every edge.
+/// A multigraph: prism's one graph type. The base of a connection (a value
+/// on every edge), and the complex a [`room`](crate::room) is built on.
 ///
 /// Two edges between the same pair are two edges ([`Edge::nth`] tells them
-/// apart), each with its own transport. Cycle space and b₁ count them both,
-/// so a doubled pair is one independent loop, of length 2.
+/// apart), each with its own transport and its own dimension of C¹. Cycle
+/// space and b₁ count them both, so a doubled pair is one independent loop,
+/// of length 2. A self-loop (v, v) is an edge. A simple graph
+/// ([`spectral::Graph`](crate::spectral::Graph)) is a multigraph with every
+/// multiplicity at most 1.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Graph {
     vertices: BTreeSet<VertexId>,
@@ -353,14 +358,70 @@ fn ordered(a: VertexId, b: VertexId) -> EdgeKey {
     }
 }
 
+/// The content address of the 1-complex with these vertices and edges, both
+/// given ascending. Canonical serialization: vertices, a separator, edges,
+/// each edge as its two ends, so `m` parallel edges are their ends `m`
+/// times. Content-address per Rec #82 β-normal AST OID. With no edges it is
+/// the address of a 0-skeleton, which is how [`room`](crate::room) addresses
+/// a vertex room by its vertex set alone.
+pub(crate) fn complex_oid(
+    vertices: impl Iterator<Item = VertexId>,
+    edges: impl Iterator<Item = EdgeKey>,
+) -> Oid {
+    let mut bytes = Vec::new();
+    for v in vertices {
+        bytes.extend_from_slice(&v.to_le_bytes());
+    }
+    bytes.push(0xFF); // separator
+    for e in edges {
+        bytes.extend_from_slice(&e.0.to_le_bytes());
+        bytes.extend_from_slice(&e.1.to_le_bytes());
+    }
+    Oid::hash(&Scope::public(), &bytes)
+}
+
 /// A spanning forest of a graph: tree neighbours (with the edge's index) and
 /// the chords, the edges that close a cycle.
 type Forest = (BTreeMap<VertexId, Vec<(VertexId, usize)>>, Vec<usize>);
 
 impl Graph {
+    /// The multigraph on `vertices` and the edges' ends, with every given
+    /// pair its own edge: a pair given twice is two parallel edges, numbered
+    /// by [`Edge::nth`] in the order given. Ends in either order.
+    pub fn new(
+        vertices: impl IntoIterator<Item = VertexId>,
+        edges: impl IntoIterator<Item = EdgeKey>,
+    ) -> Self {
+        let mut vertices: BTreeSet<VertexId> = vertices.into_iter().collect();
+        let mut seen: BTreeMap<EdgeKey, usize> = BTreeMap::new();
+        let mut numbered = Vec::new();
+        for (a, b) in edges {
+            let ends = ordered(a, b);
+            let nth = seen.entry(ends).or_insert(0);
+            numbered.push(Edge { ends, nth: *nth });
+            *nth += 1;
+            vertices.extend([a, b]);
+        }
+        numbered.sort();
+        Graph {
+            vertices,
+            edges: numbered,
+        }
+    }
+
     /// The vertices, in order.
     pub fn vertices(&self) -> impl Iterator<Item = VertexId> + '_ {
         self.vertices.iter().copied()
+    }
+
+    /// How many vertices.
+    pub fn vertex_count(&self) -> usize {
+        self.vertices.len()
+    }
+
+    /// Whether `v` is a vertex.
+    pub fn contains_vertex(&self, v: VertexId) -> bool {
+        self.vertices.contains(&v)
     }
 
     /// The edges, by ends and then by `nth`.
@@ -509,16 +570,13 @@ impl<V: Group> Field<Graph, V> {
             }
             by_edge.insert(key, t);
         }
-        let edges: Vec<Edge> = graph.edges().map(|(a, b)| Edge::between(a, b, 0)).collect();
-        let mut values = Vec::with_capacity(edges.len());
-        for e in &edges {
+        let base = graph.multigraph().clone();
+        let mut values = Vec::with_capacity(base.edges.len());
+        for e in &base.edges {
             values.push(by_edge.remove(&e.ends).ok_or(FieldError::Missing(e.ends))?);
         }
         Ok(Field {
-            base: Graph {
-                vertices: graph.vertices().collect(),
-                edges,
-            },
+            base,
             faces: Vec::new(),
             values,
         })
