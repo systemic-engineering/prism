@@ -39,6 +39,25 @@ A plain content address, `BLAKE3(content)`, has two faults:
 
 Under a scoped address, the same content in two scopes has two unrelated addresses (see the `scopes_separate` vectors). Identity is "this content, in this scope".
 
+## What identity is relative to
+
+Signed by Alex, 2026-10-31: *"It's relative to the observer itself. It is how the observer is known to the world at large."*
+
+An address is not a property of the content. It is the trace of an observer making itself known. Two rules follow, and they are one rule:
+
+- **A lossless shift doesn't change identity.** A re-sorted chart, a permutation of the basis, or a renamed label (a named-projection \*-isomorphism) leaves the observer and the content unchanged.
+- **The consent boundary changes identity,** because it is the observer's boundary: how far it lets itself be known. That is what `K_scope` is. A held key is private, a key shared with a circle is protected, and a published key is known to the world at large (`visibility/public`).
+
+The observer appears in identity **only through its boundary, never through its name.** If the observer itself were hashed, the same public sentence from two speakers would get two addresses, so dedup would break. Worse, anyone could link an utterance to its speaker by recomputing the hash. So the observer's three aspects live in three places:
+
+| aspect of the observer | where it lives |
+|---|---|
+| how far it is known (its boundary) | **in** the address: the scope key |
+| who it is | **beside** the address: the signature at the Drop |
+| where it stood | **beside** the address: the spectral uuid's active half |
+
+**Identity is content, modulo the observer's lossless re-readings, keyed by how far the observer lets itself be known.** Every other frame (type, position, chart, time within an epoch) is a reading kept beside the address, never fused into it.
+
 ## Out of scope
 
 **Key management.** Where held keys come from (the key hierarchy, sharing, rotation by key epochs, revocation, and whether a scope is deterministic or per-crystal) is designed outside prism (Mara's design, in mirror). prism takes a key as 32 bytes and never stores, derives, prints or rotates it. In prism, `Scope`'s `Debug` doesn't print the key.
