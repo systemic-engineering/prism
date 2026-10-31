@@ -58,9 +58,10 @@
 //! - `terni::{Transparency, PropertyVerdict, OpacityMap, Diagnostic}` (LOVE-
 //!   monoid re-exported via `prismqueer/src/lib.rs`)
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::oid::{Addressable, Oid, Scope};
+use crate::room::{coboundary, RoomError};
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------
@@ -297,46 +298,45 @@ pub fn graph_complete_of_order(n: usize) -> Graph {
 
 // ---------------------------------------------------------------------------
 // Property-3 helper: Fiedler λ₂ computation per Hansen-Ghrist 2019 sheaf L_F
-// composed over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via FLANG)
+// read from L₀ = δ*δ in `room` (LAPACK dsyev via FLANG)
 // ---------------------------------------------------------------------------
 
 /// Compute Fiedler λ₂ (algebraic connectivity) of the graph Laplacian.
 ///
 /// Phase 1: bare graph Laplacian (trivial stalks per Q-Mara-λ Hansen-Ghrist
-/// 2019 §3 Remark recovery). Composes over `prismqueer::ffi::eigenvalues`
-/// (LAPACK dsyev at LANDED FLANG floor).
+/// 2019 §3 Remark recovery). L₀ and its spectrum come from
+/// [`room`](crate::room), through [`laplacian_spectrum`].
 ///
 /// Returns 0.0 for empty or single-vertex sheaves (λ₁ = 0; no λ₂).
 /// Returns 0.0 for disconnected sheaves (λ₂ = 0 by definition).
 pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
-    let n = sheaf.vertex_count();
-    if n < 2 {
+    if sheaf.vertex_count() < 2 {
         return 0.0;
     }
-
-    // Map VertexId → matrix index (canonical order per BTreeSet).
-    let vertex_index: BTreeMap<VertexId, usize> =
-        sheaf.vertices().enumerate().map(|(i, v)| (v, i)).collect();
-
-    // Build graph Laplacian L = D - A (row-major flat matrix; symmetric).
-    let mut laplacian = vec![0.0_f64; n * n];
-    for (u, v) in sheaf.edges() {
-        let i = vertex_index[&u];
-        let j = vertex_index[&v];
-        // Off-diagonal: -1 per edge (symmetric)
-        laplacian[i * n + j] -= 1.0;
-        laplacian[j * n + i] -= 1.0;
-        // Diagonal: degree (accumulate)
-        laplacian[i * n + i] += 1.0;
-        laplacian[j * n + j] += 1.0;
-    }
-
-    // Compose over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via
-    // FLANG-compiled native/spectral.f90). Returns sorted eigenvalues.
-    match crate::ffi::eigenvalues(n, &laplacian) {
+    match laplacian_spectrum(sheaf) {
         Ok(evals) if evals.len() >= 2 => evals[1],
         _ => 0.0,
     }
+}
+
+/// The spectrum of the graph Laplacian L₀ = δ*δ on C⁰, ascending: built
+/// exactly in [`room`](crate::room), measured once, read by dsyev('N')
+/// ([`Symmetric::spectrum`](crate::room::Symmetric::spectrum)). Vertices in
+/// canonical order, as [`Graph::vertices`]. `Err` only when LAPACK refuses
+/// ([`RoomError::Unmeasured`]).
+pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, RoomError> {
+    let delta = coboundary(graph);
+    // Neither expect can fire, and no type here says so: δ and δ* are built
+    // from one graph, so their rooms agree, and δ*δ is symmetric exactly
+    // (entries in Z), so `symmetric` can't refuse.
+    let laplacian = delta
+        .then(&delta.adjoint())
+        .expect("δ then δ*: C⁰ → C¹ → C⁰ of one graph");
+    laplacian
+        .measure()
+        .symmetric()
+        .expect("δ*δ is symmetric, exactly")
+        .spectrum()
 }
 
 // ---------------------------------------------------------------------------
