@@ -73,7 +73,11 @@ fn derivative_content_and_primitive_part() {
     assert_eq!(z(&[7]).derivative(), z(&[]));
     let p = z(&[-6, 4, 10]); // −2·(3x² − 2x − 5)
     assert_eq!(p.content(), BigInt::from(2));
-    assert_eq!(p.primitive(), z(&[3, -2, -5]), "positive leading coefficient");
+    assert_eq!(
+        p.primitive(),
+        z(&[3, -2, -5]),
+        "positive leading coefficient"
+    );
     assert_eq!(z(&[]).content(), BigInt::from(0));
     assert_eq!(z(&[]).primitive(), z(&[]));
 }
@@ -192,7 +196,18 @@ fn the_triangles_roots_isolate_to_0_and_3() {
     assert!(intervals[0].contains(&q(0, 1)));
     assert!(intervals[1].contains(&q(3, 1)));
     assert!(intervals[0].hi() <= intervals[1].lo());
-    assert_eq!(roots.index_of(&q(3, 1)), Some(1), "3 is the root of index 1");
+    // Exactly: the Cauchy bound 1 + 3 = 4, bisected once at 0.
+    let ends: Vec<_> = intervals.iter().map(|i| (i.lo(), i.hi())).collect();
+    assert_eq!(
+        ends,
+        vec![(&q(-4, 1), &q(0, 1)), (&q(0, 1), &q(4, 1))],
+        "(−4, 0] and (0, 4]"
+    );
+    assert_eq!(
+        roots.index_of(&q(3, 1)),
+        Some(1),
+        "3 is the root of index 1"
+    );
     assert_eq!(roots.index_of(&q(0, 1)), Some(0));
     assert_eq!(roots.index_of(&q(1, 1)), None, "1 isn't a root");
 }

@@ -100,6 +100,10 @@ pub mod band;
 #[cfg(feature = "lapack")]
 pub mod room;
 
+// Exact polynomials over ℤ and ℚ: gcds, square-free parts, real roots
+// isolated by Sturm sequences. No floats, no LAPACK.
+pub mod poly;
+
 #[cfg(feature = "lapack")]
 pub mod music;
 

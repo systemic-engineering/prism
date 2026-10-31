@@ -1400,6 +1400,12 @@ impl Charpoly {
     pub fn degree(&self) -> usize {
         self.coefficients.len() - 1
     }
+
+    /// The same polynomial in ℤ[x], for exact arithmetic on it: its
+    /// square-free part, its real roots ([`crate::poly`]).
+    pub fn poly(&self) -> crate::poly::ZPoly {
+        crate::poly::ZPoly::from_descending(self.coefficients.iter().map(|c| c.0.clone()))
+    }
 }
 
 // --- Smith normal form -------------------------------------------------------
