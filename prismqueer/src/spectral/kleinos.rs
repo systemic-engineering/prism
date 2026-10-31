@@ -179,19 +179,29 @@ impl Graph {
 
 impl Addressable for Graph {
     fn oid(&self) -> Oid {
-        // Canonical serialization: vertices sorted + edges sorted (BTreeSet
-        // preserves order). Content-address per Rec #82 β-normal AST OID.
-        let mut bytes = Vec::new();
-        for v in self.vertices.iter() {
-            bytes.extend_from_slice(&v.to_le_bytes());
-        }
-        bytes.push(0xFF); // separator
-        for e in self.edges.iter() {
-            bytes.extend_from_slice(&e.0.to_le_bytes());
-            bytes.extend_from_slice(&e.1.to_le_bytes());
-        }
-        Oid::hash(&Scope::public(), &bytes)
+        complex_oid(self.vertices(), self.edges())
     }
+}
+
+/// The content address of the 1-complex with these vertices and edges, both
+/// given ascending. Canonical serialization: vertices, a separator, edges.
+/// Content-address per Rec #82 β-normal AST OID. With no edges it is the
+/// address of a 0-skeleton, which is how [`room`](crate::room) addresses a
+/// vertex room by its vertex set alone.
+pub(crate) fn complex_oid(
+    vertices: impl Iterator<Item = VertexId>,
+    edges: impl Iterator<Item = EdgeKey>,
+) -> Oid {
+    let mut bytes = Vec::new();
+    for v in vertices {
+        bytes.extend_from_slice(&v.to_le_bytes());
+    }
+    bytes.push(0xFF); // separator
+    for e in edges {
+        bytes.extend_from_slice(&e.0.to_le_bytes());
+        bytes.extend_from_slice(&e.1.to_le_bytes());
+    }
+    Oid::hash(&Scope::public(), &bytes)
 }
 
 /// The composed sheaf carries the K_3-composed structure with accessor

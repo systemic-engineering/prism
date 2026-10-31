@@ -15,9 +15,14 @@
 //! What `room` keeps from collapsing early:
 //! - **The kind of a room is a type.** [`Map<A, B, R>`] goes from a room of
 //!   kind `A` to one of kind `B`; it only composes ([`Map::then`]) with a map
-//!   out of `B`. The dimension and the complex (the graph's [`Oid`]) are
-//!   runtime values the room carries; a mismatch there is a checked
-//!   [`RoomError::Mismatch`], never a panic or a silent wrong answer.
+//!   out of `B`. The dimension and the address ([`Oid`]) are runtime values
+//!   the room carries; a mismatch there is a checked [`RoomError::Mismatch`],
+//!   never a panic or a silent wrong answer.
+//! - **Identity is per skeleton.** C⁰ is addressed by its vertex set alone,
+//!   and C¹ sits over a C⁰ by relation ([`Room::skeleton`]), so the
+//!   Laplacians of two graphs on one vertex set compose: they are maps of one
+//!   room. [`coboundary_over`] takes δ out of a larger C⁰(V), for graphs on
+//!   different vertices compared over their union.
 //! - **Exact topology stays exact.** δ is built over [`Z`], integers that are
 //!   an [`Exact`] group in `field`'s terms. They are arbitrary-precision, so
 //!   exact maps compose exactly and never overflow. Moving to `f64` is one
@@ -85,8 +90,8 @@ use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{Exact, Group};
-use crate::oid::{Addressable, Oid};
-use crate::spectral::kleinos::{Graph, VertexId};
+use crate::oid::{Oid, Scope};
+use crate::spectral::kleinos::{complex_oid, Graph, VertexId};
 
 // --- Kinds of room -----------------------------------------------------------
 
@@ -97,12 +102,12 @@ mod sealed {
 /// The kind of a room: which space it is, as a type. Sealed: the kinds are
 /// [`Vertices`], [`Edges`] and their [`Sum`]s.
 pub trait Kind: sealed::Sealed + Clone + PartialEq + Debug + 'static {
-    /// What a room of this kind carries besides its dimension and complex:
-    /// nothing for a cell room, its two summands for a sum.
+    /// What a room of this kind carries besides its dimension and address:
+    /// its basis for C⁰, nothing for C¹, its two summands for a sum.
     type Parts: Clone + PartialEq + Debug;
 }
 
-/// C⁰: one dimension per vertex, in the graph's vertex order.
+/// C⁰: one dimension per vertex, in ascending vertex id.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Vertices;
 
@@ -120,7 +125,8 @@ impl sealed::Sealed for Edges {}
 impl<A, B> sealed::Sealed for Sum<A, B> {}
 
 impl Kind for Vertices {
-    type Parts = ();
+    /// The basis: the vertex ids, ascending.
+    type Parts = Vec<VertexId>;
 }
 impl Kind for Edges {
     type Parts = ();
@@ -131,30 +137,42 @@ impl<A: Kind, B: Kind> Kind for Sum<A, B> {
 
 // --- Rooms -------------------------------------------------------------------
 
-/// A room: a space of kind `K`, with its dimension and the complex it
-/// belongs to. Two rooms are the same room when kind, dimension, complex
-/// and (for a sum) summands agree.
+/// A room: a space of kind `K`, with its dimension, its address and the
+/// 0-skeleton it sits over. Two rooms are the same room when kind,
+/// dimension, address, skeleton and parts (C⁰'s basis, a sum's summands)
+/// agree.
+///
+/// Identity is per skeleton level, not the whole complex. C⁰ is addressed
+/// by its vertex set alone, so two graphs on one vertex set share one C⁰.
+/// C¹ is addressed by its complex and sits over a C⁰ by relation: its
+/// [`skeleton`](Room::skeleton) is that C⁰'s address. Rewiring the edges
+/// changes C¹ over a fixed C⁰, not the vertex space.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Room<K: Kind> {
+    /// C⁰: the 0-skeleton (V, ∅)'s address. C¹: the complex's. A sum: its
+    /// summands', in order.
     complex: Oid,
+    /// The address of the C⁰ this room sits over.
+    skeleton: Oid,
     dim: usize,
     parts: K::Parts,
     kind: PhantomData<K>,
 }
 
-/// Where a room is, for an error report: its dimension and complex.
+/// Where a room is, for an error report: its dimension and address.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
     /// The room's dimension.
     pub dim: usize,
-    /// The content address of the complex the room belongs to.
+    /// The room's address ([`Room::complex`]).
     pub complex: Oid,
 }
 
 /// Why a room operation refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RoomError {
-    /// Two rooms that had to be one aren't (dimension, complex or summands).
+    /// Two rooms that had to be one aren't (dimension, address, skeleton or
+    /// summands), or a graph doesn't fit in a vertex room.
     Mismatch {
         /// The room the operation was in.
         expected: Place,
@@ -179,38 +197,57 @@ pub enum RoomError {
     Unmeasured(i32),
 }
 
-impl<K: Kind<Parts = ()>> Room<K> {
-    fn cell(graph: &Graph, dim: usize) -> Self {
-        Room {
-            complex: graph.oid(),
-            dim,
-            parts: (),
-            kind: PhantomData,
-        }
-    }
-}
-
 impl Room<Vertices> {
-    /// C⁰(V): one dimension per vertex of `vertices`, ascending.
+    /// C⁰(V): one dimension per vertex of `vertices`, ascending. Addressed
+    /// by V alone: the address of the 0-skeleton (V, ∅).
     pub fn over(vertices: &BTreeSet<VertexId>) -> Self {
+        let address = complex_oid(vertices.iter().copied(), std::iter::empty());
         Room {
-            complex: Oid::dark(),
+            skeleton: address.clone(),
+            complex: address,
             dim: vertices.len(),
-            parts: (),
+            parts: vertices.iter().copied().collect(),
             kind: PhantomData,
         }
     }
 
-    /// C⁰ of `graph`.
+    /// C⁰ of `graph`: the room over its vertex set.
     pub fn vertices(graph: &Graph) -> Self {
-        Room::cell(graph, graph.vertex_count())
+        Room::over(&graph.vertices().collect())
+    }
+
+    /// `Ok` when every vertex of `graph` is a dimension of this room.
+    fn holds(&self, graph: &Graph) -> Result<(), RoomError> {
+        if graph
+            .vertices()
+            .all(|v| self.parts.binary_search(&v).is_ok())
+        {
+            Ok(())
+        } else {
+            Err(RoomError::Mismatch {
+                expected: self.place(),
+                found: Room::vertices(graph).place(),
+            })
+        }
     }
 }
 
 impl Room<Edges> {
-    /// C¹ of `graph`.
+    /// C¹ of `graph`, over its own C⁰.
     pub fn edges(graph: &Graph) -> Self {
-        Room::cell(graph, graph.edges().count())
+        Room::edges_over(&Room::vertices(graph), graph)
+    }
+
+    /// C¹ of `graph` over `skeleton`, whose vertices hold the graph's: the
+    /// complex (V, E). Unchecked; [`Room::holds`] checks.
+    fn edges_over(skeleton: &Room<Vertices>, graph: &Graph) -> Self {
+        Room {
+            complex: complex_oid(skeleton.parts.iter().copied(), graph.edges()),
+            skeleton: skeleton.complex.clone(),
+            dim: graph.edges().count(),
+            parts: (),
+            kind: PhantomData,
+        }
     }
 }
 
@@ -220,14 +257,16 @@ impl<K: Kind> Room<K> {
         self.dim
     }
 
-    /// The content address of the complex this room belongs to.
+    /// This room's content address: for C⁰ its vertex set's, for C¹ its
+    /// complex's, for a sum its summands' in order.
     pub fn complex(&self) -> &Oid {
         &self.complex
     }
 
-    /// The content address of the 0-skeleton this room sits over.
+    /// The content address of the C⁰ this room sits over: C⁰'s own, C¹'s
+    /// 0-skeleton, a sum's shared one.
     pub fn skeleton(&self) -> &Oid {
-        &self.complex
+        &self.skeleton
     }
 
     fn place(&self) -> Place {
@@ -251,16 +290,18 @@ impl<K: Kind> Room<K> {
 }
 
 impl<A: Kind, B: Kind> Room<Sum<A, B>> {
-    /// `left ⊕ right`. Refused unless both belong to one complex.
+    /// `left ⊕ right`. Refused unless both sit over one C⁰.
     pub fn sum(left: &Room<A>, right: &Room<B>) -> Result<Self, RoomError> {
-        if left.complex != right.complex {
+        if left.skeleton != right.skeleton {
             return Err(RoomError::Mismatch {
                 expected: left.place(),
                 found: right.place(),
             });
         }
+        let summands = format!("{}⊕{}", left.complex.as_str(), right.complex.as_str());
         Ok(Room {
-            complex: left.complex.clone(),
+            complex: Oid::hash(&Scope::public(), summands.as_bytes()),
+            skeleton: left.skeleton.clone(),
             dim: left.dim + right.dim,
             parts: Box::new((left.clone(), right.clone())),
             kind: PhantomData,
@@ -799,8 +840,31 @@ impl<A: Kind> Modes<A> {
 /// A self-loop (v, v) has the zero row: s(v) − s(v) = 0. The two ends are
 /// summed, not written over each other.
 pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
-    let index: BTreeMap<_, _> = graph.vertices().enumerate().map(|(i, v)| (v, i)).collect();
-    let mut delta: Map<Vertices, Edges, Z> = Map::zero(&Room::vertices(graph), &Room::edges(graph));
+    delta(&Room::vertices(graph), graph)
+}
+
+/// δ of `graph` out of a given C⁰(V), V ⊇ the graph's vertices, into C¹ of
+/// the complex (V, E) over it. A vertex of V outside the graph has a zero
+/// column. Refused ([`RoomError::Mismatch`]) when the graph has a vertex
+/// outside V.
+pub fn coboundary_over(
+    skeleton: &Room<Vertices>,
+    graph: &Graph,
+) -> Result<Map<Vertices, Edges, Z>, RoomError> {
+    skeleton.holds(graph)?;
+    Ok(delta(skeleton, graph))
+}
+
+/// δ out of `skeleton`, which holds the graph's vertices.
+fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
+    let index: BTreeMap<_, _> = skeleton
+        .parts
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (v, i))
+        .collect();
+    let mut delta: Map<Vertices, Edges, Z> =
+        Map::zero(skeleton, &Room::edges_over(skeleton, graph));
     for (row, (u, v)) in graph.edges().enumerate() {
         for (w, sign) in [(u, Z::one().neg()), (v, Z::one())] {
             let at = delta.at(row, index[&w]);
@@ -808,15 +872,6 @@ pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
         }
     }
     delta
-}
-
-/// δ of `graph` out of a given C⁰(V), V ⊇ the graph's vertices.
-pub fn coboundary_over(
-    skeleton: &Room<Vertices>,
-    graph: &Graph,
-) -> Result<Map<Vertices, Edges, Z>, RoomError> {
-    let _ = skeleton;
-    Ok(coboundary(graph))
 }
 
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge
@@ -829,7 +884,7 @@ pub fn coboundary_over(
 /// is exactly L₁↓.
 pub fn dirac(graph: &Graph) -> Map<Sum<Vertices, Edges>, Sum<Vertices, Edges>, Z> {
     let delta = coboundary(graph);
-    let room = Room::sum(delta.from(), delta.to()).expect("δ's rooms share its graph");
+    let room = Room::sum(delta.from(), delta.to()).expect("δ's C¹ sits over its C⁰");
     // Every room below is built from `room`: the compositions can't mismatch.
     let down = Map::project_left(&room)
         .then(&delta)
