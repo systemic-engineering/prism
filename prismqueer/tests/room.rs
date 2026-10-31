@@ -254,17 +254,18 @@ fn naive_dirac(edges: &[(u64, u64)]) -> (usize, Vec<f64>) {
     let mut d = vec![0.0_f64; n * n];
     for (k, &(u, v)) in canonical.iter().enumerate() {
         let e = n0 + k;
-        d[e * n + at(u)] = -1.0;
-        d[at(u) * n + e] = -1.0;
-        d[e * n + at(v)] = 1.0;
-        d[at(v) * n + e] = 1.0;
+        // Summed, so a self-loop's two ends cancel.
+        d[e * n + at(u)] -= 1.0;
+        d[at(u) * n + e] -= 1.0;
+        d[e * n + at(v)] += 1.0;
+        d[at(v) * n + e] += 1.0;
     }
     (n, d)
 }
 
 /// Graphs for the cross-check: a cycle, a path, a chordal square, two
-/// components, and a cycle with a tail.
-fn reference_graphs() -> [(&'static str, Vec<(u64, u64)>); 5] {
+/// components, a cycle with a tail, and a self-loop.
+fn reference_graphs() -> [(&'static str, Vec<(u64, u64)>); 6] {
     [
         ("triangle", vec![(0, 1), (1, 2), (0, 2)]),
         ("path", vec![(10, 20), (20, 30), (30, 40)]),
@@ -280,6 +281,7 @@ fn reference_graphs() -> [(&'static str, Vec<(u64, u64)>); 5] {
             "cycle with a tail",
             vec![(0, 1), (1, 2), (2, 3), (3, 0), (3, 4), (4, 5)],
         ),
+        ("path with a self-loop", vec![(0, 1), (1, 1), (1, 2)]),
     ]
 }
 

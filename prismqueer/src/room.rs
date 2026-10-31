@@ -772,12 +772,17 @@ impl<A: Kind> Modes<A> {
 
 /// δ: C⁰ → C¹, exactly. `(δs)(u, v) = s(v) − s(u)` on each edge in
 /// canonical orientation: the edge's row holds −1 at `u`, +1 at `v`.
+///
+/// A self-loop (v, v) has the zero row: s(v) − s(v) = 0. The two ends are
+/// summed, not written over each other.
 pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
     let index: BTreeMap<_, _> = graph.vertices().enumerate().map(|(i, v)| (v, i)).collect();
-    let mut delta = Map::zero(&Room::vertices(graph), &Room::edges(graph));
+    let mut delta: Map<Vertices, Edges, Z> = Map::zero(&Room::vertices(graph), &Room::edges(graph));
     for (row, (u, v)) in graph.edges().enumerate() {
-        delta.set(row, index[&u], Z::one().neg());
-        delta.set(row, index[&v], Z::one());
+        for (w, sign) in [(u, Z::one().neg()), (v, Z::one())] {
+            let at = delta.at(row, index[&w]);
+            delta.entries[at] = delta.entries[at].add(&sign);
+        }
     }
     delta
 }
