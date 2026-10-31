@@ -15,6 +15,9 @@
 //!    follows from D² = L₀ ⊕ L₁↓.
 //! 7. The measured spectrum roots the exact charpoly, within a declared band.
 //! 8. The triple is even: γ (+1 on C⁰, −1 on C¹) anticommutes with D exactly.
+//! 9. Identity is per skeleton: C⁰ is its vertex set alone, C¹ sits over a
+//!    C⁰, and Laplacians over one C⁰ compose exactly (their commutator
+//!    too), while rooms over different vertex sets still refuse.
 //!
 //! (Law 5, wrong-kind composition is a compile error, is a doctest on
 //! `prismqueer::room`.)
@@ -25,10 +28,14 @@
 
 #![cfg(feature = "lapack")]
 
+use std::collections::BTreeSet;
+
 use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use prismqueer::band::{zeros, Verdict};
-use prismqueer::room::{coboundary, dirac, Edges, Map, Room, RoomError, Sum, Vertices, Z};
+use prismqueer::room::{
+    coboundary, coboundary_over, dirac, Edges, Map, Room, RoomError, Sum, Vertices, Z,
+};
 use prismqueer::spectral::instrument::Instrument;
 use prismqueer::spectral::{graph_from_edges, Graph};
 use prismqueer::spectral_dimension::laplacian_from_edges;
@@ -861,4 +868,150 @@ fn the_grading_anticommutes_with_dirac() {
         assert_eq!(gd, dg.negate(), "{name}: γD = −Dγ");
         assert_ne!(gd, dg, "{name}: and not γD = Dγ, unless D = 0");
     }
+}
+
+// --- Law 9: identity is per skeleton -----------------------------------------
+//
+// A room's identity is per skeleton level, not the whole complex: C⁰ is its
+// vertex set alone, and C¹ sits over a C⁰ by relation. Rewiring the edges
+// changes the complex over a fixed 0-skeleton, not the vertex space.
+
+fn set(vertices: &[u64]) -> BTreeSet<u64> {
+    vertices.iter().copied().collect()
+}
+
+/// The exact map with these rows, from `from` to `to`.
+fn exact<A: prismqueer::room::Kind, B: prismqueer::room::Kind>(
+    from: &Room<A>,
+    to: &Room<B>,
+    rows: &[&[i64]],
+) -> Map<A, B, Z> {
+    let rows: Vec<Vec<Z>> = rows.iter().map(|row| ints(row)).collect();
+    Map::from_rows(from, to, &rows).expect("rows fit the rooms")
+}
+
+/// L₀ = δ*δ of `g`, out of C⁰(V).
+fn laplacian_over(v: &Room<Vertices>, g: &Graph) -> Map<Vertices, Vertices, Z> {
+    let delta = coboundary_over(v, g).expect("V(g) ⊆ V");
+    delta.then(&delta.adjoint()).expect("C⁰(V) → C¹ → C⁰(V)")
+}
+
+#[test]
+fn a_vertex_room_is_its_vertex_set() {
+    let v = set(&[0, 1, 2]);
+    assert_eq!(
+        Room::vertices(&triangle()),
+        Room::vertices(&p3()),
+        "two graphs on one vertex set share one C⁰"
+    );
+    assert_eq!(Room::vertices(&triangle()), Room::over(&v));
+    assert_eq!(Room::over(&v).dim(), 3);
+    assert_ne!(
+        Room::over(&v),
+        Room::over(&set(&[0, 1, 3])),
+        "same dimension, different vertex set"
+    );
+    assert_ne!(Room::over(&v), Room::over(&set(&[])));
+}
+
+#[test]
+fn an_edge_room_sits_over_its_vertex_room() {
+    // Three edges each over {0, 1, 2}: same V, same dimension, other wiring.
+    let looped = graph_from_edges(&[(0, 1), (1, 2), (2, 2)]);
+    assert_eq!(
+        Room::edges(&triangle()),
+        Room::edges(&triangle()),
+        "one graph, one C¹"
+    );
+    assert_ne!(Room::edges(&triangle()), Room::edges(&looped));
+    assert_ne!(Room::edges(&triangle()), Room::edges(&p3()));
+    let c0 = Room::vertices(&triangle());
+    for g in [triangle(), looped, p3()] {
+        assert_eq!(Room::edges(&g).skeleton(), c0.complex(), "C¹ sits over C⁰");
+        assert_eq!(coboundary(&g).from(), &c0, "one C⁰ under every wiring");
+    }
+    assert!(
+        Room::sum(&c0, &Room::edges(&p3())).is_ok(),
+        "rewiring keeps the 0-skeleton"
+    );
+}
+
+#[test]
+fn a_coboundary_out_of_a_larger_vertex_room_has_zero_columns() {
+    let v = Room::over(&set(&[0, 1, 2, 7]));
+    let delta = coboundary_over(&v, &p3()).expect("{0, 1, 2} ⊆ V");
+    assert_eq!(delta.from(), &v);
+    assert_eq!(delta.to().skeleton(), v.complex());
+    assert_eq!(
+        delta,
+        exact(&v, delta.to(), &[&[-1, 1, 0, 0], &[0, -1, 1, 0]]),
+        "vertex 7 is outside the graph: its column is zero"
+    );
+    assert_eq!(
+        coboundary_over(&Room::vertices(&p3()), &p3()),
+        Ok(coboundary(&p3())),
+        "over its own vertices, δ is the graph's own"
+    );
+}
+
+/// L_tri = 3I − J kills constants and L_P₃ has zero column sums, so
+/// L_tri · L_P₃ = 3 L_P₃, exactly.
+#[test]
+fn laplacians_over_one_vertex_set_compose_exactly() {
+    let (l_tri, _) = laplacians(&triangle());
+    let (l_p3, _) = laplacians(&p3());
+    let c0 = Room::vertices(&p3());
+    // Path order: L_P₃ first, then L_tri, is the matrix L_tri · L_P₃.
+    let product = l_p3.then(&l_tri).expect("one C⁰");
+    assert_eq!(
+        product,
+        exact(&c0, &c0, &[&[3, -3, 0], &[-3, 6, -3], &[0, -3, 3]])
+    );
+}
+
+/// Over V = {0, 1, 2}: L_a = [[1, −1, 0], [−1, 1, 0], [0, 0, 0]] for the
+/// edge (0, 1) and L_b = [[0, 0, 0], [0, 1, −1], [0, −1, 1]] for (1, 2).
+/// L_a L_b = [[0, −1, 1], [0, 1, −1], [0, 0, 0]] and L_b L_a is its
+/// transpose, so [L_a, L_b] = [[0, −1, 1], [1, 0, −1], [−1, 1, 0]].
+#[test]
+fn the_commutator_over_a_union_of_vertex_sets_is_exact() {
+    let v = Room::over(&set(&[0, 1, 2]));
+    let l_a = laplacian_over(&v, &graph_from_edges(&[(0, 1)]));
+    let l_b = laplacian_over(&v, &graph_from_edges(&[(1, 2)]));
+    let ab = l_b.then(&l_a).expect("one C⁰(V)");
+    let ba = l_a.then(&l_b).expect("one C⁰(V)");
+    let commutator = ab.plus(&ba.negate()).expect("one C⁰(V)");
+    assert_eq!(
+        commutator,
+        exact(&v, &v, &[&[0, -1, 1], &[1, 0, -1], &[-1, 1, 0]])
+    );
+    assert_eq!(commutator.adjoint(), commutator.negate(), "antisymmetric");
+}
+
+#[test]
+fn composing_across_vertex_sets_is_still_an_error() {
+    let (l_a, _) = laplacians(&graph_from_edges(&[(0, 1)]));
+    let (l_b, _) = laplacians(&graph_from_edges(&[(1, 2)]));
+    match l_b.then(&l_a) {
+        Err(RoomError::Mismatch { expected, found }) => {
+            assert_eq!((expected.dim, found.dim), (2, 2));
+            assert_ne!(expected.complex, found.complex);
+        }
+        other => panic!("expected a mismatch, got {other:?}"),
+    }
+    assert!(
+        matches!(
+            coboundary_over(&Room::over(&set(&[0, 1])), &p3()),
+            Err(RoomError::Mismatch { .. })
+        ),
+        "P₃'s vertex 2 isn't in V"
+    );
+    let wider = coboundary_over(&Room::over(&set(&[0, 1, 2, 7])), &p3()).expect("⊆");
+    assert!(
+        matches!(
+            Room::sum(&Room::vertices(&p3()), wider.to()),
+            Err(RoomError::Mismatch { .. })
+        ),
+        "an edge room over another 0-skeleton"
+    );
 }

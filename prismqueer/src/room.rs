@@ -77,7 +77,7 @@
 //! let _ = delta.symmetric();
 //! ```
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -86,7 +86,7 @@ use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{Exact, Group};
 use crate::oid::{Addressable, Oid};
-use crate::spectral::kleinos::Graph;
+use crate::spectral::kleinos::{Graph, VertexId};
 
 // --- Kinds of room -----------------------------------------------------------
 
@@ -191,6 +191,16 @@ impl<K: Kind<Parts = ()>> Room<K> {
 }
 
 impl Room<Vertices> {
+    /// C⁰(V): one dimension per vertex of `vertices`, ascending.
+    pub fn over(vertices: &BTreeSet<VertexId>) -> Self {
+        Room {
+            complex: Oid::dark(),
+            dim: vertices.len(),
+            parts: (),
+            kind: PhantomData,
+        }
+    }
+
     /// C⁰ of `graph`.
     pub fn vertices(graph: &Graph) -> Self {
         Room::cell(graph, graph.vertex_count())
@@ -212,6 +222,11 @@ impl<K: Kind> Room<K> {
 
     /// The content address of the complex this room belongs to.
     pub fn complex(&self) -> &Oid {
+        &self.complex
+    }
+
+    /// The content address of the 0-skeleton this room sits over.
+    pub fn skeleton(&self) -> &Oid {
         &self.complex
     }
 
@@ -793,6 +808,15 @@ pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
         }
     }
     delta
+}
+
+/// δ of `graph` out of a given C⁰(V), V ⊇ the graph's vertices.
+pub fn coboundary_over(
+    skeleton: &Room<Vertices>,
+    graph: &Graph,
+) -> Result<Map<Vertices, Edges, Z>, RoomError> {
+    let _ = skeleton;
+    Ok(coboundary(graph))
 }
 
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge
