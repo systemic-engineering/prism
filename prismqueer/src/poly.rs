@@ -19,14 +19,22 @@
 //!   part p / gcd(p, p′) ([`ZPoly::square_free`]); an eigenvalue's
 //!   multiplicity is the charpoly's business, its identity the root's.
 //!
+//! - **A factorization is certified, or it says it isn't.**
+//!   [`ZPoly::factor`] (Zassenhaus: a good prime, Berlekamp mod p, a Hensel
+//!   lift past the Mignotte bound, subset recombination) returns
+//!   [`Factored::Certified`] only with every irreducible factor in hand. The
+//!   subset search is exponential in the worst case, so it runs against a
+//!   [`Budget`] of trials, and running out is [`Factored::Uncertified`]:
+//!   the factors found, and the rest, never a guess.
+//!
 //! For mirror's exact algebraic tag (`0x06`: the minimal polynomial, then
-//! the root's index among its real roots), one step is still missing: the
-//! **minimal polynomial** of an eigenvalue is its *irreducible* factor over
-//! ℚ, and the square-free part is only the product of those factors. Until
-//! factoring over ℚ (Zassenhaus, or van Hoeij with LLL) lands, the index
-//! here is among the square-free part's roots, which is the tag only when
-//! that part is irreducible, and this module cannot certify that it is.
-//! With the factor in hand, its index is the same computation on it.
+//! the root's index among its real roots): the minimal polynomial of an
+//! eigenvalue is its *irreducible* factor over ℚ, and the square-free part
+//! is only the product of those factors. [`Factorization::identify`] reads
+//! a measured value against every factor's isolated roots and returns the
+//! tag, [`Algebraic`] (minimal, index), or refuses. [`Roots::index_of`] on
+//! a square-free part that isn't irreducible is an index among *its* roots,
+//! not the tag.
 //!
 //! Polynomials are stored lowest degree first: `coefficients()[k]` is the
 //! coefficient of xᵏ, and there are no trailing zeros, so the zero
@@ -794,5 +802,652 @@ impl Invariants {
             at += k;
         }
         form
+    }
+}
+
+// --- Factoring over ℚ: Zassenhaus --------------------------------------------
+
+/// How many subset trials Zassenhaus recombination may make before it
+/// stops and says so ([`Factored::Uncertified`]).
+///
+/// An **evaluation** budget: it may change the answer from certified to
+/// uncertified, so it is a count of trials, the same on every machine, and
+/// never a clock or a memory threshold (never `brain::Capacity`). With the
+/// `bundle` feature, `flux::pillar::Budget` converts into it.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Budget(pub usize);
+
+#[cfg(feature = "bundle")]
+impl From<crate::flux::pillar::Budget> for Budget {
+    fn from(budget: crate::flux::pillar::Budget) -> Self {
+        Budget(budget.0)
+    }
+}
+
+/// The polynomial is zero or has a repeated root: [`ZPoly::factor`] wants a
+/// square-free one ([`ZPoly::square_free`] makes it so).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotSquareFree;
+
+/// What [`ZPoly::factor`] knows, within its budget.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Factored {
+    /// Every irreducible factor over ℚ, and their product is the input.
+    Certified(Factorization),
+    /// The budget ran out. `irreducible` are true irreducible factors (each
+    /// found at the least subset size still possible, so none splits), and
+    /// `unresolved` is the rest, of degree ≥ 1, **not** certified either
+    /// way. Their product is still the input. Uncertified is never wrong.
+    Uncertified {
+        /// Irreducible factors found before the budget ran out, in the
+        /// canonical order.
+        irreducible: Vec<ZPoly>,
+        /// The cofactor still to factor: maybe irreducible, maybe not.
+        unresolved: ZPoly,
+    },
+}
+
+/// A certified factorization over ℚ of a square-free integer polynomial:
+/// primitive irreducible factors with positive leading coefficients, in
+/// canonical order (by degree, then coefficients leading first), whose
+/// product is the input's primitive part.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Factorization {
+    factors: Vec<ZPoly>,
+    roots: Vec<Roots>,
+}
+
+/// An exact real algebraic number, the way mirror's `0x06` tag reads it:
+/// its **minimal polynomial** (primitive, positive leading coefficient)
+/// and its **index among that polynomial's real roots**, in increasing
+/// order. The byte encoding is mirror's; this is the value.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Algebraic {
+    minimal: ZPoly,
+    index: usize,
+}
+
+/// What a measured value is, against a factorization's exact roots.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Identified {
+    /// Exactly one root of one factor is in the window.
+    Algebraic(Algebraic),
+    /// Several roots are in the window, across one or more factors: the
+    /// reading refuses and names them all, in factor order.
+    Ambiguous(Vec<Algebraic>),
+    /// No root is in the window.
+    Absent,
+    /// The value or the radius isn't a finite measurement.
+    Unmeasured,
+}
+
+impl Algebraic {
+    /// The tag (minimal, index). Not checked: a tag read off a certified
+    /// [`Factorization`] has an irreducible `minimal`; one decoded from
+    /// bytes is what the bytes say.
+    pub fn new(minimal: ZPoly, index: usize) -> Self {
+        Algebraic { minimal, index }
+    }
+
+    /// The minimal polynomial.
+    pub fn minimal(&self) -> &ZPoly {
+        &self.minimal
+    }
+
+    /// The index among the minimal polynomial's real roots, ascending.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// The isolating interval (lo, hi] of the root: exactly one real root
+    /// of the minimal polynomial lies in it. `None` when the index is past
+    /// the last real root.
+    pub fn isolating(&self) -> Option<Interval> {
+        self.minimal.real_roots().intervals.get(self.index).cloned()
+    }
+}
+
+impl Factorization {
+    fn new(factors: Vec<ZPoly>) -> Self {
+        let factors = canonical(factors);
+        // Irreducible over ℚ, so square-free: isolation runs on each as is.
+        let roots = factors.iter().map(|f| Roots::isolate(f.clone())).collect();
+        Factorization { factors, roots }
+    }
+
+    /// The irreducible factors, in canonical order. A constant's are none.
+    pub fn factors(&self) -> &[ZPoly] {
+        &self.factors
+    }
+
+    /// Their product: the input's primitive part.
+    pub fn product(&self) -> ZPoly {
+        self.factors
+            .iter()
+            .fold(ZPoly(vec![BigInt::one()]), |acc, f| &acc * f)
+    }
+
+    /// Which exact algebraic number a measured value is: the roots of every
+    /// factor in the closed window [measured − radius, measured + radius],
+    /// counted exactly ([`Roots::locate`] on each). One root: its tag, the
+    /// factor as minimal polynomial and the root's index among that
+    /// factor's real roots. Several: a refusal naming them.
+    pub fn identify(&self, measured: f64, radius: f64) -> Identified {
+        let mut hits = Vec::new();
+        for (f, roots) in self.factors.iter().zip(&self.roots) {
+            let tag = |index| Algebraic::new(f.clone(), index);
+            match roots.locate(measured, radius) {
+                Located::Unmeasured => return Identified::Unmeasured,
+                Located::Absent => {}
+                Located::Root(i) => hits.push(tag(i)),
+                Located::Ambiguous(range) => hits.extend(range.map(tag)),
+            }
+        }
+        match hits.len() {
+            0 => Identified::Absent,
+            1 => Identified::Algebraic(hits.pop().expect("one")),
+            _ => Identified::Ambiguous(hits),
+        }
+    }
+}
+
+/// The canonical order of factors: by degree, then coefficients leading
+/// first.
+fn canonical(mut factors: Vec<ZPoly>) -> Vec<ZPoly> {
+    factors.sort_by(|a, b| {
+        a.degree()
+            .cmp(&b.degree())
+            .then_with(|| a.0.iter().rev().cmp(b.0.iter().rev()))
+    });
+    factors
+}
+
+/// How many good primes to try; the one with the fewest factors mod p wins
+/// (fewer factors, smaller subset search).
+const PRIMES_TRIED: usize = 5;
+
+impl ZPoly {
+    /// Factor into irreducibles over ℚ, exactly: Zassenhaus.
+    ///
+    /// The input must be square-free (else [`NotSquareFree`]). Its content
+    /// and sign are units over ℚ, so the primitive part is what gets
+    /// factored, and what the factors multiply to.
+    ///
+    /// 1. **A good prime p**: p ∤ lc(f), and f mod p is still square-free.
+    ///    The first five such primes are tried, in order, and
+    ///    the one with the fewest factors mod p is kept (the first, on a
+    ///    tie). There are finitely many bad primes (those dividing lc(f) or
+    ///    the discriminant), so this ends.
+    /// 2. **Factor mod p** by Berlekamp: the null space of Q − I, Q the
+    ///    matrix of the Frobenius g ↦ gᵖ on 𝔽ₚ[x]/(f), has dimension r, the
+    ///    number of irreducible factors; gcd(g, v − s) over its basis
+    ///    vectors v and every s ∈ 𝔽ₚ splits them all. Deterministic
+    ///    outright: no random choice is made, so no seed is needed.
+    /// 3. **Hensel-lift** the monic factors to pᵏ, one p-adic digit at a
+    ///    time (linear lifting), with pᵏ > 2B for the Mignotte bound
+    ///    B = |lc(f)| · 2ⁿ · ⌈‖f‖₂⌉: a factor g of f over ℤ of degree
+    ///    m ≤ n has |gᵢ| ≤ C(m, i)·M(g) ≤ 2ⁿ‖f‖₂ (M the Mahler measure,
+    ///    M(g) ≤ M(f) ≤ ‖f‖₂), and the candidate lc(f)/lc(g)·g is at most
+    ///    |lc(f)| times that. So every true factor's candidate is exact in
+    ///    the symmetric range (−pᵏ/2, pᵏ/2].
+    /// 4. **Recombine** (Zassenhaus): for subsets S of the lifted factors,
+    ///    by size s = 1, 2, … up to half of what is left, the candidate is
+    ///    the primitive part of lc(f)·∏ₛ hᵢ mod pᵏ, symmetric; if it divides
+    ///    f exactly over ℤ it is a factor, its subset is removed and f is
+    ///    divided by it. What is left when no subset of size ≤ half remains
+    ///    is irreducible.
+    ///
+    /// **Cost, and the budget.** A subset trial is a product mod pᵏ and a
+    /// trial division. With r factors mod p there are at most
+    /// Σ_{s ≤ r/2} C(r, s) ≤ 2ʳ⁻¹ trials: exponential in r. r is small for
+    /// most polynomials, but not all: the Swinnerton-Dyer polynomial Sₘ
+    /// (the minimal polynomial of √2 + √3 + … + √pₘ, degree 2ᵐ) splits into
+    /// factors of degree ≤ 2 mod *every* prime, so r ≥ 2ᵐ⁻¹ and the search
+    /// is ~2^(2ᵐ⁻¹ − 1): fine at m = 3, hopeless by m = 6. So the trials
+    /// are counted against `budget`, and running out returns
+    /// [`Factored::Uncertified`] with what is known, never a guess. A prime
+    /// where f stays irreducible (r = 1) needs no trial at all.
+    ///
+    /// van Hoeij's algorithm replaces the subset search with lattice
+    /// reduction (LLL on the traces of the lifted factors, a knapsack
+    /// lattice), which recombines in polynomial time; that is a later step.
+    ///
+    /// **The certificate.** The product of the factors is the input's
+    /// primitive part; that is checked exactly, here, before anything is
+    /// returned. Irreducibility has no cheap independent check: the
+    /// evidence is the algorithm (every smaller subset was tried and
+    /// failed, with the lift past the bound), and the tests confirm it by
+    /// exhaustion on small cases.
+    pub fn factor(&self, budget: Budget) -> Result<Factored, NotSquareFree> {
+        if self.is_zero() || self.gcd(&self.derivative()).degree() != Some(0) {
+            return Err(NotSquareFree);
+        }
+        let f = self.primitive();
+        let n = f.degree().expect("nonzero");
+        if n == 0 {
+            return Ok(Factored::Certified(Factorization::new(Vec::new())));
+        }
+        if n == 1 {
+            return Ok(Factored::Certified(Factorization::new(vec![f])));
+        }
+        let (p, modular) = good_prime(&f);
+        // ⌈‖f‖₂⌉ ≤ ⌊√Σcᵢ²⌋ + 1, then B = |lc|·2ⁿ·⌈‖f‖₂⌉.
+        let norm: BigInt = f.0.iter().map(|c| c * c).sum::<BigInt>().sqrt() + 1;
+        let bound = f.leading().expect("n ≥ 1").abs() * (BigInt::one() << n) * norm;
+        let prime = BigInt::from(p);
+        let (mut k, mut modulus) = (1u32, prime.clone());
+        while modulus <= &bound * 2 {
+            modulus *= &prime;
+            k += 1;
+        }
+        let lifted = hensel(&f, &modular, p, k, &modulus);
+        let factored = recombine(f.clone(), lifted, &modulus, budget);
+        // The certificate: the product is the input, exactly.
+        let product = match &factored {
+            Factored::Certified(fs) => fs.product(),
+            Factored::Uncertified {
+                irreducible,
+                unresolved,
+            } => irreducible
+                .iter()
+                .fold(unresolved.clone(), |acc, g| &acc * g),
+        };
+        assert_eq!(product, f, "the factors' product is the input");
+        Ok(factored)
+    }
+
+    /// The exact quotient by `d` in ℤ[x], if `d` divides `self` there.
+    fn div_exact(&self, d: &ZPoly) -> Option<ZPoly> {
+        let n = d.degree()?;
+        let lc = d.leading().expect("d ≠ 0");
+        let m = match self.degree() {
+            None => return Some(ZPoly(Vec::new())),
+            Some(m) if m < n => return None,
+            Some(m) => m,
+        };
+        let mut r = self.0.clone();
+        let mut q = vec![BigInt::zero(); m - n + 1];
+        for k in (0..=m - n).rev() {
+            let (s, rest) = r[k + n].div_rem(lc);
+            if !rest.is_zero() {
+                return None;
+            }
+            for (i, di) in d.0.iter().enumerate() {
+                r[i + k] -= &s * di;
+            }
+            q[k] = s;
+        }
+        r.iter().all(Zero::is_zero).then(|| ZPoly(trim(q)))
+    }
+}
+
+/// The first [`PRIMES_TRIED`] good primes for f, and the one with the
+/// fewest factors mod p: (p, f's monic irreducible factors mod p).
+fn good_prime(f: &ZPoly) -> (u64, Vec<Vec<u64>>) {
+    let lc = f.leading().expect("nonzero");
+    let mut best: Option<(u64, Vec<Vec<u64>>)> = None;
+    let mut good = 0;
+    for p in (2u64..).filter(|&p| (2..p).take_while(|d| d * d <= p).all(|d| p % d != 0)) {
+        if (lc % p).is_zero() {
+            continue;
+        }
+        let fp = modp::from_z(&f.0, p);
+        if modp::gcd(&fp, &modp::derivative(&fp, p), p).len() > 1 {
+            continue;
+        }
+        let factors = modp::berlekamp(&modp::monic(&fp, p), p);
+        let fewer = best.as_ref().is_none_or(|(_, b)| factors.len() < b.len());
+        if fewer {
+            best = Some((p, factors));
+        }
+        good += 1;
+        if good == PRIMES_TRIED || best.as_ref().is_some_and(|(_, b)| b.len() == 1) {
+            break;
+        }
+    }
+    best.expect("a square-free polynomial has a good prime")
+}
+
+/// From f ≡ lc(f)·∏ gᵢ (mod p), the gᵢ monic, irreducible and distinct:
+/// monic hᵢ ≡ gᵢ (mod p) with f ≡ lc(f)·∏ hᵢ (mod pᵏ), coefficients in
+/// [0, pᵏ).
+fn hensel(f: &ZPoly, modular: &[Vec<u64>], p: u64, k: u32, modulus: &BigInt) -> Vec<ZPoly> {
+    let lc = f.leading().expect("nonzero");
+    let inverse = lc.extended_gcd(modulus).x.mod_floor(modulus);
+    let target = ZPoly(trim(
+        f.0.iter()
+            .map(|c| (c * &inverse).mod_floor(modulus))
+            .collect(),
+    ));
+    let mut lifted = Vec::with_capacity(modular.len());
+    let mut target = target;
+    for (i, g0) in modular.iter().enumerate() {
+        if i + 1 == modular.len() {
+            lifted.push(target);
+            break;
+        }
+        let h0 = modular[i + 1..]
+            .iter()
+            .fold(vec![1u64], |acc, g| modp::mul(&acc, g, p));
+        let (g, h) = lift(&target, g0, &h0, p, k);
+        lifted.push(g);
+        target = h;
+    }
+    lifted
+}
+
+/// One two-factor Hensel lift: from monic `target` ≡ g₀·h₀ (mod p), g₀ and
+/// h₀ monic and coprime, monic g ≡ g₀, h ≡ h₀ with target ≡ g·h (mod pᵏ).
+/// With s·g₀ + t·h₀ = 1 mod p, each step takes the next digit
+/// e = (target − g·h)/pʲ mod p and adds pʲ·τ to g and pʲ·σ to h, where
+/// τ = t·e mod g₀ and σ = (e − τ·h₀)/g₀: then σ·g₀ + τ·h₀ = e, and
+/// deg τ < deg g₀, deg σ < deg h₀ keep both monic.
+fn lift(target: &ZPoly, g0: &[u64], h0: &[u64], p: u64, k: u32) -> (ZPoly, ZPoly) {
+    let (_, _, t) = modp::ext_gcd(g0, h0, p);
+    let up = |v: &[u64]| ZPoly(v.iter().map(|&c| BigInt::from(c)).collect());
+    let (mut g, mut h) = (up(g0), up(h0));
+    let mut pj = BigInt::from(p);
+    for _ in 1..k {
+        let diff = target - &(&g * &h);
+        let digits: Vec<BigInt> = diff.0.iter().map(|c| c / &pj).collect();
+        let e = modp::from_z(&digits, p);
+        let tau = modp::div_rem(&modp::mul(&t, &e, p), g0, p).1;
+        let sigma = modp::div_rem(&modp::sub(&e, &modp::mul(&tau, h0, p), p), g0, p).0;
+        g = &g + &(&up(&tau) * &ZPoly(vec![pj.clone()]));
+        h = &h + &(&up(&sigma) * &ZPoly(vec![pj.clone()]));
+        pj *= p;
+    }
+    (g, h)
+}
+
+/// c mod m, in the symmetric range (−m/2, m/2].
+fn symmetric(c: &BigInt, m: &BigInt) -> BigInt {
+    let r = c.mod_floor(m);
+    if &r * 2 > *m {
+        r - m
+    } else {
+        r
+    }
+}
+
+/// Zassenhaus recombination of the lifted factors, within `budget` trials.
+fn recombine(mut f: ZPoly, mut lifted: Vec<ZPoly>, modulus: &BigInt, budget: Budget) -> Factored {
+    let mut found = Vec::new();
+    let mut trials = 0;
+    let mut s = 1;
+    'size: while 2 * s <= lifted.len() {
+        let mut subset: Vec<usize> = (0..s).collect();
+        loop {
+            if trials == budget.0 {
+                return Factored::Uncertified {
+                    irreducible: canonical(found),
+                    unresolved: f,
+                };
+            }
+            trials += 1;
+            let lc = f.leading().expect("deg f ≥ 1").clone();
+            let candidate = subset.iter().fold(ZPoly(vec![lc]), |acc, &i| {
+                let c = &acc * &lifted[i];
+                ZPoly(trim(c.0.iter().map(|x| symmetric(x, modulus)).collect()))
+            });
+            let g = candidate.primitive();
+            if let Some(q) = f.div_exact(&g).filter(|_| g.degree() >= Some(1)) {
+                found.push(g);
+                f = q;
+                for &i in subset.iter().rev() {
+                    lifted.remove(i);
+                }
+                continue 'size;
+            }
+            if !next_subset(&mut subset, lifted.len()) {
+                break;
+            }
+        }
+        s += 1;
+    }
+    found.push(f);
+    Factored::Certified(Factorization::new(found))
+}
+
+/// The next s-subset of 0..n in lexicographic order; false after the last.
+fn next_subset(subset: &mut [usize], n: usize) -> bool {
+    let s = subset.len();
+    let Some(i) = (0..s).rev().find(|&i| subset[i] < n - s + i) else {
+        return false;
+    };
+    subset[i] += 1;
+    for j in i + 1..s {
+        subset[j] = subset[j - 1] + 1;
+    }
+    true
+}
+
+/// 𝔽ₚ[x], for a word-sized prime p < 2³²: coefficients in [0, p), lowest
+/// degree first, no trailing zeros.
+mod modp {
+    use num_bigint::BigInt;
+    use num_integer::Integer;
+    use num_traits::ToPrimitive;
+
+    fn trim(mut a: Vec<u64>) -> Vec<u64> {
+        while a.last() == Some(&0) {
+            a.pop();
+        }
+        a
+    }
+
+    pub(super) fn from_z(c: &[BigInt], p: u64) -> Vec<u64> {
+        let m = BigInt::from(p);
+        trim(
+            c.iter()
+                .map(|x| x.mod_floor(&m).to_u64().expect("< p"))
+                .collect(),
+        )
+    }
+
+    fn pow(mut a: u64, mut e: u64, p: u64) -> u64 {
+        let mut r = 1;
+        a %= p;
+        while e > 0 {
+            if e & 1 == 1 {
+                r = r * a % p;
+            }
+            a = a * a % p;
+            e >>= 1;
+        }
+        r
+    }
+
+    fn inv(a: u64, p: u64) -> u64 {
+        pow(a, p - 2, p)
+    }
+
+    pub(super) fn sub(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
+        let n = a.len().max(b.len());
+        let at = |v: &[u64], i: usize| v.get(i).copied().unwrap_or(0);
+        trim((0..n).map(|i| (at(a, i) + p - at(b, i)) % p).collect())
+    }
+
+    pub(super) fn mul(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
+        if a.is_empty() || b.is_empty() {
+            return Vec::new();
+        }
+        let mut c = vec![0; a.len() + b.len() - 1];
+        for (i, x) in a.iter().enumerate() {
+            for (j, y) in b.iter().enumerate() {
+                c[i + j] = (c[i + j] + x * y) % p;
+            }
+        }
+        trim(c)
+    }
+
+    pub(super) fn monic(a: &[u64], p: u64) -> Vec<u64> {
+        match a.last() {
+            None => Vec::new(),
+            Some(&lc) => {
+                let i = inv(lc, p);
+                a.iter().map(|x| x * i % p).collect()
+            }
+        }
+    }
+
+    pub(super) fn derivative(a: &[u64], p: u64) -> Vec<u64> {
+        trim(
+            a.iter()
+                .enumerate()
+                .skip(1)
+                .map(|(k, x)| (k as u64 % p) * x % p)
+                .collect(),
+        )
+    }
+
+    /// (q, r) with a = q·b + r, deg r < deg b; b ≠ 0.
+    pub(super) fn div_rem(a: &[u64], b: &[u64], p: u64) -> (Vec<u64>, Vec<u64>) {
+        let n = b.len() - 1;
+        if a.len() <= n {
+            return (Vec::new(), a.to_vec());
+        }
+        let i = inv(b[n], p);
+        let mut r = a.to_vec();
+        let mut q = vec![0; a.len() - n];
+        for k in (0..q.len()).rev() {
+            let s = r[k + n] * i % p;
+            q[k] = s;
+            for (j, bj) in b.iter().enumerate() {
+                r[k + j] = (r[k + j] + p - s * bj % p) % p;
+            }
+        }
+        (trim(q), trim(r))
+    }
+
+    /// The monic gcd; gcd(0, 0) = 0.
+    pub(super) fn gcd(a: &[u64], b: &[u64], p: u64) -> Vec<u64> {
+        let (mut a, mut b) = (a.to_vec(), b.to_vec());
+        while !b.is_empty() {
+            let r = div_rem(&a, &b, p).1;
+            a = b;
+            b = r;
+        }
+        monic(&a, p)
+    }
+
+    /// (g, s, t) with s·a + t·b = g, the monic gcd.
+    pub(super) fn ext_gcd(a: &[u64], b: &[u64], p: u64) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
+        let (mut r0, mut r1) = (a.to_vec(), b.to_vec());
+        let (mut s0, mut s1) = (vec![1], Vec::new());
+        let (mut t0, mut t1) = (Vec::new(), vec![1]);
+        while !r1.is_empty() {
+            let (q, r) = div_rem(&r0, &r1, p);
+            let s = sub(&s0, &mul(&q, &s1, p), p);
+            let t = sub(&t0, &mul(&q, &t1, p), p);
+            (r0, r1) = (r1, r);
+            (s0, s1) = (s1, s);
+            (t0, t1) = (t1, t);
+        }
+        let i = inv(*r0.last().expect("a or b ≠ 0"), p);
+        let scale = |v: &[u64]| trim(v.iter().map(|x| x * i % p).collect());
+        (scale(&r0), scale(&s0), scale(&t0))
+    }
+
+    /// The left null space of `rows` (n × n), as basis vectors.
+    fn null_space(rows: &[Vec<u64>], p: u64) -> Vec<Vec<u64>> {
+        let n = rows.len();
+        // v·M = 0 ⇔ Mᵀ·v = 0: eliminate on the transpose.
+        let mut a: Vec<Vec<u64>> = (0..n)
+            .map(|j| (0..n).map(|i| rows[i][j]).collect())
+            .collect();
+        let mut pivots: Vec<Option<usize>> = vec![None; n];
+        let mut row = 0;
+        for col in 0..n {
+            let Some(r) = (row..n).find(|&r| a[r][col] != 0) else {
+                continue;
+            };
+            a.swap(row, r);
+            let i = inv(a[row][col], p);
+            for x in a[row].iter_mut() {
+                *x = *x * i % p;
+            }
+            let pivot = a[row].clone();
+            for (r, line) in a.iter_mut().enumerate() {
+                let f = line[col];
+                if r != row && f != 0 {
+                    for (x, y) in line.iter_mut().zip(&pivot) {
+                        *x = (*x + p - f * y % p) % p;
+                    }
+                }
+            }
+            pivots[col] = Some(row);
+            row += 1;
+        }
+        (0..n)
+            .filter(|&free| pivots[free].is_none())
+            .map(|free| {
+                let mut v = vec![0; n];
+                v[free] = 1;
+                for (col, pivot) in pivots.iter().enumerate() {
+                    if let Some(r) = pivot {
+                        v[col] = (p - a[*r][free]) % p;
+                    }
+                }
+                v
+            })
+            .collect()
+    }
+
+    /// Berlekamp: the monic irreducible factors of a monic square-free f of
+    /// degree ≥ 1 over 𝔽ₚ. The rows of Q are xⁱᵖ mod f; g = Σvᵢxⁱ has
+    /// gᵖ ≡ g (mod f) exactly when v·(Q − I) = 0, and that space has
+    /// dimension r, the number of factors. For each basis vector v, f's
+    /// pieces split as ∏ₛ gcd(piece, v − s), s ∈ 𝔽ₚ.
+    pub(super) fn berlekamp(f: &[u64], p: u64) -> Vec<Vec<u64>> {
+        let n = f.len() - 1;
+        if n == 1 {
+            return vec![f.to_vec()];
+        }
+        let mulmod = |a: &[u64], b: &[u64]| div_rem(&mul(a, b, p), f, p).1;
+        let (mut xp, mut base, mut e) = (vec![1], vec![0, 1], p);
+        while e > 0 {
+            if e & 1 == 1 {
+                xp = mulmod(&xp, &base);
+            }
+            base = mulmod(&base, &base);
+            e >>= 1;
+        }
+        let mut rows = Vec::with_capacity(n);
+        let mut power = vec![1];
+        for i in 0..n {
+            let mut row: Vec<u64> = (0..n).map(|j| power.get(j).copied().unwrap_or(0)).collect();
+            row[i] = (row[i] + p - 1) % p;
+            rows.push(row);
+            power = mulmod(&power, &xp);
+        }
+        let basis = null_space(&rows, p);
+        let r = basis.len();
+        let mut factors = vec![f.to_vec()];
+        for v in basis.into_iter().map(trim).filter(|v| v.len() > 1) {
+            if factors.len() == r {
+                break;
+            }
+            let mut next = Vec::with_capacity(r);
+            for g in factors {
+                if g.len() <= 2 {
+                    next.push(g);
+                    continue;
+                }
+                let mut rest = g;
+                for s in 0..p {
+                    if rest.len() <= 1 {
+                        break;
+                    }
+                    let h = gcd(&rest, &sub(&v, &[s], p), p);
+                    if h.len() > 1 {
+                        rest = div_rem(&rest, &h, p).0;
+                        next.push(h);
+                    }
+                }
+            }
+            factors = next;
+        }
+        factors
     }
 }

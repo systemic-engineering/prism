@@ -1324,6 +1324,15 @@ impl<A: Kind> Symmetric<A, Z> {
         self.0.invariant_factors()
     }
 
+    /// The minimal polynomial in ℤ[x], primitive with a positive leading
+    /// coefficient: the square-free part of the charpoly. A symmetric
+    /// matrix is diagonalisable, so this is also its last invariant factor
+    /// (made primitive), at Berkowitz's cost rather than the Smith form's.
+    /// [`crate::poly::ZPoly::factor`] takes it on to mirror's `0x06` tag.
+    pub fn minimal_polynomial(&self) -> crate::poly::ZPoly {
+        self.charpoly().poly().square_free()
+    }
+
     /// The characteristic polynomial det(xI − M), exactly, by Berkowitz's
     /// algorithm: no division, so every step stays in Z.
     ///

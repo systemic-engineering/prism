@@ -110,10 +110,11 @@ fn no_small_factor(g: &ZPoly) {
 fn assert_factors(p: &ZPoly, expected: &[ZPoly]) {
     let got = factors(p);
     assert_eq!(product(&got), p.primitive(), "product");
+    // Cheap first: a wrong answer fails here, before the exhaustion runs.
+    assert_eq!(got, expected);
     for g in &got {
         no_small_factor(g);
     }
-    assert_eq!(got, expected);
 }
 
 // --- Law 1: the factorization and its certificate ---------------------------
@@ -184,8 +185,9 @@ fn a_leading_coefficient_is_carried_through_the_lift() {
 fn content_and_sign_are_units_over_q() {
     // −2x² + 4 = −2(x² − 2): the primitive part x² − 2 is factored.
     assert_factors(&z(&[-2, 0, 4]), &[z(&[1, 0, -2])]);
-    // x² − x = x(x − 1): the root 0 is a factor like any other.
-    assert_factors(&z(&[1, -1, 0]), &[z(&[1, 0]), z(&[1, -1])]);
+    // x² − x = x(x − 1): the root 0 is a factor like any other. Order is
+    // by degree, then coefficients leading first: x − 1 before x.
+    assert_factors(&z(&[1, -1, 0]), &[z(&[1, -1]), z(&[1, 0])]);
     // Linear and constant inputs.
     assert_factors(&z(&[5, 3]), &[z(&[5, 3])]);
     assert_factors(&z(&[7]), &[]);
@@ -296,12 +298,12 @@ fn an_exact_rational_root_is_its_own_linear_tag() {
     );
     assert_eq!(f.identify(1.0, 0.1), Identified::Absent);
     assert_eq!(f.identify(f64::NAN, 0.1), Identified::Unmeasured);
-    // A window over both roots refuses, naming both.
+    // A window over both roots refuses, naming both, in factor order.
     assert_eq!(
         f.identify(1.0, 1.5),
         Identified::Ambiguous(vec![
-            Algebraic::new(z(&[1, 0]), 0),
             Algebraic::new(z(&[1, -2]), 0),
+            Algebraic::new(z(&[1, 0]), 0),
         ])
     );
 }
@@ -309,7 +311,8 @@ fn an_exact_rational_root_is_its_own_linear_tag() {
 #[test]
 fn an_algebraic_tag_has_an_isolating_interval() {
     let tag = Algebraic::new(z(&[1, 0, -2]), 1);
-    let iv = tag.isolating();
+    let iv = tag.isolating().expect("x² − 2 has a root at index 1");
+    assert_eq!(Algebraic::new(z(&[1, 0, -2]), 2).isolating(), None);
     // The interval holds √2 and only it: one root of x² − 2, positive.
     let roots = z(&[1, 0, -2]).real_roots();
     assert_eq!(roots.count_in(iv.lo(), iv.hi()), 1);
