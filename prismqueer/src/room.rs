@@ -593,6 +593,19 @@ impl<A: Kind, B: Kind, R: Measure> Map<A, B, R> {
     }
 }
 
+impl<A: Kind, B: Kind> Map<A, B, f64> {
+    /// The Frobenius norm: the square root of the sum of squared entries.
+    pub(crate) fn frobenius(&self) -> f64 {
+        self.entries.iter().map(|x| x * x).sum::<f64>().sqrt()
+    }
+
+    /// The singular values, descending, by LAPACK's dgesdd. The matrix goes
+    /// over as stored (column-major). `Err` is dgesdd's `info`.
+    pub(crate) fn singular_values(&self) -> Result<Vec<f64>, i32> {
+        crate::ffi::singular_values_columns(self.to.dim, self.from.dim, &self.entries)
+    }
+}
+
 impl<A: Kind, R: Entry> Map<A, A, R> {
     /// The map that changes nothing.
     pub fn identity(room: &Room<A>) -> Self {

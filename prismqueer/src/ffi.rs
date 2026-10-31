@@ -337,11 +337,18 @@ pub(crate) fn eigenvalues_columns(n: usize, matrix: &[f64]) -> Result<Vec<f64>, 
 /// Returns `Ok(vec![])` when `m == 0` or `n == 0`.
 /// Returns `Err(info)` if LAPACK convergence fails (info != 0).
 pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
+    singular_values_columns(m, n, &row_to_col_major(matrix, m, n))
+}
+
+/// The singular values of an `m×n` matrix given column-major, by dgesdd: no
+/// conversion on the way in. Descending. Only `room` calls this; it owns
+/// the layout.
+pub(crate) fn singular_values_columns(m: usize, n: usize, mat_cm: &[f64]) -> Result<Vec<f64>, i32> {
+    debug_assert_eq!(mat_cm.len(), m * n, "an m×n matrix");
     let k = m.min(n);
     if k == 0 {
         return Ok(Vec::new());
     }
-    let mat_cm = row_to_col_major(matrix, m, n);
     let mut svs = vec![0.0_f64; k];
     let mut info: c_int = 0;
 

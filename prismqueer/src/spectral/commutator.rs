@@ -11,7 +11,9 @@
 //! # Geometry
 //!
 //! Given two sheafs A and B over union vertex set V, build the graph
-//! Laplacians `L_A` and `L_B` (symmetric, real n×n). The commutator
+//! Laplacians `L_A` and `L_B` exactly in [`room`](crate::room), both maps
+//! of one C⁰(V) (identity is per skeleton: a vertex room is its vertex set
+//! alone), and compose them exactly over Z; the commutator is measured once. The commutator
 //! `[L_A, L_B] = L_A L_B - L_B L_A` is antisymmetric (since `(L_A L_B -
 //! L_B L_A)^T = L_B L_A - L_A L_B = -[L_A, L_B]`). Real antisymmetric
 //! matrices have pure-imaginary eigenvalues in conjugate pairs; the
@@ -31,13 +33,15 @@
 //! # Composes over LANDED
 //!
 //! - `prismqueer::spectral::kleinos::Graph` — input carrier
+//! - `prismqueer::room` — C⁰(V), δ out of it, exact composition
 //! - `prismqueer::ffi::singular_values` — LAPACK dgesdd via FLANG-compiled
 //!   `native/spectral.f90`
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use terni::Imperfect;
 
+use crate::room::{coboundary_over, Map, Room, RoomError, Vertices, Z};
 use crate::spectral::kleinos::{Graph, VertexId};
 
 /// Singular-value spectrum of the sheaf-Laplacian commutator `[L_A, L_B]`.
@@ -62,30 +66,38 @@ impl Dissonance {
     /// nonzero are returned as `Partial`: not dropped, not guessed.
     pub fn of(a: &Graph, b: &Graph) -> Imperfect<Self, Unmeasured, Vec<f64>> {
         let vertices: BTreeSet<VertexId> = a.vertices().chain(b.vertices()).collect();
-        let n = vertices.len();
-        if n < 2 {
+        if vertices.len() < 2 {
             return Imperfect::Success(Self {
                 spectrum: Vec::new(),
             });
         }
-        let vertex_index: BTreeMap<VertexId, usize> = vertices
-            .into_iter()
-            .enumerate()
-            .map(|(i, v)| (v, i))
-            .collect();
-
-        let l_a = build_laplacian(a, &vertex_index, n);
-        let l_b = build_laplacian(b, &vertex_index, n);
-
-        let ab = matmul(&l_a, &l_b, n);
-        let ba = matmul(&l_b, &l_a, n);
-        let commutator: Vec<f64> = ab.iter().zip(ba.iter()).map(|(x, y)| x - y).collect();
-
-        let frobenius = |m: &[f64]| m.iter().map(|x| x * x).sum::<f64>().sqrt();
-        let scale = frobenius(&l_a) * frobenius(&l_b);
-        read(crate::ffi::singular_values(n, n, &commutator), scale)
+        let (commutator, l_a, l_b) = exact_commutator(&Room::over(&vertices), a, b)
+            .expect("V is the union of both graphs' vertices: every map is of C⁰(V)");
+        let scale = l_a.measure().frobenius() * l_b.measure().frobenius();
+        read(commutator.measure().singular_values(), scale)
     }
 }
+
+/// [L_a, L_b] = L_a·L_b − L_b·L_a over C⁰(V), exactly, with L_a and L_b.
+/// `Err` only when a graph has a vertex outside V.
+fn exact_commutator(
+    room: &Room<Vertices>,
+    a: &Graph,
+    b: &Graph,
+) -> Result<(Laplacian, Laplacian, Laplacian), RoomError> {
+    let laplacian = |g: &Graph| -> Result<Laplacian, RoomError> {
+        let delta = coboundary_over(room, g)?;
+        delta.then(&delta.adjoint())
+    };
+    let (l_a, l_b) = (laplacian(a)?, laplacian(b)?);
+    // Path order: `l_b.then(&l_a)` is L_b first, then L_a: the matrix L_a·L_b.
+    let ab = l_b.then(&l_a)?;
+    let ba = l_a.then(&l_b)?;
+    Ok((ab.plus(&ba.negate())?, l_a, l_b))
+}
+
+/// A map of C⁰ to itself, exactly.
+type Laplacian = Map<Vertices, Vertices, Z>;
 
 /// LAPACK could not compute the singular values (`info` code).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,41 +132,6 @@ fn read(
     } else {
         Imperfect::Partial(cs, ambiguous)
     }
-}
-
-/// Build the graph Laplacian of `sheaf` over the given vertex-index basis.
-/// Edges whose endpoints are outside the basis are skipped.
-pub(crate) fn build_laplacian(
-    sheaf: &Graph,
-    vertex_index: &BTreeMap<VertexId, usize>,
-    n: usize,
-) -> Vec<f64> {
-    let mut lap = vec![0.0_f64; n * n];
-    for (u, v) in sheaf.edges() {
-        if let (Some(&i), Some(&j)) = (vertex_index.get(&u), vertex_index.get(&v)) {
-            lap[i * n + j] -= 1.0;
-            lap[j * n + i] -= 1.0;
-            lap[i * n + i] += 1.0;
-            lap[j * n + j] += 1.0;
-        }
-    }
-    lap
-}
-
-/// Row-major n×n dense matrix multiplication. Naive O(n³); acceptable for
-/// small sheafs. Lift to BLAS `dgemm` if profiling shows this on the hot path.
-fn matmul(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
-    let mut c = vec![0.0_f64; n * n];
-    for i in 0..n {
-        for j in 0..n {
-            let mut sum = 0.0_f64;
-            for k in 0..n {
-                sum += a[i * n + k] * b[k * n + j];
-            }
-            c[i * n + j] = sum;
-        }
-    }
-    c
 }
 
 #[cfg(test)]
