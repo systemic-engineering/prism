@@ -316,7 +316,15 @@
       # pkgs.prism.{prismqueer,terni}, built against the consumer's nixpkgs.
       overlays.default = final: _prev: { prism = (mkPrism final).packages; };
     }
-    // flake-utils.lib.eachDefaultSystem (
+    # nixpkgs dropped x86_64-darwin (26.11), so evaluating it throws; these
+    # are the systems that evaluate (nix/invariance.sh checks all of them).
+    // flake-utils.lib.eachSystem
+      [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-linux"
+      ]
+      (
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
