@@ -949,7 +949,7 @@ const UNREACHED: &[&str] = &["e", "f", "g"];
 
 #[test]
 fn the_vacuum_classifies_reachable_dangling_and_dark_exactly() {
-    let mut dag = Dag::new();
+    let dag = Dag::new();
     let mut roots = Roots::default();
     roots.hold(dag.at["identity"].clone());
     // A root held in another scope: this brain can't see into it.
@@ -1030,7 +1030,7 @@ fn dangling_is_never_final_a_new_root_reaches_a_cooled_crystal_again() {
 
 #[test]
 fn a_vacuum_over_a_snapshot_never_sees_roots_held_after_sealing() {
-    let mut dag = Dag::new();
+    let dag = Dag::new();
     let mut roots = Roots::default();
     roots.hold(dag.at["identity"].clone());
     let snapshot = roots.seal();

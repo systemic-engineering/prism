@@ -85,7 +85,32 @@
 //! never in a crystal's bytes. Two brains that settle the same bytes settle
 //! the same address, however much light either has seen.
 //!
-//! Not here yet: the vacuum (unreachability), keyed private scopes, and
+//! # The vacuum: the fourth law (prism-013 §3)
+//!
+//! Alex: a crystal that no identity reaches is dangling; no observer
+//! observes it, so it can be vacuumed. With Seam's corrections:
+//!
+//! - **Cooling is lossless forgetting** (invariant 2). [`Brain::cool`]
+//!   evicts from memory; the backend still holds the bytes, and they read
+//!   back by address.
+//! - **Erasure** (deleting a scope's `K_id`) is a separate act, outside
+//!   prism, and unreachability never drives it.
+//! - **Purge** (deleting bytes) is irreversible: allowed only with an
+//!   [`Erasure`], which only an erasure mints. The public key can't be
+//!   erased, so the public scope cools and never purges.
+//! - **Dangling is relative to the scopes this brain holds.** An address it
+//!   can't see into is dark, never dangling; reach doesn't pass through it.
+//! - **Unreachability is a negation**, decided only on a [`SealedRoots`]
+//!   snapshot, and never final: [`Dangling`] is "not reached as of".
+//! - **Reference counting holds within one key only.**
+//!
+//! References are declared at the Drop ([`Brain::settle_with`]) and kept
+//! beside the crystal, never in its bytes, so they never change an address.
+//! Roots are identities (addresses held in a relation), sealed with
+//! [`Roots::seal`]. Reach reuses [`crate::dependency`]. A vacuum pass
+//! changes no answer, no crystal and no lum (invariant 1).
+//!
+//! Not here yet: keyed private scopes (and so erasure, and purge), and
 //! windowed input.
 //!
 //! # Crystals are immutable
@@ -270,11 +295,12 @@
 //! ```
 
 use std::cell::Cell;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::convert::Infallible;
 use std::ops::Bound;
 use std::sync::Arc;
 
+use crate::dependency::{DependencyGraph, Sign, Through};
 use crate::oid::{Oid, Scope};
 
 // ---------------------------------------------------------------------------
@@ -550,6 +576,33 @@ pub trait Backend {
 
     /// The bytes persisted under `address`, if any.
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Self::Error>;
+
+    /// Delete the bytes under `address`: irreversible, so it takes evidence
+    /// that the scope's key was erased. Nothing in prism mints that
+    /// evidence (see [`Erasure`]), so this can't be called today, and the
+    /// default body is the proof: there is no value to match.
+    fn purge(&mut self, erasure: &Erasure, address: &Oid) -> Result<(), Self::Error> {
+        let _ = address;
+        match erasure.never {}
+    }
+}
+
+/// Uninhabited: no value of it exists.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Never {}
+
+/// Evidence that a scope's `K_id` was erased: the only thing that lets a
+/// [`Backend::purge`] delete bytes.
+///
+/// **Only an erasure can mint it**, and erasure happens outside prism, by
+/// the key holder, never because something became unreachable. The public
+/// key can't be erased (anyone can derive it), so the public scope never
+/// has this evidence: the public-scope vacuum can cool, never purge. Today
+/// the type is uninhabited, because prism holds no held scope and builds no
+/// erasure. A dangling verdict is never this evidence; it is never final.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Erasure {
+    never: Never,
 }
 
 /// The in-memory backend, for tests.
@@ -581,6 +634,102 @@ impl Backend for Memory {
 
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
         Ok(self.crystals.get(address).map(|b| b.to_vec()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The vacuum: roots, reach, and the verdicts
+// ---------------------------------------------------------------------------
+
+/// The live root set: identities, each an address held in a relation
+/// (`docs/spec/identity.md`, "Address and identity"). It can still grow, so
+/// the vacuum never reads it; [`Roots::seal`] takes the snapshot it reads.
+///
+/// prism doesn't see the relation an address is held in (that is mirror's);
+/// whoever holds a root here vouches that it is held.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Roots {
+    roots: BTreeSet<Oid>,
+}
+
+impl Roots {
+    /// Hold an identity as a root.
+    pub fn hold(&mut self, identity: Oid) {
+        self.roots.insert(identity);
+    }
+
+    /// The snapshot of the roots held now. Roots held later are not in it.
+    pub fn seal(&self) -> SealedRoots {
+        SealedRoots {
+            roots: self.roots.clone(),
+        }
+    }
+}
+
+/// A settled snapshot of roots: the only root set a vacuum takes. The only
+/// way to get one is [`Roots::seal`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SealedRoots {
+    roots: BTreeSet<Oid>,
+}
+
+impl SealedRoots {
+    /// The roots as sealed.
+    pub fn roots(&self) -> &BTreeSet<Oid> {
+        &self.roots
+    }
+}
+
+/// The crystals of this scope that a snapshot's roots didn't reach.
+///
+/// **Never final.** Unreachability is a negation: it says "not reached as
+/// of [`Dangling::as_of`]", like an `Imperfect::Partial` that carries what
+/// it doesn't know yet. A root held later can reach any of them again. So
+/// the only thing it licenses is [`Brain::cool`], which is lossless, and it
+/// never converts to an [`Erasure`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Dangling {
+    addresses: BTreeSet<Oid>,
+    as_of: SealedRoots,
+}
+
+impl Dangling {
+    /// The addresses not reached.
+    pub fn addresses(&self) -> &BTreeSet<Oid> {
+        &self.addresses
+    }
+
+    /// The snapshot the verdict was decided on, and holds only for.
+    pub fn as_of(&self) -> &SealedRoots {
+        &self.as_of
+    }
+}
+
+/// What a vacuum found, from a sealed snapshot of roots.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reach {
+    reachable: BTreeSet<Oid>,
+    dangling: Dangling,
+    dark: BTreeSet<Oid>,
+}
+
+impl Reach {
+    /// Crystals of this scope that the roots reach.
+    pub fn reachable(&self) -> &BTreeSet<Oid> {
+        &self.reachable
+    }
+
+    /// Crystals of this scope that the roots didn't reach, as of the
+    /// snapshot. Never final.
+    pub fn dangling(&self) -> &Dangling {
+        &self.dangling
+    }
+
+    /// Addresses named (by a reference or a root) that this brain doesn't
+    /// hold: another scope's, or not settled here. Unknown, never dangling,
+    /// and reach doesn't pass through them: what they point to is unseen.
+    pub fn dark(&self) -> &BTreeSet<Oid> {
+        &self.dark
     }
 }
 
@@ -660,6 +809,9 @@ pub struct Brain<B> {
     committed: Option<Tick>,
     crystals: BTreeMap<Oid, Crystal>,
     settled_order: VecDeque<Oid>,
+    /// Every crystal settled here, with the addresses it points to. Beside
+    /// the crystals, never in their bytes, and never evicted.
+    references: BTreeMap<Oid, BTreeSet<Oid>>,
     stats: Stats,
     recalled: Cell<usize>,
     lit: u64,
@@ -684,6 +836,7 @@ impl<B: Backend> Brain<B> {
             committed: None,
             crystals: BTreeMap::new(),
             settled_order: VecDeque::new(),
+            references: BTreeMap::new(),
             stats: Stats::default(),
             recalled: Cell::new(0),
             lit: 0,
@@ -841,6 +994,20 @@ impl<B: Backend> Brain<B> {
     /// The Drop: settle `bytes` as a crystal, persist it, and return its
     /// address. The same bytes settle to the same address, and add nothing.
     pub fn settle(&mut self, bytes: Vec<u8>) -> Result<Oid, B::Error> {
+        self.settle_with(bytes, [])
+    }
+
+    /// [`Brain::settle`], declaring the addresses the crystal points to.
+    ///
+    /// The references are kept beside the crystal, never in its bytes, so
+    /// they never change its address. Settling the same bytes again adds
+    /// any new references to the old ones: a union, which can only reach
+    /// more, so it errs toward keeping crystals warm.
+    pub fn settle_with(
+        &mut self,
+        bytes: Vec<u8>,
+        references: impl IntoIterator<Item = Oid>,
+    ) -> Result<Oid, B::Error> {
         let crystal = Crystal::settle(&self.scope, bytes);
         let address = crystal.address.clone();
         if !self.crystals.contains_key(&address) {
@@ -851,6 +1018,11 @@ impl<B: Backend> Brain<B> {
             self.hold(cost);
             self.press();
         }
+        // Only once it is persisted is it in this scope's census.
+        self.references
+            .entry(address.clone())
+            .or_default()
+            .extend(references);
         Ok(address)
     }
 
@@ -871,6 +1043,80 @@ impl<B: Backend> Brain<B> {
         }
         self.recalled.set(self.recalled.get() + 1);
         Ok(crystal)
+    }
+
+    /// The addresses a crystal settled here points to, or `None` if it was
+    /// never settled here.
+    pub fn references(&self, address: &Oid) -> Option<&BTreeSet<Oid>> {
+        self.references.get(address)
+    }
+
+    /// The vacuum: reach over the reference graph from a sealed snapshot of
+    /// roots, and classify every address it knows of as reachable, dangling
+    /// or dark. Changes nothing; [`Brain::cool`] acts on the verdict.
+    ///
+    /// "Dangling" is relative to the scopes this brain holds: the public
+    /// scope, for now. Reference counting would hold within this one key
+    /// only, so none is kept across scopes.
+    pub fn vacuum(&self, roots: &SealedRoots) -> Reach {
+        let mut graph = DependencyGraph::new();
+        for (from, tos) in &self.references {
+            graph.add_node(from.clone());
+            for to in tos {
+                graph.add_edge(from.clone(), to.clone(), Sign::Positive);
+            }
+        }
+        for root in &roots.roots {
+            graph.add_node(root.clone());
+        }
+        // Dark addresses have no edges here, so reach stops at them.
+        let reached = graph.reach(&roots.roots, Through::Positive);
+        let held = |a: &&Oid| self.references.contains_key(*a);
+        let reachable: BTreeSet<Oid> = reached.iter().filter(held).cloned().collect();
+        let dangling = self
+            .references
+            .keys()
+            .filter(|a| !reachable.contains(*a))
+            .cloned()
+            .collect();
+        let dark = self
+            .references
+            .values()
+            .flatten()
+            .chain(&roots.roots)
+            .filter(|a| !held(a))
+            .cloned()
+            .collect();
+        Reach {
+            reachable,
+            dangling: Dangling {
+                addresses: dangling,
+                as_of: roots.clone(),
+            },
+            dark,
+        }
+    }
+
+    /// Cool the dangling: evict them from the hot cache. Lossless, because
+    /// every crystal was persisted when it settled, so each still reads back
+    /// by address. Returns how many were hot.
+    ///
+    /// A stale verdict is harmless: a crystal cooled that is reached again
+    /// costs only a backend read. Temperature never changes truth.
+    pub fn cool(&mut self, dangling: &Dangling) -> usize {
+        let mut cooled = 0;
+        for address in &dangling.addresses {
+            if let Some(crystal) = self.crystals.remove(address) {
+                self.stats.hot_bytes -= crystal.bytes.len();
+                self.stats.evicted_crystals += 1;
+                cooled += 1;
+            }
+        }
+        if cooled > 0 {
+            let crystals = &self.crystals;
+            self.settled_order.retain(|a| crystals.contains_key(a));
+        }
+        cooled
     }
 
     fn hold(&mut self, bytes: usize) {
