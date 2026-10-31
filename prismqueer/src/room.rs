@@ -82,6 +82,92 @@
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = delta.symmetric();
 //! ```
+//!
+//! # Rings
+//!
+//! A room's coefficients live in one number system, and every computation
+//! about them runs there (prism-011). The **kind** of ring is a type: [`Z`],
+//! [`ZMod`] (ℤ/n) and [`QModOne`] (ℚ/ℤ, exact U(1)). The **modulus** of
+//! ℤ/n is a runtime value ([`Modulus`]), carried by every residue and every
+//! map and checked like dimension and address: two moduli in one operation
+//! is a [`RoomError::Modulus`]. Between rings only named maps cross:
+//! [`Z::reduce`], [`Map::reduce`], [`clear_denominators`],
+//! [`ZMod::fraction`].
+//!
+//! The control compiles:
+//!
+//! ```
+//! use prismqueer::field::Graph;
+//! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, ZMod, Z};
+//! let g = Graph::new([], [(0, 1), (0, 1)]);
+//! let twelve = Modulus::new(12).unwrap();
+//! let delta = coboundary(&g);
+//! let delta12 = coboundary_in::<ZMod>(&twelve, &g);
+//! let _ = delta.reduce(&twelve).then(&delta12.adjoint());
+//! let c: Vec<ZMod> = [Z::from(6), Z::from(-6)].iter().map(|x| x.reduce(&twelve)).collect();
+//! let _ = solve(&twelve, &g, &c);
+//! ```
+//!
+//! Each of the following changes one line of it, and doesn't compile. A map
+//! over ℤ then one over ℤ/12, with no reduction between:
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::field::Graph;
+//! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, ZMod, Z};
+//! let g = Graph::new([], [(0, 1), (0, 1)]);
+//! let twelve = Modulus::new(12).unwrap();
+//! let delta = coboundary(&g);
+//! let delta12 = coboundary_in::<ZMod>(&twelve, &g);
+//! let _ = delta.then(&delta12.adjoint());
+//! let c: Vec<ZMod> = [Z::from(6), Z::from(-6)].iter().map(|x| x.reduce(&twelve)).collect();
+//! let _ = solve(&twelve, &g, &c);
+//! ```
+//!
+//! Integers solved in the ℤ/12 room: an integer isn't a residue until it is
+//! reduced.
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::field::Graph;
+//! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, ZMod, Z};
+//! let g = Graph::new([], [(0, 1), (0, 1)]);
+//! let twelve = Modulus::new(12).unwrap();
+//! let delta = coboundary(&g);
+//! let delta12 = coboundary_in::<ZMod>(&twelve, &g);
+//! let _ = delta.reduce(&twelve).then(&delta12.adjoint());
+//! let c: Vec<ZMod> = [Z::from(6), Z::from(-6)].iter().map(|x| x.reduce(&twelve)).collect();
+//! let _ = solve(&twelve, &g, &[Z::from(6), Z::from(-6)]);
+//! ```
+//!
+//! δ with entries in ℚ mod 1: ℚ/ℤ is a group, not a ring (1/3 ≡ 4/3, but
+//! (1/3)² = 1/9 and (4/3)² = 16/9 ≢ 1/9), so it has no matrices. δ over ℤ
+//! acts on its cochains instead ([`Map::act`]).
+//!
+//! ```compile_fail,E0277
+//! use prismqueer::field::Graph;
+//! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, QModOne, ZMod, Z};
+//! let g = Graph::new([], [(0, 1), (0, 1)]);
+//! let twelve = Modulus::new(12).unwrap();
+//! let delta = coboundary(&g);
+//! let delta12 = coboundary_in::<QModOne>(&(), &g);
+//! let _ = delta.reduce(&twelve).then(&delta12.adjoint());
+//! let c: Vec<ZMod> = [Z::from(6), Z::from(-6)].iter().map(|x| x.reduce(&twelve)).collect();
+//! let _ = solve(&twelve, &g, &c);
+//! ```
+//!
+//! An exact solve over floats: `f64` isn't [`Exactly`], since a nonzero
+//! float pairing may be rounding. Floats are read through a band.
+//!
+//! ```compile_fail,E0277
+//! use prismqueer::field::Graph;
+//! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, ZMod, Z};
+//! let g = Graph::new([], [(0, 1), (0, 1)]);
+//! let twelve = Modulus::new(12).unwrap();
+//! let delta = coboundary(&g);
+//! let delta12 = coboundary_in::<ZMod>(&twelve, &g);
+//! let _ = delta.reduce(&twelve).then(&delta12.adjoint());
+//! let c: Vec<ZMod> = [Z::from(6), Z::from(-6)].iter().map(|x| x.reduce(&twelve)).collect();
+//! let _ = solve(&(), &g, &[6.0, -6.0]);
+//! ```
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
