@@ -1463,7 +1463,11 @@ impl<A: Kind, B: Kind> Map<A, B, Z> {
     pub fn smith(&self) -> Smith<A, B> {
         let (m, n) = (self.to.dim, self.from.dim);
         let mut a: Vec<Vec<BigInt>> = (0..m)
-            .map(|i| (0..n).map(|j| self.entries[self.at(i, j)].0.clone()).collect())
+            .map(|i| {
+                (0..n)
+                    .map(|j| self.entries[self.at(i, j)].0.clone())
+                    .collect()
+            })
             .collect();
         let unit = |k: usize| -> Vec<Vec<BigInt>> {
             (0..k)
@@ -1514,7 +1518,8 @@ impl<A: Kind, B: Kind> Map<A, B, Z> {
                     continue;
                 }
                 let pivot = a[t][t].clone();
-                let stray = (t + 1..m).find(|&i| (t + 1..n).any(|j| !(&a[i][j] % &pivot).is_zero()));
+                let stray =
+                    (t + 1..m).find(|&i| (t + 1..n).any(|j| !(&a[i][j] % &pivot).is_zero()));
                 match stray {
                     Some(i) => {
                         let minus_one = BigInt::from(-1);
@@ -1546,6 +1551,13 @@ impl<A: Kind, B: Kind> Map<A, B, Z> {
             to: self.to.clone(),
         }
     }
+
+    /// Row `i`, as a vector of `from`.
+    fn row(&self, i: usize) -> Vec<Z> {
+        (0..self.from.dim)
+            .map(|j| self.entries[self.at(i, j)].clone())
+            .collect()
+    }
 }
 
 impl<A: Kind> Map<A, A, Z> {
@@ -1554,7 +1566,11 @@ impl<A: Kind> Map<A, A, Z> {
     pub fn determinant(&self) -> Z {
         let n = self.from.dim;
         let mut a: Vec<Vec<BigInt>> = (0..n)
-            .map(|i| (0..n).map(|j| self.entries[self.at(i, j)].0.clone()).collect())
+            .map(|i| {
+                (0..n)
+                    .map(|j| self.entries[self.at(i, j)].0.clone())
+                    .collect()
+            })
             .collect();
         let mut sign = BigInt::one();
         let mut previous = BigInt::one();
@@ -1819,7 +1835,7 @@ pub fn pair<V: Coefficient>(ring: &V::Ring, z: &[Z], c: &[V]) -> Result<V, RoomE
 ///   factor of δ is 1, coker δ over ℤ is free (ℤ^b₁, no torsion), and over
 ///   any coefficient group c is exact iff every cycle pairs to 0 with it.
 ///   Torsion first appears on faces (δ₁: C¹ → C², ℝℙ²'s ℤ/2), which is
-///   where Smith form will be needed.
+///   where Smith form is needed ([`bounds`]).
 /// - **ℚ mod 1 is ℤ/m.** The method needs only an abelian group, so
 ///   [`QModOne`] is solved directly; with m the lcm of the denominators it
 ///   is the same solve as ℤ/m on [`clear_denominators`]'s c′, mapped back by
@@ -1885,4 +1901,239 @@ pub fn solve<V: Exactly>(
     } else {
         Exactness::Genuine(genuine)
     })
+}
+
+// --- Faces: curvature, three kinds of twist, and boundaries -----------------
+
+/// Each face's curvature: (δ₁c)(f), the twist around f in its canonical
+/// orientation, exactly in c's ring. The holonomy field's
+/// [`check_flat`](crate::field::check_flat) reports on a face that doesn't
+/// close.
+///
+/// Refused when c isn't one value per edge, or a value lives in another
+/// ring than `ring`; or a face is off the graph.
+pub fn curvature<V: Exactly>(
+    ring: &V::Ring,
+    graph: &Graph,
+    faces: &[Face],
+    c: &[V],
+) -> Result<Vec<V>, RoomError> {
+    coboundary1(graph, faces)?.act(ring, c)
+}
+
+/// What kind of twist a 1-cochain c is, on a graph filled by faces, decided
+/// in its own ring, with the witness. The filtration exact ⊆ closed ⊆ all
+/// (Seam's K2), read from the inside out.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Twist<V> {
+    /// c = δg, c ∈ im δ₀: a rotation removes it. The potential g, as
+    /// [`Exactness::Exact`]'s.
+    Gradient(Vec<V>),
+    /// δ₁c = 0 but c ∉ im δ₀: a genuine comma, around a loop that bounds
+    /// nothing. Every basis cycle z with ⟨z, c⟩ ≠ 0, as
+    /// [`Exactness::Genuine`]'s. Never empty.
+    ///
+    /// Each z bounds no faces: c is closed, so for any 2-chain w,
+    /// ⟨∂₂w, c⟩ = ⟨w, δ₁c⟩ = 0, and ⟨z, c⟩ ≠ 0 rules z = ∂₂w out.
+    Harmonic(Vec<Cycle<V>>),
+    /// δ₁c ≠ 0: a local twist on these faces, each with its (δ₁c)(f).
+    /// Never empty.
+    Curvature(Vec<Curl<V>>),
+}
+
+/// A face that doesn't close: curvature, located.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Curl<V> {
+    index: usize,
+    face: Face,
+    value: V,
+}
+
+impl<V> Curl<V> {
+    /// Which face, by its place in the faces given: its dimension of C².
+    pub fn index(&self) -> usize {
+        self.index
+    }
+    /// The face.
+    pub fn face(&self) -> &Face {
+        &self.face
+    }
+    /// (δ₁c)(f), the twist around it: never zero.
+    pub fn value(&self) -> &V {
+        &self.value
+    }
+}
+
+/// Classify c ∈ C¹ on `graph` filled by `faces`, exactly, in `ring`:
+/// curvature if δ₁c ≠ 0; else gradient if c = δg ([`solve`]); else
+/// harmonic.
+///
+/// Only the filtration exact ⊆ closed ⊆ all is promised, in every ring.
+/// There is no orthogonal split c = gradient + harmonic + curl: over ℤ/n
+/// and ℚ mod 1 there is no inner product to split by, so none is offered.
+/// A curved c may hide a harmonic part too; it is reported by its faces,
+/// and the loops [`solve`] finds around holes can be read with [`bounds`].
+/// The orthogonal Hodge split exists only measured, over `f64`.
+///
+/// Refused as [`curvature`] and [`solve`] refuse.
+pub fn classify<V: Exactly>(
+    ring: &V::Ring,
+    graph: &Graph,
+    faces: &[Face],
+    c: &[V],
+) -> Result<Twist<V>, RoomError> {
+    let zero = V::zero(ring);
+    let curls: Vec<Curl<V>> = curvature(ring, graph, faces, c)?
+        .into_iter()
+        .zip(faces)
+        .enumerate()
+        .filter(|(_, (value, _))| *value != zero)
+        .map(|(index, (value, face))| Curl {
+            index,
+            face: face.clone(),
+            value,
+        })
+        .collect();
+    if !curls.is_empty() {
+        return Ok(Twist::Curvature(curls));
+    }
+    Ok(match solve(ring, graph, c)? {
+        Exactness::Exact(g) => Twist::Gradient(g),
+        Exactness::Genuine(cycles) => Twist::Harmonic(cycles),
+    })
+}
+
+/// Whether a 1-chain z bounds faces, z = ∂₂w, in R, with the witness.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Boundary<R: Bounded> {
+    /// z = ∂₂w: the 2-chain w, one value per face.
+    Bounds(Vec<R>),
+    /// z is no ∂₂w: a cocycle c with values in R's [dual](Bounded::Dual),
+    /// δ₁c = 0 and ⟨z, c⟩ ≠ 0. For every w, ⟨∂₂w, c⟩ = ⟨w, δ₁c⟩ = 0,
+    /// so no w has ∂₂w = z.
+    Unbounded(Vec<R::Dual>),
+}
+
+/// Rings whose linear equations Smith form decides: [`Z`] and [`ZMod`].
+/// A diagonal equation d·x = y is solved one entry at a time, and when one
+/// has no solution its row of U is turned into a separating cocycle.
+pub trait Bounded: Entry + Exactly {
+    /// Where the separating cocycles live: a group in which every z that
+    /// isn't a boundary pairs nonzero with some cocycle. For ℤ that is
+    /// ℚ/ℤ ([`QModOne`]): torsion is seen only mod 1 (ℝℙ²'s loop z pairs
+    /// to 1/2, while every integer cocycle pairs to 0 with it). For ℤ/n it
+    /// is ℤ/n itself.
+    type Dual: Exactly;
+    /// The dual's runtime part.
+    fn dual(ring: &Self::Ring) -> <Self::Dual as Coefficient>::Ring;
+    /// An x with d·x = self, if any. d is an invariant factor, ≥ 0.
+    fn divide(&self, d: &BigInt) -> Option<Self>;
+    /// When d·x = self has no solution: the cocycle s·u from U's row u, s
+    /// chosen so that ⟨z, s·u⟩ = s·self ≠ 0 and s·d = 0.
+    fn linking(&self, d: &BigInt, row: &[Z]) -> Vec<Self::Dual>;
+}
+
+impl Bounded for Z {
+    type Dual = QModOne;
+    fn dual(_: &()) {}
+    fn divide(&self, d: &BigInt) -> Option<Self> {
+        if d.is_zero() {
+            return self.0.is_zero().then(|| self.clone());
+        }
+        (&self.0 % d).is_zero().then(|| Z(&self.0 / d))
+    }
+    /// d > 0, d ∤ y: u/d, so ⟨z, c⟩ = y/d ≢ 0 mod 1. d = 0, y ≠ 0:
+    /// u/(2y), so ⟨z, c⟩ = 1/2.
+    fn linking(&self, d: &BigInt, row: &[Z]) -> Vec<QModOne> {
+        let den = if d.is_zero() {
+            BigInt::from(2) * &self.0
+        } else {
+            d.clone()
+        };
+        row.iter()
+            .map(|u| QModOne::new(u.0.clone(), den.clone()).expect("a nonzero denominator"))
+            .collect()
+    }
+}
+
+impl Bounded for ZMod {
+    type Dual = ZMod;
+    fn dual(n: &Modulus) -> Modulus {
+        n.clone()
+    }
+    /// d acts on ℤ/n as g = gcd(d, n): d·x = y is solvable iff g | y, and
+    /// then x = (y/g)·(d/g)⁻¹ mod n/g.
+    fn divide(&self, d: &BigInt) -> Option<Self> {
+        let n = &self.modulus;
+        let g = acting(d, n);
+        if !(&self.residue % &g).is_zero() {
+            return None;
+        }
+        let part = &n.0 / &g;
+        let x = (&self.residue / &g) * inverse(&(d / &g), &part);
+        Some(ZMod::new(x, n))
+    }
+    /// g ∤ y: (n/g)·u, so δ₁c = (n/g)·d·(…) ≡ 0 and ⟨z, c⟩ = (n/g)·y ≢ 0.
+    fn linking(&self, d: &BigInt, row: &[Z]) -> Vec<ZMod> {
+        let n = &self.modulus;
+        let s = &n.0 / acting(d, n);
+        row.iter().map(|u| ZMod::new(&s * &u.0, n)).collect()
+    }
+}
+
+/// How the invariant factor d acts on ℤ/n: as gcd(d, n), so 0 acts as n.
+fn acting(d: &BigInt, n: &Modulus) -> BigInt {
+    gcd(d.clone(), n.0.clone())
+}
+
+/// a⁻¹ mod m, for a coprime to m ≥ 1, by the extended Euclidean algorithm.
+fn inverse(a: &BigInt, m: &BigInt) -> BigInt {
+    let (mut r0, mut r1) = (m.clone(), a % m);
+    let (mut s0, mut s1) = (BigInt::zero(), BigInt::one());
+    while !r1.is_zero() {
+        let q = &r0 / &r1;
+        (r0, r1) = (r1.clone(), r0 - &q * &r1);
+        (s0, s1) = (s1.clone(), s0 - &q * &s1);
+    }
+    s0
+}
+
+/// Decide whether z ∈ C₁ bounds faces, z = ∂₂w, exactly, in `ring`: the
+/// 2-chain w, or a cocycle that certifies there is none.
+///
+/// By the Smith form of ∂₂ = δ₁* over ℤ, U·∂₂·V = diag(d): ∂₂w = z
+/// exactly when diag(d)·x = U·z with w = V·x. U and V are unimodular, so
+/// they stay invertible over ℤ/n, and the equation splits into dᵢ·xᵢ = yᵢ,
+/// one per factor (dᵢ = 0 past the rank). Over ℤ/n, dᵢ acts as gcd(dᵢ, n):
+/// ℝℙ²'s factor 2 is 0 over ℤ/2 (the loop through the cross-cap doesn't
+/// bound) and a unit over ℤ/3 (it does). When some yᵢ isn't reachable,
+/// row i of U, scaled ([`Bounded::linking`]), is a cocycle that pairs
+/// nonzero with z: row i of U·∂₂ is dᵢ times row i of V⁻¹, so the scale
+/// that kills dᵢ makes it closed.
+///
+/// Refused when z isn't one value per edge, or a value lives in another
+/// ring than `ring`; or a face is off the graph.
+pub fn bounds<R: Bounded>(
+    ring: &R::Ring,
+    graph: &Graph,
+    faces: &[Face],
+    z: &[R],
+) -> Result<Boundary<R>, RoomError> {
+    let boundary = coboundary1(graph, faces)?.adjoint();
+    length(boundary.to.dim, z.len())?;
+    within(ring, z)?;
+    let smith = boundary.smith();
+    let y = smith.left.act(ring, z)?;
+    let none = BigInt::zero();
+    let mut x = Vec::with_capacity(faces.len());
+    for (i, yi) in y.iter().enumerate() {
+        let d = smith.factors.get(i).map_or(&none, |d| &d.0);
+        match yi.divide(d) {
+            Some(xi) if i < faces.len() => x.push(xi),
+            Some(_) => {}
+            None => return Ok(Boundary::Unbounded(yi.linking(d, &smith.left.row(i)))),
+        }
+    }
+    x.resize(faces.len(), R::zero(ring));
+    Ok(Boundary::Bounds(smith.right.act(ring, &x)?))
 }
