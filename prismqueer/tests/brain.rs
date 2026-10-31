@@ -508,9 +508,12 @@ fn lums_are_capacity_independent_evicted_facts_still_count() {
                 "{name:>12} {capacity:?}: evicted {:>3} restored {:>3} lums {:?}",
                 trace.stats.evicted_facts, trace.stats.restored_facts, trace.lums
             );
-            if capacity != Capacity::unbounded() && capacity != Capacity::bytes(400) {
-                // The small runs really forgot.
+            if capacity == Capacity::unbounded() {
+                assert_eq!(trace.stats.evicted_facts, 0);
+            } else {
+                // Every bounded run really forgot, and recomputed.
                 assert!(trace.stats.evicted_facts > 0, "{name} under {capacity:?}");
+                assert!(trace.stats.restored_facts > 0, "{name} under {capacity:?}");
                 evicted_somewhere += 1;
             }
             assert_eq!(trace.lums, reference.lums, "{name} under {capacity:?}");
@@ -520,7 +523,7 @@ fn lums_are_capacity_independent_evicted_facts_still_count() {
             );
         }
     }
-    assert_eq!(evicted_somewhere, 15);
+    assert_eq!(evicted_somewhere, 20);
 }
 
 #[test]
@@ -561,7 +564,10 @@ fn equal_successive_lums_are_the_fixpoint() {
         let expected = all.keys().filter(|(r, _)| r == rel).count() as u64;
         assert_eq!(*count, expected, "{rel}");
     }
-    assert_eq!(trace.lums_by_relation.values().sum::<u64>(), all.len() as u64);
+    assert_eq!(
+        trace.lums_by_relation.values().sum::<u64>(),
+        all.len() as u64
+    );
 }
 
 #[test]
@@ -648,7 +654,10 @@ fn lums_are_never_identity_the_same_crystals_settle_the_same_addresses() {
     let (dim, dim_crystal, dim_lums) = settle(false);
     let (lit, lit_crystal, lit_lums) = settle(true);
     assert_ne!(dim_lums, lit_lums);
-    assert!(dim_lums.last() < lit_lums.last(), "{dim_lums:?} {lit_lums:?}");
+    assert!(
+        dim_lums.last() < lit_lums.last(),
+        "{dim_lums:?} {lit_lums:?}"
+    );
     assert_eq!(dim, lit);
     assert_eq!(dim_crystal, lit_crystal);
     // The address is the bytes' alone.

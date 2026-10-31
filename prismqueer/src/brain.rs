@@ -68,6 +68,23 @@
 //! Until then a [`Brain`] works only in the public scope: [`Brain::new`]
 //! takes no scope, and there is no constructor that does.
 //!
+//! # Lums: progress and monotonicity, never identity
+//!
+//! [`Brain::lums`] is the count of light: the number of distinct facts ever
+//! deposited at or before the committed tick (prism-012, Ask 2; tr(P_S) for
+//! the lit set S). It is a counter kept **beside** the hot tier, not the hot
+//! tier's size: an evicted fact still counts, because eviction is lossless
+//! forgetting, and a fact a [`Recompute`] restores is not counted again,
+//! because it keeps its original deposit tick. So lums are the same under
+//! every [`Capacity`] and [`Ruler`] (invariant 1), readable in O(1) at each
+//! step boundary without copying anything.
+//!
+//! For a positive program lums never fall, and two equal successive counts
+//! mean the fixpoint. Lums are **progress and monotonicity, never
+//! identity**: they are read beside an address, never part of one, and
+//! never in a crystal's bytes. Two brains that settle the same bytes settle
+//! the same address, however much light either has seen.
+//!
 //! Not here yet: the vacuum (unreachability), keyed private scopes, and
 //! windowed input.
 //!
@@ -481,6 +498,10 @@ struct Table {
     rows: BTreeMap<Box<[Sym]>, Tick>,
     /// Facts evicted and not yet restored. While zero, a miss is a miss.
     evicted: usize,
+    /// Lums: distinct facts deposited at committed ticks.
+    lit: u64,
+    /// Distinct facts deposited at the open tick, not yet lit.
+    pending: u64,
 }
 
 impl Table {
@@ -513,6 +534,8 @@ pub struct Brain<B> {
     settled_order: VecDeque<Oid>,
     stats: Stats,
     recalled: Cell<usize>,
+    lit: u64,
+    pending: u64,
 }
 
 impl<B: Backend> Brain<B> {
@@ -535,6 +558,8 @@ impl<B: Backend> Brain<B> {
             settled_order: VecDeque::new(),
             stats: Stats::default(),
             recalled: Cell::new(0),
+            lit: 0,
+            pending: 0,
         }
     }
 
@@ -582,6 +607,8 @@ impl<B: Backend> Brain<B> {
                     arity,
                     rows: BTreeMap::new(),
                     evicted: 0,
+                    lit: 0,
+                    pending: 0,
                 });
                 next
             })
@@ -605,6 +632,22 @@ impl<B: Backend> Brain<B> {
         }
     }
 
+    /// Lums: the number of distinct facts ever deposited at or before the
+    /// committed tick. Evicted facts still count; restored facts are not
+    /// counted again; the open tick's deposits count once it commits. O(1).
+    ///
+    /// **Progress and monotonicity, never identity**: read it beside an
+    /// address, never as part of one (see the module docs).
+    pub fn lums(&self) -> u64 {
+        self.lit
+    }
+
+    /// [`Brain::lums`] for one relation. The relations' lums sum to the
+    /// brain's. O(1).
+    pub fn lums_of(&self, relation: Relation) -> u64 {
+        self.tables[relation.0 as usize].lit
+    }
+
     /// Deposit a fact at the open tick. False if it was already known
     /// (hot, or evicted and recomputed), in which case its tick stays.
     pub fn deposit(&mut self, relation: Relation, tuple: &[Sym]) -> bool {
@@ -614,6 +657,8 @@ impl<B: Backend> Brain<B> {
         let table = &mut self.tables[relation.0 as usize];
         let cost = table.row_bytes();
         table.rows.insert(tuple.into(), self.open);
+        table.pending += 1;
+        self.pending += 1;
         self.hold(cost);
         true
     }
@@ -653,6 +698,14 @@ impl<B: Backend> Brain<B> {
         let closed = self.open;
         self.committed = Some(closed);
         self.open = Tick(closed.0 + 1);
+        // The open tick's light is lit. A table's pending is non-zero only
+        // if something was deposited this tick.
+        if self.pending > 0 {
+            for table in &mut self.tables {
+                table.lit += std::mem::take(&mut table.pending);
+            }
+            self.lit += std::mem::take(&mut self.pending);
+        }
         self.press();
         closed
     }
