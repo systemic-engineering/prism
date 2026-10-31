@@ -70,26 +70,25 @@ fn round<B: Backend>(brain: &mut Brain<B>, rules: &[Rule]) -> usize {
             for (j, a) in rule.body.iter().enumerate() {
                 let mut next = Vec::new();
                 for b in &bindings {
-                    let pattern: Vec<Option<Sym>> = a
-                        .terms
-                        .iter()
-                        .map(|&Term::Var(v)| b[v])
-                        .collect();
+                    let pattern: Vec<Option<Sym>> =
+                        a.terms.iter().map(|&Term::Var(v)| b[v]).collect();
                     for (tuple, tick) in brain.scan(a.rel, &pattern) {
                         let fits = if j == delta { tick == last } else { tick < t };
                         if !fits {
                             continue;
                         }
                         let mut b2 = b.clone();
-                        let unifies = a.terms.iter().zip(&tuple).all(|(&Term::Var(v), &s)| {
-                            match b2[v] {
-                                Some(bound) => bound == s,
-                                None => {
-                                    b2[v] = Some(s);
-                                    true
-                                }
-                            }
-                        });
+                        let unifies =
+                            a.terms
+                                .iter()
+                                .zip(&tuple)
+                                .all(|(&Term::Var(v), &s)| match b2[v] {
+                                    Some(bound) => bound == s,
+                                    None => {
+                                        b2[v] = Some(s);
+                                        true
+                                    }
+                                });
                         if unifies {
                             next.push(b2);
                         }
@@ -173,6 +172,12 @@ fn from_input() -> BTreeMap<(&'static str, Vec<String>), u64> {
     all
 }
 
+/// What a recompute answers: tuples with their deposit ticks.
+type Rows = Vec<(Vec<Sym>, Tick)>;
+
+/// An eviction ruler, as a plain function.
+type Warmth = fn(Fact<'_>) -> i64;
+
 struct Program {
     edge: Relation,
     path: Relation,
@@ -214,7 +219,7 @@ fn program<B: Backend>(brain: &mut Brain<B>) -> Program {
 fn recompute(
     names: BTreeMap<Relation, &'static str>,
     calls: Rc<Cell<usize>>,
-) -> impl FnMut(&Interner, Relation, &[Option<Sym>]) -> Vec<(Vec<Sym>, Tick)> {
+) -> impl FnMut(&Interner, Relation, &[Option<Sym>]) -> Rows {
     let all = from_input();
     move |interner, rel, _pattern| {
         calls.set(calls.get() + 1);
@@ -258,7 +263,7 @@ fn canonical(header: String, lines: BTreeSet<String>) -> Vec<u8> {
     out.into_bytes()
 }
 
-fn run(capacity: Capacity, ruler: Option<fn(Fact<'_>) -> i64>) -> (Light, Stats) {
+fn run(capacity: Capacity, ruler: Option<Warmth>) -> (Light, Stats) {
     let mut brain = Brain::new(capacity, Memory::default());
     let p = program(&mut brain);
     let names = BTreeMap::from([(p.edge, "edge"), (p.path, "path"), (p.both, "both")]);
@@ -373,6 +378,13 @@ fn threshold_independence_tiny_and_unbounded_give_the_same_light() {
         .collect();
     assert_eq!(wide.facts, expected);
 
+    // The same facts, the same deposit ticks, the same crystals.
+    assert_eq!(tiny.facts, wide.facts);
+    assert_eq!(tiny.verdicts, wide.verdicts);
+    assert_eq!(tiny.settled, wide.settled);
+    assert_eq!(tiny.read_back, wide.read_back);
+    assert_eq!(tiny, wide);
+
     // Eviction and recompute really happened at the small threshold, and
     // not at the unbounded one.
     assert!(tiny_stats.evicted_facts > 0, "{tiny_stats:?}");
@@ -385,13 +397,6 @@ fn threshold_independence_tiny_and_unbounded_give_the_same_light() {
     assert_eq!(wide_stats.recomputes, 0);
     assert_eq!(wide_stats.recalled_crystals, 0);
     assert!(tiny_stats.peak_hot_bytes < wide_stats.peak_hot_bytes);
-
-    // The same facts, the same deposit ticks, the same crystals.
-    assert_eq!(tiny.facts, wide.facts);
-    assert_eq!(tiny.verdicts, wide.verdicts);
-    assert_eq!(tiny.settled, wide.settled);
-    assert_eq!(tiny.read_back, wide.read_back);
-    assert_eq!(tiny, wide);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +420,8 @@ fn scrambled(f: Fact<'_>) -> i64 {
         .tuple
         .iter()
         .fold(f.tick.0 * 97 + u64::from(f.relation.index()), |h, s| {
-            h.wrapping_mul(2_654_435_761).wrapping_add(u64::from(s.index()))
+            h.wrapping_mul(2_654_435_761)
+                .wrapping_add(u64::from(s.index()))
         });
     (h % 1009) as i64 - 504
 }
@@ -427,7 +433,7 @@ fn all_equal(_: Fact<'_>) -> i64 {
 #[test]
 fn warmer_never_truer_priority_and_threshold_never_change_the_light() {
     let (reference, _) = run(Capacity::unbounded(), None);
-    let rulers: [(&str, fn(Fact<'_>) -> i64); 5] = [
+    let rulers: [(&str, Warmth); 5] = [
         ("oldest first", oldest_first),
         ("newest first", newest_first),
         ("by constants", by_constants),
@@ -580,8 +586,9 @@ fn without_a_recompute_no_fact_is_ever_forgotten() {
 
 #[test]
 fn an_uncommitted_fact_is_never_evicted() {
-    let mut brain =
-        Brain::new(Capacity::bytes(0), Memory::default()).with_recompute(|_: &Interner, _, _: &[Option<Sym>]| Vec::new());
+    let mut brain = Brain::new(Capacity::bytes(0), Memory::default()).with_recompute(
+        |_: &Interner, _: Relation, _: &[Option<Sym>]| Vec::<(Vec<Sym>, Tick)>::new(),
+    );
     let edge = brain.relation("edge", 2);
     let (a, b) = (brain.intern(b"a"), brain.intern(b"b"));
     assert!(brain.deposit(edge, &[a, b]));
@@ -628,6 +635,10 @@ fn interned_constants_and_relations_are_stable() {
     assert_eq!(brain.interner().get(b"zz"), None);
     let edge = brain.relation("edge", 2);
     assert_eq!(brain.relation("edge", 2), edge);
-    assert_ne!(brain.relation("edge", 3), edge, "a relation is a name and an arity");
+    assert_ne!(
+        brain.relation("edge", 3),
+        edge,
+        "a relation is a name and an arity"
+    );
     assert_eq!(brain.tick(), Tick(0));
 }
