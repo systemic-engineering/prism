@@ -37,11 +37,10 @@
 //! # Composition (over LANDED per FLOOR Definition M8.1)
 //!
 //! - `prismqueer::spectral::kleinos::Graph` — input carrier
-//! - `prismqueer::ffi::eigenvalues` — LAPACK dsyev via FLANG-compiled `native/spectral.f90`
+//! - `prismqueer::room` — L₀ = δ*δ, exact, and its spectrum by LAPACK dsyev('N')
+//!   via FLANG-compiled `native/spectral.f90`
 
-use std::collections::BTreeMap;
-
-use crate::spectral::kleinos::{Graph, VertexId};
+use crate::spectral::kleinos::{laplacian_spectrum, Graph};
 
 /// Full non-trivial harmonic spectrum of the sheaf Laplacian.
 ///
@@ -56,32 +55,16 @@ pub struct Spectrum {
 impl Spectrum {
     /// Read the full non-trivial spectrum of `sheaf`.
     ///
-    /// Composes over LANDED `prismqueer::ffi::eigenvalues` (LAPACK dsyev via
-    /// FLANG-compiled `native/spectral.f90`).
+    /// L₀ = δ*δ and its spectrum come from [`room`](crate::room), read by
+    /// LAPACK dsyev('N') (FLANG-compiled `native/spectral.f90`).
     pub fn of(sheaf: &Graph) -> Self {
-        let n = sheaf.vertex_count();
-        if n < 2 {
+        if sheaf.vertex_count() < 2 {
             return Self {
                 eigenvalues: Vec::new(),
             };
         }
 
-        // Map VertexId → matrix index (canonical order per BTreeSet).
-        let vertex_index: BTreeMap<VertexId, usize> =
-            sheaf.vertices().enumerate().map(|(i, v)| (v, i)).collect();
-
-        // Build graph Laplacian L = D - A (row-major flat matrix; symmetric).
-        let mut laplacian = vec![0.0_f64; n * n];
-        for (u, v) in sheaf.edges() {
-            let i = vertex_index[&u];
-            let j = vertex_index[&v];
-            laplacian[i * n + j] -= 1.0;
-            laplacian[j * n + i] -= 1.0;
-            laplacian[i * n + i] += 1.0;
-            laplacian[j * n + j] += 1.0;
-        }
-
-        let eigenvalues = match crate::ffi::eigenvalues(n, &laplacian) {
+        let eigenvalues = match laplacian_spectrum(sheaf) {
             Ok(evals) if evals.len() >= 2 => evals[1..].to_vec(),
             _ => Vec::new(),
         };
