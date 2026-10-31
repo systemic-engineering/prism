@@ -1,7 +1,8 @@
 //! `prismqueer::room` — the room in which a thing resonates.
 //!
 //! A [`Room`] is a space: the space a value lives in, and the space an
-//! operator's resonances live in. On one graph there are two rooms, C⁰ (the
+//! operator's resonances live in. On one graph (a [`Graph`] multigraph, the
+//! one graph type `field` is built on too) there are two rooms, C⁰ (the
 //! vertex room, [`Vertices`]) and C¹ (the edge room, [`Edges`]), and their
 //! sum C⁰ ⊕ C¹ ([`Sum`]) where the Dirac operator D lives. Operators move
 //! between rooms: δ ([`coboundary`]) is a door from C⁰ into C¹, and δ*
@@ -91,7 +92,7 @@ use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{complex_oid, Exact, Graph, Group};
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::{EdgeKey, VertexId};
+use crate::spectral::kleinos::VertexId;
 
 // --- Kinds of room -----------------------------------------------------------
 
@@ -112,7 +113,8 @@ pub trait Kind: sealed::Sealed + Clone + PartialEq + Debug + 'static {
 pub struct Vertices;
 
 /// C¹: one dimension per edge, in canonical order and orientation (lower
-/// vertex id first).
+/// vertex id first). Parallel edges are distinct dimensions, by
+/// [`Edge::nth`](crate::field::Edge::nth).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Edges;
 
@@ -242,9 +244,12 @@ impl Room<Edges> {
     /// complex (V, E). Unchecked; [`Room::holds`] checks.
     fn edges_over(skeleton: &Room<Vertices>, graph: &Graph) -> Self {
         Room {
-            complex: complex_oid(skeleton.parts.iter().copied(), basis(graph).into_iter()),
+            complex: complex_oid(
+                skeleton.parts.iter().copied(),
+                graph.edges().map(|e| e.ends()),
+            ),
             skeleton: skeleton.complex.clone(),
-            dim: basis(graph).len(),
+            dim: graph.edges().count(),
             parts: (),
             kind: PhantomData,
         }
@@ -878,8 +883,10 @@ impl<A: Kind> Modes<A> {
 /// δ: C⁰ → C¹, exactly. `(δs)(u, v) = s(v) − s(u)` on each edge in
 /// canonical orientation: the edge's row holds −1 at `u`, +1 at `v`.
 ///
-/// A self-loop (v, v) has the zero row: s(v) − s(v) = 0. The two ends are
-/// summed, not written over each other.
+/// One row per edge: m parallel edges on u–v are m rows, so L₀ = δ*δ adds m
+/// to each end's diagonal and −m off it. A self-loop (v, v) has the zero
+/// row: s(v) − s(v) = 0. The two ends are summed, not written over each
+/// other.
 pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
     delta(&Room::vertices(graph), graph)
 }
@@ -906,20 +913,13 @@ fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
         .collect();
     let mut delta: Map<Vertices, Edges, Z> =
         Map::zero(skeleton, &Room::edges_over(skeleton, graph));
-    for (row, (u, v)) in basis(graph).into_iter().enumerate() {
+    for (row, (u, v)) in graph.edges().map(|e| e.ends()).enumerate() {
         for (w, sign) in [(u, Z::one().neg()), (v, Z::one())] {
             let at = delta.at(row, index[&w]);
             delta.entries[at] = delta.entries[at].add(&sign);
         }
     }
     delta
-}
-
-/// C¹'s basis: the ends of each dimension, in canonical order.
-fn basis(graph: &Graph) -> Vec<EdgeKey> {
-    let mut pairs: Vec<EdgeKey> = graph.edges().map(|e| e.ends()).collect();
-    pairs.dedup();
-    pairs
 }
 
 /// L₀ = δ*δ on C⁰ of `graph`, exactly: symmetric by construction.
