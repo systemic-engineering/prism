@@ -8,7 +8,8 @@
 //!    L₁↓ = δδ* is the down-Laplacian: a graph has no 2-cells, so C¹ has no
 //!    up part, and the lower block is L₁↓, not the full Hodge L₁.
 //! 3. An eigenbasis is read by columns, and every column is an eigenvector.
-//! 4. A room-built D has `Instrument`'s spectrum.
+//! 4. `Instrument`'s spectrum is that of a D built independently, flat,
+//!    from the edge list.
 //! 6. The exact charpoly: det(xI − M) over Z, monic, leading first, and D's
 //!    follows from D² = L₀ ⊕ L₁↓.
 //! 7. The measured spectrum roots the exact charpoly, within a declared band.
@@ -18,7 +19,8 @@
 //! `prismqueer::room`.)
 //!
 //! Expected values come from outside `room`: the graph's own edge list, a
-//! hand-checked Laplacian (`laplacian_from_edges`) and `Instrument`.
+//! hand-checked Laplacian (`laplacian_from_edges`), `Instrument`, and a
+//! naive flat D built in this file.
 
 #![cfg(feature = "lapack")]
 
@@ -202,20 +204,94 @@ fn eigenvectors_are_columns() {
     );
 }
 
-// --- Law 4: the same spectrum as Instrument ---------------------------------
+// --- Law 4: the same spectrum as Instrument, built independently ---------
 
+/// D, deliberately naive and flat: straight from an edge list, row-major,
+/// with no `room`, no `Graph` and no shared code. Vertices sorted, edges
+/// canonical (lower id first) and sorted; rows 0..n₀ are vertices, then one
+/// row per edge, which holds δ: −1 at its lower end, +1 at its upper end.
+/// D = δ + δ*, so the same entries mirror above the diagonal.
+fn naive_dirac(edges: &[(u64, u64)]) -> (usize, Vec<f64>) {
+    let mut canonical: Vec<(u64, u64)> = edges.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect();
+    canonical.sort_unstable();
+    canonical.dedup();
+    let mut vertices: Vec<u64> = canonical.iter().flat_map(|&(u, v)| [u, v]).collect();
+    vertices.sort_unstable();
+    vertices.dedup();
+    let at = |x: u64| vertices.binary_search(&x).expect("an endpoint");
+    let n0 = vertices.len();
+    let n = n0 + canonical.len();
+    let mut d = vec![0.0_f64; n * n];
+    for (k, &(u, v)) in canonical.iter().enumerate() {
+        let e = n0 + k;
+        d[e * n + at(u)] = -1.0;
+        d[at(u) * n + e] = -1.0;
+        d[e * n + at(v)] = 1.0;
+        d[at(v) * n + e] = 1.0;
+    }
+    (n, d)
+}
+
+/// Graphs for the cross-check: a cycle, a path, a chordal square, two
+/// components, and a cycle with a tail.
+fn reference_graphs() -> [(&'static str, Vec<(u64, u64)>); 5] {
+    [
+        ("triangle", vec![(0, 1), (1, 2), (0, 2)]),
+        ("path", vec![(10, 20), (20, 30), (30, 40)]),
+        (
+            "square with diagonal",
+            vec![(0, 1), (1, 2), (2, 3), (0, 3), (0, 2)],
+        ),
+        (
+            "triangle and an edge (disconnected)",
+            vec![(0, 1), (1, 2), (0, 2), (5, 6)],
+        ),
+        (
+            "cycle with a tail",
+            vec![(0, 1), (1, 2), (2, 3), (3, 0), (3, 4), (4, 5)],
+        ),
+    ]
+}
+
+/// The independent cross-check: `Instrument` (room-built D, column-major,
+/// handed to dsyev as stored) against a flat D built here from the edge list
+/// (row-major, through `ffi`'s own layout conversion).
+///
+/// - Against `ffi::eigensystem`, the same dsyev job (`'V'`) on the flat
+///   matrix: bit-equal. Same matrix, same basis order, same arithmetic.
+/// - Against `ffi::eigenvalues` (dsyev `'N'`): within `settle`'s band only.
+///   `'N'` and `'V'` tridiagonalize alike but then run different QR
+///   iterations (dsterf vs dsteqr), so their last bits differ, measured.
 #[test]
-fn dirac_spectrum_matches_instrument() {
-    for (name, g) in graphs() {
-        let modes = dirac(&g)
-            .measure()
-            .symmetric()
-            .expect("D is self-adjoint")
-            .decompose()
-            .expect("measured");
-        let instrument = Instrument::of(&g).expect("measured");
-        // Same matrix, same basis order, same dsyev: the same numbers.
-        assert_eq!(modes.spectrum(), instrument.eigenvalues(), "{name}");
+fn dirac_spectrum_matches_an_independent_flat_build() {
+    let bits = |xs: &[f64]| xs.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+    for (name, edges) in reference_graphs() {
+        let (n, flat) = naive_dirac(&edges);
+        // dsyev reads one triangle only: a sign flipped in the other would
+        // pass unseen, so the reference's symmetry is checked here.
+        for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
+            assert_eq!(flat[i * n + j], flat[j * n + i], "{name}: D[{i}, {j}]");
+        }
+        let instrument = Instrument::of(&graph_from_edges(&edges)).expect("measured");
+        let measured = instrument.eigenvalues();
+
+        let (same_job, _) = prismqueer::ffi::eigensystem(n, &flat).expect("measured");
+        assert_eq!(
+            bits(measured),
+            bits(&same_job),
+            "{name}: {measured:?} vs {same_job:?}"
+        );
+
+        let values_only = prismqueer::ffi::eigenvalues(n, &flat).expect("measured");
+        let scale = values_only.iter().fold(0.0_f64, |m, x| m.max(x.abs()));
+        assert_eq!(values_only.len(), measured.len(), "{name}");
+        for (a, b) in measured.iter().zip(&values_only) {
+            assert_eq!(
+                zeros::settle(n).read((a - b).abs(), scale),
+                Verdict::Zero,
+                "{name}: {a} vs {b}"
+            );
+        }
     }
 }
 
