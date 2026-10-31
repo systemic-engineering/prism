@@ -140,6 +140,134 @@
 //! let c = Crystal { address: Oid::hash(&Scope::public(), b"edge a b"), bytes: b"edge a c".to_vec().into() };
 //! assert_eq!(c.address(), &Oid::hash(&Scope::public(), c.bytes()));
 //! ```
+//!
+//! # The vacuum runs on a sealed snapshot of roots
+//!
+//! Unreachability is a negation, so it is decided only on a settled
+//! snapshot. The control compiles: the vacuum takes roots that were sealed.
+//!
+//! ```
+//! use std::collections::BTreeSet;
+//! use prismqueer::brain::{Brain, Capacity, Memory, Roots, SealedRoots};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let root = brain.settle(b"identity".to_vec()).unwrap();
+//! let mut roots = Roots::default();
+//! roots.hold(root.clone());
+//! let reach = brain.vacuum(&roots.seal());
+//! assert!(reach.reachable().contains(&root));
+//! ```
+//!
+//! The live root set, which can still grow, is refused:
+//!
+//! ```compile_fail,E0308
+//! use std::collections::BTreeSet;
+//! use prismqueer::brain::{Brain, Capacity, Memory, Roots, SealedRoots};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let root = brain.settle(b"identity".to_vec()).unwrap();
+//! let mut roots = Roots::default();
+//! roots.hold(root.clone());
+//! let reach = brain.vacuum(&roots);
+//! assert!(reach.reachable().contains(&root));
+//! ```
+//!
+//! so is a bare set of addresses:
+//!
+//! ```compile_fail,E0308
+//! use std::collections::BTreeSet;
+//! use prismqueer::brain::{Brain, Capacity, Memory, Roots, SealedRoots};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let root = brain.settle(b"identity".to_vec()).unwrap();
+//! let mut roots = Roots::default();
+//! roots.hold(root.clone());
+//! let reach = brain.vacuum(&BTreeSet::from([root.clone()]));
+//! assert!(reach.reachable().contains(&root));
+//! ```
+//!
+//! and a sealed snapshot can't be built except by sealing:
+//!
+//! ```compile_fail,E0451
+//! use std::collections::BTreeSet;
+//! use prismqueer::brain::{Brain, Capacity, Memory, Roots, SealedRoots};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let root = brain.settle(b"identity".to_vec()).unwrap();
+//! let mut roots = Roots::default();
+//! roots.hold(root.clone());
+//! let reach = brain.vacuum(&SealedRoots { roots: BTreeSet::from([root.clone()]) });
+//! assert!(reach.reachable().contains(&root));
+//! ```
+//!
+//! # The public scope can cool, never purge
+//!
+//! A purge needs an [`Erasure`], and only an erasure of the scope's key can
+//! mint one. The public key can't be erased, and erasure happens outside
+//! prism, so nothing in prism mints one. The control compiles: given that
+//! evidence, a purge is callable, and cooling needs none.
+//!
+//! ```
+//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Oid, Scope};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let mut backend = Memory::default();
+//! fn after_erasure(backend: &mut Memory, erasure: &Erasure, address: &Oid) {
+//!     let _ = backend.purge(erasure, address);
+//! }
+//! ```
+//!
+//! Each of the following changes its last lines, and doesn't compile. The
+//! public scope can't mint the evidence:
+//!
+//! ```compile_fail,E0599
+//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Oid, Scope};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let mut backend = Memory::default();
+//! let _ = backend.purge(&Erasure::of(&Scope::public()), &address);
+//! ```
+//!
+//! nor build it by hand:
+//!
+//! ```compile_fail,E0451
+//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Oid, Scope};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let mut backend = Memory::default();
+//! let _ = backend.purge(&Erasure { never: loop {} }, &address);
+//! ```
+//!
+//! a dangling verdict is not erasure evidence (it is never final):
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Oid, Scope};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let mut backend = Memory::default();
+//! let _ = backend.purge(reach.dangling(), &address);
+//! ```
+//!
+//! and there is no purge without evidence:
+//!
+//! ```compile_fail,E0061
+//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Oid, Scope};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let mut backend = Memory::default();
+//! let _ = backend.purge(&address);
+//! ```
 
 use std::cell::Cell;
 use std::collections::{BTreeMap, VecDeque};

@@ -26,7 +26,8 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Fact, Interner, Memory, Recall, Relation, Stats, Sym, Tick,
+    Backend, Brain, Capacity, Crystal, Fact, Interner, Memory, Recall, Relation, Roots, Stats, Sym,
+    Tick,
 };
 use prismqueer::oid::{Oid, Scope};
 
@@ -281,6 +282,12 @@ struct Trace {
 }
 
 fn run_traced(capacity: Capacity, ruler: Option<Warmth>) -> Trace {
+    run_traced_with(capacity, ruler, false)
+}
+
+/// A run; with `vacuum`, a vacuum pass over an empty sealed snapshot after
+/// every settle, cooling every crystal it finds dangling (all of them).
+fn run_traced_with(capacity: Capacity, ruler: Option<Warmth>, vacuum: bool) -> Trace {
     let mut lums = Vec::new();
     let mut news = Vec::new();
     let mut brain = Brain::new(capacity, Memory::default());
@@ -322,6 +329,10 @@ fn run_traced(capacity: Capacity, ruler: Option<Warmth>) -> Trace {
         assert_eq!(lines.len(), new);
         let bytes = canonical(format!("tick {}", t.0), lines);
         settled.push((brain.settle(bytes.clone()).unwrap(), bytes));
+        if vacuum {
+            let reach = brain.vacuum(&Roots::default().seal());
+            brain.cool(reach.dangling());
+        }
     }
 
     // Every node's reach settles too.
@@ -334,6 +345,10 @@ fn run_traced(capacity: Capacity, ruler: Option<Warmth>) -> Trace {
             .collect();
         let bytes = canonical(format!("reach {x}"), lines);
         settled.push((brain.settle(bytes.clone()).unwrap(), bytes));
+        if vacuum {
+            let reach = brain.vacuum(&Roots::default().seal());
+            brain.cool(reach.dangling());
+        }
     }
 
     let mut facts = BTreeMap::new();
@@ -846,4 +861,241 @@ fn interned_constants_and_relations_are_stable() {
         "a relation is a name and an arity"
     );
     assert_eq!(brain.tick(), Tick(0));
+}
+
+// ---------------------------------------------------------------------------
+// 6. The vacuum (prism-013 §3): reach from a sealed snapshot of roots, cool
+//    what isn't reached, and never purge in the public scope.
+// ---------------------------------------------------------------------------
+
+/// An address in a scope this brain doesn't hold: dark here, not dangling.
+fn elsewhere(bytes: &[u8]) -> Oid {
+    Oid::hash(&Scope::keyed([7; 32]), bytes)
+}
+
+/// A small public crystal DAG, by name. References are declared beside the
+/// bytes, never in them:
+///
+/// ```text
+/// identity → a → {b, c}     b → d     c → {d, x̄}     d → ∅
+/// e → f     f → ȳ     g → a                 (x̄, ȳ: dark, another scope)
+/// ```
+///
+/// Held as a root, `identity` reaches a, b, c and d. e, f and g are settled
+/// here and unreached: dangling. g points *into* the reached part, which
+/// doesn't make it reached.
+struct Dag {
+    brain: Brain<Counted>,
+    at: BTreeMap<&'static str, Oid>,
+    bytes: BTreeMap<&'static str, Vec<u8>>,
+}
+
+impl Dag {
+    fn new() -> Self {
+        let mut dag = Dag {
+            brain: Brain::new(Capacity::unbounded(), Counted::default()),
+            at: BTreeMap::new(),
+            bytes: BTreeMap::new(),
+        };
+        // Targets first, so every reference is an address already settled
+        // (or dark).
+        dag.settle("d", &[]);
+        dag.settle("b", &["d"]);
+        dag.settle_to("c", &["d"], &[elsewhere(b"x")]);
+        dag.settle("a", &["b", "c"]);
+        dag.settle("identity", &["a"]);
+        dag.settle_to("f", &[], &[elsewhere(b"y")]);
+        dag.settle("e", &["f"]);
+        dag.settle("g", &["a"]);
+        dag
+    }
+
+    fn settle(&mut self, name: &'static str, refs: &[&str]) {
+        self.settle_to(name, refs, &[]);
+    }
+
+    fn settle_to(&mut self, name: &'static str, refs: &[&str], dark: &[Oid]) {
+        let bytes = format!("node {name}").into_bytes();
+        let references: Vec<Oid> = refs
+            .iter()
+            .map(|r| self.at[r].clone())
+            .chain(dark.iter().cloned())
+            .collect();
+        let address = self.brain.settle_with(bytes.clone(), references).unwrap();
+        self.at.insert(name, address);
+        self.bytes.insert(name, bytes);
+    }
+
+    fn set(&self, names: &[&str]) -> BTreeSet<Oid> {
+        names.iter().map(|n| self.at[n].clone()).collect()
+    }
+
+    fn bytes_of(&self, names: &[&str]) -> usize {
+        names.iter().map(|n| self.bytes[n].len()).sum()
+    }
+
+    /// Every named crystal reads back by address with its settled bytes.
+    fn reads_back(&self, names: &[&str]) {
+        for n in names {
+            let c = self.brain.crystal(&self.at[n]).unwrap();
+            assert_eq!(c.bytes(), &self.bytes[n][..], "{n}");
+            assert_eq!(c.address(), &self.at[n], "{n}");
+        }
+    }
+}
+
+const REACHED: &[&str] = &["identity", "a", "b", "c", "d"];
+const UNREACHED: &[&str] = &["e", "f", "g"];
+
+#[test]
+fn the_vacuum_classifies_reachable_dangling_and_dark_exactly() {
+    let mut dag = Dag::new();
+    let mut roots = Roots::default();
+    roots.hold(dag.at["identity"].clone());
+    // A root held in another scope: this brain can't see into it.
+    roots.hold(elsewhere(b"their identity"));
+    let snapshot = roots.seal();
+
+    let reach = dag.brain.vacuum(&snapshot);
+    eprintln!("reachable: {:?}", reach.reachable());
+    eprintln!("dangling:  {:?}", reach.dangling().addresses());
+    eprintln!("dark:      {:?}", reach.dark());
+    assert_eq!(reach.reachable(), &dag.set(REACHED));
+    assert_eq!(reach.dangling().addresses(), &dag.set(UNREACHED));
+    // Dark: referenced (or held as a root), but not in this scope. Never
+    // dangling: what it reaches is unknown here.
+    let dark = BTreeSet::from([
+        elsewhere(b"x"),
+        elsewhere(b"y"),
+        elsewhere(b"their identity"),
+    ]);
+    assert_eq!(reach.dark(), &dark);
+    assert!(reach.dark().is_disjoint(reach.dangling().addresses()));
+    // The verdict says which snapshot it was decided on.
+    assert_eq!(reach.dangling().as_of(), &snapshot);
+}
+
+#[test]
+fn cooling_the_dangling_is_lossless_every_read_back_is_identical() {
+    let mut dag = Dag::new();
+    let mut roots = Roots::default();
+    roots.hold(dag.at["identity"].clone());
+    let reach = dag.brain.vacuum(&roots.seal());
+
+    let hot = dag.brain.stats().hot_bytes;
+    let lums = dag.brain.lums();
+    assert_eq!(dag.brain.cool(reach.dangling()), UNREACHED.len());
+    assert_eq!(dag.brain.stats().hot_bytes, hot - dag.bytes_of(UNREACHED));
+    assert_eq!(dag.brain.stats().evicted_crystals, UNREACHED.len());
+    assert_eq!(dag.brain.lums(), lums);
+    // Cooling again finds nothing hot to cool.
+    assert_eq!(dag.brain.cool(reach.dangling()), 0);
+    // The backend still holds every crystal.
+    assert_eq!(
+        dag.brain.backend().inner.len(),
+        REACHED.len() + UNREACHED.len()
+    );
+
+    // The reachable read back hot, without the backend.
+    dag.reads_back(REACHED);
+    assert_eq!(dag.brain.backend().fetches.get(), 0);
+    // The cooled read back from cold, identical.
+    dag.reads_back(UNREACHED);
+    assert_eq!(dag.brain.backend().fetches.get(), UNREACHED.len());
+}
+
+#[test]
+fn dangling_is_never_final_a_new_root_reaches_a_cooled_crystal_again() {
+    let mut dag = Dag::new();
+    let mut roots = Roots::default();
+    roots.hold(dag.at["identity"].clone());
+    let first = dag.brain.vacuum(&roots.seal());
+    dag.brain.cool(first.dangling());
+    assert!(first.dangling().addresses().contains(&dag.at["e"]));
+
+    // A new identity reaches e (and through it f).
+    roots.hold(dag.at["e"].clone());
+    let second = dag.brain.vacuum(&roots.seal());
+    eprintln!(
+        "after e is held: dangling {:?}",
+        second.dangling().addresses()
+    );
+    let mut reached = dag.set(REACHED);
+    reached.extend(dag.set(&["e", "f"]));
+    assert_eq!(second.reachable(), &reached);
+    assert_eq!(second.dangling().addresses(), &dag.set(&["g"]));
+    // Reachable again, and its read-back identical: cooling lost nothing.
+    dag.reads_back(&["e", "f"]);
+}
+
+#[test]
+fn a_vacuum_over_a_snapshot_never_sees_roots_held_after_sealing() {
+    let mut dag = Dag::new();
+    let mut roots = Roots::default();
+    roots.hold(dag.at["identity"].clone());
+    let snapshot = roots.seal();
+    roots.hold(dag.at["e"].clone());
+    roots.hold(dag.at["g"].clone());
+
+    assert_eq!(snapshot.roots(), &dag.set(&["identity"]));
+    let stale = dag.brain.vacuum(&snapshot);
+    assert_eq!(stale.reachable(), &dag.set(REACHED));
+    assert_eq!(stale.dangling().addresses(), &dag.set(UNREACHED));
+
+    // A fresh seal sees them.
+    let fresh = dag.brain.vacuum(&roots.seal());
+    assert!(fresh.dangling().addresses().is_empty());
+}
+
+#[test]
+fn the_vacuum_is_light_neutral_results_and_lums_never_change() {
+    for capacity in thresholds() {
+        let plain = run_traced_with(capacity, None, false);
+        let vacuumed = run_traced_with(capacity, None, true);
+        assert_eq!(vacuumed.light, plain.light, "{capacity:?}");
+        assert_eq!(vacuumed.lums, plain.lums, "{capacity:?}");
+        assert_eq!(vacuumed.news, plain.news, "{capacity:?}");
+        assert_eq!(
+            vacuumed.lums_by_relation, plain.lums_by_relation,
+            "{capacity:?}"
+        );
+        if capacity == Capacity::unbounded() {
+            // Only the vacuum cooled anything, and it cooled every crystal.
+            assert_eq!(plain.stats.evicted_crystals, 0);
+            assert_eq!(
+                vacuumed.stats.evicted_crystals,
+                plain.light.settled.len(),
+                "{:?}",
+                vacuumed.stats
+            );
+        }
+    }
+}
+
+#[test]
+fn references_never_change_an_address() {
+    let bytes = b"node a".to_vec();
+    let mut plain = Brain::new(Capacity::unbounded(), Memory::default());
+    let mut referring = Brain::new(Capacity::unbounded(), Memory::default());
+    let a = plain.settle(bytes.clone()).unwrap();
+    let b = referring
+        .settle_with(
+            bytes.clone(),
+            [elsewhere(b"x"), Oid::hash(&Scope::public(), b"node b")],
+        )
+        .unwrap();
+    assert_eq!(a, b);
+    assert_eq!(a, Oid::hash(&Scope::public(), &bytes));
+    assert_eq!(plain.crystal(&a).unwrap(), referring.crystal(&b).unwrap());
+
+    // Declaring the same bytes again with other references: the same
+    // address, nothing new persisted, and the references accumulate.
+    let c = referring
+        .settle_with(bytes.clone(), [elsewhere(b"y")])
+        .unwrap();
+    assert_eq!(c, a);
+    assert_eq!(referring.backend().len(), 1);
+    assert_eq!(referring.references(&a).map(BTreeSet::len), Some(3));
+    assert_eq!(plain.references(&a), Some(&BTreeSet::new()));
+    assert_eq!(plain.references(&elsewhere(b"x")), None);
 }
