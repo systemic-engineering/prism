@@ -264,6 +264,25 @@ fn canonical(header: String, lines: BTreeSet<String>) -> Vec<u8> {
 }
 
 fn run(capacity: Capacity, ruler: Option<Warmth>) -> (Light, Stats) {
+    let trace = run_traced(capacity, ruler);
+    (trace.light, trace.stats)
+}
+
+/// A run, with what it read beside the light at each committed tick.
+struct Trace {
+    light: Light,
+    stats: Stats,
+    /// `brain.lums()` after each commit: one value per committed tick.
+    lums: Vec<u64>,
+    /// New facts deposited in each committed tick (the input at tick 0).
+    news: Vec<usize>,
+    /// `brain.lums_of(r)` per relation, by name, at the end.
+    lums_by_relation: BTreeMap<&'static str, u64>,
+}
+
+fn run_traced(capacity: Capacity, ruler: Option<Warmth>) -> Trace {
+    let mut lums = Vec::new();
+    let mut news = Vec::new();
     let mut brain = Brain::new(capacity, Memory::default());
     let p = program(&mut brain);
     let names = BTreeMap::from([(p.edge, "edge"), (p.path, "path"), (p.both, "both")]);
@@ -279,12 +298,16 @@ fn run(capacity: Capacity, ruler: Option<Warmth>) -> (Light, Stats) {
         assert!(brain.deposit(p.edge, &t));
     }
     brain.commit();
+    lums.push(brain.lums());
+    news.push(EDGES.len());
 
     // Rounds to the fixpoint. Each round's facts settle at its committed point.
     let mut settled = Vec::new();
     loop {
         let new = round(&mut brain, &p.rules);
         let t = brain.commit();
+        lums.push(brain.lums());
+        news.push(new);
         if new == 0 {
             break;
         }
@@ -348,8 +371,11 @@ fn run(capacity: Capacity, ruler: Option<Warmth>) -> (Light, Stats) {
     let ticks = brain.tick();
     let stats = brain.stats();
     assert_eq!(stats.recomputes, calls.get());
-    (
-        Light {
+    // Reading lums and scanning everything back changed neither.
+    assert_eq!(Some(&brain.lums()), lums.last());
+    let lums_by_relation = names.iter().map(|(&r, &n)| (n, brain.lums_of(r))).collect();
+    Trace {
+        light: Light {
             facts,
             verdicts,
             settled,
@@ -357,7 +383,10 @@ fn run(capacity: Capacity, ruler: Option<Warmth>) -> (Light, Stats) {
             ticks,
         },
         stats,
-    )
+        lums,
+        news,
+        lums_by_relation,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -433,23 +462,9 @@ fn all_equal(_: Fact<'_>) -> i64 {
 #[test]
 fn warmer_never_truer_priority_and_threshold_never_change_the_light() {
     let (reference, _) = run(Capacity::unbounded(), None);
-    let rulers: [(&str, Warmth); 5] = [
-        ("oldest first", oldest_first),
-        ("newest first", newest_first),
-        ("by constants", by_constants),
-        ("scrambled", scrambled),
-        ("all equal", all_equal),
-    ];
-    let thresholds = [
-        Capacity::bytes(0),
-        Capacity::bytes(16),
-        Capacity::bytes(100),
-        Capacity::bytes(400),
-        Capacity::unbounded(),
-    ];
     let mut evictions = BTreeSet::new();
-    for (name, ruler) in rulers {
-        for capacity in thresholds {
+    for (name, ruler) in RULERS {
+        for capacity in thresholds() {
             let (light, stats) = run(capacity, Some(ruler));
             evictions.insert(stats.evicted_facts);
             assert_eq!(light, reference, "{name} under {capacity:?}");
@@ -457,6 +472,187 @@ fn warmer_never_truer_priority_and_threshold_never_change_the_light() {
     }
     // The runs really differed in what they held.
     assert!(evictions.len() > 3, "{evictions:?}");
+}
+
+// ---------------------------------------------------------------------------
+// 2b. Lums: the count of light. Progress and monotonicity, never identity.
+// ---------------------------------------------------------------------------
+
+const RULERS: [(&str, Warmth); 5] = [
+    ("oldest first", oldest_first),
+    ("newest first", newest_first),
+    ("by constants", by_constants),
+    ("scrambled", scrambled),
+    ("all equal", all_equal),
+];
+
+fn thresholds() -> [Capacity; 5] {
+    [
+        Capacity::bytes(0),
+        Capacity::bytes(16),
+        Capacity::bytes(100),
+        Capacity::bytes(400),
+        Capacity::unbounded(),
+    ]
+}
+
+#[test]
+fn lums_are_capacity_independent_evicted_facts_still_count() {
+    let reference = run_traced(Capacity::unbounded(), None);
+    eprintln!("reference lums: {:?}", reference.lums);
+    let mut evicted_somewhere = 0;
+    for (name, ruler) in RULERS {
+        for capacity in thresholds() {
+            let trace = run_traced(capacity, Some(ruler));
+            eprintln!(
+                "{name:>12} {capacity:?}: evicted {:>3} restored {:>3} lums {:?}",
+                trace.stats.evicted_facts, trace.stats.restored_facts, trace.lums
+            );
+            if capacity != Capacity::unbounded() && capacity != Capacity::bytes(400) {
+                // The small runs really forgot.
+                assert!(trace.stats.evicted_facts > 0, "{name} under {capacity:?}");
+                evicted_somewhere += 1;
+            }
+            assert_eq!(trace.lums, reference.lums, "{name} under {capacity:?}");
+            assert_eq!(
+                trace.lums_by_relation, reference.lums_by_relation,
+                "{name} under {capacity:?}"
+            );
+        }
+    }
+    assert_eq!(evicted_somewhere, 15);
+}
+
+#[test]
+fn lums_never_fall_across_commits_of_a_stable_program() {
+    for (name, ruler) in RULERS {
+        for capacity in thresholds() {
+            let trace = run_traced(capacity, Some(ruler));
+            for w in trace.lums.windows(2) {
+                assert!(w[0] <= w[1], "{name} under {capacity:?}: {:?}", trace.lums);
+            }
+            // Each commit adds exactly the light its tick deposited.
+            let mut sum = 0;
+            for (&l, &n) in trace.lums.iter().zip(&trace.news) {
+                sum += n as u64;
+                assert_eq!(l, sum, "{name} under {capacity:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn equal_successive_lums_are_the_fixpoint() {
+    let trace = run_traced(Capacity::bytes(0), None);
+    assert!(trace.lums.len() > 2, "{:?}", trace.lums);
+    for (i, w) in trace.lums.windows(2).enumerate() {
+        // Equal counts iff the round derived nothing new.
+        assert_eq!(w[0] == w[1], trace.news[i + 1] == 0, "{:?}", trace.lums);
+    }
+    // Only the last pair is equal: the run stops at the fixpoint.
+    let n = trace.lums.len();
+    assert_eq!(trace.lums[n - 1], trace.lums[n - 2]);
+    assert!(trace.lums[..n - 1].windows(2).all(|w| w[0] < w[1]));
+    // At the fixpoint, lums count every fact of the program, per relation
+    // and in all.
+    let all = from_input();
+    assert_eq!(*trace.lums.last().unwrap(), all.len() as u64);
+    for (rel, count) in &trace.lums_by_relation {
+        let expected = all.keys().filter(|(r, _)| r == rel).count() as u64;
+        assert_eq!(*count, expected, "{rel}");
+    }
+    assert_eq!(trace.lums_by_relation.values().sum::<u64>(), all.len() as u64);
+}
+
+#[test]
+fn lums_never_double_count_a_restored_fact() {
+    let mut brain = Brain::new(Capacity::bytes(0), Memory::default());
+    let edge = brain.relation("edge", 2);
+    let path = brain.relation("path", 2);
+    let (a, b, c) = (brain.intern(b"a"), brain.intern(b"b"), brain.intern(b"c"));
+    // Recompute knows exactly what this test deposits, with its ticks.
+    let calls = Rc::new(Cell::new(0));
+    let counted = calls.clone();
+    brain = brain.with_recompute(move |_: &Interner, rel: Relation, _: &[Option<Sym>]| {
+        counted.set(counted.get() + 1);
+        if rel == edge {
+            vec![(vec![a, b], Tick(0)), (vec![b, c], Tick(0))]
+        } else {
+            vec![(vec![a, b], Tick(2))]
+        }
+    });
+    assert_eq!(brain.lums(), 0);
+
+    assert!(brain.deposit(edge, &[a, b]));
+    assert!(brain.deposit(edge, &[b, c]));
+    // The open tick's light is not read until it commits.
+    assert_eq!(brain.lums(), 0);
+    brain.commit();
+    assert_eq!(brain.lums(), 2);
+    assert_eq!(brain.lums_of(edge), 2);
+    assert_eq!(brain.lums_of(path), 0);
+    // Everything committed is evicted at capacity 0; lums stay.
+    assert_eq!(brain.stats().evicted_facts, 2);
+    assert_eq!(brain.stats().hot_bytes, 0);
+    assert_eq!(brain.lums(), 2);
+
+    // Recompute restores both, at their original tick. Lums stay.
+    let back = brain.scan(edge, &[None, None]);
+    assert_eq!(back, vec![(vec![a, b], Tick(0)), (vec![b, c], Tick(0))]);
+    assert_eq!(brain.stats().restored_facts, 2);
+    assert!(calls.get() > 0);
+    assert_eq!(brain.lums(), 2);
+
+    // Depositing a restored (or evicted) fact again is not new light.
+    assert!(!brain.deposit(edge, &[a, b]));
+    brain.commit();
+    assert!(!brain.deposit(edge, &[b, c]), "evicted, recomputed, known");
+    assert!(brain.deposit(path, &[a, b]));
+    brain.commit();
+    assert_eq!(brain.lums(), 3);
+    assert_eq!(brain.lums_of(edge), 2);
+    assert_eq!(brain.lums_of(path), 1);
+    assert!(brain.stats().restored_facts > 2, "{:?}", brain.stats());
+}
+
+#[test]
+fn lums_are_never_identity_the_same_crystals_settle_the_same_addresses() {
+    // One brain derives the whole program; the other holds only the input.
+    // Both settle the same crystals.
+    let settle = |derive: bool| {
+        let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+        let p = program(&mut brain);
+        for (x, y) in EDGES {
+            let t = [brain.intern(x.as_bytes()), brain.intern(y.as_bytes())];
+            brain.deposit(p.edge, &t);
+        }
+        brain.commit();
+        let mut history = vec![brain.lums()];
+        if derive {
+            // Derived light, never settled.
+            while round(&mut brain, &p.rules) > 0 {
+                brain.commit();
+                history.push(brain.lums());
+            }
+        }
+        let lines = brain
+            .scan(p.edge, &[None, None])
+            .into_iter()
+            .map(|(tuple, _)| format!("edge {}", named(&brain, &tuple).join(" ")))
+            .collect();
+        let bytes = canonical("input".to_string(), lines);
+        let address = brain.settle(bytes).unwrap();
+        let crystal = brain.crystal(&address).unwrap();
+        (address, crystal, history)
+    };
+    let (dim, dim_crystal, dim_lums) = settle(false);
+    let (lit, lit_crystal, lit_lums) = settle(true);
+    assert_ne!(dim_lums, lit_lums);
+    assert!(dim_lums.last() < lit_lums.last(), "{dim_lums:?} {lit_lums:?}");
+    assert_eq!(dim, lit);
+    assert_eq!(dim_crystal, lit_crystal);
+    // The address is the bytes' alone.
+    assert_eq!(&Oid::hash(&Scope::public(), lit_crystal.bytes()), &lit);
 }
 
 // ---------------------------------------------------------------------------
