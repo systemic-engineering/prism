@@ -646,6 +646,12 @@ impl<A: Kind> Symmetric<A, f64> {
             vectors,
         })
     }
+
+    /// The room's resonant values alone, ascending: its spectrum without the
+    /// modes.
+    pub fn spectrum(&self) -> Result<Vec<f64>, RoomError> {
+        self.decompose().map(|modes| modes.spectrum)
+    }
 }
 
 impl<A: Kind> Symmetric<A, Z> {

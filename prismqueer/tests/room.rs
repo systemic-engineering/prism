@@ -500,6 +500,35 @@ fn an_empty_room_decomposes_to_nothing() {
     assert_eq!(modes.room().dim(), 0);
 }
 
+/// A spectrum without its modes is dsyev('N')'s, not dsyev('V')'s: the two
+/// run different tridiagonal solvers and can differ in the last bits (K₅'s
+/// L₀ does). Bit for bit, it's `ffi::eigenvalues` of the hand-checked
+/// Laplacian, on every graph here, a self-loop and an empty room included.
+#[test]
+fn a_spectrum_without_modes_is_dsyev_n() {
+    let mut all = more_graphs();
+    all.push(("loops", graph_from_edges(&[(0, 1), (1, 1), (1, 2), (2, 2)])));
+    all.push(("empty", graph_from_edges(&[])));
+    for (name, g) in all {
+        let delta = coboundary(&g);
+        let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
+        let spectrum = l0
+            .measure()
+            .symmetric()
+            .expect("δ*δ is symmetric")
+            .spectrum()
+            .expect("measured");
+
+        let index = |x: u64| g.vertices().position(|v| v == x).unwrap();
+        let edges: Vec<(usize, usize)> = g.edges().map(|(u, v)| (index(u), index(v))).collect();
+        let n = g.vertex_count();
+        let known = prismqueer::ffi::eigenvalues(n, &laplacian_from_edges(n, &edges))
+            .expect("dsyev 'N' converges");
+        let bits = |xs: &[f64]| xs.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+        assert_eq!(bits(&spectrum), bits(&known), "{name}");
+    }
+}
+
 #[test]
 fn z_is_an_exact_group_in_field_terms() {
     use prismqueer::field::{Exact, Group};
