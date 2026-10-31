@@ -53,7 +53,7 @@ fn factors(a: &[Vec<BigInt>]) -> Vec<QPoly> {
     }
     for w in f.windows(2) {
         let (_, r) = w[1].div_rem(&w[0]).expect("nonzero");
-        assert!(r.is_zero(), "{:?} divides {:?}", w[0], w[1]);
+        assert!(r.is_zero(), "{:?} must divide {:?}", w[0], w[1]);
     }
     f
 }
@@ -152,15 +152,22 @@ fn conjugating_by_a_unimodular_matrix_keeps_the_invariant_factors() {
         m(&[&[1, 1, 0], &[0, 1, 0], &[0, 0, 2]]),
         m(&[&[1, 0, 0], &[0, 1, 0], &[0, 0, 2]]),
         m(&[&[2, -1, 0], &[3, 1, 4], &[0, 5, -2]]),
-        m(&[&[3, 0, 0], &[0, 3, 0], &[0, 0, 3]]),
+        m(&[&[3, 0, 0], &[0, 3, 1], &[0, 0, 3]]),
     ];
     for a in &cases {
         let conjugate = mul(&mul(&pm, a), &pinv);
         assert_ne!(&conjugate, a, "a genuine change of basis");
         assert_eq!(factors(&conjugate), factors(a), "{a:?}");
     }
-    // 3I is scalar: (x − 3, x − 3, x − 3).
-    assert_eq!(factors(&cases[3]), vec![p(&[1, -3]); 3]);
+    // J₁(3) ⊕ J₂(3): (1, x − 3, (x − 3)²).
+    assert_eq!(
+        factors(&cases[3]),
+        vec![p(&[1]), p(&[1, -3]), p(&[1, -6, 9])]
+    );
+    // 3I is scalar, so every conjugate of it is itself: (x − 3) three times.
+    let scalar = m(&[&[3, 0, 0], &[0, 3, 0], &[0, 0, 3]]);
+    assert_eq!(mul(&mul(&pm, &scalar), &pinv), scalar);
+    assert_eq!(factors(&scalar), vec![p(&[1, -3]); 3]);
 }
 
 // --- Law 1: the product is the charpoly ----------------------------------------

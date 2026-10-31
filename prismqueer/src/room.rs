@@ -1318,6 +1318,12 @@ impl<A: Kind> Symmetric<A, f64> {
 }
 
 impl<A: Kind> Symmetric<A, Z> {
+    /// The invariant factors ([`Map::invariant_factors`]). A symmetric
+    /// matrix is diagonalisable, so each is square-free.
+    pub fn invariant_factors(&self) -> crate::poly::Invariants {
+        self.0.invariant_factors()
+    }
+
     /// The characteristic polynomial det(xI − M), exactly, by Berkowitz's
     /// algorithm: no division, so every step stays in Z.
     ///
@@ -1567,6 +1573,21 @@ impl<A: Kind, B: Kind> Map<A, B, Z> {
 }
 
 impl<A: Kind> Map<A, A, Z> {
+    /// The invariant factors of M: the Smith form of xI − M over ℚ[x]
+    /// ([`crate::poly::Invariants`]), M's complete similarity invariant.
+    /// Their product is the charpoly.
+    pub fn invariant_factors(&self) -> crate::poly::Invariants {
+        let n = self.from.dim;
+        let rows: Vec<Vec<BigInt>> = (0..n)
+            .map(|i| {
+                (0..n)
+                    .map(|j| self.entries[self.at(i, j)].0.clone())
+                    .collect()
+            })
+            .collect();
+        crate::poly::Invariants::of(&rows).expect("square, by construction")
+    }
+
     /// det M, exactly, by Bareiss's fraction-free elimination: every
     /// division is exact, so every step stays in ℤ. The empty map's is 1.
     pub fn determinant(&self) -> Z {

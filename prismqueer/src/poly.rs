@@ -636,3 +636,163 @@ fn sturm(p: &ZPoly) -> Vec<ZPoly> {
     }
     seq
 }
+
+// --- Similarity: the Smith form of xI − A over ℚ[x] ---------------------------
+
+/// The rows of a matrix aren't all as long as there are rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotSquare;
+
+/// The invariant factors of a square matrix A: the Smith form of xI − A
+/// over ℚ[x], a Euclidean domain. Monic, each dividing the next, and their
+/// product is det(xI − A).
+///
+/// They are A's complete similarity invariant over ℚ: two matrices are
+/// similar exactly when their invariant factors agree. The charpoly is only
+/// their product, so it can't tell the shear [[1, 1], [0, 1]], with factors
+/// (1, (x − 1)²), from I₂, with (x − 1, x − 1). The last factor is the
+/// minimal polynomial; the nontrivial ones give the rational canonical form
+/// ([`Invariants::rational_canonical`]).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Invariants {
+    factors: Vec<QPoly>,
+}
+
+impl Invariants {
+    /// The invariant factors of an integer matrix, given by rows.
+    pub fn of(a: &[Vec<BigInt>]) -> Result<Self, NotSquare> {
+        let a: Vec<Vec<BigRational>> = a
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|x| BigRational::from_integer(x.clone()))
+                    .collect()
+            })
+            .collect();
+        Self::of_rational(&a)
+    }
+
+    /// The invariant factors of a rational matrix, given by rows: by
+    /// elimination on xI − A over ℚ[x]. Pivot on an entry of least degree,
+    /// clear its row and column by division with remainder (a remainder
+    /// becomes the next, lower-degree pivot), and when the pivot doesn't
+    /// divide an entry left, add that entry's row to the pivot's and go
+    /// again. Each pass lowers the pivot's degree, so it ends.
+    pub fn of_rational(a: &[Vec<BigRational>]) -> Result<Self, NotSquare> {
+        let n = a.len();
+        if a.iter().any(|r| r.len() != n) {
+            return Err(NotSquare);
+        }
+        let mut m: Vec<Vec<QPoly>> = (0..n)
+            .map(|i| {
+                (0..n)
+                    .map(|j| {
+                        let mut c = vec![-&a[i][j]];
+                        if i == j {
+                            c.push(BigRational::one());
+                        }
+                        QPoly::from_ascending(c)
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut factors = Vec::with_capacity(n);
+        for t in 0..n {
+            loop {
+                let smallest = (t..n)
+                    .flat_map(|i| (t..n).map(move |j| (i, j)))
+                    .filter(|&(i, j)| !m[i][j].is_zero())
+                    .min_by_key(|&(i, j)| m[i][j].degree());
+                let Some((p, q)) = smallest else { break };
+                m.swap(t, p);
+                for row in m.iter_mut() {
+                    row.swap(t, q);
+                }
+                let mut clear = true;
+                // Rows and columns before t are already zero off the diagonal.
+                let pivot_row = m[t].clone();
+                for row in m.iter_mut().skip(t + 1) {
+                    let (quotient, _) = row[t].div_rem(&pivot_row[t]).expect("pivot ≠ 0");
+                    for (x, p) in row[t..].iter_mut().zip(&pivot_row[t..]) {
+                        *x = &*x - &(p * &quotient);
+                    }
+                    clear &= row[t].is_zero();
+                }
+                for j in t + 1..n {
+                    let (quotient, _) = m[t][j].div_rem(&m[t][t]).expect("pivot ≠ 0");
+                    for row in m.iter_mut().skip(t) {
+                        let x = &row[j] - &(&row[t] * &quotient);
+                        row[j] = x;
+                    }
+                    clear &= m[t][j].is_zero();
+                }
+                if !clear {
+                    continue;
+                }
+                let pivot = &m[t][t];
+                let divides = |x: &QPoly| x.div_rem(pivot).expect("pivot ≠ 0").1.is_zero();
+                let stray = (t + 1..n).find(|&i| !m[i][t + 1..].iter().all(divides));
+                match stray {
+                    Some(i) => {
+                        let stray_row = m[i].clone();
+                        for (x, s) in m[t][t..].iter_mut().zip(&stray_row[t..]) {
+                            *x = &*x + s;
+                        }
+                    }
+                    None => break,
+                }
+            }
+            factors.push(m[t][t].monic());
+        }
+        Ok(Invariants { factors })
+    }
+
+    /// d₁ | d₂ | … | dₙ: one per row, monic, the units (1) first.
+    pub fn factors(&self) -> &[QPoly] {
+        &self.factors
+    }
+
+    /// The factors of degree ≥ 1: the companion blocks of the rational
+    /// canonical form. The last is the minimal polynomial.
+    pub fn nontrivial(&self) -> &[QPoly] {
+        let units = self
+            .factors
+            .iter()
+            .take_while(|f| f.degree() == Some(0))
+            .count();
+        &self.factors[units..]
+    }
+
+    /// d₁ · d₂ ⋯ dₙ = det(xI − A), the characteristic polynomial. The empty
+    /// matrix's is 1.
+    pub fn product(&self) -> QPoly {
+        self.factors
+            .iter()
+            .fold(QPoly::constant(BigRational::one()), |acc, f| &acc * f)
+    }
+
+    /// The rational canonical form, by rows: the companion matrix of each
+    /// nontrivial factor, block diagonal in order. The companion of
+    /// xᵏ + cₖ₋₁xᵏ⁻¹ + … + c₀ has ones below its diagonal and −c₀, …, −cₖ₋₁
+    /// down its last column. It is similar to A, and has A's factors.
+    pub fn rational_canonical(&self) -> Vec<Vec<BigRational>> {
+        let n = self.factors.len();
+        let mut form = vec![vec![BigRational::zero(); n]; n];
+        let mut at = n - self
+            .nontrivial()
+            .iter()
+            .map(|f| f.0.len() - 1)
+            .sum::<usize>();
+        for f in self.nontrivial() {
+            let k = f.0.len() - 1;
+            for i in 0..k {
+                if i + 1 < k {
+                    form[at + i + 1][at + i] = BigRational::one();
+                }
+                form[at + i][at + k - 1] = -&f.0[i];
+            }
+            at += k;
+        }
+        form
+    }
+}
