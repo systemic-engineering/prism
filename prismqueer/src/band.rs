@@ -166,6 +166,14 @@ pub mod zeros {
         .expect("ordered")
     }
 
+    /// `rotation.rs`, a grain boundary: settle's rule, `16 · ε · n · scale`,
+    /// read on the distance of a quantized value to its rounding boundary,
+    /// with `scale` the value's float error bound in grain units. Within it
+    /// the address is ambiguous.
+    pub fn rotation(n: usize) -> Band {
+        settle(n.max(1))
+    }
+
     /// `spectrum.rs`: `1e-12`, absolute.
     pub fn spectrum() -> Band {
         Band::new(tenth(12), tenth(12), ScaleLaw::Absolute).expect("ordered")

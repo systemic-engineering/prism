@@ -38,6 +38,9 @@ pub use kleinos::{
 };
 
 pub use commutator::{Dissonance, Unmeasured};
-pub use rotation::{infer_via_rotation, RotationConfig, Splinter};
+pub use rotation::{
+    infer_via_rotation, spin, Altitude, Deposit, Grain, Observation, Period, Rotation,
+    RotationConfig, Splinter, Stop,
+};
 pub use spectrum::{DeltaCritical, Focus, Lift, Project, Refract, Spectrum, Split};
 pub use tension::{detect_tensions, Tension, TensionKind};
