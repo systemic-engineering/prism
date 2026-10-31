@@ -193,7 +193,7 @@ fn holes_checked<R: Bounded>(
             ints(&vec![0; g.vertex_count()]),
             "{name}: hole {i} is a cycle, ∂₁z = 0"
         );
-        let curl = d1.act(&dual, c).unwrap();
+        let curl = d1.act::<R::Dual>(&dual, c).unwrap();
         assert!(curl.iter().all(|x| *x == zero), "{name}: δ₁c = 0");
         let reading = pair(&dual, z, c).unwrap();
         assert_ne!(reading, zero, "{name}: ⟨z, c⟩ ≠ 0");
@@ -271,7 +271,7 @@ fn a_hollow_triangle_has_one_free_hole() {
         [vec![Order::Infinite], vec![finite(2)], vec![finite(3)]]
     );
     // The cycle is forced, up to sign: 0 → 1 → 2 → 0 on (0,1), (0,2), (1,2).
-    let found = holes(&(), &fixture.0, &fixture.1).unwrap();
+    let found = holes::<Z>(&(), &fixture.0, &fixture.1).unwrap();
     let z = found[0].cycle().to_vec();
     assert!(z == ints(&[1, -1, 1]) || z == ints(&[-1, 1, -1]), "{z:?}");
 }
@@ -285,7 +285,7 @@ fn a_square_with_one_triangle_filled_has_one_hole() {
     );
     // The basis is a choice: the hole is 0 → 2 → 3 → 0 up to a boundary and
     // a sign, whichever representative was chosen.
-    let h = holes(&(), &g, &faces).unwrap().remove(0);
+    let h = holes::<Z>(&(), &g, &faces).unwrap().remove(0);
     let around = ints(&[0, 1, -1, 0, 1]);
     let homologous = [1i64, -1].iter().any(|&s| {
         let diff: Vec<Z> = h
@@ -321,14 +321,14 @@ fn rp2_has_one_hole_of_order_two() {
     }
     // Torsion is certified in ℚ/ℤ: the hole pairs to exactly 1/2.
     let (g, faces) = rp2();
-    let h = holes(&(), &g, &faces).unwrap().remove(0);
+    let h = holes::<Z>(&(), &g, &faces).unwrap().remove(0);
     assert_eq!(
         pair(&(), h.cycle(), h.certificate()).unwrap(),
         QModOne::new(1, 2).unwrap()
     );
     // The one-cell cycle is forced: ±a.
     let (g, faces) = rp2_one_cell();
-    let h = holes(&(), &g, &faces).unwrap().remove(0);
+    let h = holes::<Z>(&(), &g, &faces).unwrap().remove(0);
     assert!(h.cycle() == ints(&[1]) || h.cycle() == ints(&[-1]));
 }
 
@@ -351,7 +351,7 @@ fn a_bigon_unfilled_has_a_hole_and_filled_has_none() {
         [vec![Order::Infinite], vec![finite(2)], vec![finite(3)]]
     );
     let (g, faces) = bigon(false);
-    let z = holes(&(), &g, &faces).unwrap()[0].cycle().to_vec();
+    let z = holes::<Z>(&(), &g, &faces).unwrap()[0].cycle().to_vec();
     assert!(z == ints(&[1, -1]) || z == ints(&[-1, 1]), "forced: {z:?}");
     assert_eq!(
         three("filled bigon", &bigon(true)),
@@ -363,7 +363,7 @@ fn a_bigon_unfilled_has_a_hole_and_filled_has_none() {
 fn a_face_off_the_graph_is_refused() {
     let (_, faces) = filled_triangle();
     let path = Graph::new([], [(0, 1), (1, 2)]);
-    assert!(holes(&(), &path, &faces).is_err());
+    assert!(holes::<Z>(&(), &path, &faces).is_err());
 }
 
 // --- Laws 2 and 3: invariants, and universal coefficients ---------------------
@@ -468,7 +468,7 @@ fn on_a_curved_field_two_paths_around_one_hole_read_differently() {
     let d2 = coboundary1(&g, &faces).unwrap().adjoint();
     assert_eq!(d2.apply(&w).unwrap(), gap, "∂₂w = z′ − z");
     // Both go around the one hole.
-    let h = holes(&(), &g, &faces).unwrap();
+    let h = holes::<Z>(&(), &g, &faces).unwrap();
     assert_eq!(h.len(), 1);
     for z in [&short, &long] {
         assert!(matches!(
@@ -572,12 +572,12 @@ fn the_count_agrees_with_fields_non_bounding_loops() {
         };
         let two = modulus(2);
         assert_eq!(
-            holes(&(), &g, &faces).unwrap().len(),
+            holes::<Z>(&(), &g, &faces).unwrap().len(),
             loops,
             "{name} over ℤ"
         );
         assert_eq!(
-            holes(&two, &g, &faces).unwrap().len(),
+            holes::<ZMod>(&two, &g, &faces).unwrap().len(),
             loops,
             "{name} over ℤ/2"
         );

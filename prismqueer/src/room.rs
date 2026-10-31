@@ -218,7 +218,7 @@ use std::marker::PhantomData;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning};
+use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning, Walk};
 use crate::oid::{Oid, Scope};
 use crate::spectral::kleinos::VertexId;
 
@@ -1880,18 +1880,16 @@ pub fn solve<V: Exactly>(
 
     let mut genuine = Vec::new();
     for walk in cycles {
-        let mut chain = vec![Z::zero(&()); edges.len()];
-        let mut pairing = zero.clone();
-        for (&from, &i) in walk.vertices.iter().zip(&walk.edges) {
-            pairing = pairing.add(&step(i, from));
-            let sign = if forward(i, from) { 1 } else { -1 };
-            chain[i] = chain[i].add(&Z::from(sign));
-        }
+        let pairing = walk
+            .vertices
+            .iter()
+            .zip(&walk.edges)
+            .fold(zero.clone(), |sum, (&from, &i)| sum.add(&step(i, from)));
         if pairing != zero {
             genuine.push(Cycle {
+                chain: chain(&walk, &edges),
                 edges: walk.edges.iter().map(|&i| edges[i]).collect(),
                 vertices: walk.vertices,
-                chain,
                 pairing,
             });
         }
@@ -1901,6 +1899,17 @@ pub fn solve<V: Exactly>(
     } else {
         Exactness::Genuine(genuine)
     })
+}
+
+/// A closed walk as an integer chain z ∈ C₁: +1 for each step along an edge
+/// from its smaller end, −1 against it. A self-loop walked once is +1.
+fn chain(walk: &Walk, edges: &[Edge]) -> Vec<Z> {
+    let mut z = vec![Z::zero(&()); edges.len()];
+    for (&from, &i) in walk.vertices.iter().zip(&walk.edges) {
+        let sign = if edges[i].ends().0 == from { 1 } else { -1 };
+        z[i] = z[i].add(&Z::from(sign));
+    }
+    z
 }
 
 // --- Faces: curvature, three kinds of twist, and boundaries -----------------
@@ -1972,7 +1981,9 @@ impl<V> Curl<V> {
 /// There is no orthogonal split c = gradient + harmonic + curl: over ℤ/n
 /// and ℚ mod 1 there is no inner product to split by, so none is offered.
 /// A curved c may hide a harmonic part too; it is reported by its faces,
-/// and the loops [`solve`] finds around holes can be read with [`bounds`].
+/// never folded in. The complex's holes are [`holes`], c-independent, and a
+/// reading of c along one names its cycle ([`Hole`]): on a curved c the
+/// number depends on the path, so the path is the caller's to choose.
 /// The orthogonal Hodge split exists only measured, over `f64`.
 ///
 /// Refused as [`curvature`] and [`solve`] refuse.
@@ -2031,6 +2042,9 @@ pub trait Bounded: Entry + Exactly {
     /// When d·x = self has no solution: the cocycle s·u from U's row u, s
     /// chosen so that ⟨z, s·u⟩ = s·self ≠ 0 and s·d = 0.
     fn linking(&self, d: &BigInt, row: &[Z]) -> Vec<Self::Dual>;
+    /// The order of the summand R/dR that the invariant factor d leaves in
+    /// a cokernel, or `None` when d acts as a unit and leaves nothing.
+    fn order(ring: &Self::Ring, d: &BigInt) -> Option<Order>;
 }
 
 impl Bounded for Z {
@@ -2053,6 +2067,14 @@ impl Bounded for Z {
         row.iter()
             .map(|u| QModOne::new(u.0.clone(), den.clone()).expect("a nonzero denominator"))
             .collect()
+    }
+    /// 0 leaves ℤ, free; 1 leaves nothing; d > 1 leaves ℤ/d.
+    fn order(_: &(), d: &BigInt) -> Option<Order> {
+        if d.is_zero() {
+            Some(Order::Infinite)
+        } else {
+            (!d.is_one()).then(|| Order::Finite(Z(d.clone())))
+        }
     }
 }
 
@@ -2078,6 +2100,12 @@ impl Bounded for ZMod {
         let n = &self.modulus;
         let s = &n.0 / acting(d, n);
         row.iter().map(|u| ZMod::new(&s * &u.0, n)).collect()
+    }
+    /// d leaves ℤ/n / dℤ/n = ℤ/gcd(d, n): nothing when the gcd is 1, and
+    /// all of ℤ/n for d = 0.
+    fn order(n: &Modulus, d: &BigInt) -> Option<Order> {
+        let g = acting(d, n);
+        (!g.is_one()).then_some(Order::Finite(Z(g)))
     }
 }
 
@@ -2136,4 +2164,141 @@ pub fn bounds<R: Bounded>(
     }
     x.resize(faces.len(), R::zero(ring));
     Ok(Boundary::Bounds(smith.right.act(ring, &x)?))
+}
+
+// --- Holes: H₁ of the complex ------------------------------------------------
+
+/// The order of a hole in H₁: how many times around it bounds.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Order {
+    /// No multiple bounds: a free generator, a ℤ of H₁(ℤ).
+    Infinite,
+    /// d·z bounds and no smaller positive multiple does: a ℤ/d. Over ℤ that
+    /// is torsion (ℝℙ²'s 2); over ℤ/n every generator is finite, a free one
+    /// of order n and a torsion one of order gcd(d, n).
+    Finite(Z),
+}
+
+/// One generator of H₁ of the complex: a cycle that bounds no faces, with
+/// its order and the certificate that it bounds nothing. A property of the
+/// complex, never of a cochain c.
+///
+/// A reading of c along the hole is `pair(ring, hole.cycle(), c)`
+/// ([`pair`]), and it belongs to this cycle, not to the hole: when c is
+/// curved, another cycle z′ around the same hole, z′ = z + ∂₂w, reads
+/// ⟨z′, c⟩ = ⟨z, c⟩ + ⟨w, δ₁c⟩. So a reading names its path, (z, ⟨z, c⟩),
+/// and which path is the caller's choice. Curvature ([`curvature`],
+/// [`Twist::Curvature`]) stays per face and path-free; nothing here folds
+/// the two into one verdict.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Hole<R: Bounded> {
+    cycle: Vec<Z>,
+    order: Order,
+    certificate: Vec<R::Dual>,
+}
+
+impl<R: Bounded> Hole<R> {
+    /// z, an integer chain of C¹'s edges with ∂₁z = 0 (δ*z = 0), read in R
+    /// by reduction. As [`Cycle::chain`], but a sum of basis loops, not
+    /// always one walk.
+    pub fn cycle(&self) -> &[Z] {
+        &self.cycle
+    }
+    /// Its order in H₁(R).
+    pub fn order(&self) -> &Order {
+        &self.order
+    }
+    /// A cocycle c with values in R's [dual](Bounded::Dual): δ₁c = 0 and
+    /// ⟨z, c⟩ ≠ 0, so z bounds nothing ([`Boundary::Unbounded`]'s kind).
+    /// The certificates of one [`holes`] call are dual to its cycles:
+    /// ⟨zᵢ, cⱼ⟩ = 0 for i ≠ j.
+    pub fn certificate(&self) -> &[R::Dual] {
+        &self.certificate
+    }
+}
+
+/// The genuine holes of `graph` filled by `faces`, exactly, in `ring`: a
+/// basis of H₁ = ker ∂₁ / im ∂₂, each generator a cycle with its order and
+/// its certificate. Independent of any cochain.
+///
+/// - **Cycles.** [`Graph::walked`]'s fundamental cycles z₁ … z_b₁ are a
+///   ℤ-basis of ker ∂₁ (chord k lies on z_k alone, with sign s_k = ±1, so a
+///   cycle's coordinates are its chord values times s_k). ∂₁ is totally
+///   unimodular, so they stay a basis of ker ∂₁ over every ℤ/n.
+/// - **Boundaries.** ∂₂ in those coordinates is the b₁ × F integer matrix A,
+///   A[k][f] = s_k·(∂f)(chord k). Its Smith form U·A·V = diag(d) splits
+///   H₁(ℤ) = ⊕ ℤ/dᵢ ⊕ ℤ^(b₁ − rank): a factor 1 is no hole, dᵢ > 1 is
+///   torsion of order dᵢ, and 0 (and every i past F) is free.
+/// - **Over ℤ/n**, dᵢ acts as gcd(dᵢ, n), so H₁(ℤ/n) = ⊕ ℤ/gcd(dᵢ, n):
+///   a free generator gives ℤ/n, torsion dᵢ gives ℤ/gcd(dᵢ, n), nothing
+///   when that's 1. That is the universal coefficient theorem,
+///   H₁(ℤ/n) = H₁(ℤ) ⊗ ℤ/n, with no Tor term since H₀ is free. ℝℙ²: one
+///   generator of order 2 over ℤ and over ℤ/2, none over ℤ/3.
+/// - **Generators.** Generator i is column i of U⁻¹ in the cycle basis:
+///   Σ_k (U⁻¹)ₖᵢ z_k. U⁻¹ is exact: with U′·U·V′ = I (U's own Smith form,
+///   all units), U⁻¹ = V′·U′.
+/// - **Certificates.** Row i of U, scaled by [`Bounded::linking`] so that
+///   s·dᵢ = 0 (1/dᵢ over ℤ, 1/2 for a free one; n/gcd over ℤ/n), and put on
+///   the chords (times s_k): δ₁c = s·dᵢ·(row i of V⁻¹) = 0, and
+///   ⟨zⱼ, cᵢ⟩ = s·(U·U⁻¹)ᵢⱼ, so the certificates are dual to the cycles.
+///
+/// **The basis is a choice**, made deterministically by the forest and the
+/// Smith transforms: generators come in Smith order (torsion by ascending
+/// factor, then free). The counts and the orders are the invariants.
+///
+/// Refused ([`RoomError::Outside`]) when a face is off the graph.
+pub fn holes<R: Bounded>(
+    ring: &R::Ring,
+    graph: &Graph,
+    faces: &[Face],
+) -> Result<Vec<Hole<R>>, RoomError> {
+    let boundary = boundaries(graph, faces)?;
+    let edges: Vec<Edge> = graph.edges().collect();
+    let Spanning { cycles, .. } = graph.walked();
+    let chords = graph.chords();
+    let basis: Vec<Vec<Z>> = cycles.iter().map(|walk| chain(walk, &edges)).collect();
+    let signs: Vec<Z> = chords
+        .iter()
+        .zip(&basis)
+        .map(|(&e, z)| z[e].clone())
+        .collect();
+    let room = |k: usize| Room::over(&(0..k as u64).collect());
+    let rows: Vec<Vec<Z>> = chords
+        .iter()
+        .zip(&signs)
+        .map(|(&e, s)| boundary.iter().map(|df| df[e].mul(s)).collect())
+        .collect();
+    let a = Map::from_rows(&room(faces.len()), &room(basis.len()), &rows)
+        .expect("b₁ rows of F, by construction");
+    let smith = a.smith();
+    let own = smith.left.smith();
+    let inverse = own.left.then(&own.right).expect("one room");
+
+    let none = BigInt::zero();
+    let one = R::one(ring);
+    let zero = <R::Dual as Coefficient>::zero(&R::dual(ring));
+    let mut found = Vec::new();
+    for i in 0..basis.len() {
+        let d = smith.factors.get(i).map_or(&none, |d| &d.0);
+        let Some(order) = R::order(ring, d) else {
+            continue;
+        };
+        let mut cycle = vec![Z::zero(&()); edges.len()];
+        for (k, zk) in basis.iter().enumerate() {
+            let coefficient = &inverse.entries[inverse.at(k, i)].0;
+            for (x, y) in cycle.iter_mut().zip(zk) {
+                *x = x.add(&y.times(coefficient));
+            }
+        }
+        let mut certificate = vec![zero.clone(); edges.len()];
+        for (k, value) in one.linking(d, &smith.left.row(i)).into_iter().enumerate() {
+            certificate[chords[k]] = value.times(&signs[k].0);
+        }
+        found.push(Hole {
+            cycle,
+            order,
+            certificate,
+        });
+    }
+    Ok(found)
 }

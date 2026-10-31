@@ -471,6 +471,12 @@ impl Graph {
         Spanning { order, cycles }
     }
 
+    /// The chords of the spanning forest, in edge order: chord k closes
+    /// [`walked`](Self::walked)'s cycle k, and lies on no other.
+    pub(crate) fn chords(&self) -> Vec<usize> {
+        self.spanning().1
+    }
+
     pub(crate) fn index(&self, edge: Edge) -> Option<usize> {
         self.edges.binary_search(&edge).ok()
     }
