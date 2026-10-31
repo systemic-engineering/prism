@@ -7,7 +7,10 @@
 //! - Content is quotiented by common phase rotation (Def. 1.8).
 //! - Stop on consecutive equality; a recurrence at distance p > 1 is
 //!   `cycle(p)`, never fixed; a budget cut is its own outcome (Prop. 1.9).
-//! - The altitude is in the address (Cor. 1.3); transparency is not (§1.2).
+//! - Neither the altitude nor transparency is in the address: both are
+//!   readings kept beside it (`docs/spec/identity.md`, "What identity is
+//!   relative to", signed 2026-10-31; mirror-014 Response). This supersedes
+//!   math Cor. 1.3's τ-in-the-address.
 
 #![cfg(feature = "lapack")]
 
@@ -103,9 +106,9 @@ fn the_same_content_at_two_ticks_is_one_splinter_deposited_twice() {
     assert_eq!(rot.stop, Stop::Fixed { at: Tick(0) });
 }
 
-/// The preimage, from the spec's bytes (§5.0): `"splinter\0" ‖ τ ‖
-/// enc(content)`, `τ = UTF-8(altitude) ‖ 0x00 ‖ 0x00` (an engine altitude,
-/// root flag), `u64` big-endian, hashed with `Oid::hash` in the public scope.
+/// The preimage: `"splinter\0" ‖ enc(content)`, `u64` big-endian, hashed
+/// with `Oid::hash` in the public scope. The shape prefix stays; τ is gone
+/// (the signed identity rule; mirror-014, which retires τ from mirror §5.0).
 /// Content: `u64(grain bits) ‖ u64(n) ‖ u64(k₁) … u64(k_{n−1}) ‖ u64(k_r) ‖
 /// u64(λ₂ bits)`. No tick anywhere.
 #[test]
@@ -123,7 +126,6 @@ fn the_address_is_the_documented_preimage_with_no_tick() {
         content.extend_from_slice(&word.to_be_bytes());
     }
     let mut preimage = b"splinter\0".to_vec();
-    preimage.extend_from_slice(b"@spectral/rotation\0\0");
     preimage.extend_from_slice(&(content.len() as u64).to_be_bytes());
     preimage.extend_from_slice(&content);
     assert_eq!(addr(&obs, &grain), Oid::hash(&Scope::public(), &preimage));
@@ -353,19 +355,22 @@ fn rotation_splinters_are_at_the_rotation_altitude() {
     assert!(rot
         .splinters
         .iter()
-        .all(|s| s.altitude == rotation_altitude()));
+        .all(|s| s.altitude() == &rotation_altitude()));
 }
 
-/// Cor. 1.3: the altitude is inside the hashed encoding, so the same content
-/// at two altitudes is two addresses.
+/// Identity is content modulo lossless re-readings; the altitude is a
+/// reading kept beside the address (signed 2026-10-31; mirror-014). So the
+/// same content at two altitudes is one address, with two altitudes
+/// readable beside it. Supersedes math Cor. 1.3.
 #[test]
-fn the_same_content_at_another_altitude_has_another_address() {
+fn the_same_content_at_another_altitude_has_the_same_address() {
     let grain = Grain::default();
     let other = Altitude::new("@spectral/elsewhere").expect("well formed");
     let here = Splinter::observe(&rotation_altitude(), &observation(&A), &grain);
     let there = Splinter::observe(&other, &observation(&A), &grain);
-    assert_ne!(here.splinter.oid, there.splinter.oid);
-    assert_eq!(there.splinter.altitude, other);
+    assert_eq!(here.splinter.oid, there.splinter.oid, "one address");
+    assert_eq!(here.splinter.altitude(), &rotation_altitude());
+    assert_eq!(there.splinter.altitude(), &other, "read beside the address");
 }
 
 /// §1.2: transparency is not in the address. The verdict about a thing is
@@ -406,7 +411,7 @@ fn the_kuramoto_rotation_deposits_clear_splinters() {
     assert!(rot
         .splinters
         .iter()
-        .all(|s| s.altitude == rotation_altitude()));
+        .all(|s| s.altitude() == &rotation_altitude()));
 }
 
 #[test]
