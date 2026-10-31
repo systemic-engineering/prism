@@ -308,6 +308,28 @@ pub(crate) fn eigensystem_columns(n: usize, matrix: &[f64]) -> Result<(Vec<f64>,
     }
 }
 
+/// The eigenvalues of a real symmetric `n×n` matrix given column-major, by
+/// dsyev('N'): no conversion on the way in. Ascending. Only `room` calls
+/// this; it owns the layout and the symmetry check.
+pub(crate) fn eigenvalues_columns(n: usize, matrix: &[f64]) -> Result<Vec<f64>, i32> {
+    debug_assert_eq!(matrix.len(), n * n, "an n×n matrix");
+    if n == 0 {
+        return Ok(Vec::new());
+    }
+    let mut evals = vec![0.0_f64; n];
+    let mut info: c_int = 0;
+
+    unsafe {
+        spectral_eigenvalues(n as c_int, matrix.as_ptr(), evals.as_mut_ptr(), &mut info);
+    }
+
+    if info != 0 {
+        Err(info)
+    } else {
+        Ok(evals)
+    }
+}
+
 /// Compute singular values of an `m×n` matrix.
 ///
 /// Returns `min(m, n)` singular values in descending order.

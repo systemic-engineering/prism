@@ -648,9 +648,11 @@ impl<A: Kind> Symmetric<A, f64> {
     }
 
     /// The room's resonant values alone, ascending: its spectrum without the
-    /// modes.
+    /// modes, by dsyev('N'). Not [`decompose`](Self::decompose)'s spectrum to
+    /// the bit: dsyev('V') solves the tridiagonal problem another way.
     pub fn spectrum(&self) -> Result<Vec<f64>, RoomError> {
-        self.decompose().map(|modes| modes.spectrum)
+        let map = &self.0;
+        crate::ffi::eigenvalues_columns(map.from.dim, &map.entries).map_err(RoomError::Unmeasured)
     }
 }
 

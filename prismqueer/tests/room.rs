@@ -501,8 +501,8 @@ fn an_empty_room_decomposes_to_nothing() {
 }
 
 /// A spectrum without its modes is dsyev('N')'s, not dsyev('V')'s: the two
-/// run different tridiagonal solvers and can differ in the last bits (K₅'s
-/// L₀ does). Bit for bit, it's `ffi::eigenvalues` of the hand-checked
+/// run different tridiagonal solvers and can differ in the last bits (the
+/// triangle's L₀ does, at λ₀). Bit for bit, it's `ffi::eigenvalues` of the hand-checked
 /// Laplacian, on every graph here, a self-loop and an empty room included.
 #[test]
 fn a_spectrum_without_modes_is_dsyev_n() {
