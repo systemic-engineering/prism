@@ -74,10 +74,25 @@
 //! §12 row 7):
 //!
 //! - **A splinter is `(altitude, content, transparency)`.** Its address is
-//!   `Oid::hash(public, "splinter\0" ‖ τ ‖ enc(content))`, with
-//!   `τ = UTF-8(altitude) ‖ 0x00 ‖ 0x00` (an engine altitude, root flag) and
-//!   `enc(b) = u64(len b) ‖ b`, `u64` big-endian. The altitude is in the
-//!   address (Cor. 1.3). Transparency is not (§1.2).
+//!   `Oid::hash(public, "splinter\0" ‖ enc(content))`, with
+//!   `enc(b) = u64(len b) ‖ b`, `u64` big-endian. Only the content is
+//!   hashed. The altitude and the transparency are readings kept beside the
+//!   address ([`Splinter::altitude`], `transparency`), never in it.
+//! - **Divergence from math Cor. 1.3 and spec §5.0.** Those put `τ` (the
+//!   altitude) inside the hashed encoding. They predate the identity rule
+//!   Alex signed on 2026-10-31 (`docs/spec/identity.md`, "What identity is
+//!   relative to"): identity is content modulo the observer's lossless
+//!   re-readings, and type and altitude are readings beside the address.
+//!   mirror-014's Response (Mara) proves the address stays injective without
+//!   `τ`: the shape prefixes (`splinter\0`, `fragment\0`, …) are
+//!   prefix-free and every body is self-delimiting. It also retires `τ` from
+//!   mirror's §5.0 through the post-T1 migration. So equal content at two
+//!   altitudes is one address. Never infer an altitude from an address;
+//!   read it beside.
+//! - **The hash is `Oid::hash` in the public scope**, not spec §5's "plain
+//!   BLAKE3". §5 predates scoping; under the signed rule the address is keyed
+//!   by how far the observer is known (`Scope`, `K_id`), and a rotation
+//!   splinter is public.
 //! - **The tick is a deposit coordinate** ([`Deposit`]), never in the
 //!   address (Prop. 1.7). The same content at two ticks is one splinter
 //!   deposited twice, as `brain` keeps a fact's tick beside its tuple.
@@ -119,8 +134,8 @@ pub const ROTATION: &str = "@spectral/rotation";
 /// An altitude: an `@`-ref naming what kind of thing a splinter is.
 ///
 /// mirror spec §4 (newtypes): starts with `@`, contains no NUL, and every
-/// `/`-separated path segment is non-empty. The NUL ban keeps `τ`
-/// prefix-free.
+/// `/`-separated path segment is non-empty. A reading kept beside a
+/// splinter's address, never hashed (module docs).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Altitude(String);
 
@@ -137,14 +152,6 @@ impl Altitude {
     /// The `@`-ref.
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-
-    /// `τ`: the UTF-8 of the ref, then `0x00`, then the root flag `0x00`
-    /// (spec §5.0; engine altitudes use the root flag, §4.1).
-    fn tau(&self) -> Vec<u8> {
-        let mut t = self.0.as_bytes().to_vec();
-        t.extend_from_slice(&[0, 0]);
-        t
     }
 
     fn rotation() -> Self {
@@ -226,7 +233,8 @@ pub struct Observation {
     pub transparency: Transparency<Property>,
 }
 
-/// A `Splinter` is one rotation state, content-addressed at its altitude.
+/// A `Splinter` is one rotation state, content-addressed, read at an
+/// altitude.
 ///
 /// `(altitude, content, transparency)` per math Def. 1.6. The content is
 /// gauge-fixed (Def. 1.8); `oid` is its address (module docs). There is no
@@ -235,8 +243,8 @@ pub struct Observation {
 /// transparency.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Splinter {
-    /// What kind of thing this is. In the address.
-    pub altitude: Altitude,
+    /// What kind of thing this is: beside the address, never in it.
+    altitude: Altitude,
     /// The content address.
     pub oid: Oid,
     /// `(θᵢ − θ₀) mod 2π`, as measured (before the grain).
@@ -263,6 +271,12 @@ pub struct Reading {
 }
 
 impl Splinter {
+    /// The altitude this splinter was read at. A reading beside the
+    /// address: two splinters with one address may carry different ones.
+    pub fn altitude(&self) -> &Altitude {
+        &self.altitude
+    }
+
     /// The splinter an observation gives at `altitude` under `grain`.
     pub fn observe(altitude: &Altitude, obs: &Observation, grain: &Grain) -> Reading {
         let n = obs.phases.len();
@@ -294,7 +308,6 @@ impl Splinter {
         content.extend_from_slice(&obs.fiedler_lambda_2.to_bits().to_be_bytes());
 
         let mut preimage = b"splinter\0".to_vec();
-        preimage.extend_from_slice(&altitude.tau());
         preimage.extend_from_slice(&(content.len() as u64).to_be_bytes());
         preimage.extend_from_slice(&content);
 
