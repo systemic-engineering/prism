@@ -127,6 +127,9 @@ pub fn spectral_dimension(eigenvalues: &[f64], sigma: Sigma) -> SpectralDimensio
 /// Each edge `(u, v)` adds `1` to `A[u][v]` and `A[v][u]` and increments the
 /// degree of both endpoints. Self-loops and multi-edges are taken at face
 /// value (degree counts them). Vertices are `0..n`.
+///
+/// Deliberately independent of [`room`](crate::room): `tests/room.rs` checks
+/// L₀ = δ*δ against it.
 pub fn laplacian_from_edges(n: usize, edges: &[(usize, usize)]) -> Vec<f64> {
     let mut l = vec![0.0_f64; n * n];
     for &(u, v) in edges {
