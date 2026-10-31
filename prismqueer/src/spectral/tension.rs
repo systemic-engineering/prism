@@ -30,8 +30,8 @@
 //!
 //! - `prismqueer::spectral::fiedler_lambda_2_of_graph` — the apparatus read across from Anna Jakobs's 2012 thesis
 //!   at basepoint via LAPACK dsyev (composes into tension detection)
-//! - `prismqueer::ffi::eigenvalues` — full spectrum for component-count via
-//!   zero-eigenvalue-multiplicity read
+//! - `prismqueer::room` — L₀ = δ*δ and its full spectrum (dsyev 'N') for
+//!   component-count via zero-eigenvalue-multiplicity read
 //! - `prismqueer::spectral::Graph` — input carrier
 //! - `terni::Imperfect<Vec<Tension>, Red, ConvergenceLoss>` — ternary functor
 //!   return per Alex 2026-09-02 color-coded repo state
@@ -52,7 +52,8 @@ use std::collections::BTreeSet;
 
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
-use crate::ffi::eigenvalues;
+use crate::room::RoomError;
+use crate::spectral::kleinos::laplacian_spectrum;
 use crate::spectral::{Graph, Property, Red, VertexId};
 
 // ---------------------------------------------------------------------------
@@ -136,34 +137,19 @@ pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, Convergenc
         return Imperfect::Success(Vec::new());
     }
 
-    // Build graph Laplacian L = D - A per fiedler_lambda_2_of_graph pattern.
-    let mut vertex_index: std::collections::BTreeMap<VertexId, usize> =
-        std::collections::BTreeMap::new();
-    for (i, v) in sheaf.vertices().enumerate() {
-        vertex_index.insert(v, i);
-    }
+    // L₀ = δ*δ and its spectrum, from room (fiedler_lambda_2_of_graph's).
     let n = vertex_count;
-    let mut laplacian = vec![0.0_f64; n * n];
-    for (u, v) in sheaf.edges() {
-        let i = vertex_index[&u];
-        let j = vertex_index[&v];
-        laplacian[i * n + j] -= 1.0;
-        laplacian[j * n + i] -= 1.0;
-        laplacian[i * n + i] += 1.0;
-        laplacian[j * n + j] += 1.0;
-    }
-
-    // Compose over LANDED LAPACK dsyev for spectrum.
-    let spectrum = match eigenvalues(n, &laplacian) {
+    let spectrum = match laplacian_spectrum(sheaf) {
         Ok(evals) => evals,
-        Err(info) => {
+        Err(e) => {
+            let why = match e {
+                RoomError::Unmeasured(info) => format!("LAPACK dsyev failed with info={info}"),
+                other => format!("{other:?}"),
+            };
             return Imperfect::Failure(
                 Transparency::single(
                     Property::FiedlerRise,
-                    PropertyVerdict::Fail(Diagnostic::new(format!(
-                        "detect_tensions: LAPACK dsyev failed with info={}",
-                        info
-                    ))),
+                    PropertyVerdict::Fail(Diagnostic::new(format!("detect_tensions: {why}"))),
                 ),
                 ConvergenceLoss::zero(),
             );
