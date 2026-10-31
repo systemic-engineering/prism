@@ -61,7 +61,7 @@
 use std::collections::BTreeSet;
 
 use crate::oid::{Addressable, Oid, Scope};
-use crate::room::{coboundary, RoomError};
+use crate::room::RoomError;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------
@@ -335,18 +335,7 @@ pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
 /// canonical order, as [`Graph::vertices`]. `Err` only when LAPACK refuses
 /// ([`RoomError::Unmeasured`]).
 pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, RoomError> {
-    let delta = coboundary(graph);
-    // Neither expect can fire, and no type here says so: δ and δ* are built
-    // from one graph, so their rooms agree, and δ*δ is symmetric exactly
-    // (entries in Z), so `symmetric` can't refuse.
-    let laplacian = delta
-        .then(&delta.adjoint())
-        .expect("δ then δ*: C⁰ → C¹ → C⁰ of one graph");
-    laplacian
-        .measure()
-        .symmetric()
-        .expect("δ*δ is symmetric, exactly")
-        .spectrum()
+    crate::room::laplacian(graph).measure().spectrum()
 }
 
 // ---------------------------------------------------------------------------

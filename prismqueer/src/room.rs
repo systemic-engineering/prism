@@ -562,6 +562,27 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         }
     }
 
+    /// self*·self, from `A` to itself, without a room check: both doors are
+    /// this map's. Entry (i, j) is column i · column j, so it and (j, i) are
+    /// one product, exactly: symmetric by construction.
+    fn gram(&self) -> Map<A, A, R> {
+        let columns: Vec<&[R]> = self.columns().collect();
+        let dot = |x: &[R], y: &[R]| {
+            x.iter()
+                .zip(y)
+                .fold(R::zero(), |sum, (a, b)| sum.add(&a.mul(b)))
+        };
+        let entries = columns
+            .iter()
+            .flat_map(|cj| columns.iter().map(|ci| dot(ci, cj)))
+            .collect();
+        Map {
+            from: self.from.clone(),
+            to: self.from.clone(),
+            entries,
+        }
+    }
+
     fn at(&self, row: usize, col: usize) -> usize {
         col * self.to.dim + row
     }
@@ -896,8 +917,7 @@ fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
 
 /// L₀ = δ*δ on C⁰ of `graph`, exactly: symmetric by construction.
 pub fn laplacian(graph: &Graph) -> Symmetric<Vertices, Z> {
-    let room = Room::vertices(graph);
-    Symmetric(Map::zero(&room, &room))
+    Symmetric(coboundary(graph).gram())
 }
 
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge

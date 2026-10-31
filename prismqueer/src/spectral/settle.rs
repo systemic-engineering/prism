@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 
 use terni::{Imperfect, Loss};
 
-use crate::room::{coboundary, Modes, RoomError, Vertices};
+use crate::room::{laplacian, Modes, RoomError, Vertices};
 use crate::spectral::kleinos::{Graph, VertexId};
 
 /// A value per vertex. Keyed by vertex, not by position.
@@ -197,14 +197,8 @@ impl Eigen {
         let n = vertices.len();
         let index: BTreeMap<VertexId, usize> =
             vertices.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-        let delta = coboundary(graph);
-        let laplacian = delta
-            .then(&delta.adjoint())
-            .expect("δ then δ*: C⁰ → C¹ → C⁰ of one graph");
-        let modes = laplacian
+        let modes = laplacian(graph)
             .measure()
-            .symmetric()
-            .expect("δ*δ is symmetric, exactly")
             .decompose()
             .map_err(|e| match e {
                 RoomError::Unmeasured(info) => Wall::Eigensystem(info),
