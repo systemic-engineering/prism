@@ -441,6 +441,36 @@ impl Graph {
         self.spanning().1.len()
     }
 
+    /// The spanning forest, walked: breadth-first order and every chord's
+    /// canonical cycle.
+    pub(crate) fn walked(&self) -> Spanning {
+        let (tree, chords) = self.spanning();
+        let mut order = Vec::with_capacity(self.vertices.len());
+        let mut back: BTreeMap<VertexId, (VertexId, usize)> = BTreeMap::new();
+        let mut seen: BTreeSet<VertexId> = BTreeSet::new();
+        for start in self.vertices() {
+            if !seen.insert(start) {
+                continue;
+            }
+            order.push((start, None));
+            let mut queue = VecDeque::from([start]);
+            while let Some(u) = queue.pop_front() {
+                for &(w, i) in &tree[&u] {
+                    if seen.insert(w) {
+                        order.push((w, Some((u, i))));
+                        back.insert(w, (u, i));
+                        queue.push_back(w);
+                    }
+                }
+            }
+        }
+        let cycles = chords
+            .into_iter()
+            .map(|chord| canonical_loop(fundamental_cycle(&back, self.edges[chord].ends, chord)))
+            .collect();
+        Spanning { order, cycles }
+    }
+
     fn index(&self, edge: Edge) -> Option<usize> {
         self.edges.binary_search(&edge).ok()
     }
@@ -480,9 +510,24 @@ impl Graph {
 /// A closed walk: `vertices[k]` to `vertices[k + 1]` along the edge with
 /// index `edges[k]`.
 #[derive(Clone, Debug, PartialEq)]
-struct Walk {
-    vertices: Vec<VertexId>,
-    edges: Vec<usize>,
+pub(crate) struct Walk {
+    pub(crate) vertices: Vec<VertexId>,
+    pub(crate) edges: Vec<usize>,
+}
+
+/// A spanning forest, walked: the part of an exact solve of δg = c on edges
+/// that doesn't depend on what the values are. [`check_flat`] folds group
+/// transports over it; [`room::solve`](crate::room::solve) folds ring
+/// coefficients over it. One forest, so the two read the same potential
+/// and the same loops on one graph.
+pub(crate) struct Spanning {
+    /// Every vertex once, breadth-first from each component's smallest
+    /// vertex: a root has no parent; every other vertex comes after its
+    /// tree parent, with the index of the tree edge between them.
+    pub(crate) order: Vec<(VertexId, Option<(VertexId, usize)>)>,
+    /// The cycle each chord closes, canonical ([`canonical_loop`]), chords
+    /// in edge order.
+    pub(crate) cycles: Vec<Walk>,
 }
 
 /// A field: values over a base.
@@ -779,27 +824,16 @@ pub fn check_flat_within<V: Measured>(field: &Field<Graph, V>, noise: Noise) -> 
 
 fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> Flatness<V> {
     let graph = &field.base;
-    let (tree, chords) = graph.spanning();
+    let Spanning { order, cycles } = graph.walked();
 
     // Potential: breadth-first from each component's smallest vertex.
     let mut potential: BTreeMap<VertexId, V> = BTreeMap::new();
-    let mut back: BTreeMap<VertexId, (VertexId, usize)> = BTreeMap::new();
-    for start in graph.vertices() {
-        if potential.contains_key(&start) {
-            continue;
-        }
-        potential.insert(start, V::identity());
-        let mut queue = VecDeque::from([start]);
-        while let Some(u) = queue.pop_front() {
-            for &(w, i) in &tree[&u] {
-                if !potential.contains_key(&w) {
-                    let p = potential[&u].compose(&field.step(i, u));
-                    potential.insert(w, p);
-                    back.insert(w, (u, i));
-                    queue.push_back(w);
-                }
-            }
-        }
+    for (w, parent) in order {
+        let p = match parent {
+            None => V::identity(),
+            Some((u, i)) => potential[&u].compose(&field.step(i, u)),
+        };
+        potential.insert(w, p);
     }
 
     let around = |walk: Walk| {
@@ -841,8 +875,7 @@ fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> F
     }
 
     let mut loops = Vec::new();
-    for chord in chords {
-        let walk = canonical_loop(fundamental_cycle(&back, graph.edges[chord].ends, chord));
+    for walk in cycles {
         if span.contains(edge_set(&walk)) {
             continue;
         }
