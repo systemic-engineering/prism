@@ -471,7 +471,7 @@ impl Graph {
         Spanning { order, cycles }
     }
 
-    fn index(&self, edge: Edge) -> Option<usize> {
+    pub(crate) fn index(&self, edge: Edge) -> Option<usize> {
         self.edges.binary_search(&edge).ok()
     }
 
@@ -659,21 +659,9 @@ impl<V: Group> Field<Graph, V> {
         mut self,
         faces: impl IntoIterator<Item = [VertexId; 3]>,
     ) -> Result<Self, FieldError> {
-        for [a, b, c] in faces {
-            let mut edges = Vec::with_capacity(3);
-            for (x, y) in [(a, b), (b, c), (c, a)] {
-                let ends = ordered(x, y);
-                match self.base.multiplicity(ends) {
-                    0 => return Err(FieldError::Missing(ends)),
-                    1 => {}
-                    _ => return Err(FieldError::Parallel(ends)),
-                }
-                edges.extend(self.base.index(Edge { ends, nth: 0 }));
-            }
-            self.faces.push(Walk {
-                vertices: vec![a, b, c, a],
-                edges,
-            });
+        for corners in faces {
+            let walk = triangle(&self.base, corners)?;
+            self.faces.push(walk);
         }
         Ok(self)
     }
@@ -686,19 +674,20 @@ impl<V: Group> Field<Graph, V> {
         mut self,
         bigons: impl IntoIterator<Item = [Edge; 2]>,
     ) -> Result<Self, FieldError> {
-        for [e, f] in bigons {
-            let i = self.base.index(e).ok_or(FieldError::Missing(e.ends))?;
-            let j = self.base.index(f).ok_or(FieldError::Missing(f.ends))?;
-            if e.ends != f.ends {
-                return Err(FieldError::Apart(e.ends, f.ends));
-            }
-            let (u, v) = e.ends;
-            self.faces.push(Walk {
-                vertices: vec![u, v, u],
-                edges: vec![i, j],
-            });
+        for edges in bigons {
+            let walk = bigon(&self.base, edges)?;
+            self.faces.push(walk);
         }
         Ok(self)
+    }
+
+    /// The declared faces, in the order declared, each canonical
+    /// ([`Face`]): the 2-cells a [`room`](crate::room) builds C² from.
+    pub fn faces(&self) -> Vec<Face> {
+        self.faces
+            .iter()
+            .map(|walk| Face::of(&self.base, walk.clone()))
+            .collect()
     }
 
     /// The transport along edge `i`, leaving from its end `from`.
@@ -707,6 +696,88 @@ impl<V: Group> Field<Graph, V> {
             self.values[i].clone()
         } else {
             self.values[i].inverse()
+        }
+    }
+}
+
+/// The walk around triangle `[a, b, c]` of `graph`: a → b → c → a.
+fn triangle(graph: &Graph, [a, b, c]: [VertexId; 3]) -> Result<Walk, FieldError> {
+    let mut edges = Vec::with_capacity(3);
+    for (x, y) in [(a, b), (b, c), (c, a)] {
+        let ends = ordered(x, y);
+        match graph.multiplicity(ends) {
+            0 => return Err(FieldError::Missing(ends)),
+            1 => {}
+            _ => return Err(FieldError::Parallel(ends)),
+        }
+        edges.extend(graph.index(Edge { ends, nth: 0 }));
+    }
+    Ok(Walk {
+        vertices: vec![a, b, c, a],
+        edges,
+    })
+}
+
+/// The walk around bigon `[e, f]` of `graph`: out along `e` from its
+/// smaller end, back along `f`.
+fn bigon(graph: &Graph, [e, f]: [Edge; 2]) -> Result<Walk, FieldError> {
+    let i = graph.index(e).ok_or(FieldError::Missing(e.ends))?;
+    let j = graph.index(f).ok_or(FieldError::Missing(f.ends))?;
+    if e.ends != f.ends {
+        return Err(FieldError::Apart(e.ends, f.ends));
+    }
+    let (u, v) = e.ends;
+    Ok(Walk {
+        vertices: vec![u, v, u],
+        edges: vec![i, j],
+    })
+}
+
+/// A 2-cell of a graph: a closed walk along its edges, which the cell
+/// fills. A filled triangle ([`Face::triangle`]) or a filled bigon on two
+/// parallel edges ([`Face::bigon`]), the same 2-cells [`Field::with_faces`]
+/// and [`Field::with_bigons`] declare.
+///
+/// Canonical, as a [`Loop`]: it starts at its smallest vertex and heads
+/// toward the smaller neighbour (out along the smaller edge on a bigon).
+/// That orientation is the face's: its boundary is +1 on an edge walked
+/// from its smaller end, −1 against, and its curvature is the holonomy
+/// around it in this order, the one [`check_flat`] reports.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Face {
+    vertices: Vec<VertexId>,
+    edges: Vec<Edge>,
+}
+
+impl Face {
+    /// The filled triangle with these corners. Refused as
+    /// [`Field::with_faces`] refuses: a side missing, or parallel.
+    pub fn triangle(graph: &Graph, corners: [VertexId; 3]) -> Result<Self, FieldError> {
+        Ok(Face::of(graph, triangle(graph, corners)?))
+    }
+
+    /// The filled bigon on these two edges. Refused as
+    /// [`Field::with_bigons`] refuses: an edge missing, or the two apart.
+    pub fn bigon(graph: &Graph, edges: [Edge; 2]) -> Result<Self, FieldError> {
+        Ok(Face::of(graph, bigon(graph, edges)?))
+    }
+
+    /// Around the face, from its smallest vertex back to it.
+    pub fn vertices(&self) -> &[VertexId] {
+        &self.vertices
+    }
+
+    /// The edges around it in path order: `edges()[k]` joins `vertices()[k]`
+    /// and `vertices()[k + 1]`.
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
+
+    fn of(graph: &Graph, walk: Walk) -> Self {
+        let walk = canonical_loop(walk);
+        Face {
+            edges: walk.edges.iter().map(|&i| graph.edges[i]).collect(),
+            vertices: walk.vertices,
         }
     }
 }

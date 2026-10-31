@@ -4,8 +4,10 @@
 //! operator's resonances live in. On one graph (a [`Graph`] multigraph, the
 //! one graph type `field` is built on too) there are two rooms, C⁰ (the
 //! vertex room, [`Vertices`]) and C¹ (the edge room, [`Edges`]), and their
-//! sum C⁰ ⊕ C¹ ([`Sum`]) where the Dirac operator D lives. Operators move
-//! between rooms: δ ([`coboundary`]) is a door from C⁰ into C¹, and δ*
+//! sum C⁰ ⊕ C¹ ([`Sum`]) where the Dirac operator D lives. Filled with
+//! faces ([`Face`]), a third: C² (the face room, [`Faces`]). Operators move
+//! between rooms: δ ([`coboundary`]) is a door from C⁰ into C¹, δ₁
+//! ([`coboundary1`]) one from C¹ into C², and each adjoint
 //! ([`Map::adjoint`]) is the door back.
 //!
 //! A self-adjoint map from a room to itself has a spectrum, and that
@@ -81,6 +83,46 @@
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = delta.symmetric();
+//! ```
+//!
+//! # Faces
+//!
+//! δ₁ leads out of C¹, so it follows δ and never itself. The control
+//! compiles:
+//!
+//! ```
+//! use prismqueer::field::{Face, Graph};
+//! use prismqueer::room::{coboundary, coboundary1};
+//! let g = Graph::new([], [(0, 1), (1, 2), (0, 2)]);
+//! let d0 = coboundary(&g);
+//! let d1 = coboundary1(&g, &[Face::triangle(&g, [0, 1, 2]).unwrap()]).unwrap();
+//! let _ = d0.then(&d1); // C⁰ → C¹ → C²
+//! let _ = d1.adjoint().then(&d1); // C² → C¹ → C²
+//! ```
+//!
+//! δ₁ then δ₁: the second door leads out of C¹, but the first one ended
+//! in C².
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::field::{Face, Graph};
+//! use prismqueer::room::{coboundary, coboundary1};
+//! let g = Graph::new([], [(0, 1), (1, 2), (0, 2)]);
+//! let d0 = coboundary(&g);
+//! let d1 = coboundary1(&g, &[Face::triangle(&g, [0, 1, 2]).unwrap()]).unwrap();
+//! let _ = d1.then(&d1); // C¹ → C², then out of C¹
+//! let _ = d1.adjoint().then(&d1); // C² → C¹ → C²
+//! ```
+//!
+//! δ₁ then δ: δ leads out of C⁰, into the wrong room.
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::field::{Face, Graph};
+//! use prismqueer::room::{coboundary, coboundary1};
+//! let g = Graph::new([], [(0, 1), (1, 2), (0, 2)]);
+//! let d0 = coboundary(&g);
+//! let d1 = coboundary1(&g, &[Face::triangle(&g, [0, 1, 2]).unwrap()]).unwrap();
+//! let _ = d1.then(&d0); // C¹ → C², then out of C⁰
+//! let _ = d1.adjoint().then(&d1); // C² → C¹ → C²
 //! ```
 //!
 //! # Rings
@@ -176,7 +218,7 @@ use std::marker::PhantomData;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{complex_oid, Edge, Exact, Graph, Group, Spanning};
+use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning};
 use crate::oid::{Oid, Scope};
 use crate::spectral::kleinos::VertexId;
 
@@ -187,7 +229,7 @@ mod sealed {
 }
 
 /// The kind of a room: which space it is, as a type. Sealed: the kinds are
-/// [`Vertices`], [`Edges`] and their [`Sum`]s.
+/// [`Vertices`], [`Edges`], [`Faces`] and their [`Sum`]s.
 pub trait Kind: sealed::Sealed + Clone + PartialEq + Debug + 'static {
     /// What a room of this kind carries besides its dimension and address:
     /// its basis for C⁰, nothing for C¹, its two summands for a sum.
@@ -204,12 +246,18 @@ pub struct Vertices;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Edges;
 
+/// C²: one dimension per face, in the order the faces are given, each
+/// oriented canonically ([`Face`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Faces;
+
 /// A ⊕ B: `A`'s dimensions first, then `B`'s.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sum<A, B>(PhantomData<(A, B)>);
 
 impl sealed::Sealed for Vertices {}
 impl sealed::Sealed for Edges {}
+impl sealed::Sealed for Faces {}
 impl<A, B> sealed::Sealed for Sum<A, B> {}
 
 impl Kind for Vertices {
@@ -218,6 +266,10 @@ impl Kind for Vertices {
 }
 impl Kind for Edges {
     type Parts = ();
+}
+impl Kind for Faces {
+    /// The address of the C¹ it sits over.
+    type Parts = Oid;
 }
 impl<A: Kind, B: Kind> Kind for Sum<A, B> {
     type Parts = Box<(Room<A>, Room<B>)>;
@@ -234,11 +286,13 @@ impl<A: Kind, B: Kind> Kind for Sum<A, B> {
 /// by its vertex set alone, so two graphs on one vertex set share one C⁰.
 /// C¹ is addressed by its complex and sits over a C⁰ by relation: its
 /// [`skeleton`](Room::skeleton) is that C⁰'s address. Rewiring the edges
-/// changes C¹ over a fixed C⁰, not the vertex space.
+/// changes C¹ over a fixed C⁰, not the vertex space. C² sits over a C¹
+/// the same way ([`Room::one_skeleton`]): refilling the faces changes C²
+/// over a fixed C¹, and its `skeleton` is still the C⁰ under both.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Room<K: Kind> {
-    /// C⁰: the 0-skeleton (V, ∅)'s address. C¹: the complex's. A sum: its
-    /// summands', in order.
+    /// C⁰: the 0-skeleton (V, ∅)'s address. C¹: the complex's. C²: the
+    /// 2-complex's. A sum: its summands', in order.
     complex: Oid,
     /// The address of the C⁰ this room sits over.
     skeleton: Oid,
@@ -283,6 +337,8 @@ pub enum RoomError {
     },
     /// LAPACK couldn't measure (dsyev's `info`).
     Unmeasured(i32),
+    /// A face runs along an edge the graph doesn't have.
+    Outside(Edge),
     /// Two moduli in one operation: ℤ/n and ℤ/m are different rings, and
     /// a residue of one isn't a residue of the other.
     Modulus {
@@ -347,6 +403,43 @@ impl Room<Edges> {
             parts: (),
             kind: PhantomData,
         }
+    }
+}
+
+impl Room<Faces> {
+    /// C² of `graph` filled by `faces`, over C¹ of `graph`. Refused
+    /// ([`RoomError::Outside`]) when a face runs along an edge the graph
+    /// doesn't have.
+    pub fn faces(graph: &Graph, faces: &[Face]) -> Result<Self, RoomError> {
+        boundaries(graph, faces)?;
+        Ok(Room::faces_over(&Room::edges(graph), faces))
+    }
+
+    /// C² over `edges`. Addressed by the C¹'s address and every face, as
+    /// its walk: each step's start and edge (ends and `nth`).
+    fn faces_over(edges: &Room<Edges>, faces: &[Face]) -> Self {
+        let mut bytes = edges.complex.as_str().as_bytes().to_vec();
+        for face in faces {
+            bytes.push(0xFF); // separator
+            for (v, e) in face.vertices().iter().zip(face.edges()) {
+                let (a, b) = e.ends();
+                for x in [*v, a, b, e.nth() as u64] {
+                    bytes.extend_from_slice(&x.to_le_bytes());
+                }
+            }
+        }
+        Room {
+            complex: Oid::hash(&Scope::public(), &bytes),
+            skeleton: edges.skeleton.clone(),
+            dim: faces.len(),
+            parts: edges.complex.clone(),
+            kind: PhantomData,
+        }
+    }
+
+    /// The address of the C¹ this room sits over: its 1-skeleton.
+    pub fn one_skeleton(&self) -> &Oid {
+        &self.parts
     }
 }
 
@@ -1398,6 +1491,59 @@ fn delta<R: Entry>(
         }
     }
     delta
+}
+
+/// δ₁: C¹ → C², exactly. `(δ₁c)(f) = Σ ±c(e)` around the face, +1 on
+/// an edge walked from its smaller end, −1 against it: the twist around f
+/// in its canonical orientation ([`Face`]), the holonomy field reports on
+/// it. A face's row is its boundary ∂f as a chain, so ∂₂ = δ₁*.
+///
+/// An edge walked twice adds twice: the face of a self-loop walked twice
+/// (a bigon on one edge) is 2 there, the 1-cell ℝℙ². A self-loop walked
+/// once counts +1, as in [`Cycle::chain`].
+///
+/// δ₁ ∘ δ = 0: every face is a closed walk, so the two ends of each step
+/// cancel around it. Refused ([`RoomError::Outside`]) when a face runs
+/// along an edge the graph doesn't have.
+pub fn coboundary1(graph: &Graph, faces: &[Face]) -> Result<Map<Edges, Faces, Z>, RoomError> {
+    coboundary1_in(&(), graph, faces)
+}
+
+/// δ₁ over any ring: the same integers, which every ring has.
+pub fn coboundary1_in<R: Entry>(
+    ring: &R::Ring,
+    graph: &Graph,
+    faces: &[Face],
+) -> Result<Map<Edges, Faces, R>, RoomError> {
+    let rows = boundaries(graph, faces)?;
+    let edges = Room::edges(graph);
+    let mut delta: Map<Edges, Faces, R> =
+        Map::zero_in(ring, &edges, &Room::faces_over(&edges, faces));
+    for (row, chain) in rows.iter().enumerate() {
+        for (col, n) in chain.iter().enumerate() {
+            if !n.0.is_zero() {
+                delta.set(row, col, R::one(ring).times(&n.0));
+            }
+        }
+    }
+    Ok(delta)
+}
+
+/// Each face's boundary as an integer chain over `graph`'s edges.
+fn boundaries(graph: &Graph, faces: &[Face]) -> Result<Vec<Vec<Z>>, RoomError> {
+    let m = graph.edges().count();
+    faces
+        .iter()
+        .map(|face| {
+            let mut chain = vec![Z::zero(&()); m];
+            for (&from, &e) in face.vertices().iter().zip(face.edges()) {
+                let i = graph.index(e).ok_or(RoomError::Outside(e))?;
+                let sign = if e.ends().0 == from { 1 } else { -1 };
+                chain[i] = chain[i].add(&Z::from(sign));
+            }
+            Ok(chain)
+        })
+        .collect()
 }
 
 /// L₀ = δ*δ on C⁰ of `graph`, exactly: symmetric by construction.
