@@ -1402,6 +1402,181 @@ impl Charpoly {
     }
 }
 
+// --- Smith normal form -------------------------------------------------------
+
+/// The Smith normal form of an integer map M: A → B, exactly: unimodular U
+/// on B and V on A with U·M·V = diag(d₁, d₂, …), d₁ | d₂ | …, each
+/// dᵢ ≥ 0 and the zeros last.
+///
+/// The factors are what M is up to a change of basis on either side, over
+/// ℤ: the cokernel B / im M is ⊕ ℤ/dᵢ ⊕ ℤ^(dim B − rank). A factor
+/// dᵢ > 1 is torsion: an element of B that isn't in the image while dᵢ
+/// times it is. Over ℤ/n the factor dᵢ acts as gcd(dᵢ, n).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Smith<A: Kind, B: Kind> {
+    factors: Vec<Z>,
+    left: Map<B, B, Z>,
+    right: Map<A, A, Z>,
+    from: Room<A>,
+    to: Room<B>,
+}
+
+impl<A: Kind, B: Kind> Smith<A, B> {
+    /// d₁ | d₂ | …: min(dim A, dim B) of them, nonzero first.
+    pub fn factors(&self) -> &[Z] {
+        &self.factors
+    }
+
+    /// The rank of M: how many factors are nonzero.
+    pub fn rank(&self) -> usize {
+        self.factors.iter().filter(|d| !d.0.is_zero()).count()
+    }
+
+    /// U, on M's target: the row operations.
+    pub fn left(&self) -> &Map<B, B, Z> {
+        &self.left
+    }
+
+    /// V, on M's source: the column operations.
+    pub fn right(&self) -> &Map<A, A, Z> {
+        &self.right
+    }
+
+    /// diag(d): the map U·M·V, from A to B.
+    pub fn diagonal(&self) -> Map<A, B, Z> {
+        let mut d = Map::zero(&self.from, &self.to);
+        for (i, di) in self.factors.iter().enumerate() {
+            d.set(i, i, di.clone());
+        }
+        d
+    }
+}
+
+impl<A: Kind, B: Kind> Map<A, B, Z> {
+    /// The Smith normal form ([`Smith`]), by elimination over ℤ: pivot on
+    /// the smallest nonzero entry left, clear its row and column by division
+    /// with remainder (a remainder becomes the next, smaller pivot), and
+    /// when the pivot doesn't divide some entry left, add that entry's row to
+    /// the pivot's and go again. Each pass shrinks the pivot, so it ends.
+    /// Every step is an exact integer row or column operation, recorded in
+    /// U or V.
+    pub fn smith(&self) -> Smith<A, B> {
+        let (m, n) = (self.to.dim, self.from.dim);
+        let mut a: Vec<Vec<BigInt>> = (0..m)
+            .map(|i| (0..n).map(|j| self.entries[self.at(i, j)].0.clone()).collect())
+            .collect();
+        let unit = |k: usize| -> Vec<Vec<BigInt>> {
+            (0..k)
+                .map(|i| (0..k).map(|j| BigInt::from(u8::from(i == j))).collect())
+                .collect()
+        };
+        let (mut u, mut v) = (unit(m), unit(n));
+        // row_i -= q·row_t on A and U; col_j -= q·col_t on A and V.
+        let sub_row = |a: &mut Vec<Vec<BigInt>>, i: usize, t: usize, q: &BigInt| {
+            let pivot = a[t].clone();
+            for (x, p) in a[i].iter_mut().zip(&pivot) {
+                *x -= q * p;
+            }
+        };
+        let sub_col = |a: &mut Vec<Vec<BigInt>>, j: usize, t: usize, q: &BigInt| {
+            for row in a.iter_mut() {
+                let p = row[t].clone();
+                row[j] -= q * p;
+            }
+        };
+        let mut factors = Vec::with_capacity(m.min(n));
+        for t in 0..m.min(n) {
+            loop {
+                let smallest = (t..m)
+                    .flat_map(|i| (t..n).map(move |j| (i, j)))
+                    .filter(|&(i, j)| !a[i][j].is_zero())
+                    .min_by_key(|&(i, j)| a[i][j].magnitude().clone());
+                let Some((p, q)) = smallest else { break };
+                a.swap(t, p);
+                u.swap(t, p);
+                for row in a.iter_mut().chain(v.iter_mut()) {
+                    row.swap(t, q);
+                }
+                let mut clear = true;
+                for i in t + 1..m {
+                    let q = &a[i][t] / &a[t][t];
+                    sub_row(&mut a, i, t, &q);
+                    sub_row(&mut u, i, t, &q);
+                    clear &= a[i][t].is_zero();
+                }
+                for j in t + 1..n {
+                    let q = &a[t][j] / &a[t][t];
+                    sub_col(&mut a, j, t, &q);
+                    sub_col(&mut v, j, t, &q);
+                    clear &= a[t][j].is_zero();
+                }
+                if !clear {
+                    continue;
+                }
+                let pivot = a[t][t].clone();
+                let stray = (t + 1..m).find(|&i| (t + 1..n).any(|j| !(&a[i][j] % &pivot).is_zero()));
+                match stray {
+                    Some(i) => {
+                        let minus_one = BigInt::from(-1);
+                        sub_row(&mut a, t, i, &minus_one);
+                        sub_row(&mut u, t, i, &minus_one);
+                    }
+                    None => break,
+                }
+            }
+            if a[t][t].sign() == Sign::Minus {
+                for x in a[t].iter_mut().chain(u[t].iter_mut()) {
+                    *x = -&*x;
+                }
+            }
+            factors.push(Z(a[t][t].clone()));
+        }
+        fn square<K: Kind>(room: &Room<K>, rows: Vec<Vec<BigInt>>) -> Map<K, K, Z> {
+            let rows: Vec<Vec<Z>> = rows
+                .into_iter()
+                .map(|r| r.into_iter().map(Z).collect())
+                .collect();
+            Map::from_rows(room, room, &rows).expect("square, by construction")
+        }
+        Smith {
+            factors,
+            left: square(&self.to, u),
+            right: square(&self.from, v),
+            from: self.from.clone(),
+            to: self.to.clone(),
+        }
+    }
+}
+
+impl<A: Kind> Map<A, A, Z> {
+    /// det M, exactly, by Bareiss's fraction-free elimination: every
+    /// division is exact, so every step stays in ℤ. The empty map's is 1.
+    pub fn determinant(&self) -> Z {
+        let n = self.from.dim;
+        let mut a: Vec<Vec<BigInt>> = (0..n)
+            .map(|i| (0..n).map(|j| self.entries[self.at(i, j)].0.clone()).collect())
+            .collect();
+        let mut sign = BigInt::one();
+        let mut previous = BigInt::one();
+        for k in 0..n {
+            let Some(p) = (k..n).find(|&i| !a[i][k].is_zero()) else {
+                return Z(BigInt::zero());
+            };
+            if p != k {
+                a.swap(p, k);
+                sign = -sign;
+            }
+            for i in k + 1..n {
+                for j in k + 1..n {
+                    a[i][j] = (&a[i][j] * &a[k][k] - &a[i][k] * &a[k][j]) / &previous;
+                }
+            }
+            previous = a[k][k].clone();
+        }
+        Z(sign * previous)
+    }
+}
+
 /// The modes of a room: how a self-adjoint map on it resonates.
 ///
 /// The spectrum is sorted ascending; mode `k` is eigenvalue `k` with
