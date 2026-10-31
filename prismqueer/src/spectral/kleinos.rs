@@ -330,7 +330,9 @@ pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
 /// canonical order, as [`Graph::vertices`]. `Err` only when LAPACK refuses
 /// ([`RoomError::Unmeasured`]).
 pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, RoomError> {
-    crate::room::laplacian(graph).measure().spectrum()
+    crate::room::laplacian(graph.multigraph())
+        .measure()
+        .spectrum()
 }
 
 // ---------------------------------------------------------------------------

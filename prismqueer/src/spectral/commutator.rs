@@ -86,7 +86,7 @@ fn exact_commutator(
     b: &Graph,
 ) -> Result<(Laplacian, Laplacian, Laplacian), RoomError> {
     let laplacian = |g: &Graph| -> Result<Laplacian, RoomError> {
-        let delta = coboundary_over(room, g)?;
+        let delta = coboundary_over(room, g.multigraph())?;
         delta.then(&delta.adjoint())
     };
     let (l_a, l_b) = (laplacian(a)?, laplacian(b)?);

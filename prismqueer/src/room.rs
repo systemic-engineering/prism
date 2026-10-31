@@ -40,7 +40,7 @@
 //! ```
 //! use prismqueer::room::coboundary;
 //! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(&graph_from_edges(&[(0, 1), (1, 2), (0, 2)]));
+//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
@@ -54,7 +54,7 @@
 //! ```compile_fail,E0308
 //! use prismqueer::room::coboundary;
 //! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(&graph_from_edges(&[(0, 1), (1, 2), (0, 2)]));
+//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
 //! let laplacian = delta.then(&delta).unwrap(); // C⁰ → C¹, then out of C⁰
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
@@ -65,7 +65,7 @@
 //! ```compile_fail,E0308
 //! use prismqueer::room::coboundary;
 //! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(&graph_from_edges(&[(0, 1), (1, 2), (0, 2)]));
+//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
 //! let _ = delta.then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
@@ -76,7 +76,7 @@
 //! ```compile_fail,E0599
 //! use prismqueer::room::coboundary;
 //! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(&graph_from_edges(&[(0, 1), (1, 2), (0, 2)]));
+//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = delta.symmetric();
@@ -89,9 +89,9 @@ use std::marker::PhantomData;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{complex_oid, Exact, Group};
+use crate::field::{complex_oid, Exact, Graph, Group};
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::{Graph, VertexId};
+use crate::spectral::kleinos::{EdgeKey, VertexId};
 
 // --- Kinds of room -----------------------------------------------------------
 
@@ -242,9 +242,9 @@ impl Room<Edges> {
     /// complex (V, E). Unchecked; [`Room::holds`] checks.
     fn edges_over(skeleton: &Room<Vertices>, graph: &Graph) -> Self {
         Room {
-            complex: complex_oid(skeleton.parts.iter().copied(), graph.edges()),
+            complex: complex_oid(skeleton.parts.iter().copied(), basis(graph).into_iter()),
             skeleton: skeleton.complex.clone(),
-            dim: graph.edges().count(),
+            dim: basis(graph).len(),
             parts: (),
             kind: PhantomData,
         }
@@ -906,13 +906,20 @@ fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
         .collect();
     let mut delta: Map<Vertices, Edges, Z> =
         Map::zero(skeleton, &Room::edges_over(skeleton, graph));
-    for (row, (u, v)) in graph.edges().enumerate() {
+    for (row, (u, v)) in basis(graph).into_iter().enumerate() {
         for (w, sign) in [(u, Z::one().neg()), (v, Z::one())] {
             let at = delta.at(row, index[&w]);
             delta.entries[at] = delta.entries[at].add(&sign);
         }
     }
     delta
+}
+
+/// C¹'s basis: the ends of each dimension, in canonical order.
+fn basis(graph: &Graph) -> Vec<EdgeKey> {
+    let mut pairs: Vec<EdgeKey> = graph.edges().map(|e| e.ends()).collect();
+    pairs.dedup();
+    pairs
 }
 
 /// L₀ = δ*δ on C⁰ of `graph`, exactly: symmetric by construction.

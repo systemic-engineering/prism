@@ -197,7 +197,7 @@ impl Eigen {
         let n = vertices.len();
         let index: BTreeMap<VertexId, usize> =
             vertices.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-        let modes = laplacian(graph)
+        let modes = laplacian(graph.multigraph())
             .measure()
             .decompose()
             .map_err(|e| match e {

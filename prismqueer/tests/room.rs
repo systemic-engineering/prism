@@ -66,7 +66,7 @@ fn graphs() -> [(&'static str, Graph); 3] {
 #[test]
 fn coboundary_is_exact_signed_incidence() {
     for (name, g) in graphs() {
-        let delta = coboundary(&g);
+        let delta = coboundary(g.multigraph());
         let vertices: Vec<u64> = g.vertices().collect();
         let edges: Vec<(u64, u64)> = g.edges().collect();
         assert_eq!(delta.from().dim(), vertices.len(), "{name}: C⁰");
@@ -111,7 +111,7 @@ fn a_self_loops_coboundary_row_is_zero() {
     let g = graph_from_edges(&[(0, 1), (1, 1), (1, 2)]);
     let edges: Vec<(u64, u64)> = g.edges().collect();
     assert_eq!(edges, [(0, 1), (1, 1), (1, 2)], "Graph holds the loop");
-    let delta = coboundary(&g);
+    let delta = coboundary(g.multigraph());
     for col in 0..3 {
         assert_eq!(delta.entry(1, col), Some(&Z::from(0)), "δ[(1, 1), {col}]");
     }
@@ -122,7 +122,10 @@ fn a_self_loops_coboundary_row_is_zero() {
         assert_eq!(l0.entry(i, j), p3.entry(i, j), "L₀[{i}, {j}]");
     }
     // D's kernel: one component, one cycle (the loop).
-    let p = dirac(&g).symmetric().expect("D = D*").charpoly();
+    let p = dirac(g.multigraph())
+        .symmetric()
+        .expect("D = D*")
+        .charpoly();
     let zeros_at_0 = p
         .coefficients()
         .iter()
@@ -137,12 +140,12 @@ fn a_self_loops_coboundary_row_is_zero() {
 #[test]
 fn dirac_squared_is_l0_plus_the_down_laplacian() {
     for (name, g) in graphs() {
-        let delta = coboundary(&g);
+        let delta = coboundary(g.multigraph());
         let star = delta.adjoint();
         let l0 = delta.then(&star).expect("δ then δ*: C⁰ → C⁰");
         let l1_down = star.then(&delta).expect("δ* then δ: C¹ → C¹");
 
-        let d = dirac(&g);
+        let d = dirac(g.multigraph());
         let d2 = d.then(&d).expect("D then D");
         let blocks = Map::diagonal(&l0, &l1_down).expect("one complex");
         assert_eq!(d2, blocks, "{name}: D² = L₀ ⊕ L₁↓");
@@ -190,7 +193,7 @@ fn residual_is_zero(a: &Map<Vertices, Vertices, f64>, scale: f64, value: f64, v:
 
 #[test]
 fn eigenvectors_are_columns() {
-    let room = coboundary(&path()).from().clone();
+    let room = coboundary(path().multigraph()).from().clone();
     // Distinct eigenvalues and an eigenbasis that isn't symmetric: reading a
     // row as an eigenvector gives a wrong answer (checked below).
     let rows = [
@@ -338,8 +341,8 @@ fn dirac_spectrum_matches_an_independent_flat_build() {
 
 #[test]
 fn composing_across_complexes_is_an_error() {
-    let a = coboundary(&triangle());
-    let b = coboundary(&path());
+    let a = coboundary(triangle().multigraph());
+    let b = coboundary(path().multigraph());
     match a.then(&b.adjoint()) {
         Err(RoomError::Mismatch { expected, found }) => {
             assert_eq!(expected.dim, 3);
@@ -360,7 +363,7 @@ fn composing_across_complexes_is_an_error() {
 
 #[test]
 fn wrong_lengths_are_errors() {
-    let delta = coboundary(&triangle());
+    let delta = coboundary(triangle().multigraph());
     assert_eq!(
         delta.apply(&[Z::from(1), Z::from(2)]),
         Err(RoomError::Length {
@@ -400,7 +403,7 @@ fn wrong_lengths_are_errors() {
 
 #[test]
 fn asymmetric_maps_have_no_spectrum() {
-    let room = coboundary(&triangle()).from().clone();
+    let room = coboundary(triangle().multigraph()).from().clone();
     let mut rows = vec![vec![Z::from(0); 3]; 3];
     rows[0][2] = Z::from(1);
     let a = Map::from_rows(&room, &room, &rows).unwrap();
@@ -412,7 +415,7 @@ fn asymmetric_maps_have_no_spectrum() {
 
 #[test]
 fn exact_arithmetic_never_wraps() {
-    let room = coboundary(&triangle()).from().clone();
+    let room = coboundary(triangle().multigraph()).from().clone();
     let filled = |z: BigInt| Map::from_rows(&room, &room, &vec![vec![Z::from(z); 3]; 3]).unwrap();
     let max = BigInt::from(i64::MAX);
     let big = filled(max.clone());
@@ -445,7 +448,7 @@ fn thrice<K: prismqueer::room::Kind>(map: &Map<K, K, Z>) -> Map<K, K, Z> {
 /// entries ±3⁴⁰ > 2⁶³. The laws checked are the closed forms, exactly.
 #[test]
 fn delta_built_maps_compose_past_i64() {
-    let delta = coboundary(&triangle());
+    let delta = coboundary(triangle().multigraph());
     let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
     let l50 = power(&l0, 50);
     assert_eq!(l50.then(&l0), Ok(thrice(&l50)), "L₀⁵¹ = 3·L₀⁵⁰");
@@ -453,7 +456,7 @@ fn delta_built_maps_compose_past_i64() {
     assert_eq!(l50.entry(0, 0), Some(&Z::from(2 * &three49)), "2·3⁴⁹");
     assert_eq!(l50.entry(0, 1), Some(&Z::from(-three49)), "−3⁴⁹");
 
-    let d = dirac(&triangle());
+    let d = dirac(triangle().multigraph());
     let d81 = power(&d, 81);
     let three40 = BigInt::from(3).pow(40);
     let n = d.from().dim();
@@ -467,7 +470,7 @@ fn delta_built_maps_compose_past_i64() {
 #[test]
 fn identity_and_injections_are_exact_and_lawful() {
     let g = square_with_diagonal();
-    let d = dirac(&g);
+    let d = dirac(g.multigraph());
     let room: Room<Sum<Vertices, _>> = d.from().clone();
     assert_eq!(room.dim(), room.left().dim() + room.right().dim());
     let id = Map::identity(&room);
@@ -496,7 +499,7 @@ fn identity_and_injections_are_exact_and_lawful() {
 #[test]
 fn an_empty_room_decomposes_to_nothing() {
     let g = graph_from_edges(&[]);
-    let modes = dirac(&g)
+    let modes = dirac(g.multigraph())
         .measure()
         .symmetric()
         .unwrap()
@@ -517,7 +520,7 @@ fn a_spectrum_without_modes_is_dsyev_n() {
     all.push(("loops", graph_from_edges(&[(0, 1), (1, 1), (1, 2), (2, 2)])));
     all.push(("empty", graph_from_edges(&[])));
     for (name, g) in all {
-        let delta = coboundary(&g);
+        let delta = coboundary(g.multigraph());
         let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
         let spectrum = l0
             .measure()
@@ -588,7 +591,7 @@ fn more_graphs() -> Vec<(&'static str, Graph)> {
 
 /// L₀ = δ*δ on C⁰ and L₁↓ = δδ* on C¹, exactly.
 fn laplacians(g: &Graph) -> (Map<Vertices, Vertices, Z>, Map<Edges, Edges, Z>) {
-    let delta = coboundary(g);
+    let delta = coboundary(g.multigraph());
     let star = delta.adjoint();
     (
         delta.then(&star).expect("C⁰ → C¹ → C⁰"),
@@ -618,7 +621,7 @@ fn the_charpoly_of_the_triangles_laplacian_is_x3_minus_6x2_plus_9x() {
 /// pₖ = (x − aₖ)pₖ₋₁ − bₖ²pₖ₋₂, worked by hand: x⁴ − 16x³ + 86x² − 181x + 121.
 #[test]
 fn the_charpoly_of_a_tridiagonal_map_matches_its_recurrence() {
-    let room = coboundary(&path()).from().clone();
+    let room = coboundary(path().multigraph()).from().clone();
     let rows = [
         ints(&[2, 1, 0, 0]),
         ints(&[1, 3, 1, 0]),
@@ -661,7 +664,10 @@ fn the_charpoly_of_k20_needs_bigints() {
 #[test]
 fn an_empty_room_has_charpoly_one() {
     let g = graph_from_edges(&[]);
-    let p = dirac(&g).symmetric().expect("symmetric").charpoly();
+    let p = dirac(g.multigraph())
+        .symmetric()
+        .expect("symmetric")
+        .charpoly();
     assert_eq!(p.coefficients(), ints(&[1]).as_slice());
     assert_eq!(p.degree(), 0);
 }
@@ -698,12 +704,18 @@ fn in_squares(p: &[Z]) -> Vec<Z> {
 /// among monic polynomials is unique): eigenvalues 0, 0, ±√3, ±√3.
 #[test]
 fn the_charpoly_of_dirac_follows_from_its_square() {
-    let p = dirac(&triangle()).symmetric().expect("D = D*").charpoly();
+    let p = dirac(triangle().multigraph())
+        .symmetric()
+        .expect("D = D*")
+        .charpoly();
     assert_eq!(p.coefficients(), ints(&[1, 0, -6, 0, 9, 0, 0]).as_slice());
 
     for (name, g) in more_graphs() {
         let (l0, l1_down) = laplacians(&g);
-        let pd = dirac(&g).symmetric().expect("D = D*").charpoly();
+        let pd = dirac(g.multigraph())
+            .symmetric()
+            .expect("D = D*")
+            .charpoly();
         let p0 = l0.symmetric().expect("L₀").charpoly();
         let p1 = l1_down.symmetric().expect("L₁↓").charpoly();
         assert_eq!(
@@ -828,12 +840,12 @@ fn the_measured_spectrum_roots_the_exact_charpoly() {
         let (l0, l1_down) = laplacians(&g);
         spectrum_certifies(&format!("{name} L₀"), &l0, None);
         spectrum_certifies(&format!("{name} L₁↓"), &l1_down, None);
-        spectrum_certifies(&format!("{name} D"), &dirac(&g), None);
+        spectrum_certifies(&format!("{name} D"), &dirac(g.multigraph()), None);
     }
     // Simple spectra: P₃'s L₀ (0, 1, 3) and the path's D (0, ±√λ for
     // λ = 2 − √2, 2, 2 + √2).
     spectrum_certifies("P₃ L₀, nudged", &laplacians(&p3()).0, Some(1e-9));
-    spectrum_certifies("path D, nudged", &dirac(&path()), Some(1e-9));
+    spectrum_certifies("path D, nudged", &dirac(path().multigraph()), Some(1e-9));
 }
 
 // --- Law 8: the triple is even ----------------------------------------------
@@ -843,7 +855,7 @@ fn the_measured_spectrum_roots_the_exact_charpoly() {
 #[test]
 fn the_grading_anticommutes_with_dirac() {
     for (name, g) in more_graphs() {
-        let d = dirac(&g);
+        let d = dirac(g.multigraph());
         let room = d.from().clone();
         let gamma = Map::<Sum<Vertices, Edges>, _, Z>::grading(&room);
         let n0 = room.left().dim();
@@ -892,7 +904,7 @@ fn exact<A: prismqueer::room::Kind, B: prismqueer::room::Kind>(
 
 /// L₀ = δ*δ of `g`, out of C⁰(V).
 fn laplacian_over(v: &Room<Vertices>, g: &Graph) -> Map<Vertices, Vertices, Z> {
-    let delta = coboundary_over(v, g).expect("V(g) ⊆ V");
+    let delta = coboundary_over(v, g.multigraph()).expect("V(g) ⊆ V");
     delta.then(&delta.adjoint()).expect("C⁰(V) → C¹ → C⁰(V)")
 }
 
@@ -900,11 +912,11 @@ fn laplacian_over(v: &Room<Vertices>, g: &Graph) -> Map<Vertices, Vertices, Z> {
 fn a_vertex_room_is_its_vertex_set() {
     let v = set(&[0, 1, 2]);
     assert_eq!(
-        Room::vertices(&triangle()),
-        Room::vertices(&p3()),
+        Room::vertices(triangle().multigraph()),
+        Room::vertices(p3().multigraph()),
         "two graphs on one vertex set share one C⁰"
     );
-    assert_eq!(Room::vertices(&triangle()), Room::over(&v));
+    assert_eq!(Room::vertices(triangle().multigraph()), Room::over(&v));
     assert_eq!(Room::over(&v).dim(), 3);
     assert_ne!(
         Room::over(&v),
@@ -919,19 +931,33 @@ fn an_edge_room_sits_over_its_vertex_room() {
     // Three edges each over {0, 1, 2}: same V, same dimension, other wiring.
     let looped = graph_from_edges(&[(0, 1), (1, 2), (2, 2)]);
     assert_eq!(
-        Room::edges(&triangle()),
-        Room::edges(&triangle()),
+        Room::edges(triangle().multigraph()),
+        Room::edges(triangle().multigraph()),
         "one graph, one C¹"
     );
-    assert_ne!(Room::edges(&triangle()), Room::edges(&looped));
-    assert_ne!(Room::edges(&triangle()), Room::edges(&p3()));
-    let c0 = Room::vertices(&triangle());
+    assert_ne!(
+        Room::edges(triangle().multigraph()),
+        Room::edges(looped.multigraph())
+    );
+    assert_ne!(
+        Room::edges(triangle().multigraph()),
+        Room::edges(p3().multigraph())
+    );
+    let c0 = Room::vertices(triangle().multigraph());
     for g in [triangle(), looped, p3()] {
-        assert_eq!(Room::edges(&g).skeleton(), c0.complex(), "C¹ sits over C⁰");
-        assert_eq!(coboundary(&g).from(), &c0, "one C⁰ under every wiring");
+        assert_eq!(
+            Room::edges(g.multigraph()).skeleton(),
+            c0.complex(),
+            "C¹ sits over C⁰"
+        );
+        assert_eq!(
+            coboundary(g.multigraph()).from(),
+            &c0,
+            "one C⁰ under every wiring"
+        );
     }
     assert!(
-        Room::sum(&c0, &Room::edges(&p3())).is_ok(),
+        Room::sum(&c0, &Room::edges(p3().multigraph())).is_ok(),
         "rewiring keeps the 0-skeleton"
     );
 }
@@ -939,7 +965,7 @@ fn an_edge_room_sits_over_its_vertex_room() {
 #[test]
 fn a_coboundary_out_of_a_larger_vertex_room_has_zero_columns() {
     let v = Room::over(&set(&[0, 1, 2, 7]));
-    let delta = coboundary_over(&v, &p3()).expect("{0, 1, 2} ⊆ V");
+    let delta = coboundary_over(&v, p3().multigraph()).expect("{0, 1, 2} ⊆ V");
     assert_eq!(delta.from(), &v);
     assert_eq!(delta.to().skeleton(), v.complex());
     assert_eq!(
@@ -948,8 +974,8 @@ fn a_coboundary_out_of_a_larger_vertex_room_has_zero_columns() {
         "vertex 7 is outside the graph: its column is zero"
     );
     assert_eq!(
-        coboundary_over(&Room::vertices(&p3()), &p3()),
-        Ok(coboundary(&p3())),
+        coboundary_over(&Room::vertices(p3().multigraph()), p3().multigraph()),
+        Ok(coboundary(p3().multigraph())),
         "over its own vertices, δ is the graph's own"
     );
 }
@@ -960,7 +986,7 @@ fn a_coboundary_out_of_a_larger_vertex_room_has_zero_columns() {
 fn laplacians_over_one_vertex_set_compose_exactly() {
     let (l_tri, _) = laplacians(&triangle());
     let (l_p3, _) = laplacians(&p3());
-    let c0 = Room::vertices(&p3());
+    let c0 = Room::vertices(p3().multigraph());
     // Path order: L_P₃ first, then L_tri, is the matrix L_tri · L_P₃.
     let product = l_p3.then(&l_tri).expect("one C⁰");
     assert_eq!(
@@ -1001,15 +1027,15 @@ fn composing_across_vertex_sets_is_still_an_error() {
     }
     assert!(
         matches!(
-            coboundary_over(&Room::over(&set(&[0, 1])), &p3()),
+            coboundary_over(&Room::over(&set(&[0, 1])), p3().multigraph()),
             Err(RoomError::Mismatch { .. })
         ),
         "P₃'s vertex 2 isn't in V"
     );
-    let wider = coboundary_over(&Room::over(&set(&[0, 1, 2, 7])), &p3()).expect("⊆");
+    let wider = coboundary_over(&Room::over(&set(&[0, 1, 2, 7])), p3().multigraph()).expect("⊆");
     assert!(
         matches!(
-            Room::sum(&Room::vertices(&p3()), wider.to()),
+            Room::sum(&Room::vertices(p3().multigraph()), wider.to()),
             Err(RoomError::Mismatch { .. })
         ),
         "an edge room over another 0-skeleton"
@@ -1024,7 +1050,11 @@ fn the_laplacian_is_delta_star_delta_symmetric_by_construction() {
         let (l0, _) = laplacians(&g);
         let measured = l0.measure().symmetric().expect("δ*δ is symmetric");
         let l0 = l0.symmetric().expect("δ*δ is symmetric");
-        assert_eq!(laplacian(&g), l0, "{name}: L₀ = δ*δ, exactly");
-        assert_eq!(laplacian(&g).measure(), measured, "{name}: measured");
+        assert_eq!(laplacian(g.multigraph()), l0, "{name}: L₀ = δ*δ, exactly");
+        assert_eq!(
+            laplacian(g.multigraph()).measure(),
+            measured,
+            "{name}: measured"
+        );
     }
 }

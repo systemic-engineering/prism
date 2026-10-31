@@ -304,7 +304,7 @@ impl Instrument {
             .map(|(k, e)| (e, n0 + k))
             .collect();
         // (δs)(u, v) = s(v) − s(u); D holds δ below and δ* above.
-        let dirac = room::dirac(graph).measure();
+        let dirac = room::dirac(graph.multigraph()).measure();
         let modes = dirac
             .clone()
             .symmetric()
