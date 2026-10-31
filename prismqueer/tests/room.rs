@@ -3,7 +3,8 @@
 //! C⁰ (the vertex room) and C¹ (the edge room) of one graph; D lives in
 //! C⁰ ⊕ C¹; δ is a door from C⁰ into C¹ and δ* the door back. The laws:
 //!
-//! 1. δ is exact: entries ±1 or 0, one +1 and one −1 per edge row.
+//! 1. δ is exact: entries ±1 or 0, one +1 and one −1 per edge row; a
+//!    self-loop's row is zero.
 //! 2. D² = L₀ ⊕ L₁↓ exactly, and L₀ is the Laplacian prism already builds.
 //!    L₁↓ = δδ* is the down-Laplacian: a graph has no 2-cells, so C¹ has no
 //!    up part, and the lower block is L₁↓, not the full Hodge L₁.
@@ -93,6 +94,35 @@ fn coboundary_is_exact_signed_incidence() {
             "{name}: past the columns"
         );
     }
+}
+
+/// A self-loop (v, v) is an edge whose two ends are one vertex: (δs)(v, v) =
+/// s(v) − s(v) = 0, so its row of δ is zero, whatever s. It adds nothing to
+/// L₀ = δ*δ, and as a 1-cochain it's a cycle: harmonic, in ker D.
+#[test]
+fn a_self_loops_coboundary_row_is_zero() {
+    let g = graph_from_edges(&[(0, 1), (1, 1), (1, 2)]);
+    let edges: Vec<(u64, u64)> = g.edges().collect();
+    assert_eq!(edges, [(0, 1), (1, 1), (1, 2)], "Graph holds the loop");
+    let delta = coboundary(&g);
+    for col in 0..3 {
+        assert_eq!(delta.entry(1, col), Some(&Z::from(0)), "δ[(1, 1), {col}]");
+    }
+    // L₀ is P₃'s: the loop changes no degree.
+    let l0 = delta.then(&delta.adjoint()).expect("C⁰ → C¹ → C⁰");
+    let p3 = laplacians(&graph_from_edges(&[(0, 1), (1, 2)])).0;
+    for (i, j) in (0..3).flat_map(|i| (0..3).map(move |j| (i, j))) {
+        assert_eq!(l0.entry(i, j), p3.entry(i, j), "L₀[{i}, {j}]");
+    }
+    // D's kernel: one component, one cycle (the loop).
+    let p = dirac(&g).symmetric().expect("D = D*").charpoly();
+    let zeros_at_0 = p
+        .coefficients()
+        .iter()
+        .rev()
+        .take_while(|c| **c == Z::from(0))
+        .count();
+    assert_eq!(zeros_at_0, 2, "dim ker D = b₀ + b₁ = 1 + 1");
 }
 
 // --- Law 2: D² = L₀ ⊕ L₁↓, exactly -----------------------------------------
