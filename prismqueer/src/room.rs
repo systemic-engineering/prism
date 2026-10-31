@@ -124,9 +124,9 @@
 //! ```
 //!
 //! Integers solved in the ℤ/12 room: an integer isn't a residue until it is
-//! reduced.
+//! reduced (ℤ's ring part is `()`, not a [`Modulus`]).
 //!
-//! ```compile_fail,E0308
+//! ```compile_fail,E0271
 //! use prismqueer::field::Graph;
 //! use prismqueer::room::{coboundary, coboundary_in, solve, Modulus, ZMod, Z};
 //! let g = Graph::new([], [(0, 1), (0, 1)]);
@@ -176,7 +176,7 @@ use std::marker::PhantomData;
 use num_bigint::{BigInt, Sign};
 use num_traits::{One, ToPrimitive, Zero};
 
-use crate::field::{complex_oid, Exact, Graph, Group};
+use crate::field::{complex_oid, Edge, Exact, Graph, Group, Spanning};
 use crate::oid::{Oid, Scope};
 use crate::spectral::kleinos::VertexId;
 
@@ -283,6 +283,14 @@ pub enum RoomError {
     },
     /// LAPACK couldn't measure (dsyev's `info`).
     Unmeasured(i32),
+    /// Two moduli in one operation: ℤ/n and ℤ/m are different rings, and
+    /// a residue of one isn't a residue of the other.
+    Modulus {
+        /// The ring the operation was in.
+        expected: Modulus,
+        /// The ring it was handed.
+        found: Modulus,
+    },
 }
 
 impl Room<Vertices> {
@@ -410,24 +418,98 @@ impl<A: Kind, B: Kind> Room<Sum<A, B>> {
     }
 }
 
-// --- Entries -----------------------------------------------------------------
+// --- Rings -------------------------------------------------------------------
 
-/// What a map's entries are: a commutative ring.
+/// The runtime part of a ring: what its kind, as a type, doesn't say. `()`
+/// for [`Z`], [`QModOne`] and `f64`; the [`Modulus`] for [`ZMod`].
+pub trait RingPart: Clone + PartialEq + Debug {
+    /// `Ok` when `found` is this ring, a [`RoomError::Modulus`] otherwise.
+    fn admits(&self, found: &Self) -> Result<(), RoomError>;
+}
+
+impl RingPart for () {
+    fn admits(&self, _: &()) -> Result<(), RoomError> {
+        Ok(())
+    }
+}
+
+/// The modulus n of ℤ/n: an integer n ≥ 2, of any size.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Modulus(BigInt);
+
+impl Modulus {
+    /// n, if n ≥ 2. ℤ/1 is the zero ring (0 = 1), and ℤ/0 is ℤ.
+    pub fn new(n: impl Into<BigInt>) -> Option<Self> {
+        let n = n.into();
+        (n > BigInt::one()).then_some(Modulus(n))
+    }
+
+    /// n itself.
+    pub fn value(&self) -> &BigInt {
+        &self.0
+    }
+
+    /// x mod n, in 0..n.
+    fn residue(&self, x: BigInt) -> BigInt {
+        let r = x % &self.0;
+        if r.sign() == Sign::Minus {
+            r + &self.0
+        } else {
+            r
+        }
+    }
+}
+
+impl RingPart for Modulus {
+    fn admits(&self, found: &Self) -> Result<(), RoomError> {
+        if self == found {
+            Ok(())
+        } else {
+            Err(RoomError::Modulus {
+                expected: self.clone(),
+                found: found.clone(),
+            })
+        }
+    }
+}
+
+/// What a cochain's values are: an abelian group, which ℤ acts on by
+/// repeated addition (a ℤ-module). The values of a twist.
 ///
-/// Exact entries ([`Z`]) are arbitrary-precision, so their arithmetic is
-/// total; measured entries (`f64`) round.
-pub trait Entry: Clone + PartialEq + Debug {
-    /// The additive identity.
-    fn zero() -> Self;
-    /// The multiplicative identity.
-    fn one() -> Self;
+/// Every ring is one ([`Entry`]); [`QModOne`] is one without being a ring.
+/// The arithmetic assumes one ring: the room's operations check it
+/// ([`RingPart::admits`]) before they compute, and [`ZMod`]'s arithmetic
+/// panics, never answers, on two moduli.
+pub trait Coefficient: Clone + PartialEq + Debug {
+    /// The ring's runtime part.
+    type Ring: RingPart;
+    /// The ring this value lives in.
+    fn ring(&self) -> &Self::Ring;
+    /// The additive identity of `ring`.
+    fn zero(ring: &Self::Ring) -> Self;
     /// `self + other`.
     fn add(&self, other: &Self) -> Self;
-    /// `self · other`.
-    fn mul(&self, other: &Self) -> Self;
     /// `−self`.
     fn neg(&self) -> Self;
+    /// `n · self`: `self` added `n` times (subtracted, for n < 0).
+    fn times(&self, n: &BigInt) -> Self;
 }
+
+/// What a map's entries are: a commutative ring, with its one.
+///
+/// Exact entries ([`Z`], [`ZMod`]) are arbitrary-precision, so their
+/// arithmetic is total; measured entries (`f64`) round.
+pub trait Entry: Coefficient {
+    /// The multiplicative identity of `ring`.
+    fn one(ring: &Self::Ring) -> Self;
+    /// `self · other`.
+    fn mul(&self, other: &Self) -> Self;
+}
+
+/// Coefficients whose equality is exact, so a pairing that isn't zero
+/// really isn't: [`Z`], [`ZMod`], [`QModOne`]. Only these get [`solve`].
+/// `f64` isn't one.
+pub trait Exactly: Coefficient {}
 
 /// Exact entries that can be measured: the one explicit step to `f64`.
 pub trait Measure: Entry + Exact {
@@ -449,6 +531,11 @@ impl Z {
     pub fn value(&self) -> &BigInt {
         &self.0
     }
+
+    /// The ring map ℤ → ℤ/n: this integer mod n.
+    pub fn reduce(&self, n: &Modulus) -> ZMod {
+        ZMod::new(self.0.clone(), n)
+    }
 }
 
 impl From<i64> for Z {
@@ -465,37 +552,49 @@ impl From<BigInt> for Z {
 
 impl Group for Z {
     fn identity() -> Self {
-        Z::zero()
+        Z(BigInt::zero())
     }
     /// Addition.
     fn compose(&self, other: &Self) -> Self {
-        self.add(other)
+        Coefficient::add(self, other)
     }
     /// Negation.
     fn inverse(&self) -> Self {
-        self.neg()
+        Coefficient::neg(self)
     }
 }
 
 impl Exact for Z {}
 
-impl Entry for Z {
-    fn zero() -> Self {
-        Z(BigInt::from(0))
+impl Coefficient for Z {
+    type Ring = ();
+    fn ring(&self) -> &() {
+        &()
     }
-    fn one() -> Self {
-        Z(BigInt::from(1))
+    fn zero(_: &()) -> Self {
+        Z(BigInt::zero())
     }
     fn add(&self, other: &Self) -> Self {
         Z(&self.0 + &other.0)
     }
-    fn mul(&self, other: &Self) -> Self {
-        Z(&self.0 * &other.0)
-    }
     fn neg(&self) -> Self {
         Z(-&self.0)
     }
+    fn times(&self, n: &BigInt) -> Self {
+        Z(n * &self.0)
+    }
 }
+
+impl Entry for Z {
+    fn one(_: &()) -> Self {
+        Z(BigInt::one())
+    }
+    fn mul(&self, other: &Self) -> Self {
+        Z(&self.0 * &other.0)
+    }
+}
+
+impl Exactly for Z {}
 
 impl Measure for Z {
     /// Exact up to 2⁵³ in magnitude; beyond, the nearest float, and ±∞ past
@@ -505,21 +604,219 @@ impl Measure for Z {
     }
 }
 
-impl Entry for f64 {
-    fn zero() -> Self {
-        0.0
+/// An integer mod n, exactly: a residue in 0..n, with its [`Modulus`].
+///
+/// The ring ℤ/n, n a runtime value. Pitch classes are ℤ/12; a `not` is a
+/// half-turn in ℤ/2. Every residue carries its modulus, so a residue from
+/// another ℤ/n is refused ([`RoomError::Modulus`]), never read as one of
+/// this ring's.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ZMod {
+    residue: BigInt,
+    modulus: Modulus,
+}
+
+impl ZMod {
+    /// x mod n.
+    pub fn new(x: impl Into<BigInt>, n: &Modulus) -> Self {
+        ZMod {
+            residue: n.residue(x.into()),
+            modulus: n.clone(),
+        }
     }
-    fn one() -> Self {
-        1.0
+
+    /// The residue, in 0..n.
+    pub fn residue(&self) -> &BigInt {
+        &self.residue
+    }
+
+    /// n.
+    pub fn modulus(&self) -> &Modulus {
+        &self.modulus
+    }
+
+    /// The group map ℤ/n → ℚ/ℤ, x ↦ x/n: injective, the way back from
+    /// [`clear_denominators`]. Not a ring map; ℚ/ℤ isn't a ring.
+    pub fn fraction(&self) -> QModOne {
+        QModOne::reduced(self.residue.clone(), self.modulus.0.clone())
+    }
+
+    fn with(&self, x: BigInt) -> Self {
+        ZMod {
+            residue: self.modulus.residue(x),
+            modulus: self.modulus.clone(),
+        }
+    }
+
+    fn same(&self, other: &Self) {
+        assert!(
+            self.modulus == other.modulus,
+            "ℤ/{} and ℤ/{} don't mix: check RingPart::admits first",
+            self.modulus.0,
+            other.modulus.0
+        );
+    }
+}
+
+impl Coefficient for ZMod {
+    type Ring = Modulus;
+    fn ring(&self) -> &Modulus {
+        &self.modulus
+    }
+    fn zero(n: &Modulus) -> Self {
+        ZMod::new(0, n)
+    }
+    fn add(&self, other: &Self) -> Self {
+        self.same(other);
+        self.with(&self.residue + &other.residue)
+    }
+    fn neg(&self) -> Self {
+        self.with(-&self.residue)
+    }
+    fn times(&self, n: &BigInt) -> Self {
+        self.with(n * &self.residue)
+    }
+}
+
+impl Entry for ZMod {
+    fn one(n: &Modulus) -> Self {
+        ZMod::new(1, n)
+    }
+    fn mul(&self, other: &Self) -> Self {
+        self.same(other);
+        self.with(&self.residue * &other.residue)
+    }
+}
+
+impl Exactly for ZMod {}
+
+/// A rational mod 1, exactly: num/den reduced, with 0 ≤ num < den. The
+/// circle U(1) restricted to its exact (torsion) points, ℚ/ℤ.
+///
+/// An abelian group, a [`Coefficient`], but not a ring: 1/3 ≡ 4/3, while
+/// (1/3)² = 1/9 and (4/3)² = 16/9 ≢ 1/9, so a product isn't defined mod 1.
+/// δ over ℤ acts on its cochains ([`Map::act`]); there are no maps with
+/// entries in it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct QModOne {
+    num: BigInt,
+    den: BigInt,
+}
+
+impl QModOne {
+    /// num/den mod 1, reduced. `None` when den is 0.
+    pub fn new(num: impl Into<BigInt>, den: impl Into<BigInt>) -> Option<Self> {
+        let (num, den) = (num.into(), den.into());
+        match den.sign() {
+            Sign::NoSign => None,
+            Sign::Minus => Some(QModOne::reduced(-num, -den)),
+            Sign::Plus => Some(QModOne::reduced(num, den)),
+        }
+    }
+
+    /// The numerator, in 0..den.
+    pub fn numerator(&self) -> &BigInt {
+        &self.num
+    }
+
+    /// The denominator, ≥ 1, coprime to the numerator.
+    pub fn denominator(&self) -> &BigInt {
+        &self.den
+    }
+
+    /// num/den mod 1 for den > 0.
+    fn reduced(num: BigInt, den: BigInt) -> Self {
+        let mut num = num % &den;
+        if num.sign() == Sign::Minus {
+            num += &den;
+        }
+        let g = gcd(num.clone(), den.clone());
+        QModOne {
+            num: num / &g,
+            den: den / g,
+        }
+    }
+}
+
+/// gcd(a, b) for a ≥ 0, b > 0.
+fn gcd(mut a: BigInt, mut b: BigInt) -> BigInt {
+    while !b.is_zero() {
+        let r = a % &b;
+        a = b;
+        b = r;
+    }
+    a
+}
+
+impl Coefficient for QModOne {
+    type Ring = ();
+    fn ring(&self) -> &() {
+        &()
+    }
+    fn zero(_: &()) -> Self {
+        QModOne {
+            num: BigInt::zero(),
+            den: BigInt::one(),
+        }
+    }
+    fn add(&self, other: &Self) -> Self {
+        QModOne::reduced(
+            &self.num * &other.den + &other.num * &self.den,
+            &self.den * &other.den,
+        )
+    }
+    fn neg(&self) -> Self {
+        QModOne::reduced(-&self.num, self.den.clone())
+    }
+    fn times(&self, n: &BigInt) -> Self {
+        QModOne::reduced(n * &self.num, self.den.clone())
+    }
+}
+
+impl Exactly for QModOne {}
+
+/// ℚ mod 1 as ℤ/m: m the lcm of the denominators, each value c = c′/m
+/// with c′ = c·m mod m. A twist δg ≡ c (mod 1) is then δg′ ≡ c′ (mod m),
+/// and every witness maps back by [`ZMod::fraction`]. With every value 0
+/// (m = 1, refused as ℤ/1) m is 2, which holds 0 too.
+pub fn clear_denominators(c: &[QModOne]) -> (Modulus, Vec<ZMod>) {
+    let lcm = c.iter().fold(BigInt::one(), |m, x| {
+        let g = gcd(x.den.clone(), m.clone());
+        m / g * &x.den
+    });
+    let m = Modulus::new(lcm).unwrap_or_else(|| Modulus(BigInt::from(2)));
+    let reduced = c
+        .iter()
+        .map(|x| ZMod::new(&x.num * (&m.0 / &x.den), &m))
+        .collect();
+    (m, reduced)
+}
+
+impl Coefficient for f64 {
+    type Ring = ();
+    fn ring(&self) -> &() {
+        &()
+    }
+    fn zero(_: &()) -> Self {
+        0.0
     }
     fn add(&self, other: &Self) -> Self {
         self + other
     }
-    fn mul(&self, other: &Self) -> Self {
-        self * other
-    }
     fn neg(&self) -> Self {
         -self
+    }
+    fn times(&self, n: &BigInt) -> Self {
+        n.to_f64().expect("every BigInt has a float reading") * self
+    }
+}
+
+impl Entry for f64 {
+    fn one(_: &()) -> Self {
+        1.0
+    }
+    fn mul(&self, other: &Self) -> Self {
+        self * other
     }
 }
 
@@ -530,36 +827,70 @@ impl Entry for f64 {
 /// As a matrix it has `to().dim()` rows and `from().dim()` columns. The
 /// storage is column-major and private; read it through [`Map::entry`],
 /// [`Map::apply`] or [`Modes`].
+///
+/// It carries its ring ([`Map::ring`]): the kind is `R`, checked at compile
+/// time; the modulus of ℤ/n is a value, checked like the rooms.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Map<A: Kind, B: Kind, R> {
+pub struct Map<A: Kind, B: Kind, R: Entry> {
     from: Room<A>,
     to: Room<B>,
+    ring: R::Ring,
     /// Column-major: entry `(row, col)` is at `col * to.dim + row`.
     entries: Vec<R>,
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
+/// `Ok` when the lengths agree.
+fn length(expected: usize, found: usize) -> Result<(), RoomError> {
+    if expected == found {
+        Ok(())
+    } else {
+        Err(RoomError::Length { expected, found })
+    }
+}
+
+/// `Ok` when every value lives in `ring`.
+fn within<'a, V: Coefficient + 'a>(
+    ring: &V::Ring,
+    values: impl IntoIterator<Item = &'a V>,
+) -> Result<(), RoomError> {
+    values.into_iter().try_for_each(|x| ring.admits(x.ring()))
+}
+
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<A, B, R> {
     /// The map that sends everything to zero.
     pub fn zero(from: &Room<A>, to: &Room<B>) -> Self {
-        Map {
-            from: from.clone(),
-            to: to.clone(),
-            entries: vec![R::zero(); from.dim * to.dim],
-        }
+        Map::zero_in(&(), from, to)
     }
 
     /// A map from its rows: `to.dim()` rows of `from.dim()` entries each.
     pub fn from_rows(from: &Room<A>, to: &Room<B>, rows: &[Vec<R>]) -> Result<Self, RoomError> {
-        let length = |expected: usize, found: usize| {
-            if expected == found {
-                Ok(())
-            } else {
-                Err(RoomError::Length { expected, found })
-            }
-        };
+        Map::from_rows_in(&(), from, to, rows)
+    }
+}
+
+impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
+    /// The map over `ring` that sends everything to zero.
+    pub fn zero_in(ring: &R::Ring, from: &Room<A>, to: &Room<B>) -> Self {
+        Map {
+            from: from.clone(),
+            to: to.clone(),
+            ring: ring.clone(),
+            entries: vec![R::zero(ring); from.dim * to.dim],
+        }
+    }
+
+    /// A map over `ring` from its rows: `to.dim()` rows of `from.dim()`
+    /// entries each, every one in `ring`.
+    pub fn from_rows_in(
+        ring: &R::Ring,
+        from: &Room<A>,
+        to: &Room<B>,
+        rows: &[Vec<R>],
+    ) -> Result<Self, RoomError> {
         length(to.dim, rows.len())?;
         for row in rows {
             length(from.dim, row.len())?;
+            within(ring, row)?;
         }
         let entries = (0..from.dim)
             .flat_map(|col| rows.iter().map(move |row| row[col].clone()))
@@ -567,8 +898,14 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         Ok(Map {
             from: from.clone(),
             to: to.clone(),
+            ring: ring.clone(),
             entries,
         })
+    }
+
+    /// The ring the entries live in: its runtime part.
+    pub fn ring(&self) -> &R::Ring {
+        &self.ring
     }
 
     /// The room this map leaves.
@@ -587,15 +924,11 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         (row < self.to.dim && col < self.from.dim).then(|| &self.entries[self.at(row, col)])
     }
 
-    /// The map applied to a vector of `from`.
+    /// The map applied to a vector of `from`, in the map's ring.
     pub fn apply(&self, x: &[R]) -> Result<Vec<R>, RoomError> {
-        if x.len() != self.from.dim {
-            return Err(RoomError::Length {
-                expected: self.from.dim,
-                found: x.len(),
-            });
-        }
-        let mut y = vec![R::zero(); self.to.dim];
+        length(self.from.dim, x.len())?;
+        within(&self.ring, x)?;
+        let mut y = vec![R::zero(&self.ring); self.to.dim];
         for (column, xj) in self.columns().zip(x) {
             for (yi, aij) in y.iter_mut().zip(column) {
                 *yi = yi.add(&aij.mul(xj));
@@ -606,9 +939,10 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
 
     /// First this map, then `next`: path order, as [`Group::compose`].
     /// `next` must leave the room this map enters: by kind at compile time,
-    /// by dimension and complex here.
+    /// by dimension and complex here, and in one ring.
     pub fn then<C: Kind>(&self, next: &Map<B, C, R>) -> Result<Map<A, C, R>, RoomError> {
         self.to.admits(&next.from)?;
+        self.ring.admits(&next.ring)?;
         let mut entries = Vec::with_capacity(self.from.dim * next.to.dim);
         for column in self.columns() {
             entries.extend(next.apply(column)?);
@@ -616,26 +950,31 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         Ok(Map {
             from: self.from.clone(),
             to: next.to.clone(),
+            ring: self.ring.clone(),
             entries,
         })
     }
 
-    /// `self + other`, between the same two rooms.
+    /// `self + other`, between the same two rooms, in one ring.
     pub fn plus(&self, other: &Self) -> Result<Self, RoomError> {
         self.from.admits(&other.from)?;
         self.to.admits(&other.to)?;
+        self.ring.admits(&other.ring)?;
         let entries = self
             .entries
             .iter()
             .zip(&other.entries)
             .map(|(a, b)| a.add(b))
             .collect();
-        Ok(self.with(entries))
+        Ok(self.with(entries, self.ring.clone()))
     }
 
     /// `−self`.
     pub fn negate(&self) -> Self {
-        self.with(self.entries.iter().map(Entry::neg).collect())
+        self.with(
+            self.entries.iter().map(Coefficient::neg).collect(),
+            self.ring.clone(),
+        )
     }
 
     /// The door back: the transpose, which for real entries is the adjoint
@@ -649,6 +988,7 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         Map {
             from: self.to.clone(),
             to: self.from.clone(),
+            ring: self.ring.clone(),
             entries,
         }
     }
@@ -661,7 +1001,7 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         let dot = |x: &[R], y: &[R]| {
             x.iter()
                 .zip(y)
-                .fold(R::zero(), |sum, (a, b)| sum.add(&a.mul(b)))
+                .fold(R::zero(&self.ring), |sum, (a, b)| sum.add(&a.mul(b)))
         };
         let entries = columns
             .iter()
@@ -670,6 +1010,7 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         Map {
             from: self.from.clone(),
             to: self.from.clone(),
+            ring: self.ring.clone(),
             entries,
         }
     }
@@ -684,10 +1025,11 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
         (0..self.from.dim).map(move |j| &self.entries[j * m..(j + 1) * m])
     }
 
-    fn with<S>(&self, entries: Vec<S>) -> Map<A, B, S> {
+    fn with<S: Entry>(&self, entries: Vec<S>, ring: S::Ring) -> Map<A, B, S> {
         Map {
             from: self.from.clone(),
             to: self.to.clone(),
+            ring,
             entries,
         }
     }
@@ -701,7 +1043,35 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
 impl<A: Kind, B: Kind, R: Measure> Map<A, B, R> {
     /// The one explicit step from exact to measured: every entry as `f64`.
     pub fn measure(&self) -> Map<A, B, f64> {
-        self.with(self.entries.iter().map(Measure::measure).collect())
+        self.with(self.entries.iter().map(Measure::measure).collect(), ())
+    }
+}
+
+impl<A: Kind, B: Kind> Map<A, B, Z> {
+    /// The ring map ℤ → ℤ/n on every entry: this map over ℤ/n.
+    pub fn reduce(&self, n: &Modulus) -> Map<A, B, ZMod> {
+        self.with(
+            self.entries.iter().map(|x| x.reduce(n)).collect(),
+            n.clone(),
+        )
+    }
+
+    /// This integer map acting on a vector of `from` with values in any
+    /// [`Coefficient`] group, by n · x: how δ over ℤ moves a cochain of
+    /// ℚ mod 1, which has no maps of its own. On a vector of ℤ it is
+    /// [`apply`](Map::apply).
+    pub fn act<V: Coefficient>(&self, ring: &V::Ring, x: &[V]) -> Result<Vec<V>, RoomError> {
+        length(self.from.dim, x.len())?;
+        within(ring, x)?;
+        let mut y = vec![V::zero(ring); self.to.dim];
+        for (column, xj) in self.columns().zip(x) {
+            for (yi, aij) in y.iter_mut().zip(column) {
+                if !aij.0.is_zero() {
+                    *yi = yi.add(&xj.times(&aij.0));
+                }
+            }
+        }
+        Ok(y)
     }
 }
 
@@ -718,12 +1088,19 @@ impl<A: Kind, B: Kind> Map<A, B, f64> {
     }
 }
 
-impl<A: Kind, R: Entry> Map<A, A, R> {
+impl<A: Kind, R: Entry<Ring = ()>> Map<A, A, R> {
     /// The map that changes nothing.
     pub fn identity(room: &Room<A>) -> Self {
-        let mut map = Map::zero(room, room);
+        Map::identity_in(&(), room)
+    }
+}
+
+impl<A: Kind, R: Entry> Map<A, A, R> {
+    /// The map over `ring` that changes nothing.
+    pub fn identity_in(ring: &R::Ring, room: &Room<A>) -> Self {
+        let mut map = Map::zero_in(ring, room, room);
         for i in 0..room.dim {
-            map.set(i, i, R::one());
+            map.set(i, i, R::one(ring));
         }
         map
     }
@@ -742,44 +1119,47 @@ impl<A: Kind, R: Entry> Map<A, A, R> {
     }
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<A, Sum<A, B>, R> {
+// The sum's maps are over the rings whose kind says it all (ℤ, f64): D over
+// ℤ/n isn't needed yet.
+
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<A, Sum<A, B>, R> {
     /// A into A ⊕ B.
     pub fn inject_left(room: &Room<Sum<A, B>>) -> Self {
         let mut map = Map::zero(room.left(), room);
         for i in 0..room.left().dim {
-            map.set(i, i, R::one());
+            map.set(i, i, R::one(&()));
         }
         map
     }
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<B, Sum<A, B>, R> {
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<B, Sum<A, B>, R> {
     /// B into A ⊕ B.
     pub fn inject_right(room: &Room<Sum<A, B>>) -> Self {
         let offset = room.left().dim;
         let mut map = Map::zero(room.right(), room);
         for i in 0..room.right().dim {
-            map.set(offset + i, i, R::one());
+            map.set(offset + i, i, R::one(&()));
         }
         map
     }
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, A, R> {
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<Sum<A, B>, A, R> {
     /// A ⊕ B onto A.
     pub fn project_left(room: &Room<Sum<A, B>>) -> Self {
         Map::inject_left(room).adjoint()
     }
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, B, R> {
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<Sum<A, B>, B, R> {
     /// A ⊕ B onto B.
     pub fn project_right(room: &Room<Sum<A, B>>) -> Self {
         Map::inject_right(room).adjoint()
     }
 }
 
-impl<A: Kind, B: Kind, C: Kind, D: Kind, R: Entry> Map<Sum<A, B>, Sum<C, D>, R> {
+impl<A: Kind, B: Kind, C: Kind, D: Kind, R: Entry<Ring = ()>> Map<Sum<A, B>, Sum<C, D>, R> {
     /// `f ⊕ g`: `f` on the first summands, `g` on the second, nothing across.
     pub fn diagonal(f: &Map<A, C, R>, g: &Map<B, D, R>) -> Result<Self, RoomError> {
         let from = Room::sum(&f.from, &g.from)?;
@@ -794,14 +1174,14 @@ impl<A: Kind, B: Kind, C: Kind, D: Kind, R: Entry> Map<Sum<A, B>, Sum<C, D>, R> 
     }
 }
 
-impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, Sum<A, B>, R> {
+impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<Sum<A, B>, Sum<A, B>, R> {
     /// γ, the grading of A ⊕ B: +1 on `A`, −1 on `B`. A self-adjoint
     /// involution; D anticommutes with it on C⁰ ⊕ C¹, because D only moves
     /// between the summands.
     pub fn grading(room: &Room<Sum<A, B>>) -> Self {
         let mut map = Map::identity(room);
         for i in room.left().dim..room.dim {
-            map.set(i, i, R::one().neg());
+            map.set(i, i, R::one(&()).neg());
         }
         map
     }
@@ -812,7 +1192,7 @@ impl<A: Kind, B: Kind, R: Entry> Map<Sum<A, B>, Sum<A, B>, R> {
 /// A map from a room to itself that equals its own adjoint, checked: a
 /// room's resonator. Only [`Map::symmetric`] makes one.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Symmetric<A: Kind, R>(Map<A, A, R>);
+pub struct Symmetric<A: Kind, R: Entry>(Map<A, A, R>);
 
 impl<A: Kind, R: Measure> Symmetric<A, R> {
     /// Measured: every entry as `f64`. A mirror stays a mirror.
@@ -974,7 +1354,14 @@ impl<A: Kind> Modes<A> {
 /// row: s(v) − s(v) = 0. The two ends are summed, not written over each
 /// other.
 pub fn coboundary(graph: &Graph) -> Map<Vertices, Edges, Z> {
-    delta(&Room::vertices(graph), graph)
+    delta(&(), &Room::vertices(graph), graph)
+}
+
+/// δ over any ring: the same ±1 and 0, which every ring has. Over ℤ/n it
+/// is [`coboundary`] reduced ([`Map::reduce`]); over ℤ it is
+/// [`coboundary`].
+pub fn coboundary_in<R: Entry>(ring: &R::Ring, graph: &Graph) -> Map<Vertices, Edges, R> {
+    delta(ring, &Room::vertices(graph), graph)
 }
 
 /// δ of `graph` out of a given C⁰(V), V ⊇ the graph's vertices, into C¹ of
@@ -986,21 +1373,26 @@ pub fn coboundary_over(
     graph: &Graph,
 ) -> Result<Map<Vertices, Edges, Z>, RoomError> {
     skeleton.holds(graph)?;
-    Ok(delta(skeleton, graph))
+    Ok(delta(&(), skeleton, graph))
 }
 
-/// δ out of `skeleton`, which holds the graph's vertices.
-fn delta(skeleton: &Room<Vertices>, graph: &Graph) -> Map<Vertices, Edges, Z> {
+/// δ over `ring` out of `skeleton`, which holds the graph's vertices.
+fn delta<R: Entry>(
+    ring: &R::Ring,
+    skeleton: &Room<Vertices>,
+    graph: &Graph,
+) -> Map<Vertices, Edges, R> {
     let index: BTreeMap<_, _> = skeleton
         .parts
         .iter()
         .enumerate()
         .map(|(i, &v)| (v, i))
         .collect();
-    let mut delta: Map<Vertices, Edges, Z> =
-        Map::zero(skeleton, &Room::edges_over(skeleton, graph));
+    let mut delta: Map<Vertices, Edges, R> =
+        Map::zero_in(ring, skeleton, &Room::edges_over(skeleton, graph));
+    let one = R::one(ring);
     for (row, (u, v)) in graph.edges().map(|e| e.ends()).enumerate() {
-        for (w, sign) in [(u, Z::one().neg()), (v, Z::one())] {
+        for (w, sign) in [(u, one.neg()), (v, one.clone())] {
             let at = delta.at(row, index[&w]);
             delta.entries[at] = delta.entries[at].add(&sign);
         }
@@ -1032,4 +1424,144 @@ pub fn dirac(graph: &Graph) -> Map<Sum<Vertices, Edges>, Sum<Vertices, Edges>, Z
         .then(&delta.adjoint())
         .and_then(|m| m.then(&Map::inject_left(&room)));
     down.and_then(|d| d.plus(&up?)).expect("one complex")
+}
+
+// --- Exact or genuine --------------------------------------------------------
+
+/// Whether a twist c ∈ C¹ is exact (c = δg) or a genuine class, decided in
+/// its own ring, with the witness.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Exactness<V> {
+    /// c = δg: the potential g, a vector of C⁰ (vertices ascending), zero
+    /// at each component's smallest vertex.
+    Exact(Vec<V>),
+    /// No g has δg = c: every basis cycle whose pairing with c isn't zero.
+    /// Never empty.
+    Genuine(Vec<Cycle<V>>),
+}
+
+/// A certificate that no potential exists: a cycle z with ⟨z, c⟩ ≠ 0.
+///
+/// z is an integer chain with δ*z = 0, so for every g,
+/// ⟨z, δg⟩ = ⟨δ*z, g⟩ = 0; a c with ⟨z, c⟩ ≠ 0 isn't any δg.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Cycle<V> {
+    vertices: Vec<VertexId>,
+    edges: Vec<Edge>,
+    chain: Vec<Z>,
+    pairing: V,
+}
+
+impl<V> Cycle<V> {
+    /// The loop, from its smallest vertex back to it, as
+    /// [`field::Loop::vertices`](crate::field::Loop::vertices).
+    pub fn vertices(&self) -> &[VertexId] {
+        &self.vertices
+    }
+    /// The edges around it in path order: `edges()[k]` joins `vertices()[k]`
+    /// and `vertices()[k + 1]`.
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
+    /// z as a vector of C¹: +1 on an edge walked from its smaller end, −1
+    /// against it, 0 off the loop. A self-loop is +1.
+    pub fn chain(&self) -> &[Z] {
+        &self.chain
+    }
+    /// ⟨z, c⟩, the twist around the loop: never zero.
+    pub fn pairing(&self) -> &V {
+        &self.pairing
+    }
+}
+
+/// ⟨z, c⟩ = Σ zᵢ · cᵢ: an integer chain paired with a cochain over `ring`.
+pub fn pair<V: Coefficient>(ring: &V::Ring, z: &[Z], c: &[V]) -> Result<V, RoomError> {
+    length(z.len(), c.len())?;
+    within(ring, c)?;
+    Ok(z.iter()
+        .zip(c)
+        .fold(V::zero(ring), |sum, (zi, ci)| sum.add(&ci.times(&zi.0))))
+}
+
+/// Solve δg = c on the edges of `graph`, exactly, in `ring`: a potential g,
+/// or the cycles that certify there is none.
+///
+/// The spanning-tree method, on the forest field's
+/// [`check_flat`](crate::field::check_flat) walks (one forest, so the same
+/// potential and the same loops). g is 0 at each component's root and
+/// g(w) = g(u) + c(u → w) down each tree edge; then every chord closes a
+/// fundamental cycle z, and c = δg exactly when every ⟨z, c⟩ is 0. Those
+/// cycles are a basis of the cycle space (b₁ of them), so this decides.
+///
+/// - **No Smith normal form on edges.** A graph's incidence matrix is
+///   totally unimodular: every square minor is 0 or ±1. So every invariant
+///   factor of δ is 1, coker δ over ℤ is free (ℤ^b₁, no torsion), and over
+///   any coefficient group c is exact iff every cycle pairs to 0 with it.
+///   Torsion first appears on faces (δ₁: C¹ → C², ℝℙ²'s ℤ/2), which is
+///   where Smith form will be needed.
+/// - **ℚ mod 1 is ℤ/m.** The method needs only an abelian group, so
+///   [`QModOne`] is solved directly; with m the lcm of the denominators it
+///   is the same solve as ℤ/m on [`clear_denominators`]'s c′, mapped back by
+///   [`ZMod::fraction`]. One algorithm.
+/// - **Only the filtration.** What this decides is c ∈ im δ₀, the first
+///   step of exact ⊆ closed ⊆ all. On a graph (no 2-cells) every 1-cochain
+///   is closed, so closed = all here. There is no orthogonal Hodge split
+///   over ℤ/n or ℚ mod 1, so none is offered: a [`Cycle`] names the class
+///   by its pairing, not by a harmonic representative. The orthogonal
+///   split exists only measured, over `f64` (L₁↓'s modes).
+///
+/// Refused when c isn't one value per edge, or a value lives in another
+/// ring than `ring` ([`RoomError::Modulus`]).
+pub fn solve<V: Exactly>(
+    ring: &V::Ring,
+    graph: &Graph,
+    c: &[V],
+) -> Result<Exactness<V>, RoomError> {
+    let edges: Vec<Edge> = graph.edges().collect();
+    length(edges.len(), c.len())?;
+    within(ring, c)?;
+    // c along edge i, leaving from `from`: −c against its orientation.
+    let forward = |i: usize, from: VertexId| edges[i].ends().0 == from;
+    let step = |i: usize, from: VertexId| {
+        if forward(i, from) {
+            c[i].clone()
+        } else {
+            c[i].neg()
+        }
+    };
+    let zero = V::zero(ring);
+    let Spanning { order, cycles } = graph.walked();
+
+    let mut potential: BTreeMap<VertexId, V> = BTreeMap::new();
+    for (w, parent) in order {
+        let g = match parent {
+            None => zero.clone(),
+            Some((u, i)) => potential[&u].add(&step(i, u)),
+        };
+        potential.insert(w, g);
+    }
+
+    let mut genuine = Vec::new();
+    for walk in cycles {
+        let mut chain = vec![Z::zero(&()); edges.len()];
+        let mut pairing = zero.clone();
+        for (&from, &i) in walk.vertices.iter().zip(&walk.edges) {
+            pairing = pairing.add(&step(i, from));
+            let sign = if forward(i, from) { 1 } else { -1 };
+            chain[i] = chain[i].add(&Z::from(sign));
+        }
+        if pairing != zero {
+            genuine.push(Cycle {
+                edges: walk.edges.iter().map(|&i| edges[i]).collect(),
+                vertices: walk.vertices,
+                chain,
+                pairing,
+            });
+        }
+    }
+    Ok(if genuine.is_empty() {
+        Exactness::Exact(potential.into_values().collect())
+    } else {
+        Exactness::Genuine(genuine)
+    })
 }

@@ -97,7 +97,7 @@ fn witnessed<V: Exactly>(name: &str, ring: &V::Ring, g: &Graph, c: &[V]) -> Exac
     verdict
 }
 
-fn potential<V: Clone>(verdict: &Exactness<V>) -> Vec<V> {
+fn potential<V: Clone + std::fmt::Debug>(verdict: &Exactness<V>) -> Vec<V> {
     match verdict {
         Exactness::Exact(g) => g.clone(),
         Exactness::Genuine(cycles) => panic!("expected exact, got {cycles:?}"),
