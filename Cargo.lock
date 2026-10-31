@@ -931,6 +931,8 @@ dependencies = [
  "jsonschema",
  "metal",
  "num-bigint",
+ "num-integer",
+ "num-rational",
  "num-traits",
  "objc",
  "prismqueer-projections",
