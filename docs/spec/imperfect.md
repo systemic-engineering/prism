@@ -79,6 +79,31 @@ Rules, case by case. `f`, `g` are the caller's functions.
 - a `Failure` step's loss is added too, before its error is returned;
 - `finish(v)` gives `Success(v)` if **no** step recorded anything, and `Partial(v, accumulated)` otherwise, even if the accumulated loss is zero.
 
+## Precedence (`join_with`)
+
+Collecting several results is not binding them. `join_with(order, parts)` reads every part and never short-circuits. Under any order, its combined loss is `combine` of every part's loss, in part order.
+
+The order is a caller-supplied `Precedence` with two hooks:
+- `known_twist(loss)` marks a `Partial` whose loss carries a known twist;
+- `outranks(error)` answers `Twist` or `Darkness`.
+
+The result:
+- **No `Failure`:** `Success(values)`, or `Partial(values, loss)` if any part is `Partial`.
+- **A `Failure` but no known twist:** `Failure(first error, loss)`.
+- **A `Failure` and a known twist:** the first `Failure` the order ranks `Darkness`; if there is none, `Partial(values, loss)`.
+
+`values` are the values of the `Success` and `Partial` parts, in order. Payloads that aren't visible are dropped; their loss is not.
+
+There is **no default order**. terni ships none, and a port must make a join without an order impossible to write, not merely discouraged. mirror's `main` signs "a known twist outranks received darkness" (Alex, 2026-11-01). That is a law in the scope whose gate accepts the seal, not in terni.
+
+Laws:
+- the loss is independent of the order;
+- `Success` only if every part is `Success`;
+- a join of one part is that part;
+- splitting a join keeps its loss.
+
+`Measurement::accumulate` follows the same rule for two measurements that both happened: a `Failure` on either side keeps the first error, and the loss is the combination of both (imperfect `0caa62f`).
+
 ## Laws a port must keep
 
 1. **Map is a functor.** `map(id) = id`; `map(f).map(g) = map(g ∘ f)`.
