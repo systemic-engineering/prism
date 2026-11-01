@@ -79,7 +79,7 @@ where
     assert_eq!(dimmed.result().ok(), lit.result().ok(), "the light changed");
     match dimmed.result() {
         terni::Imperfect::Partial(_, loss) => assert_eq!(loss, ScalarLoss::new(received)),
-        other => panic!("received darkness was dropped or changed: {other:?}"),
+        _ => panic!("received darkness was dropped or changed"),
     }
 }
 
@@ -289,7 +289,10 @@ fn compose_carries_received_darkness_through() {
 #[test]
 fn compose_carries_received_loss_through() {
     let p = Compose(Parse, Double);
-    let out = apply(&p, Optic::partial((), "3".to_string(), ScalarLoss::new(1.0)));
+    let out = apply(
+        &p,
+        Optic::partial((), "3".to_string(), ScalarLoss::new(1.0)),
+    );
     assert_eq!(out.result().ok(), Some(&6));
     assert_eq!(
         out.result().loss(),

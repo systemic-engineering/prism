@@ -265,6 +265,10 @@ impl<S: Clone + 'static> Prism for IdentityPrism<S> {
     }
 }
 
+// Every stage is `next` on the same value, and the error arm is `Infallible`:
+// nothing negated, nothing checked, no darkness of its own.
+impl<S: Clone + 'static> crate::Stable for IdentityPrism<S> {}
+
 // ---------------------------------------------------------------------------
 // Cyclic<N> — a concrete group used by the test bundle.
 // ---------------------------------------------------------------------------

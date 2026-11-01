@@ -164,6 +164,13 @@ impl<In, Out, E, L: Loss> Optic<In, Out, E, L> {
         self.focus.as_ref().ok()
     }
 
+    /// Reassemble an optic from a source and a focus, as [`Beam::tick`]
+    /// would leave them. Used by [`crate::Compose`] to carry a whole run of
+    /// one Prism as a single step: `None` for the source of a dark beam.
+    pub(crate) fn from_parts(source: Option<In>, focus: Imperfect<Out, E, L>) -> Self {
+        Self { source, focus }
+    }
+
     /// Construct a dark (failed) optic with no source. Used internally
     /// when propagating failure through `tick`/`smap` — the source from
     /// the previous step does not exist because that step failed.
