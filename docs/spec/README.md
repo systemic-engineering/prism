@@ -6,6 +6,7 @@
 |---|---|
 | `imperfect.md` | `Imperfect`: three cases, loss laws, every operation's rules, what must never happen |
 | `imperfect-vectors.json` | 192 cases generated from terni 0.7.0 by `prismqueer/tests/spec_vectors.rs` |
+| `brain.md` | `brain`'s capacity is verdict-neutral: the proof behind the threshold-independence tests, its assumptions (exact recompute, a faithful backend, a blind tenant), and the tests that guard each one |
 | `gate.md` | The convergence gate for review rounds, taken from settle semantics; proven parts vs. modelling choices |
 | `gate-vectors.json` | 9 worked examples, checked against the rule by `prismqueer/tests/gate_vectors.rs` |
 | `identity.md` | Identity is scoped: `address = BLAKE3-keyed(K_scope, content)`, the public scope's derived key, why, and what's out of scope (key management) |
