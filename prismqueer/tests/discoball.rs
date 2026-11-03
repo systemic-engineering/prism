@@ -27,7 +27,7 @@ use prismqueer::discoball::{
     Ball, BallError, DarkSpot, Exit, Facet, FacetReport, Proof, Received, Rotation, Ruler,
 };
 use prismqueer::room::{coboundary, pair, Exactness, Map, Modulus, Room, Vertices, ZMod, Z};
-use prismqueer::{IdentityPrism, Optic, Prism};
+use prismqueer::{Beam, IdentityPrism, Optic, Prism};
 
 type Set = BTreeSet<u32>;
 
@@ -171,14 +171,26 @@ fn full_turn(r: &Rotation, order: usize) {
         for (a, b) in home.facets().iter().zip(now.facets()) {
             let at = format!("step {step}, {}", a.name());
             assert_eq!(a.charpoly(), b.charpoly(), "{at}: the exact spectrum");
-            assert_eq!(a.invariants(), b.invariants(), "{at}: the invariant factors");
-            assert_eq!(a.triple().lums_trace(), b.triple().lums_trace(), "{at}: lums");
+            assert_eq!(
+                a.invariants(),
+                b.invariants(),
+                "{at}: the invariant factors"
+            );
+            assert_eq!(
+                a.triple().lums_trace(),
+                b.triple().lums_trace(),
+                "{at}: lums"
+            );
             assert_eq!(
                 a.triple().horizontal(),
                 b.triple().horizontal(),
                 "{at}: the horizontal twist"
             );
-            assert_eq!(a.triple().findings(), b.triple().findings(), "{at}: findings");
+            assert_eq!(
+                a.triple().findings(),
+                b.triple().findings(),
+                "{at}: findings"
+            );
             assert_eq!(a.exit(), b.exit(), "{at}: exit");
             let expected: BTreeSet<usize> = a.spots().iter().map(|&i| moved[i]).collect();
             assert_eq!(b.spots(), &expected, "{at}: the spots moved by the turn");
@@ -262,7 +274,11 @@ fn an_even_not_loop_is_a_choice_with_trivial_holonomy() {
     match report.triple().holonomy().verdict() {
         Exactness::Exact(choice) => {
             let two = two();
-            assert_eq!(choice, &vec![ZMod::new(0, &two), ZMod::new(1, &two)], "p ≠ q");
+            assert_eq!(
+                choice,
+                &vec![ZMod::new(0, &two), ZMod::new(1, &two)],
+                "p ≠ q"
+            );
         }
         Exactness::Genuine(cycles) => panic!("expected a choice, got {cycles:?}"),
     }
@@ -271,7 +287,10 @@ fn an_even_not_loop_is_a_choice_with_trivial_holonomy() {
 
     // Two `not`s and a plain dependency around p, q, r: still a choice.
     let ball = one_facet(&[(0, 1, Negative), (1, 2, Positive), (2, 0, Negative)]);
-    assert_eq!(ball.measure(&NoDeclarations).facets()[0].exit(), Exit::Clear);
+    assert_eq!(
+        ball.measure(&NoDeclarations).facets()[0].exit(),
+        Exit::Clear
+    );
 }
 
 /// A stratified `not` closes no directed loop, so it never twists, even
@@ -297,7 +316,13 @@ fn a_stable_facet_refuses_a_not() {
         Map::identity(&h),
         rules(&[(0, 1, Sign::Negative)]),
     );
-    assert_eq!(refused.err(), Some(BallError::NotInStable { premise: 0, head: 1 }));
+    assert_eq!(
+        refused.err(),
+        Some(BallError::NotInStable {
+            premise: 0,
+            head: 1
+        })
+    );
 }
 
 // --- 3. A vertical twisted facet: mirror's pos-v05 ---------------------------
@@ -361,7 +386,10 @@ fn pos_v05(claims: &[usize]) -> Facet {
     let mut lit = Vec::new();
     let mut brain_lums = Vec::new();
     for &i in claims {
-        let t = [brain.intern(ATOMS[i].1.as_bytes()), brain.intern(ATOMS[i].2.as_bytes())];
+        let t = [
+            brain.intern(ATOMS[i].1.as_bytes()),
+            brain.intern(ATOMS[i].2.as_bytes()),
+        ];
         assert!(brain.deposit(claim, &t));
         lit.push(i);
     }
@@ -369,7 +397,10 @@ fn pos_v05(claims: &[usize]) -> Facet {
     facet.step(lit.clone());
     brain_lums.push(brain.lums());
     for &i in claims {
-        let t = [brain.intern(ATOMS[i].1.as_bytes()), brain.intern(ATOMS[i].2.as_bytes())];
+        let t = [
+            brain.intern(ATOMS[i].1.as_bytes()),
+            brain.intern(ATOMS[i].2.as_bytes()),
+        ];
         assert!(brain.deposit(owner, &t), "owner from claim");
         lit.push(i + 2);
     }
@@ -395,12 +426,19 @@ fn a_violated_declaration_is_a_vertical_twist_with_trivial_holonomy() {
     assert_eq!(triple.lums_trace(), &[2, 4], "two claims, then two owners");
     assert_eq!(triple.first_drop(), None, "monotone");
     assert!(!triple.horizontal(), "positive: trivial holonomy");
-    assert_eq!(triple.findings(), &[(2, 3)], "owner(doc, alex) and owner(doc, reed)");
+    assert_eq!(
+        triple.findings(),
+        &[(2, 3)],
+        "owner(doc, alex) and owner(doc, reed)"
+    );
     assert!(triple.vertical());
     assert_eq!(report.exit(), Exit::Paradox);
     assert_eq!(report.exit().code(), 255);
     assert_eq!(report.proof(), Proof::Unproved, "a declaration: not stable");
-    assert!(reading.dark().is_empty(), "a paradox is twisted light, not darkness");
+    assert!(
+        reading.dark().is_empty(),
+        "a paradox is twisted light, not darkness"
+    );
 
     // The control: one claim, the declaration holds.
     let mut ball = Ball::new(&h);
@@ -445,18 +483,26 @@ fn received_darkness_is_in_the_outer_channel_and_changes_no_lums() {
     let mut dark = ball_of_two();
     dark.receive(1, Received::Hole).expect("a spot of the ball");
     let (a, b) = (lit.measure(&NoDeclarations), dark.measure(&NoDeclarations));
-    assert_eq!(b.facets(), a.facets(), "no facet's triple sees the darkness");
+    assert_eq!(
+        b.facets(),
+        a.facets(),
+        "no facet's triple sees the darkness"
+    );
     assert_eq!(b.lums(), a.lums(), "darkness changes no lums");
     assert!(a.dark().is_empty());
     assert_eq!(b.dark(), &[DarkSpot::new(1, Received::Hole)]);
 
     // A dark spot is on the ball: it turns with it, and stays outside.
     dark.rotate(&cycle(&room(4))).expect("a rotation");
-    dark.receive(0, Received::Budget).expect("a spot of the ball");
+    dark.receive(0, Received::Budget)
+        .expect("a spot of the ball");
     let turned = dark.measure(&NoDeclarations);
     assert_eq!(
         turned.dark(),
-        &[DarkSpot::new(2, Received::Hole), DarkSpot::new(0, Received::Budget)]
+        &[
+            DarkSpot::new(2, Received::Hole),
+            DarkSpot::new(0, Received::Budget)
+        ]
     );
     assert_eq!(turned.lums(), a.lums());
 
@@ -474,7 +520,12 @@ fn the_invariant_factors_tell_a_shear_from_the_identity() {
     let mut ball = Ball::new(&h);
     let mut identity = Facet::unproved(&Unproved, "identity", Map::identity(&h), rules(&[]));
     identity.step([0]);
-    let mut shear = Facet::unproved(&Unproved, "shear", matrix(&h, &[&[1, 1], &[0, 1]]), rules(&[]));
+    let mut shear = Facet::unproved(
+        &Unproved,
+        "shear",
+        matrix(&h, &[&[1, 1], &[0, 1]]),
+        rules(&[]),
+    );
     shear.step([0]);
     ball.facet(identity).expect("on the room");
     ball.facet(shear).expect("on the room");
@@ -487,8 +538,16 @@ fn the_invariant_factors_tell_a_shear_from_the_identity() {
         // (x − 1)² = x² − 2x + 1, leading first, for both.
         let expected: Vec<Z> = [1, -2, 1].into_iter().map(Z::from).collect();
         assert_eq!(id.charpoly().coefficients(), &expected[..], "turn {turn}");
-        assert_eq!(id.charpoly(), sh.charpoly(), "turn {turn}: the spectrum can't tell");
-        assert_ne!(id.invariants(), sh.invariants(), "turn {turn}: the factors can");
+        assert_eq!(
+            id.charpoly(),
+            sh.charpoly(),
+            "turn {turn}: the spectrum can't tell"
+        );
+        assert_ne!(
+            id.invariants(),
+            sh.invariants(),
+            "turn {turn}: the factors can"
+        );
         assert_eq!(id.invariants().nontrivial().len(), 2, "x − 1, x − 1");
         assert_eq!(sh.invariants().nontrivial().len(), 1, "(x − 1)²");
         assert_eq!(id.invariants().product(), sh.invariants().product());
@@ -543,5 +602,8 @@ fn only_a_unitary_over_the_fixed_ring_is_a_rotation() {
         Map::identity(&h),
         rules(&[(0, 5, Sign::Positive)]),
     );
-    assert_eq!(ball.facet(loose), Err(BallError::Outside { spot: 5, dim: 2 }));
+    assert_eq!(
+        ball.facet(loose),
+        Err(BallError::Outside { spot: 5, dim: 2 })
+    );
 }

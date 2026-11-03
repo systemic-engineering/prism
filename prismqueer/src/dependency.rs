@@ -97,6 +97,11 @@ impl<N: Ord + Clone> DependencyGraph<N> {
             .count()
     }
 
+    /// Every edge, in insertion order.
+    pub fn edges(&self) -> impl Iterator<Item = &Edge<N>> {
+        self.edges.iter()
+    }
+
     /// The edges through a `not`, in insertion order.
     pub fn negative_edges(&self) -> impl Iterator<Item = &Edge<N>> {
         self.edges.iter().filter(|e| e.sign == Sign::Negative)

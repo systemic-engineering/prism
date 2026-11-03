@@ -101,6 +101,11 @@ pub mod band;
 #[cfg(feature = "lapack")]
 pub mod room;
 
+// The disco ball: facets on a room, turned by unitaries over ℤ, read as the
+// measurement triple (prism-012 Ask 3).
+#[cfg(feature = "lapack")]
+pub mod discoball;
+
 // Exact polynomials over ℤ and ℚ: gcds, square-free parts, real roots
 // isolated by Sturm sequences. No floats, no LAPACK.
 pub mod poly;

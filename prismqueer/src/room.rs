@@ -1343,7 +1343,16 @@ impl<A: Kind> Symmetric<A, Z> {
     /// products over M's non-zero entries only, so the cost is about
     /// n² · nnz(M) multiplications: n⁴/4 dense, far fewer for a graph.
     pub fn charpoly(&self) -> Charpoly {
-        let m = &self.0;
+        self.0.charpoly()
+    }
+}
+
+impl<A: Kind> Map<A, A, Z> {
+    /// The characteristic polynomial det(xI − M), exactly, by Berkowitz's
+    /// algorithm, for any square integer map, symmetric or not (a shear's is
+    /// the identity's). See [`Symmetric::charpoly`] for the method.
+    pub fn charpoly(&self) -> Charpoly {
+        let m = self;
         let n = m.from.dim;
         // Each column's non-zero entries, by row: Mᵣ is the rows below r.
         let columns: Vec<Vec<(usize, &BigInt)>> = (0..n)
