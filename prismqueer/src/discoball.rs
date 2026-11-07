@@ -30,6 +30,10 @@
 //!   arrived, from outside (a hole, unreadable input, the budget). It is
 //!   never a facet's doing, so it lives in the ball's outer channel
 //!   ([`Reading::dark`]) and in no facet's triple.
+//! - **Darkness is received × kind** (Mara, prism-012 Log (b)): each dark
+//!   spot learns which facets read it, and exits per reader ([`Shadow`],
+//!   [`Reading::shadows`]). The same hole is exit 1 beside a stable facet
+//!   and can be exit 2 beside an unproved one. See *Darkness × kind* below.
 //!
 //! What `discoball` keeps from collapsing early: the triple stays three
 //! readings, never a score; a twist carries its certificate; findings stay
@@ -79,6 +83,54 @@
 //! let mut ball = Ball::new(&h);
 //! ball.rotate(&id).unwrap();
 //! ```
+//!
+//! # Darkness × kind
+//!
+//! **Which facets read a spot.** A facet *reads* a spot if the spot is in
+//! its light (lit at some step boundary) or is an atom of one of its rules
+//! ([`Facet::reads`]). The relation is taken in the facet's own (home)
+//! chart, where the ball keeps its darkness too. A turn moves the dark spot
+//! with the ball and leaves the facet's chart alone, as it does findings,
+//! so the readers and their exits are invariant under rotation. Only the
+//! spot's place in the report moves.
+//!
+//! **The exit per reader** ([`DarkExit`]), beside the facet's own
+//! [`Exit`], never over it:
+//!
+//! - **beside a `Stable` facet: exit 1** ([`DarkExit::Uncertain`]). The
+//!   proof says no `not` and no declaration, so the facet's light only
+//!   adds. Filling the hole can add light; it can't twist it. Waiting
+//!   resolves it.
+//! - **beside an `Unproved` facet: exit 2** ([`DarkExit::Unknown`]) **when
+//!   the hole could hide a twist**, else exit 1. "Could hide a twist" is:
+//!   the spot lies on a closed directed walk of the facet's rules that
+//!   passes through a `not` edge. For a `not` edge a → b that is exactly
+//!   "b reaches the spot and the spot reaches a", decided by reachability.
+//!   A filled hole could then close a loop with a `not` on it; with none,
+//!   no loop through the spot can twist, whatever arrives.
+//!
+//!   This is exact for closed walks and **conservative** for simple
+//!   cycles: a closed walk through the spot and a `not` edge need not be
+//!   one simple cycle, and deciding whether a simple one exists is the
+//!   two-disjoint-paths problem, NP-hard on digraphs. Erring that way only
+//!   ever says 2 where 1 was true: unknown is safer than a false "waiting
+//!   resolves it". It also doesn't ask whether the loop's `not` count is
+//!   odd: an even loop is a choice today, but the hole's value can decide
+//!   which, so the darkness may still hide the twist.
+//!
+//! A spot's exit is the max over its readers; a spot no facet reads has
+//! none (`None`): no facet's light depends on it, and it still shows in
+//! [`Reading::dark`].
+//!
+//! *The Roomba mapping (prism-016, READING, mirror's).* An undecided bump
+//! is darkness received at the threshold: next to a stable facet it waits;
+//! next to an unproved facet that could hide a twist, the Roomba presses
+//! and stays. **Mara graded this reading broken** (prism-016 Log,
+//! 2026-11-07, Ask 3): imprecision and darkness are different undecideds,
+//! and waiting never fixes imprecision; "light only adds" makes waiting
+//! safe only for readings that rise with light, and variance-of-pain
+//! doesn't. The exit table above stands on the Prism's own light; the
+//! Roomba-patience rationale does not.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
@@ -344,6 +396,36 @@ impl Facet {
         let atoms = self.rules.edges().flat_map(|e| [*e.from(), *e.to()]);
         self.light.iter().flatten().copied().chain(atoms)
     }
+
+    /// Whether it reads `spot`, in its own chart: the spot is lit at some
+    /// step boundary, or an atom of one of its rules.
+    pub fn reads(&self, spot: usize) -> bool {
+        self.spots().any(|s| s == spot)
+    }
+
+    /// Whether darkness at `spot` could hide a twist here: some `not` edge
+    /// a → b and the spot lie on one closed directed walk of the rules, that
+    /// is, b reaches the spot and the spot reaches a. Exact for closed
+    /// walks, conservative for simple cycles (see the module docs).
+    fn could_hide_twist(&self, spot: usize) -> bool {
+        let from_spot = self.rules.reach(&BTreeSet::from([spot]), Through::Any);
+        self.rules.negative_edges().any(|e| {
+            from_spot.contains(e.from())
+                && self
+                    .rules
+                    .reach(&BTreeSet::from([*e.to()]), Through::Any)
+                    .contains(&spot)
+        })
+    }
+
+    /// How darkness at `spot` exits beside this facet.
+    fn dark_exit(&self, spot: usize) -> DarkExit {
+        match self.proof {
+            Proof::Stable => DarkExit::Uncertain,
+            Proof::Unproved if self.could_hide_twist(spot) => DarkExit::Unknown,
+            Proof::Unproved => DarkExit::Uncertain,
+        }
+    }
 }
 
 /// The vertical twist's judge: what a declaration finds violated in a
@@ -395,6 +477,96 @@ impl DarkSpot {
     /// Where the darkness came from.
     pub fn received(&self) -> Received {
         self.received
+    }
+}
+
+/// How received darkness exits beside one facet that reads it (Mara,
+/// prism-012 Log (b)). Never a facet's own exit: it sits beside
+/// [`FacetReport::exit`]. Ordered by code, so a spot's exit is the max.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DarkExit {
+    /// 1: waiting resolves it. Beside a stable facet, or an unproved one
+    /// with no `not` on a loop through the spot.
+    Uncertain,
+    /// 2: the hole could hide a twist. Beside an unproved facet whose rules
+    /// close a loop through the spot and a `not`.
+    Unknown,
+}
+
+impl DarkExit {
+    /// The exit code.
+    pub fn code(&self) -> u8 {
+        match self {
+            DarkExit::Uncertain => 1,
+            DarkExit::Unknown => 2,
+        }
+    }
+}
+
+/// A facet that reads a dark spot, and how the darkness exits beside it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reader {
+    facet: usize,
+    name: String,
+    proof: Proof,
+    exit: DarkExit,
+}
+
+impl Reader {
+    /// The facet's index on the ball, in the order facets joined.
+    pub fn facet(&self) -> usize {
+        self.facet
+    }
+
+    /// The facet's name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Whether its Prism carries the [`Stable`] proof.
+    pub fn proof(&self) -> Proof {
+        self.proof
+    }
+
+    /// How the darkness exits beside it.
+    pub fn exit(&self) -> DarkExit {
+        self.exit
+    }
+}
+
+/// A dark spot's shadow: the darkness, in the current chart, with the
+/// facets that read it and the exit beside each.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Shadow {
+    dark: DarkSpot,
+    readers: Vec<Reader>,
+}
+
+impl Shadow {
+    /// The darkness, in the current chart.
+    pub fn dark(&self) -> DarkSpot {
+        self.dark
+    }
+
+    /// Its spot, in the current chart.
+    pub fn spot(&self) -> usize {
+        self.dark.spot
+    }
+
+    /// Where the darkness came from.
+    pub fn received(&self) -> Received {
+        self.dark.received
+    }
+
+    /// The facets that read it, in the order they joined.
+    pub fn readers(&self) -> &[Reader] {
+        &self.readers
+    }
+
+    /// The spot's exit: the max over its readers. `None` when no facet
+    /// reads it.
+    pub fn exit(&self) -> Option<DarkExit> {
+        self.readers.iter().map(|r| r.exit).max()
     }
 }
 
@@ -526,8 +698,9 @@ impl<F> Triple<F> {
 }
 
 /// How a facet's own light exits (prism-012's corrected table). Received
-/// darkness (exit 2, unknown) is never a facet's: it is the ball's outer
-/// channel, [`Reading::dark`].
+/// darkness is never a facet's: it is the ball's outer channel,
+/// [`Reading::dark`], and its exit (1 or 2, by the reader's kind) is a
+/// [`DarkExit`] beside this one ([`Reading::shadows`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Exit {
     /// 0: the light arrives, untwisted.
@@ -612,6 +785,7 @@ impl<F> FacetReport<F> {
 pub struct Reading<F> {
     facets: Vec<FacetReport<F>>,
     dark: Vec<DarkSpot>,
+    shadows: Vec<Shadow>,
 }
 
 impl<F> Reading<F> {
@@ -624,6 +798,12 @@ impl<F> Reading<F> {
     /// order it arrived.
     pub fn dark(&self) -> &[DarkSpot] {
         &self.dark
+    }
+
+    /// Each dark spot with the facets that read it and its exit beside
+    /// each, in the order [`Reading::dark`] lists them.
+    pub fn shadows(&self) -> &[Shadow] {
+        &self.shadows
     }
 
     /// Total lums now: the facets' lums summed.
@@ -706,12 +886,32 @@ impl Ball {
     /// Smith form.
     pub fn measure<R: Ruler>(&self, ruler: &R) -> Reading<R::Finding> {
         let facets = self.facets.iter().map(|f| self.report(f, ruler)).collect();
-        let dark = self
+        let turn = |d: &DarkSpot| DarkSpot::new(self.orientation.image[d.spot], d.received);
+        let dark = self.dark.iter().map(turn).collect();
+        let shadows = self
             .dark
             .iter()
-            .map(|d| DarkSpot::new(self.orientation.image[d.spot], d.received))
+            .map(|d| Shadow {
+                dark: turn(d),
+                readers: self
+                    .facets
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, f)| f.reads(d.spot))
+                    .map(|(i, f)| Reader {
+                        facet: i,
+                        name: f.name.clone(),
+                        proof: f.proof,
+                        exit: f.dark_exit(d.spot),
+                    })
+                    .collect(),
+            })
             .collect();
-        Reading { facets, dark }
+        Reading {
+            facets,
+            dark,
+            shadows,
+        }
     }
 
     fn report<R: Ruler>(&self, facet: &Facet, ruler: &R) -> FacetReport<R::Finding> {
