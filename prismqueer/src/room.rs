@@ -416,11 +416,21 @@ impl Room<Faces> {
     }
 
     /// C² over `edges`. Addressed by the C¹'s address and every face, as
-    /// its walk: each step's start and edge (ends and `nth`).
+    /// its walk: each step's start and edge (ends and `nth`). The preimage
+    /// is self-delimiting:
+    ///
+    /// `C¹ hex ‖ u64le(F) ‖ per face: u64le(steps) ‖ per step (v ‖ a ‖ b ‖ nth)`,
+    ///
+    /// every word a `u64le`, the C¹ hex its 64 digits. The face count and
+    /// each walk's length are in the bytes, so they decode back to one list
+    /// of walks. (Before prism-016 each face was `0xFF ‖ steps`, with no
+    /// lengths.)
     fn faces_over(edges: &Room<Edges>, faces: &[Face]) -> Self {
         let mut bytes = edges.complex.as_str().as_bytes().to_vec();
+        bytes.extend_from_slice(&(faces.len() as u64).to_le_bytes());
         for face in faces {
-            bytes.push(0xFF); // separator
+            let steps = face.vertices().len().min(face.edges().len());
+            bytes.extend_from_slice(&(steps as u64).to_le_bytes());
             for (v, e) in face.vertices().iter().zip(face.edges()) {
                 let (a, b) = e.ends();
                 for x in [*v, a, b, e.nth() as u64] {
