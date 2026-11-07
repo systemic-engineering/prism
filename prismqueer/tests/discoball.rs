@@ -1072,11 +1072,11 @@ fn replay_is_deterministic_and_independent_visits_commute() {
     ab.extend([dark(1, Received::Hole), dark(2, Received::Budget)]);
     let mut ba = light_of_two();
     ba.extend([dark(2, Received::Budget), dark(1, Received::Hole)]);
-    let shown = |visits: &[Visit]| match replay(&unlit_two(), visits, &NoDeclarations, &DarknessFirst)
-    {
-        Ok(Imperfect::Failure(s, _)) => s.dark(),
-        other => panic!("expected darkness, got {other:?}"),
-    };
+    let shown =
+        |visits: &[Visit]| match replay(&unlit_two(), visits, &NoDeclarations, &DarknessFirst) {
+            Ok(Imperfect::Failure(s, _)) => s.dark(),
+            other => panic!("expected darkness, got {other:?}"),
+        };
     assert_eq!(shown(&ab), DarkSpot::new(1, Received::Hole));
     assert_eq!(shown(&ba), DarkSpot::new(2, Received::Budget));
 

@@ -238,6 +238,8 @@ use crate::room::{
 };
 use crate::{Prism, Stable};
 
+use terni::{join_with, Imperfect, Precedence};
+
 /// Why the ball refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BallError {
@@ -260,6 +262,13 @@ pub enum BallError {
         premise: usize,
         /// Its head.
         head: usize,
+    },
+    /// A visit named a facet the ball doesn't have.
+    NoFacet {
+        /// The facet named.
+        facet: usize,
+        /// How many facets the ball has: facets are `0..facets`.
+        facets: usize,
     },
 }
 
@@ -905,6 +914,145 @@ impl<F> Reading<F> {
     }
 }
 
+impl<F: Clone> Reading<F> {
+    /// The reading as parts [`terni::join_with`] can read: every facet in the
+    /// order it joined, then every shadow in the order its darkness arrived.
+    ///
+    /// - a clear facet: `Success(report)`;
+    /// - a facet with a known twist: `Partial(report, marks)`, a
+    ///   [`Mark::Vertical`] for its findings, then a [`Mark::Horizontal`] for
+    ///   its odd `not` loop, whichever it has;
+    /// - received darkness: `Failure(shadow, [Mark::Dark(shadow)])`. Never a
+    ///   twist, whatever its exit: exit 2 says a twist *may* hide there, not
+    ///   that one is known.
+    pub fn parts(&self) -> Vec<Part<F>> {
+        let facets = self.facets.iter().enumerate().map(|(i, report)| {
+            let triple = report.triple();
+            let mut marks = Vec::new();
+            if triple.vertical() {
+                marks.push(Mark::Vertical {
+                    facet: i,
+                    name: report.name.clone(),
+                    findings: triple.findings.clone(),
+                });
+            }
+            if triple.horizontal() {
+                marks.push(Mark::Horizontal {
+                    facet: i,
+                    name: report.name.clone(),
+                    holonomy: triple.holonomy.clone(),
+                });
+            }
+            if marks.is_empty() {
+                Imperfect::Success(report.clone())
+            } else {
+                Imperfect::Partial(report.clone(), marks)
+            }
+        });
+        let dark = self
+            .shadows
+            .iter()
+            .map(|s| Imperfect::Failure(s.clone(), vec![Mark::Dark(s.clone())]));
+        facets.chain(dark).collect()
+    }
+}
+
+// --- Trace-back --------------------------------------------------------------
+
+/// What a part carried into a join, kept in the loss whatever is shown.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Mark<F> {
+    /// A known vertical twist: the ruler's findings in the facet's true set.
+    Vertical {
+        /// The facet's index on the ball.
+        facet: usize,
+        /// The facet's name.
+        name: String,
+        /// The ruler's findings, as it gave them.
+        findings: Vec<F>,
+    },
+    /// A known horizontal twist: an odd `not` loop, with room's certificate.
+    Horizontal {
+        /// The facet's index on the ball.
+        facet: usize,
+        /// The facet's name.
+        name: String,
+        /// The holonomy, whose verdict is `Genuine` with the loops.
+        holonomy: Holonomy,
+    },
+    /// Received darkness, with its readers and exits. Never a twist.
+    Dark(Shadow),
+}
+
+impl<F> Mark<F> {
+    /// Whether this mark is a known twist, vertical or horizontal. What a
+    /// caller's `Precedence::known_twist` reads; received darkness, even at
+    /// exit 2, is not one.
+    pub fn is_twist(&self) -> bool {
+        match self {
+            Mark::Vertical { .. } | Mark::Horizontal { .. } => true,
+            Mark::Dark(_) => false,
+        }
+    }
+}
+
+/// The loss of a part, and of a join: every [`Mark`], in part order.
+pub type Trace<F> = Vec<Mark<F>>;
+
+/// One part for [`terni::join_with`]: a facet's report or a shadow.
+pub type Part<F> = Imperfect<FacetReport<F>, Shadow, Trace<F>>;
+
+/// A joined reading: the facets' reports shown, or the darkness shown, and
+/// the trace of every part.
+pub type Joined<F> = Imperfect<Vec<FacetReport<F>>, Shadow, Trace<F>>;
+
+/// One event of a tray, as data: what the ball went through, in order. No
+/// clock: the order of the visits is the only sequence. Spots are in the
+/// chart of the visit's own time, as [`Ball::receive`] takes them.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Visit {
+    /// A step of light: `facet` lit `lit` at a step boundary.
+    Light {
+        /// The facet's index on the ball.
+        facet: usize,
+        /// The spots lit, in the current chart.
+        lit: BTreeSet<usize>,
+    },
+    /// Darkness received at `spot`, in the current chart.
+    Dark {
+        /// The spot.
+        spot: usize,
+        /// Where the darkness came from.
+        received: Received,
+    },
+    /// The ball turned.
+    Turn(Rotation),
+}
+
+/// Replay `visits` onto `ball` and join its reading under the caller's
+/// signed `order` (see *Trace-back* in the module docs). `ball` is the spec:
+/// its room and facets, and any light or darkness it already holds. It is
+/// not changed.
+///
+/// There is no default order: `order` is the caller's, always. A known twist
+/// masked by darkness shows if `order` lets it; an unknown one never does.
+pub fn replay<R, P>(
+    ball: &Ball,
+    visits: &[Visit],
+    ruler: &R,
+    order: &P,
+) -> Result<Joined<R::Finding>, BallError>
+where
+    R: Ruler,
+    P: Precedence<Shadow, Trace<R::Finding>> + ?Sized,
+{
+    let mut ball = ball.clone();
+    for visit in visits {
+        ball.visit(visit)?;
+    }
+    Ok(join_with(order, ball.measure(ruler).parts()))
+}
+
 // --- The ball ----------------------------------------------------------------
 
 /// The disco ball: facets on one room H over ℤ, an orientation, and the
@@ -948,14 +1096,41 @@ impl Ball {
     /// Receive darkness at `spot`, in the current chart.
     pub fn receive(&mut self, spot: usize, received: Received) -> Result<(), BallError> {
         self.on_ball([spot])?;
-        let home = self
-            .orientation
+        let home = self.home(spot);
+        self.dark.push(DarkSpot::new(home, received));
+        Ok(())
+    }
+
+    /// Take one visit: a step of light, darkness received, or a turn. Spots
+    /// are in the current chart. Refused, and nothing changed, if it names
+    /// a facet or a spot off the ball, or turns another room.
+    pub fn visit(&mut self, visit: &Visit) -> Result<(), BallError> {
+        match visit {
+            Visit::Light { facet, lit } => {
+                let facets = self.facets.len();
+                if *facet >= facets {
+                    return Err(BallError::NoFacet {
+                        facet: *facet,
+                        facets,
+                    });
+                }
+                self.on_ball(lit.iter().copied())?;
+                let home: Vec<usize> = lit.iter().map(|&s| self.home(s)).collect();
+                self.facets[*facet].step(home);
+                Ok(())
+            }
+            Visit::Dark { spot, received } => self.receive(*spot, *received),
+            Visit::Turn(rotation) => self.rotate(rotation),
+        }
+    }
+
+    /// Where `spot`, in the current chart, is in the home chart.
+    fn home(&self, spot: usize) -> usize {
+        self.orientation
             .image
             .iter()
             .position(|&i| i == spot)
-            .expect("a permutation reaches every spot");
-        self.dark.push(DarkSpot::new(home, received));
-        Ok(())
+            .expect("a permutation reaches every spot")
     }
 
     /// Turn the ball by `rotation`, which must be of the ball's room.
