@@ -15,6 +15,7 @@
 use num_bigint::{BigInt, Sign};
 use num_traits::{ToPrimitive, Zero};
 use prismqueer::field::{check_flat, Edge, Face, Field, Flatness, Graph, Zn};
+use prismqueer::oid::{Oid, Scope};
 use prismqueer::room::{
     bounds, classify, coboundary, coboundary1, coboundary1_in, coboundary_in, curvature, pair,
     solve, Boundary, Bounded, Coefficient, Exactly, Exactness, Kind, Map, Modulus, QModOne, Room,
@@ -827,5 +828,149 @@ fn room_and_field_agree_over_z_mod_two() {
     let gf2 = |x: &ZMod| Zn::<2>::new(x.residue().to_u64().unwrap());
     for (name, g, faces) in field_fixtures() {
         agree(name, &two, (&g, &faces), &[0, 1], gf2);
+    }
+}
+
+// --- C²'s address is self-delimiting (prism-016) ------------------------------
+//
+// C²'s preimage: `C¹ hex ‖ u64le(F) ‖ per face: u64le(steps) ‖ per step
+// (v ‖ a ‖ b ‖ nth)`, every word a `u64le`. The old one, `C¹ hex ‖ (0xFF ‖
+// steps)*`, carried no lengths: one face of one step whose words are all
+// `u64::MAX` and 33 empty walks were both `C¹ hex ‖ 0xFF × 33`.
+
+/// One step of a face's walk: its start, and its edge as ends and `nth`.
+type Step = [u64; 4];
+
+fn walks(faces: &[Face]) -> Vec<Vec<Step>> {
+    faces
+        .iter()
+        .map(|f| {
+            f.vertices()
+                .iter()
+                .zip(f.edges())
+                .map(|(&v, e)| {
+                    let (a, b) = e.ends();
+                    [v, a, b, e.nth() as u64]
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// The documented C² preimage.
+fn documented(one_skeleton: &Oid, walks: &[Vec<Step>]) -> Vec<u8> {
+    let mut bytes = one_skeleton.as_str().as_bytes().to_vec();
+    bytes.extend_from_slice(&(walks.len() as u64).to_le_bytes());
+    for walk in walks {
+        bytes.extend_from_slice(&(walk.len() as u64).to_le_bytes());
+        for word in walk.iter().flatten() {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+    }
+    bytes
+}
+
+/// Read a documented C² preimage back: the C¹ hex (64 digits, as every
+/// hashed address is) and the walks, or `None` if it isn't one.
+fn decode(bytes: &[u8]) -> Option<(String, Vec<Vec<Step>>)> {
+    let hex = String::from_utf8(bytes.get(..64)?.to_vec()).ok()?;
+    let mut words = bytes[64..]
+        .chunks(8)
+        .map(|w| <[u8; 8]>::try_from(w).ok().map(u64::from_le_bytes));
+    let mut next = || words.next().flatten();
+    let faces = next()?;
+    let mut walks = Vec::new();
+    for _ in 0..faces {
+        let steps = next()?;
+        let walk: Option<Vec<Step>> = (0..steps)
+            .map(|_| Some([next()?, next()?, next()?, next()?]))
+            .collect();
+        walks.push(walk?);
+    }
+    next().is_none().then_some((hex, walks))
+}
+
+fn splitmix(x: &mut u64) -> u64 {
+    *x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = *x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// A vertex id: small, 0xFF-topped, or anything.
+fn id(seed: &mut u64) -> u64 {
+    match splitmix(seed) % 3 {
+        0 => splitmix(seed) % 16,
+        1 => 0xFF00_0000_0000_0000 | (splitmix(seed) % 0x1_0000),
+        _ => splitmix(seed),
+    }
+}
+
+/// The old encoding's collision, at the encoding: the documented one tells
+/// the two apart.
+#[test]
+fn one_face_of_all_ones_and_33_empty_walks_are_two_preimages() {
+    let c1 = Room::edges(&triangle().0).complex().clone();
+    let one = documented(&c1, &[vec![[u64::MAX; 4]]]);
+    let empty = documented(&c1, &vec![Vec::new(); 33]);
+    assert_ne!(one, empty);
+    assert_eq!(
+        decode(&one),
+        Some((c1.as_str().to_owned(), vec![vec![[u64::MAX; 4]]]))
+    );
+    assert_eq!(decode(&empty).map(|(_, w)| w.len()), Some(33));
+}
+
+/// The property: C²'s address hashes the documented preimage, and that
+/// preimage decodes back to exactly its C¹ and its faces' walks. Over the
+/// fixtures and 300 seeded K₄s on random ids (small, 0xFF-topped, any),
+/// one side doubled, with a random subset of its four triangles and its
+/// bigon filled.
+#[test]
+fn a_face_rooms_address_is_its_self_delimiting_preimage() {
+    let mut cases: Vec<(Graph, Vec<Face>)> = vec![triangle(), square(), bigon()];
+    let mut seed = 0x6661_6365_7321_2121; // "faces!!!"
+    while cases.len() < 303 {
+        let mut ids: Vec<u64> = (0..4).map(|_| id(&mut seed)).collect();
+        ids.sort();
+        ids.dedup();
+        if ids.len() < 4 {
+            continue;
+        }
+        let [p, q, r, s] = [ids[0], ids[1], ids[2], ids[3]];
+        let mut edges = vec![(p, q), (p, r), (p, s), (q, r), (q, s), (r, s)];
+        edges.push((r, s)); // doubled: no triangle through r–s, one bigon
+        let g = Graph::new([], edges);
+        let pick = splitmix(&mut seed);
+        let mut faces: Vec<Face> = [[p, q, r], [p, q, s]]
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| pick >> i & 1 == 1)
+            .map(|(_, &c)| Face::triangle(&g, c).expect("a simple triangle"))
+            .collect();
+        if pick >> 2 & 1 == 1 {
+            faces.push(
+                Face::bigon(&g, [Edge::between(r, s, 0), Edge::between(r, s, 1)])
+                    .expect("the doubled side"),
+            );
+        }
+        cases.push((g, faces));
+    }
+    for (g, faces) in &cases {
+        let room = Room::faces(g, faces).expect("faces of g");
+        let c1 = Room::edges(g).complex().clone();
+        let w = walks(faces);
+        let bytes = documented(&c1, &w);
+        assert_eq!(
+            decode(&bytes),
+            Some((c1.as_str().to_owned(), w)),
+            "decodes back"
+        );
+        assert_eq!(
+            room.complex(),
+            &Oid::hash(&Scope::public(), &bytes),
+            "C² hashes the documented preimage"
+        );
     }
 }
