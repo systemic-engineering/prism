@@ -13,8 +13,9 @@
 //! 5. Abelian vanishing — `Cyclic<N>`-gauged bundles have `‖[A, B]‖ == 0`
 //!    for any state, because cyclic groups commute.
 //!
-//! And that the pillar verdicts (`dispatch_ambiguity`, `algedonic`,
-//! `viability`) return the correct `PropertyVerdict` for each case.
+//! And that the pillar verdicts (`dispatch_ambiguity`, `viability`) return
+//! the correct `PropertyVerdict` for each case, and that `cross` certifies
+//! a commutator's crossing (In | Out | Undecided).
 //!
 //! # Substrate-honesty notice
 //!
@@ -29,10 +30,25 @@
 
 #![cfg(feature = "bundle")]
 
+use num_rational::BigRational;
+use prismqueer::algedonic::{Enclosure, Membership, Region};
 use prismqueer::bundle::examples::{FluxConstraint, Perm3, PermBundle, TestBundle};
 use prismqueer::bundle::GroupStructure;
 use prismqueer::flux::prelude::*;
 use prismqueer::{Loss, Metric, ScalarLoss};
+
+/// A float, exactly: the dyadic rational it is.
+fn rational(x: f64) -> BigRational {
+    BigRational::from_float(x).expect("finite")
+}
+
+/// The enclosure of a magnitude these fixtures compute exactly. Their
+/// commutators are differences of small integers, so the float is the
+/// value, and the point enclosure is certified. A float from a computation
+/// that rounds would need its instrument's error bound instead.
+fn exactly(m: ScalarLoss) -> Enclosure {
+    Enclosure::exact(rational(m.as_f64()))
+}
 
 // ──────────────────────────────────────────────────────────────────
 // 1. Antisymmetry — |[A, B]| == |[B, A]|.
@@ -298,70 +314,58 @@ fn pillar_dispatch_ambiguity_fail_when_pivot_song_missing() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 9. Pillar II — algedonic threshold.
+// 9. Pillar II — the commutator's certified crossing.
 // ──────────────────────────────────────────────────────────────────
 
 #[test]
-fn pillar_algedonic_pass_above_threshold() {
+fn pillar_cross_in_above_threshold() {
     let a = FluxConstraint::with_strategy(0);
     let b = FluxConstraint::with_strategy(3);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
-    // magnitude = |0 - 3| = 3.0, theta = 1.0 → Pass
-    let theta = ScalarLoss::new(1.0);
-    let verdict = pillar::algedonic(&c, &theta);
-    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+    // magnitude = |0 - 3| = 3, region (1, ∞) → In
+    let verdict = pillar::cross(&exactly(c.magnitude()), &Region::above(rational(1.0)));
+    assert!(matches!(verdict, Membership::In(_)), "got {verdict:?}");
 }
 
 #[test]
-/// Pass is strictly above the threshold: a magnitude exactly at theta is a
-/// signal below it, Partial.
-fn pillar_algedonic_at_the_threshold_is_partial() {
+/// The region is open: an exact magnitude at theta is certified Out, and an
+/// exact magnitude one ulp above it is In. Exact, because the value is.
+fn pillar_cross_at_the_threshold_is_out() {
     let a = FluxConstraint::with_strategy(0);
     let b = FluxConstraint::with_strategy(3);
     let c = commutator(&a, &b, &[1.0; 4]);
-    let verdict = pillar::algedonic(&c, &ScalarLoss::new(3.0));
-    assert!(
-        matches!(verdict, PropertyVerdict::Partial { confidence, .. } if confidence == 0.5),
-        "got {verdict:?}"
-    );
-    let verdict = pillar::algedonic(&c, &ScalarLoss::new(3.0f64.next_down()));
-    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+    let m = exactly(c.magnitude());
+    let verdict = pillar::cross(&m, &Region::above(rational(3.0)));
+    assert!(matches!(verdict, Membership::Out(_)), "got {verdict:?}");
+    let verdict = pillar::cross(&m, &Region::above(rational(3.0f64.next_down())));
+    assert!(matches!(verdict, Membership::In(_)), "got {verdict:?}");
 }
 
 #[test]
-fn pillar_algedonic_partial_below_threshold_but_nonzero() {
+/// A signal below the threshold is certified below: Out, a decided claim,
+/// never a `Partial` with a confidence.
+fn pillar_cross_out_below_threshold_but_nonzero() {
     let a = FluxConstraint::with_strategy(0);
     let b = FluxConstraint::with_strategy(1);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
-    // magnitude = 1.0, theta = 5.0 → Partial
-    let theta = ScalarLoss::new(5.0);
-    let verdict = pillar::algedonic(&c, &theta);
-    match verdict {
-        PropertyVerdict::Partial { confidence, .. } => {
-            assert!(
-                (0.0..=1.0).contains(&confidence),
-                "confidence out of range: {confidence}"
-            );
-        }
-        other => panic!("expected Partial, got {other:?}"),
-    }
+    // magnitude = 1, region (5, ∞) → Out
+    let verdict = pillar::cross(&exactly(c.magnitude()), &Region::above(rational(5.0)));
+    assert!(matches!(verdict, Membership::Out(_)), "got {verdict:?}");
 }
 
 #[test]
-fn pillar_algedonic_fail_when_commutator_vanishes() {
-    // Same strategy → magnitude 0 → Fail
+/// A vanished commutator is a reading, zero: certified Out of (½, ∞).
+fn pillar_cross_reads_a_vanished_commutator_as_zero() {
     let a = FluxConstraint::with_strategy(2);
     let b = FluxConstraint::with_strategy(2);
     let state = [1.0; 4];
     let c = commutator(&a, &b, &state);
-    let theta = ScalarLoss::new(0.5);
-    let verdict = pillar::algedonic(&c, &theta);
-    assert!(
-        matches!(verdict, PropertyVerdict::Fail(_)),
-        "got {verdict:?}"
-    );
+    let m = exactly(c.magnitude());
+    assert_eq!(m, Enclosure::exact(rational(0.0)));
+    let verdict = pillar::cross(&m, &Region::above(rational(0.5)));
+    assert!(matches!(verdict, Membership::Out(_)), "got {verdict:?}");
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -577,18 +581,17 @@ fn perm_bundle_commutator_antisymmetric_across_full_s3_grid() {
 }
 
 #[test]
-/// Pillar II algedonic verdict Pass when non-abelian commutator
-/// magnitude exceeds theta — the machinery detects the signal.
-fn perm_bundle_pillar_algedonic_pass_on_non_commuting_pair() {
+/// Pillar II crosses In when a non-abelian commutator's magnitude exceeds
+/// theta — the machinery detects the signal.
+fn perm_bundle_pillar_cross_in_on_non_commuting_pair() {
     let a = PermBundle::from_perm(Perm3::SWAP_01);
     let b = PermBundle::from_perm(Perm3::SWAP_12);
     let state = [10, 20, 30];
     let c = commutator(&a, &b, &state);
-    // magnitude is non-zero (verified above); with theta = 0 the
-    // Pass gate opens on any positive signal.
-    let theta = ScalarLoss::new(0.0);
-    let verdict = pillar::algedonic(&c, &theta);
-    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+    // magnitude is non-zero (verified above); the region (0, ∞) holds any
+    // positive signal.
+    let verdict = pillar::cross(&exactly(c.magnitude()), &Region::above(rational(0.0)));
+    assert!(matches!(verdict, Membership::In(_)), "got {verdict:?}");
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -711,55 +714,56 @@ fn fold_all_partial_takes_min_confidence() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 15. Pillar II generalized — algedonic_of_magnitude over raw Loss.
+// 15. Pillar II on a measured magnitude: cross an enclosure.
 // ──────────────────────────────────────────────────────────────────
 
 #[test]
-/// algedonic_of_magnitude Pass when magnitude > theta.
-fn algedonic_of_magnitude_pass_above_threshold() {
-    let magnitude = ScalarLoss::new(5.0);
-    let theta = ScalarLoss::new(1.0);
-    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
-    assert!(matches!(verdict, PropertyVerdict::Pass), "got {verdict:?}");
+/// An enclosure wholly above theta crosses In.
+fn cross_in_above_threshold() {
+    let verdict = pillar::cross(
+        &Enclosure::of_floats(4.5, 5.5).expect("finite"),
+        &Region::above(rational(1.0)),
+    );
+    assert!(matches!(verdict, Membership::In(_)), "got {verdict:?}");
 }
 
 #[test]
 /// One ulp above theta is not a pass (Mara 2739e94c §9 A3). A float one ulp
-/// above the threshold lies inside any honest enclosure of the value it
-/// measured, so the crossing can't be certified: it is Undecided, never Pass.
+/// above the threshold, enclosed by one ulp either side, straddles it: the
+/// crossing can't be certified, so it is Undecided, never Pass.
 fn algedonic_one_ulp_above_the_threshold_is_not_a_pass() {
-    let theta = ScalarLoss::new(1.0);
-    let above = pillar::algedonic_of_magnitude(&ScalarLoss::new(1.0f64.next_up()), &theta);
+    let theta = Region::above(rational(1.0));
+    let v = 1.0f64.next_up();
+    let measured = Enclosure::of_floats(v.next_down(), v.next_up()).expect("finite");
+    let verdict = pillar::cross(&measured, &theta);
     assert!(
-        !matches!(above, PropertyVerdict::Pass),
-        "one ulp above theta passed: {above:?}"
+        matches!(verdict, Membership::Undecided(_)),
+        "one ulp above theta: {verdict:?}"
     );
+    // Only an exact value one ulp above is In, and an exact value at theta is
+    // certified Out.
+    let exact = pillar::cross(&Enclosure::exact(rational(v)), &theta);
+    assert!(matches!(exact, Membership::In(_)), "got {exact:?}");
+    let at = pillar::cross(&Enclosure::exact(rational(1.0)), &theta);
+    assert!(matches!(at, Membership::Out(_)), "got {at:?}");
 }
 
 #[test]
-/// algedonic_of_magnitude Fail when magnitude vanishes.
-fn algedonic_of_magnitude_fail_when_zero() {
-    let magnitude = ScalarLoss::zero();
-    let theta = ScalarLoss::new(1.0);
-    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
-    assert!(
-        matches!(verdict, PropertyVerdict::Fail(_)),
-        "got {verdict:?}"
-    );
+/// Zero is a reading, not the absence of one: certified Out of (1, ∞).
+fn cross_reads_zero_as_a_value() {
+    let verdict = pillar::cross(&exactly(ScalarLoss::zero()), &Region::above(rational(1.0)));
+    assert!(matches!(verdict, Membership::Out(_)), "got {verdict:?}");
 }
 
 #[test]
-/// algedonic_of_magnitude Partial when signal below threshold.
-fn algedonic_of_magnitude_partial_below_threshold_but_nonzero() {
-    let magnitude = ScalarLoss::new(0.3);
-    let theta = ScalarLoss::new(1.0);
-    let verdict = pillar::algedonic_of_magnitude(&magnitude, &theta);
-    match verdict {
-        PropertyVerdict::Partial { confidence, .. } => {
-            assert!((confidence - 0.5).abs() < 1e-9, "confidence = {confidence}");
-        }
-        other => panic!("expected Partial, got {other:?}"),
-    }
+/// An enclosure wholly below theta is certified Out: a decided claim, with
+/// no confidence number.
+fn cross_out_below_threshold_but_nonzero() {
+    let verdict = pillar::cross(
+        &Enclosure::of_floats(0.25, 0.375).expect("finite"),
+        &Region::above(rational(1.0)),
+    );
+    assert!(matches!(verdict, Membership::Out(_)), "got {verdict:?}");
 }
 
 // ──────────────────────────────────────────────────────────────────

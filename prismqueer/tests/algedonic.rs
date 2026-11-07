@@ -163,7 +163,7 @@ impl Mix {
 
     /// A non-negative width, zero one time in four.
     fn width(&mut self) -> BigRational {
-        if self.next() % 4 == 0 {
+        if self.next().is_multiple_of(4) {
             q(0, 1)
         } else {
             q((self.next() % 9) as i64, 1 + (self.next() % 8) as i64)

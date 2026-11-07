@@ -27,7 +27,8 @@ fate-metal = ["fate", "dep:metal", "dep:objc"]
 fate-training = ["fate", "dep:serde", "dep:serde_json"]
 
 [dependencies]
-terni = { version = "0.7", path = "../imperfect" }
+# fractal: `Membership { In, Out, Undecided }` for algedonic::cross.
+terni = { version = "0.7", path = "../imperfect", features = ["fractal"] }
 prismqueer-projections = { version = "0.1", path = "../projections" }
 sha2 = "0.10"
 hex = "0.4"

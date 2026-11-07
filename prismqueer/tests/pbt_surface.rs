@@ -11,6 +11,9 @@
 
 #![cfg(feature = "bundle")]
 
+use num_bigint::BigInt;
+use num_rational::BigRational;
+use prismqueer::algedonic::{Enclosure, Membership, Region};
 use prismqueer::flux::pillar::{self, forall, Arbitrary, Sample};
 use terni::PropertyVerdict;
 
@@ -313,41 +316,58 @@ fn forall_partial_when_property_sometimes_holds() {
 }
 
 #[test]
-fn forall_composes_with_pillar_algedonic_of_magnitude() {
-    // Compose forall with an existing pillar primitive.
-    // Property: draw an i32, project to a Loss magnitude; check algedonic verdict.
-    // terni::Loss is impl'd for f64 (per terni/src/lib.rs); use f64 directly.
-    // Magnitudes 1..=100, so a draw can land on either side of theta, and
-    // the fold's outcome depends on the draws. The seed fixes them, so the
-    // outcome is exact: one Partial diagnostic per draw at or below theta.
-    let seed = b"forall_composes_with_pillar_algedonic_of_magnitude";
-    let magnitude = |x: i32| (1 + x.rem_euclid(100)) as f64;
-    let below = derived::<i32>(seed, 30)
-        .into_iter()
-        .filter(|&x| magnitude(x) <= 50.0)
-        .count();
-    assert!(
-        (1..30).contains(&below),
-        "the draws fall on both sides: {below} of 30 at or below"
-    );
-    let v = forall::<i32, _>(seed, 30, |x: i32| {
-        pillar::algedonic_of_magnitude(&magnitude(x), &50.0)
-    });
-    match v {
-        PropertyVerdict::Partial {
-            confidence,
-            diagnostics,
-        } => {
-            assert_eq!(confidence, 0.5);
-            assert_eq!(diagnostics.len(), below, "one per draw at or below theta");
+fn forall_composes_with_pillar_cross() {
+    // Compose forall with a pillar primitive.
+    // Property: draw an i32, project to an exact magnitude 1..=100, and
+    // cross the region (theta, ∞). The magnitudes are integers, so each
+    // enclosure is exact and every crossing is decided: In passes, a
+    // certified Out fails with its draw. The seed fixes the draws, so the
+    // outcome is exact: the first draw at or below theta is reported.
+    let seed = b"forall_composes_with_pillar_cross";
+    let magnitude = |x: i32| BigInt::from(1 + x.rem_euclid(100));
+    let crossing = |x: i32, theta: i64| {
+        pillar::cross(
+            &Enclosure::exact(BigRational::from_integer(magnitude(x))),
+            &Region::above(BigRational::from_integer(BigInt::from(theta))),
+        )
+    };
+    let property = |theta: i64| {
+        move |x: i32| match crossing(x, theta) {
+            Membership::In(_) => PropertyVerdict::Pass,
+            Membership::Out(_) => {
+                PropertyVerdict::Fail(terni::Diagnostic::new(format!("certified below at {x}")))
+            }
+            Membership::Undecided(_) => {
+                PropertyVerdict::Fail(terni::Diagnostic::new(format!("undecided at {x}")))
+            }
         }
-        other => panic!("expected Partial, got {other:?}"),
-    }
+    };
+    let draws = derived::<i32>(seed, 30);
+    let below: Vec<i32> = draws
+        .iter()
+        .copied()
+        .filter(|&x| matches!(crossing(x, 50), Membership::Out(_)))
+        .collect();
+    assert!(
+        (1..30).contains(&below.len()),
+        "the draws fall on both sides: {} of 30 at or below",
+        below.len()
+    );
+    assert!(
+        draws.iter().all(|&x| crossing(x, 50).is_decided()),
+        "exact magnitudes always decide"
+    );
+    let v = forall::<i32, _>(seed, 30, property(50));
+    assert_eq!(
+        v,
+        PropertyVerdict::Fail(terni::Diagnostic::new(format!(
+            "certified below at {}",
+            below[0]
+        ))),
+    );
 
     // Under a threshold every magnitude clears, the same draws Pass.
-    let v = forall::<i32, _>(seed, 30, |x: i32| {
-        pillar::algedonic_of_magnitude(&magnitude(x), &0.5)
-    });
+    let v = forall::<i32, _>(seed, 30, property(0));
     assert_eq!(v, PropertyVerdict::Pass);
 }
 

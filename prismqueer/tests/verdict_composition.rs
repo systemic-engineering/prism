@@ -1,9 +1,10 @@
 //! PropertyVerdict composition witnesses — `merge_with` semantics.
 //!
-//! Iter 4 + iter 6 landed `viability_of_magnitudes` +
-//! `algedonic_of_magnitude` so any `Loss + PartialOrd` can compose
-//! into either pillar. Iter 8 witnesses the LAYER ABOVE: how do
-//! multiple `PropertyVerdict`s combine into a single unified verdict?
+//! Iter 4 landed `viability_of_magnitudes` so any `Loss + PartialOrd`
+//! can compose into Pillar III. (Pillar II is `algedonic::cross` and
+//! `persist` now, Mara 2739e94c A3: no `PropertyVerdict`, no
+//! confidence.) Iter 8 witnesses the LAYER ABOVE: how do multiple
+//! `PropertyVerdict`s combine into a single unified verdict?
 //!
 //! Per `terni/src/transparency.rs` (`PropertyVerdict::merge_with`):
 //!

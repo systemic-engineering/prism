@@ -271,8 +271,8 @@ pub mod pillar {
     /// mirror-side property tests (e.g. `rust/src/collapse.rs::
     /// prop_tests::merged_algedonic_verdicts_pass_when_all_ticks_
     /// positive`) previously did manually. Parallel to
-    /// [`viability_of_magnitudes`] + [`algedonic_of_magnitude`] —
-    /// completes the pillar composition surface.
+    /// [`viability_of_magnitudes`] — completes the pillar composition
+    /// surface.
     pub fn fold(verdicts: &[PropertyVerdict]) -> PropertyVerdict {
         let mut unified = PropertyVerdict::Pass;
         for v in verdicts {
@@ -281,75 +281,17 @@ pub mod pillar {
         unified
     }
 
-    /// **Pillar II — algedonic threshold, generalized.**
+    /// **Pillar II — the algedonic threshold, split** (Mara 2739e94c §9
+    /// A3). The old pillar put "certified below" and "can't tell" into one
+    /// `Partial` with an unsigned `confidence: 0.5`, and read zero as "no
+    /// signal". It is two functions now, in [`crate::algedonic`]:
     ///
-    /// Same Pass/Partial/Fail semantics as [`algedonic`] but on a
-    /// raw `Loss` magnitude instead of a `Commutator` wrapper. Use
-    /// this when the magnitude comes from substrate-specific
-    /// measurements — e.g. a single collapse tick's byte-shrinkage
-    /// from `mirror/rust/src/collapse.rs`, or any measured `Loss`
-    /// that does not originate from a commutator computation.
-    ///
-    /// Parallel to [`viability_of_magnitudes`] (iter 4) — completes
-    /// the symmetric generalization of Pillar II + Pillar III to
-    /// domain-specific `Loss` values.
-    ///
-    /// - Pass when `magnitude > theta`.
-    /// - Fail when `magnitude.is_zero()` (no signal to detect).
-    /// - Partial when `0 < magnitude <= theta`
-    ///   (`confidence = 0.5` Rice-safe midpoint).
-    pub fn algedonic_of_magnitude<L>(magnitude: &L, theta: &L) -> PropertyVerdict
-    where
-        L: Loss + PartialOrd,
-    {
-        if magnitude > theta {
-            PropertyVerdict::Pass
-        } else if magnitude.is_zero() {
-            PropertyVerdict::Fail(Diagnostic::new("magnitude vanished; no algedonic signal"))
-        } else {
-            PropertyVerdict::Partial {
-                confidence: 0.5,
-                diagnostics: vec![Diagnostic::new(
-                    "algedonic signal present but below threshold",
-                )],
-            }
-        }
-    }
-
-    /// **Pillar II — algedonic threshold.**
-    ///
-    /// Per Mara `3cd9a42` §4:
-    ///
-    /// - Pass when `‖[A, B]‖ > theta`.
-    /// - Fail when `‖[A, B]‖ == Loss::zero()` (no signal).
-    /// - Partial otherwise — signal exists but below threshold.
-    ///
-    /// Requires `C::Holonomy: PartialOrd` because the pillar compares
-    /// magnitude against `theta`. `ScalarLoss` satisfies this.
-    pub fn algedonic<'a, C>(commutator: &Commutator<'a, C>, theta: &C::Holonomy) -> PropertyVerdict
-    where
-        C: FluxThread,
-        C::Holonomy: PartialOrd,
-        C::Optic: crate::Prism,
-        <<C::Optic as crate::Prism>::Input as crate::Beam>::In: Sized,
-    {
-        let m = commutator.magnitude();
-        if &m > theta {
-            PropertyVerdict::Pass
-        } else if m.is_zero() {
-            PropertyVerdict::Fail(Diagnostic::new("commutator vanished; no algedonic signal"))
-        } else {
-            // Partial: got a signal but below threshold. Confidence 0.5
-            // is a Rice-safe midpoint; consumers with domain-specific
-            // Holonomy types can implement a tighter Partial verdict.
-            PropertyVerdict::Partial {
-                confidence: 0.5,
-                diagnostics: vec![Diagnostic::new(
-                    "algedonic signal present but below threshold",
-                )],
-            }
-        }
-    }
+    /// - [`cross`]`(enclosure, region)`: T1, In | Out | Undecided. A
+    ///   magnitude arrives as an enclosure, from an instrument that ships
+    ///   one; a bare float or a generic `Loss` can't be crossed.
+    /// - [`persist`]`(evidence, ruler)`: T2, Accept | Reject | Continue
+    ///   over distinct contexts, under a signed ruler.
+    pub use crate::algedonic::{cross, persist};
 
     /// **Pillar III — viability persistence, generalized.**
     ///
@@ -872,12 +814,12 @@ pub mod pillar {
     ///
     /// Composes cleanly with all other pillar primitives: the
     /// per-iteration verdict `f(value)` can invoke
-    /// [`algedonic`](super::pillar::algedonic),
     /// [`viability`](super::pillar::viability),
-    /// [`algedonic_of_magnitude`](super::pillar::algedonic_of_magnitude),
     /// [`viability_of_magnitudes`](super::pillar::viability_of_magnitudes),
     /// [`dispatch_ambiguity`](super::pillar::dispatch_ambiguity), or
-    /// return a `PropertyVerdict` directly — the fold contract holds.
+    /// return a `PropertyVerdict` directly — the fold contract holds. A
+    /// [`cross`](super::pillar::cross) is a `Membership`, not a verdict:
+    /// the property says what each arm means.
     ///
     /// Per Mara witnessed-property-inference spec (mirror repo)
     /// §7.3 + §9.2 Arc 2. First liquid floor board for Void's default

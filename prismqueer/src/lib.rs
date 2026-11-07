@@ -31,6 +31,7 @@
 // when used within this crate.
 extern crate self as prismqueer;
 
+pub mod algedonic;
 pub mod beam;
 pub mod brain;
 pub mod coincidence;
