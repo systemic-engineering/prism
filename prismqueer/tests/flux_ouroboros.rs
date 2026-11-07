@@ -724,16 +724,16 @@ fn algedonic_of_magnitude_pass_above_threshold() {
 }
 
 #[test]
-/// Pass is strictly above theta: at theta it's Partial, one ulp above Pass.
-fn algedonic_of_magnitude_at_the_threshold_is_partial() {
+/// One ulp above theta is not a pass (Mara 2739e94c §9 A3). A float one ulp
+/// above the threshold lies inside any honest enclosure of the value it
+/// measured, so the crossing can't be certified: it is Undecided, never Pass.
+fn algedonic_one_ulp_above_the_threshold_is_not_a_pass() {
     let theta = ScalarLoss::new(1.0);
-    let at = pillar::algedonic_of_magnitude(&ScalarLoss::new(1.0), &theta);
-    assert!(
-        matches!(at, PropertyVerdict::Partial { confidence, .. } if confidence == 0.5),
-        "got {at:?}"
-    );
     let above = pillar::algedonic_of_magnitude(&ScalarLoss::new(1.0f64.next_up()), &theta);
-    assert!(matches!(above, PropertyVerdict::Pass), "got {above:?}");
+    assert!(
+        !matches!(above, PropertyVerdict::Pass),
+        "one ulp above theta passed: {above:?}"
+    );
 }
 
 #[test]
