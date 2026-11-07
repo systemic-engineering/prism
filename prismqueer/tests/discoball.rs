@@ -24,11 +24,12 @@ use std::collections::BTreeSet;
 use prismqueer::brain::{Brain, Capacity, Memory};
 use prismqueer::dependency::{DependencyGraph, Sign};
 use prismqueer::discoball::{
-    Ball, BallError, DarkExit, DarkSpot, Exit, Facet, FacetReport, Proof, Reading, Received,
-    Rotation, Ruler,
+    replay, Ball, BallError, DarkExit, DarkSpot, Exit, Facet, FacetReport, Mark, Proof, Reading,
+    Received, Rotation, Ruler, Shadow, Trace, Visit,
 };
 use prismqueer::room::{coboundary, pair, Exactness, Map, Modulus, Room, Vertices, ZMod, Z};
 use prismqueer::{Beam, IdentityPrism, Optic, Prism};
+use terni::{Imperfect, Outranks, Precedence};
 
 type Set = BTreeSet<u32>;
 
@@ -789,4 +790,335 @@ fn with_no_dark_spot_there_is_no_shadow_and_the_facets_exit_as_before() {
     assert!(reading.dark().is_empty());
     let exits: Vec<Exit> = reading.facets().iter().map(|f| f.exit()).collect();
     assert_eq!(exits, vec![Exit::Clear, Exit::Uncertain]);
+}
+
+// --- 7. Trace-back: replay under the caller's signed order -------------------
+//
+// prism-016 item 4, as Mara graded it: replay surfaces a twist that is
+// *known but masked* (in some facet's triple already, but another part's
+// received darkness would show instead). It cannot surface an unknown one,
+// a twist that would appear only if a hole were filled: that stays the
+// shadow's exit 2.
+
+/// Alex's signed order (prism-012 Log, 2026-11-01): a known twist should
+/// always show, so it outranks every received darkness.
+struct TwistFirst;
+
+impl<F: Clone> Precedence<Shadow, Trace<F>> for TwistFirst {
+    fn known_twist(&self, loss: &Trace<F>) -> bool {
+        loss.iter().any(Mark::is_twist)
+    }
+    fn outranks(&self, _darkness: &Shadow) -> Outranks {
+        Outranks::Twist
+    }
+}
+
+/// The reverse order: darkness outranks every twist.
+struct DarknessFirst;
+
+impl<F: Clone> Precedence<Shadow, Trace<F>> for DarknessFirst {
+    fn known_twist(&self, loss: &Trace<F>) -> bool {
+        loss.iter().any(Mark::is_twist)
+    }
+    fn outranks(&self, _darkness: &Shadow) -> Outranks {
+        Outranks::Darkness
+    }
+}
+
+fn light(facet: usize, lit: &[usize]) -> Visit {
+    Visit::Light {
+        facet,
+        lit: set(lit),
+    }
+}
+
+fn dark(spot: usize, received: Received) -> Visit {
+    Visit::Dark { spot, received }
+}
+
+/// `ball_of_two`'s facets with no light yet: the ball spec a tray replays
+/// onto.
+fn unlit_two() -> Ball {
+    let h = room(4);
+    let mut ball = Ball::new(&h);
+    let lit = Facet::stable(
+        &IdentityPrism::<Set>::new(),
+        "lit",
+        Map::identity(&h),
+        rules(&[(0, 1, Sign::Positive), (1, 0, Sign::Positive)]),
+    )
+    .expect("no `not`");
+    let shear = matrix(
+        &h,
+        &[&[1, 1, 0, 0], &[0, 1, 0, 0], &[0, 0, 2, 0], &[0, 0, 0, 3]],
+    );
+    let twisted = Facet::unproved(
+        &Unproved,
+        "twisted",
+        shear,
+        rules(&[(2, 3, Sign::Negative), (3, 2, Sign::Positive)]),
+    );
+    ball.facet(lit).expect("on the room");
+    ball.facet(twisted).expect("on the room");
+    ball
+}
+
+/// `ball_of_two`'s light, as visits.
+fn light_of_two() -> Vec<Visit> {
+    vec![
+        light(0, &[0]),
+        light(0, &[0, 1]),
+        light(1, &[2]),
+        light(1, &[2, 3]),
+    ]
+}
+
+fn shadows<F>(loss: &Trace<F>) -> Vec<&Shadow> {
+    loss.iter()
+        .filter_map(|m| match m {
+            Mark::Dark(s) => Some(s),
+            _ => None,
+        })
+        .collect()
+}
+
+fn twists<F>(loss: &Trace<F>) -> Vec<&Mark<F>> {
+    loss.iter().filter(|m| m.is_twist()).collect()
+}
+
+#[test]
+fn a_known_horizontal_twist_masked_by_darkness_surfaces_under_twist_first() {
+    let mut visits = light_of_two();
+    visits.push(dark(1, Received::Hole));
+
+    // The parts, as the ball reads them: the stable facet clear, the odd
+    // `not` loop a Partial marked as a twist, the hole a Failure.
+    let mut ball = unlit_two();
+    for v in &visits {
+        ball.visit(v).expect("on the ball");
+    }
+    let parts = ball.measure(&NoDeclarations).parts();
+    assert_eq!(parts.len(), 3);
+    assert!(matches!(parts[0], Imperfect::Success(_)));
+    assert!(matches!(&parts[1], Imperfect::Partial(_, l) if l.iter().any(Mark::is_twist)));
+    assert!(matches!(parts[2], Imperfect::Failure(_, _)));
+
+    let joined = replay(&unlit_two(), &visits, &NoDeclarations, &TwistFirst).expect("on the ball");
+    let (reports, loss) = match joined {
+        Imperfect::Partial(reports, loss) => (reports, loss),
+        other => panic!("expected the twist to show, got {other:?}"),
+    };
+    let names: Vec<&str> = reports.iter().map(|r| r.name()).collect();
+    assert_eq!(names, ["lit", "twisted"]);
+
+    // The twist is marked, with its certificate.
+    match twists(&loss)[..] {
+        [Mark::Horizontal {
+            facet,
+            name,
+            holonomy,
+        }] => {
+            assert_eq!((*facet, name.as_str()), (1, "twisted"));
+            assert!(holonomy.twisted());
+            assert_eq!(holonomy, reports[1].triple().holonomy());
+        }
+        ref other => panic!("expected one horizontal twist, got {other:?}"),
+    }
+    // The darkness is kept in the loss, not lost.
+    let kept = shadows(&loss);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].dark(), DarkSpot::new(1, Received::Hole));
+    assert_eq!(kept[0].exit(), Some(DarkExit::Uncertain));
+}
+
+#[test]
+fn the_order_is_the_caller_s_under_darkness_first_the_darkness_shows() {
+    let mut visits = light_of_two();
+    visits.push(dark(1, Received::Hole));
+    let joined =
+        replay(&unlit_two(), &visits, &NoDeclarations, &DarknessFirst).expect("on the ball");
+    let (shown, loss) = match joined {
+        Imperfect::Failure(shown, loss) => (shown, loss),
+        other => panic!("expected the darkness to show, got {other:?}"),
+    };
+    assert_eq!(shown.dark(), DarkSpot::new(1, Received::Hole));
+    // The twist is still kept in the loss: precedence decides visibility,
+    // never what's kept.
+    assert_eq!(twists(&loss).len(), 1);
+    assert_eq!(shadows(&loss), [&shown]);
+}
+
+#[test]
+fn a_known_vertical_twist_masked_by_darkness_surfaces_the_same_way() {
+    let h = room(4);
+    let run = pos_v05(&[0, 1]);
+    let mut spec = Ball::new(&h);
+    spec.facet(Facet::unproved(
+        &Unproved,
+        "pos-v05",
+        Map::identity(&h),
+        run.rules().clone(),
+    ))
+    .expect("on the room");
+    let mut visits: Vec<Visit> = run
+        .light()
+        .iter()
+        .map(|lit| Visit::Light {
+            facet: 0,
+            lit: lit.clone(),
+        })
+        .collect();
+    visits.push(dark(0, Received::Unreadable));
+
+    match replay(&spec, &visits, &Functional, &TwistFirst).expect("on the ball") {
+        Imperfect::Partial(reports, loss) => {
+            assert_eq!(reports[0].triple().findings(), &[(2, 3)]);
+            assert!(!reports[0].triple().horizontal(), "no loop: vertical only");
+            assert_eq!(
+                twists(&loss),
+                [&Mark::Vertical {
+                    facet: 0,
+                    name: "pos-v05".to_string(),
+                    findings: vec![(2, 3)],
+                }]
+            );
+            assert_eq!(shadows(&loss).len(), 1, "the darkness is kept");
+        }
+        other => panic!("expected the paradox to show, got {other:?}"),
+    }
+    match replay(&spec, &visits, &Functional, &DarknessFirst).expect("on the ball") {
+        Imperfect::Failure(shown, loss) => {
+            assert_eq!(shown.dark(), DarkSpot::new(0, Received::Unreadable));
+            assert_eq!(twists(&loss).len(), 1, "the paradox is kept");
+        }
+        other => panic!("expected the darkness to show, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_unknown_twist_is_not_surfaced_the_darkness_shows_and_keeps_exit_two() {
+    use Sign::Negative;
+    // 0 → 1 → 0, two `not`s: an even loop, a choice today, no known twist.
+    // A hole at 0 sits on that closed walk: what arrives there could decide
+    // a twist, so the shadow exits 2. Nothing has arrived, so nothing is
+    // known, and replay must not invent it.
+    let h = room(2);
+    let mut spec = Ball::new(&h);
+    spec.facet(Facet::unproved(
+        &Unproved,
+        "choice",
+        Map::identity(&h),
+        rules(&[(0, 1, Negative), (1, 0, Negative)]),
+    ))
+    .expect("on the room");
+    let visits = [light(0, &[1]), dark(0, Received::Hole)];
+
+    match replay(&spec, &visits, &NoDeclarations, &TwistFirst).expect("on the ball") {
+        Imperfect::Failure(shown, loss) => {
+            assert_eq!(shown.dark(), DarkSpot::new(0, Received::Hole));
+            assert_eq!(shown.exit(), Some(DarkExit::Unknown), "still exit 2");
+            assert!(twists(&loss).is_empty(), "replay invents no twist");
+            assert_eq!(loss, vec![Mark::Dark(shown.clone())]);
+        }
+        other => panic!("an unknown twist can't surface, got {other:?}"),
+    }
+}
+
+#[test]
+fn replay_is_deterministic_and_independent_visits_commute() {
+    let h = room(4);
+    let mut visits = light_of_two();
+    visits.push(dark(1, Received::Hole));
+    let once = replay(&unlit_two(), &visits, &NoDeclarations, &TwistFirst);
+    assert_eq!(
+        replay(&unlit_two(), &visits, &NoDeclarations, &TwistFirst),
+        once,
+        "the same visits, the same result"
+    );
+
+    // Light of different facets, and darkness among light, commute.
+    let interleaved = [
+        light(1, &[2]),
+        dark(1, Received::Hole),
+        light(0, &[0]),
+        light(1, &[2, 3]),
+        light(0, &[0, 1]),
+    ];
+    assert_eq!(
+        replay(&unlit_two(), &interleaved, &NoDeclarations, &TwistFirst),
+        once
+    );
+
+    // A turn commutes with light given in the chart of its own time.
+    let r = cycle(&h);
+    let mut before = light_of_two();
+    before.push(Visit::Turn(r.clone()));
+    let mut after = vec![Visit::Turn(r.clone())];
+    after.extend(light_of_two().into_iter().map(|v| match v {
+        Visit::Light { facet, lit } => Visit::Light {
+            facet,
+            lit: lit.iter().map(|&s| r.image()[s]).collect(),
+        },
+        other => other,
+    }));
+    assert_eq!(
+        replay(&unlit_two(), &before, &NoDeclarations, &TwistFirst),
+        replay(&unlit_two(), &after, &NoDeclarations, &TwistFirst)
+    );
+
+    // Where order matters, and why. Darkness arrives in order: the first
+    // darkness that outranks is the one shown.
+    let mut ab = light_of_two();
+    ab.extend([dark(1, Received::Hole), dark(2, Received::Budget)]);
+    let mut ba = light_of_two();
+    ba.extend([dark(2, Received::Budget), dark(1, Received::Hole)]);
+    let shown = |visits: &[Visit]| match replay(&unlit_two(), visits, &NoDeclarations, &DarknessFirst)
+    {
+        Ok(Imperfect::Failure(s, _)) => s.dark(),
+        other => panic!("expected darkness, got {other:?}"),
+    };
+    assert_eq!(shown(&ab), DarkSpot::new(1, Received::Hole));
+    assert_eq!(shown(&ba), DarkSpot::new(2, Received::Budget));
+
+    // Steps of one facet are its step boundaries, in order: discoball's
+    // light is not monotone by fiat, so a reversed run is another run.
+    let trace = |visits: &[Visit]| match replay(&unlit_two(), visits, &NoDeclarations, &TwistFirst)
+    {
+        Ok(Imperfect::Partial(r, _)) => r[0].triple().lums_trace().to_vec(),
+        other => panic!("expected the twist to show, got {other:?}"),
+    };
+    let rising = [light(0, &[0]), light(0, &[0, 1]), light(1, &[2, 3])];
+    let falling = [light(0, &[0, 1]), light(0, &[0]), light(1, &[2, 3])];
+    assert_eq!(trace(&rising), [1, 2]);
+    assert_eq!(trace(&falling), [2, 1]);
+}
+
+#[test]
+fn a_visit_off_the_ball_is_refused() {
+    let ball = unlit_two();
+    assert_eq!(
+        replay(&ball, &[light(2, &[0])], &NoDeclarations, &TwistFirst),
+        Err(BallError::NoFacet {
+            facet: 2,
+            facets: 2
+        })
+    );
+    assert_eq!(
+        replay(&ball, &[light(0, &[4])], &NoDeclarations, &TwistFirst),
+        Err(BallError::Outside { spot: 4, dim: 4 })
+    );
+    assert_eq!(
+        replay(
+            &ball,
+            &[dark(9, Received::Hole)],
+            &NoDeclarations,
+            &TwistFirst
+        ),
+        Err(BallError::Outside { spot: 9, dim: 4 })
+    );
+    let other = Rotation::identity(&room(3));
+    assert!(matches!(
+        replay(&ball, &[Visit::Turn(other)], &NoDeclarations, &TwistFirst),
+        Err(BallError::Room(_))
+    ));
 }

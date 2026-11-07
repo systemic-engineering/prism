@@ -131,6 +131,99 @@
 //! safe only for readings that rise with light, and variance-of-pain
 //! doesn't. The exit table above stands on the Prism's own light; the
 //! Roomba-patience rationale does not.
+//!
+//! # Trace-back: replay under the caller's signed order
+//!
+//! prism's half of kintsugi trace-back (prism-016 item 4). mirror owns dock
+//! and the Roomba's event-sourced tray; prism owns the parts and the replay.
+//!
+//! - **Reports as parts** ([`Reading::parts`]): each facet, then each
+//!   shadow, becomes a [`terni::Imperfect`] that [`terni::join_with`] reads.
+//!   A clear facet is `Success(report)`. A facet with a known twist is
+//!   `Partial(report, marks)`, its loss naming each twist ([`Mark::Vertical`]
+//!   with the ruler's findings, [`Mark::Horizontal`] with the holonomy and
+//!   its certificate). Received darkness is `Failure(shadow, [Mark::Dark])`:
+//!   the shadow is the error the order reads, and it is in the loss as well,
+//!   so it is kept when a twist is the one shown.
+//! - **How an order sees a twist:** the loss is a [`Trace`], a list of
+//!   [`Mark`]s, and [`Mark::is_twist`] says which are twists. A caller's
+//!   `Precedence::known_twist` is `loss.iter().any(Mark::is_twist)`, and its
+//!   `outranks` reads the [`Shadow`]: received how, read by whom, which exit.
+//!   terni knows nothing of prism; prism ships no order.
+//! - **Replay** ([`replay`]): a ball spec and a sequence of [`Visit`]s, a step
+//!   of light, a dark spot received, a turn, as data, re-measured and joined
+//!   under the caller's order. There is no clock: the visits' order in the
+//!   slice is the only sequence, and the same visits give the same result.
+//!   Visits name spots in the chart of their own time, as
+//!   [`Ball::receive`] does.
+//!
+//!   What commutes: light of different facets, and darkness among light, in
+//!   one chart. What doesn't: steps of one facet (they are its step
+//!   boundaries, in order; light needn't rise, [`Triple::first_drop`]);
+//!   darkness among darkness (it arrives in order, and a join shows the first
+//!   darkness that outranks); and any visit across a turn, unless its spots
+//!   are turned with it.
+//!
+//! **What replay surfaces, and what it can't** (Mara's grade, prism-016 Log,
+//! 2026-11-07, Ask 4):
+//!
+//! - **It surfaces a twist that is known but masked.** Known: it is in a
+//!   facet's triple already, an odd `not` loop certified by room's solver or
+//!   a finding of the caller's ruler, from light that arrived. Masked: some
+//!   other part's received darkness would show instead (a bind's `.eh()`
+//!   stops at the first `Failure`; so does a join under an order where
+//!   darkness outranks). Under Alex's signed order (prism-012 Log,
+//!   2026-11-01: "a known twist should always show") the twist shows as
+//!   `Partial`, and the darkness stays in the loss.
+//! - **It cannot surface an unknown twist,** one that would appear only if a
+//!   hole were filled. Replay re-measures the light that arrived; it never
+//!   fills a hole, guesses what a hole holds, or reads exit 2 as a twist. Such
+//!   darkness joins as `Failure`, whatever the order, and its shadow keeps
+//!   [`DarkExit::Unknown`] (exit 2): the only honest report of a twist that
+//!   may be hiding. Offering it as `maybe` to whoever can answer is mirror's.
+//!
+//! Replay takes an order, always. Without one it doesn't compile:
+//!
+//! ```compile_fail,E0277
+//! use prismqueer::discoball::{replay, Ball, Facet, Ruler};
+//! use prismqueer::room::{Room, Vertices};
+//! struct Silent;
+//! impl Ruler for Silent {
+//!     type Finding = ();
+//!     fn findings(&self, _: &Facet) -> Vec<()> {
+//!         Vec::new()
+//!     }
+//! }
+//! let h: Room<Vertices> = Room::over(&(0..2).collect());
+//! let _ = replay(&Ball::new(&h), &[], &Silent, &());
+//! ```
+//!
+//! The control, with a signed order supplied:
+//!
+//! ```
+//! use prismqueer::discoball::{replay, Ball, Facet, Mark, Ruler, Shadow, Trace};
+//! use prismqueer::room::{Room, Vertices};
+//! use terni::{Imperfect, Outranks, Precedence};
+//! struct Silent;
+//! impl Ruler for Silent {
+//!     type Finding = ();
+//!     fn findings(&self, _: &Facet) -> Vec<()> {
+//!         Vec::new()
+//!     }
+//! }
+//! struct TwistFirst;
+//! impl Precedence<Shadow, Trace<()>> for TwistFirst {
+//!     fn known_twist(&self, loss: &Trace<()>) -> bool {
+//!         loss.iter().any(Mark::is_twist)
+//!     }
+//!     fn outranks(&self, _: &Shadow) -> Outranks {
+//!         Outranks::Twist
+//!     }
+//! }
+//! let h: Room<Vertices> = Room::over(&(0..2).collect());
+//! let joined = replay(&Ball::new(&h), &[], &Silent, &TwistFirst);
+//! assert_eq!(joined, Ok(Imperfect::Success(Vec::new())));
+//! ```
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
