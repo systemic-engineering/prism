@@ -1059,3 +1059,96 @@ fn canonical_loop(walk: Walk) -> Walk {
     };
     Walk { vertices, edges }
 }
+
+#[cfg(test)]
+mod complex_encoding {
+    use super::*;
+
+    /// The documented preimage of [`complex_oid`]: `u64le(|V|) ‖ V ‖
+    /// u64le(|E|) ‖ E`, every vertex a `u64le`, every edge its two ends.
+    fn documented(vertices: &[VertexId], edges: &[EdgeKey]) -> Vec<u8> {
+        let mut bytes = (vertices.len() as u64).to_le_bytes().to_vec();
+        for v in vertices {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        bytes.extend_from_slice(&(edges.len() as u64).to_le_bytes());
+        for (a, b) in edges {
+            bytes.extend_from_slice(&a.to_le_bytes());
+            bytes.extend_from_slice(&b.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// Read the documented preimage back, or `None` if it isn't one.
+    fn decode(bytes: &[u8]) -> Option<(Vec<VertexId>, Vec<EdgeKey>)> {
+        let mut words = bytes
+            .chunks(8)
+            .map(|w| <[u8; 8]>::try_from(w).ok().map(u64::from_le_bytes));
+        let mut next = || words.next().flatten();
+        let n = next()?;
+        let vertices: Vec<VertexId> = (0..n).map(|_| next()).collect::<Option<_>>()?;
+        let m = next()?;
+        let edges: Vec<EdgeKey> = (0..m)
+            .map(|_| Some((next()?, next()?)))
+            .collect::<Option<_>>()?;
+        next().is_none().then_some((vertices, edges))
+    }
+
+    fn splitmix(x: &mut u64) -> u64 {
+        *x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *x;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+
+    /// A word that is small, all-0xFF-topped, or anything: the old
+    /// encoding's separator lives in those bytes.
+    fn word(seed: &mut u64) -> u64 {
+        match splitmix(seed) % 3 {
+            0 => splitmix(seed) % 8,
+            1 => 0xFF00_0000_0000_0000 | (splitmix(seed) % 0x1_0000),
+            _ => splitmix(seed),
+        }
+    }
+
+    /// Two raw vertex and edge lists the old encoding (`vertices ‖ 0xFF ‖
+    /// edges`, no lengths) gave one preimage: `[1, b, 0x1FF, 0x200]` with no
+    /// edges, and `[1, b]` with the edge `(1, b)`, for `b = 0xFF00…02`. Not
+    /// both graphs (the four aren't ascending): on vertex sets with ends
+    /// among them the old encoding happened to be injective, by the
+    /// ordering alone. The encoding itself delimits nothing; now it does.
+    #[test]
+    fn the_complex_encoding_delimits_its_own_lists() {
+        let b = 0xFF00_0000_0000_0002u64;
+        let four = complex_oid([1, b, 0x1FF, 0x200].into_iter(), std::iter::empty());
+        let two_and_an_edge = complex_oid([1, b].into_iter(), [(1, b)].into_iter());
+        assert_ne!(four, two_and_an_edge, "the lists are delimited");
+    }
+
+    /// The property: `complex_oid` hashes the documented encoding, and the
+    /// encoding decodes back to exactly its lists, so distinct lists have
+    /// distinct preimages. Over 2 000 deterministic samples, lists of length
+    /// 0 to 5, words biased to the bytes the old separator could hide in.
+    #[test]
+    fn the_complex_encoding_decodes_uniquely() {
+        let mut seed = 0x636f_6d70_6c65_7821; // "complex!"
+        for _ in 0..2_000 {
+            let n = (splitmix(&mut seed) % 6) as usize;
+            let m = (splitmix(&mut seed) % 6) as usize;
+            let vertices: Vec<VertexId> = (0..n).map(|_| word(&mut seed)).collect();
+            let edges: Vec<EdgeKey> = (0..m).map(|_| (word(&mut seed), word(&mut seed))).collect();
+            let bytes = documented(&vertices, &edges);
+            assert_eq!(
+                decode(&bytes),
+                Some((vertices.clone(), edges.clone())),
+                "decodes back"
+            );
+            assert_eq!(
+                complex_oid(vertices.iter().copied(), edges.iter().copied()),
+                Oid::hash(&Scope::public(), &bytes),
+                "complex_oid hashes the documented encoding"
+            );
+        }
+    }
+}

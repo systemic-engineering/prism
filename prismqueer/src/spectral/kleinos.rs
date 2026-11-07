@@ -736,19 +736,22 @@ mod tests {
         );
     }
 
-    /// The composition's preimage: its graph's address (hex) ‖ 0xFF ‖ the
-    /// emergent third (`u64`, little-endian). No λ₂.
+    /// The composition's preimage: `"composition\0" ‖ enc(content)`, with
+    /// `enc(b) = u64be(len b) ‖ b` and content its graph's address (hex) ‖
+    /// the emergent third (`u64be`). No λ₂.
     #[test]
     fn the_composition_address_is_its_graph_and_emergent_third() {
         let a = graph_from_edges(&[(0, 1), (1, 2)]);
         let b = graph_from_edges(&[(3, 4), (4, 5)]);
         let c = green(&a, &b);
-        let mut bytes = complex_oid(c.vertices(), c.edges())
+        let mut content = complex_oid(c.vertices(), c.edges())
             .as_str()
             .as_bytes()
             .to_vec();
-        bytes.push(0xFF);
-        bytes.extend_from_slice(&6u64.to_le_bytes()); // max(0..=5) + 1
+        content.extend_from_slice(&6u64.to_be_bytes()); // max(0..=5) + 1
+        let mut bytes = b"composition\0".to_vec();
+        bytes.extend_from_slice(&(content.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&content);
         assert_eq!(c.emergent_third_stalk(), 6);
         assert_eq!(c.oid(), Oid::hash(&Scope::public(), &bytes));
     }
@@ -760,6 +763,39 @@ mod tests {
         let path = graph_from_edges(&[(3, 4), (4, 5)]);
         let triangle = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]);
         assert_ne!(green(&a, &path).oid(), green(&a, &triangle).oid());
+    }
+
+    /// A composition is not the graph its preimage spells. Before the shape
+    /// prefix, a composition's preimage was `graph hex ‖ 0xFF ‖ u64le(e)`:
+    /// 73 bytes. Read as eight little-endian words of hex and a ninth that
+    /// starts at the 0xFF, it is `vertices ‖ 0xFF`, a 9-vertex graph with
+    /// no edges, whenever the eight hex words ascend and `e`'s top byte is
+    /// 0xFF (the graph's separator). Searching the second operand's first
+    /// end from 3 up found 25 515 (on the encodings of `59e0a7b`): the
+    /// composition and that graph had one address. Two kinds, one address.
+    #[test]
+    fn a_composition_is_not_the_graph_its_preimage_spells() {
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(25_515, 0xFFFF_0000_0000_0000)]);
+        let c = green(&a, &b);
+        let e = c.emergent_third_stalk();
+        assert_eq!(e, 0xFFFF_0000_0000_0001, "its top byte is 0xFF");
+        let hex = complex_oid(c.vertices(), c.edges());
+        let mut spelled: Vec<u64> = hex
+            .as_str()
+            .as_bytes()
+            .chunks(8)
+            .map(|w| u64::from_le_bytes(w.try_into().expect("64 hex digits")))
+            .collect();
+        let mut ninth = [0xFFu8; 8];
+        ninth[1..].copy_from_slice(&e.to_le_bytes()[..7]);
+        spelled.push(u64::from_le_bytes(ninth));
+        let graph = Multigraph::new(spelled.iter().copied(), std::iter::empty());
+        assert_ne!(
+            c.oid(),
+            complex_oid(graph.vertices(), std::iter::empty()),
+            "a composition and a graph never share an address"
+        );
     }
 
     #[test]
