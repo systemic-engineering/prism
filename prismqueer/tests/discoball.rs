@@ -24,7 +24,8 @@ use std::collections::BTreeSet;
 use prismqueer::brain::{Brain, Capacity, Memory};
 use prismqueer::dependency::{DependencyGraph, Sign};
 use prismqueer::discoball::{
-    Ball, BallError, DarkSpot, Exit, Facet, FacetReport, Proof, Received, Rotation, Ruler,
+    Ball, BallError, DarkExit, DarkSpot, Exit, Facet, FacetReport, Proof, Reading, Received,
+    Rotation, Ruler,
 };
 use prismqueer::room::{coboundary, pair, Exactness, Map, Modulus, Room, Vertices, ZMod, Z};
 use prismqueer::{Beam, IdentityPrism, Optic, Prism};
@@ -606,4 +607,186 @@ fn only_a_unitary_over_the_fixed_ring_is_a_rotation() {
         ball.facet(loose),
         Err(BallError::Outside { spot: 5, dim: 2 })
     );
+}
+
+// --- 6. Darkness × kind ------------------------------------------------------
+//
+// Mara, prism-012 Log (b): darkness is received × kind. The same hole is
+// exit 1 beside a stable facet and can be exit 2 beside an unproved one.
+// Each dark spot lists the facets that read it, and its exit per reader,
+// beside the facets' own exits.
+
+/// Each shadow's readers as (facet index, name, exit code).
+fn readers(reading: &Reading<()>) -> Vec<Vec<(usize, String, u8)>> {
+    reading
+        .shadows()
+        .iter()
+        .map(|s| {
+            s.readers()
+                .iter()
+                .map(|r| (r.facet(), r.name().to_string(), r.exit().code()))
+                .collect()
+        })
+        .collect()
+}
+
+#[test]
+fn a_dark_spot_read_only_by_a_stable_facet_exits_one() {
+    let mut ball = ball_of_two();
+    ball.receive(1, Received::Hole).expect("a spot of the ball");
+    let reading = ball.measure(&NoDeclarations);
+    let shadow = &reading.shadows()[0];
+    assert_eq!(shadow.dark(), DarkSpot::new(1, Received::Hole));
+    assert_eq!(readers(&reading), vec![vec![(0, "lit".to_string(), 1)]]);
+    assert_eq!(shadow.readers()[0].proof(), Proof::Stable);
+    assert_eq!(shadow.exit(), Some(DarkExit::Uncertain));
+    assert_eq!(DarkExit::Uncertain.code(), 1);
+}
+
+#[test]
+fn a_dark_spot_on_a_cycle_through_a_not_of_an_unproved_facet_exits_two() {
+    let mut ball = ball_of_two();
+    // 2 → 3 is a `not`, 3 → 2 closes the loop: both spots sit on it.
+    ball.receive(2, Received::Hole).expect("a spot of the ball");
+    ball.receive(3, Received::Unreadable)
+        .expect("a spot of the ball");
+    let reading = ball.measure(&NoDeclarations);
+    assert_eq!(
+        readers(&reading),
+        vec![
+            vec![(1, "twisted".to_string(), 2)],
+            vec![(1, "twisted".to_string(), 2)]
+        ]
+    );
+    assert_eq!(reading.shadows()[0].exit(), Some(DarkExit::Unknown));
+    assert_eq!(DarkExit::Unknown.code(), 2);
+    // Exit 2 sits beside the facet's own exit, never over it.
+    assert_eq!(reading.facets()[1].exit(), Exit::Uncertain);
+
+    // A `not` loop of length one: the spot is on it.
+    let mut ball = one_facet(&[(0, 0, Sign::Negative)]);
+    ball.receive(0, Received::Budget)
+        .expect("a spot of the ball");
+    let reading = ball.measure(&NoDeclarations);
+    assert_eq!(reading.shadows()[0].exit(), Some(DarkExit::Unknown));
+}
+
+#[test]
+fn a_dark_spot_of_an_unproved_facet_with_no_not_on_a_cycle_through_it_exits_one() {
+    use Sign::{Negative, Positive};
+    // 0 ⇄ 1 is a positive loop; 1 → 2 is a stratified `not`, on no cycle.
+    // A separate loop could hold a `not` too, but none passes through 0.
+    let mut ball = one_facet(&[(0, 1, Positive), (1, 0, Positive), (1, 2, Negative)]);
+    for spot in 0..3 {
+        ball.receive(spot, Received::Hole)
+            .expect("a spot of the ball");
+    }
+    let reading = ball.measure(&NoDeclarations);
+    assert_eq!(
+        readers(&reading),
+        vec![vec![(0, "rules".to_string(), 1)]; 3],
+        "every spot is read (lit, or an atom), and none sits on a `not` cycle"
+    );
+    for shadow in reading.shadows() {
+        assert_eq!(shadow.readers()[0].proof(), Proof::Unproved);
+        assert_eq!(shadow.exit(), Some(DarkExit::Uncertain));
+    }
+
+    // A `not` cycle elsewhere doesn't reach a spot off it: 0 → 1 → 0 holds
+    // a `not`, 2 only hangs off it.
+    let mut ball = one_facet(&[(0, 1, Negative), (1, 0, Positive), (1, 2, Positive)]);
+    ball.receive(2, Received::Hole).expect("a spot of the ball");
+    ball.receive(0, Received::Hole).expect("a spot of the ball");
+    let reading = ball.measure(&NoDeclarations);
+    assert_eq!(reading.shadows()[0].exit(), Some(DarkExit::Uncertain));
+    assert_eq!(reading.shadows()[1].exit(), Some(DarkExit::Unknown));
+}
+
+#[test]
+fn a_spot_read_by_a_stable_and_an_unproved_facet_exits_at_the_max() {
+    use Sign::{Negative, Positive};
+    let h = room(3);
+    let mut ball = Ball::new(&h);
+    let mut steady = Facet::stable(
+        &IdentityPrism::<Set>::new(),
+        "steady",
+        Map::identity(&h),
+        rules(&[]),
+    )
+    .expect("no `not`");
+    steady.step([0]);
+    let loose = Facet::unproved(
+        &Unproved,
+        "loose",
+        Map::identity(&h),
+        rules(&[(0, 1, Negative), (1, 0, Positive)]),
+    );
+    ball.facet(steady).expect("on the room");
+    ball.facet(loose).expect("on the room");
+    ball.receive(0, Received::Hole).expect("a spot of the ball");
+    ball.receive(2, Received::Hole).expect("a spot of the ball");
+    let reading = ball.measure(&NoDeclarations);
+    assert_eq!(
+        readers(&reading),
+        vec![
+            vec![(0, "steady".to_string(), 1), (1, "loose".to_string(), 2)],
+            vec![],
+        ],
+        "each reader at its own exit, in the order the facets joined; spot 2 has none"
+    );
+    assert_eq!(
+        reading.shadows()[0].exit(),
+        Some(DarkExit::Unknown),
+        "the max"
+    );
+    assert_eq!(
+        reading.shadows()[1].exit(),
+        None,
+        "no reader, no exit: the darkness still shows in the channel"
+    );
+    assert_eq!(reading.dark().len(), 2);
+}
+
+#[test]
+fn a_full_turn_keeps_every_shadow_s_readers_and_exits_and_moves_its_spot() {
+    let h = room(4);
+    let r = cycle(&h);
+    let mut ball = ball_of_two();
+    ball.receive(1, Received::Hole).expect("a spot of the ball");
+    ball.receive(2, Received::Budget)
+        .expect("a spot of the ball");
+    let home = ball.measure(&NoDeclarations);
+    let mut moved: Vec<usize> = (0..4).collect();
+    for step in 1..=4 {
+        ball.rotate(&r).expect("a rotation of the ball's room");
+        moved = moved.iter().map(|&i| r.image()[i]).collect();
+        let now = ball.measure(&NoDeclarations);
+        assert_eq!(
+            readers(&now),
+            readers(&home),
+            "step {step}: readers and exits"
+        );
+        for (a, b) in home.shadows().iter().zip(now.shadows()) {
+            assert_eq!(b.exit(), a.exit(), "step {step}: the spot's exit");
+            assert_eq!(b.received(), a.received());
+            assert_eq!(b.spot(), moved[a.spot()], "step {step}: the spot turned");
+        }
+        if step < 4 {
+            assert_ne!(now.shadows(), home.shadows(), "step {step}: moved");
+        }
+    }
+    assert_eq!(
+        ball.measure(&NoDeclarations),
+        home,
+        "home after a full turn"
+    );
+}
+
+#[test]
+fn with_no_dark_spot_there_is_no_shadow_and_the_facets_exit_as_before() {
+    let reading = ball_of_two().measure(&NoDeclarations);
+    assert!(reading.shadows().is_empty());
+    assert!(reading.dark().is_empty());
+    let exits: Vec<Exit> = reading.facets().iter().map(|f| f.exit()).collect();
+    assert_eq!(exits, vec![Exit::Clear, Exit::Uncertain]);
 }
