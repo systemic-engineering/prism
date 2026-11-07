@@ -662,6 +662,7 @@ fn into_imperfect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::band::{Machine, Measurement};
 
     #[test]
     fn sheaf_construction_edges_only_per_q_mara_lambda() {
@@ -689,6 +690,57 @@ mod tests {
             result.is_err(),
             "identical inputs must refuse fusion per PAPER §3.6.4 — Red state"
         );
+    }
+
+    fn green(a: &Graph, b: &Graph) -> Composition {
+        match kleinos(a, b) {
+            Imperfect::Success(c) => c,
+            other => panic!("expected Green, got {other:?}"),
+        }
+    }
+
+    /// The machine test (prism-016 item 2). Another machine reads the same
+    /// composition's λ₂ a last bit up. The exact content is equal, so the
+    /// address is one; both readings stay beside it, sealed.
+    #[test]
+    fn two_machines_reading_lambda_2_a_bit_apart_give_one_composition_address() {
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(3, 4), (4, 5)]);
+        let here = green(&a, &b);
+        let value = here.fiedler_lambda_2();
+        let next = f64::from_bits(value.to_bits() + 1);
+        let other = Machine::new("riscv64", "elsewhere");
+        let mut there = here.clone();
+        there.fiedler = Measurement::on(other, next, FIEDLER_METHOD);
+        assert_ne!(value, next, "the readings differ in the last bit");
+        assert_eq!(here.oid(), there.oid(), "one address across machines");
+        assert_eq!(there.fiedler_lambda_2(), next, "read beside");
+        assert_eq!(here.fiedler().machine(), Machine::here());
+        assert_eq!(there.fiedler().machine(), other, "sealed with machine");
+        assert_eq!(here.fiedler().method(), FIEDLER_METHOD, "sealed with method");
+    }
+
+    /// The composition's preimage: its graph's address (hex) ‖ 0xFF ‖ the
+    /// emergent third (`u64`, little-endian). No λ₂.
+    #[test]
+    fn the_composition_address_is_its_graph_and_emergent_third() {
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let b = graph_from_edges(&[(3, 4), (4, 5)]);
+        let c = green(&a, &b);
+        let mut bytes = complex_oid(c.vertices(), c.edges()).as_str().as_bytes().to_vec();
+        bytes.push(0xFF);
+        bytes.extend_from_slice(&6u64.to_le_bytes()); // max(0..=5) + 1
+        assert_eq!(c.emergent_third_stalk(), 6);
+        assert_eq!(c.oid(), Oid::hash(&Scope::public(), &bytes));
+    }
+
+    /// Genuinely different compositions keep different addresses.
+    #[test]
+    fn different_graphs_compose_to_different_addresses() {
+        let a = graph_from_edges(&[(0, 1), (1, 2)]);
+        let path = graph_from_edges(&[(3, 4), (4, 5)]);
+        let triangle = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]);
+        assert_ne!(green(&a, &path).oid(), green(&a, &triangle).oid());
     }
 
     #[test]

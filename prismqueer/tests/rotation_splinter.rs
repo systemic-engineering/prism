@@ -11,15 +11,19 @@
 //!   readings kept beside it (`docs/spec/identity.md`, "What identity is
 //!   relative to", signed 2026-10-31; mirror-014 Response). This supersedes
 //!   math Cor. 1.3's τ-in-the-address.
+//! - λ₂ is not in the address either (prism-016 item 2; Mara: a measurement
+//!   never enters the address of what it measures). The exact source it is
+//!   measured from, the substrate's address, is; the float sits beside,
+//!   sealed with machine and method.
 
 #![cfg(feature = "lapack")]
 
 use std::f64::consts::{PI, TAU};
 
-use prismqueer::band::Verdict;
+use prismqueer::band::{Machine, Measurement, Verdict};
 use prismqueer::brain::Tick;
-use prismqueer::oid::{Oid, Scope};
-use prismqueer::spectral::graph_from_edges;
+use prismqueer::oid::{Addressable, Oid, Scope};
+use prismqueer::spectral::{graph_from_edges, kleinos};
 use prismqueer::spectral::rotation::{
     infer_via_rotation, spin, Altitude, Grain, Observation, Period, Rotation, RotationConfig,
     Splinter, Stop, ROTATION,
@@ -27,11 +31,20 @@ use prismqueer::spectral::rotation::{
 use prismqueer::spectral::Property;
 use terni::{Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
+/// The method the fixtures' λ₂ is sealed with.
+const FIXTURE: &str = "fixture: declared, not computed";
+
+/// The address of the graph the fixtures rotate on: a path on three vertices.
+fn substrate() -> Oid {
+    graph_from_edges(&[(0, 1), (1, 2)]).oid()
+}
+
 fn observation(phases: &[f64]) -> Observation {
     Observation {
         phases: phases.to_vec(),
         order_r: 0.25,
-        fiedler_lambda_2: 1.5,
+        substrate: substrate(),
+        fiedler_lambda_2: Measurement::here(1.0, FIXTURE),
         transparency: Transparency::Clear,
     }
 }
@@ -110,21 +123,26 @@ fn the_same_content_at_two_ticks_is_one_splinter_deposited_twice() {
 /// with `Oid::hash` in the public scope. The shape prefix stays; τ is gone
 /// (the signed identity rule; mirror-014, which retires τ from mirror §5.0).
 /// Content: `u64(grain bits) ‖ u64(n) ‖ u64(k₁) … u64(k_{n−1}) ‖ u64(k_r) ‖
-/// u64(λ₂ bits)`. No tick anywhere.
+/// enc(substrate)`, the substrate's address as its hex string. No tick and
+/// no λ₂ anywhere.
 #[test]
 fn the_address_is_the_documented_preimage_with_no_tick() {
     let grain = Grain::new(2).expect("two bits: quarter turns");
     let obs = Observation {
         phases: vec![0.0, PI],
         order_r: 0.0,
-        fiedler_lambda_2: 1.0,
+        substrate: substrate(),
+        fiedler_lambda_2: Measurement::here(1.0, FIXTURE),
         transparency: Transparency::Clear,
     };
     let mut content = Vec::new();
-    for word in [2u64, 2, 2, 0, 1.0f64.to_bits()] {
-        // bits, n, k₁ = π as two quarter turns, k_r = 0, λ₂
+    for word in [2u64, 2, 2, 0] {
+        // bits, n, k₁ = π as two quarter turns, k_r = 0
         content.extend_from_slice(&word.to_be_bytes());
     }
+    let at = substrate();
+    content.extend_from_slice(&(at.as_str().len() as u64).to_be_bytes());
+    content.extend_from_slice(at.as_str().as_bytes());
     let mut preimage = b"splinter\0".to_vec();
     preimage.extend_from_slice(&(content.len() as u64).to_be_bytes());
     preimage.extend_from_slice(&content);
@@ -157,9 +175,76 @@ fn a_non_global_change_gives_a_different_address() {
     let mut r = observation(&A);
     r.order_r = 0.5;
     assert_ne!(addr(&r, &grain), base, "r is content");
-    let mut l = observation(&A);
-    l.fiedler_lambda_2 = 2.0;
-    assert_ne!(addr(&l, &grain), base, "λ₂ is content");
+    let mut s = observation(&A);
+    s.substrate = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).oid();
+    assert_ne!(addr(&s, &grain), base, "the substrate is content");
+}
+
+// ---------------------------------------------------------------------------
+// 2b. λ₂ beside the address (prism-016 item 2)
+// ---------------------------------------------------------------------------
+
+/// The machine test. Two machines read λ₂ of one graph a last bit apart
+/// (simulated: the other machine's reading is the next float up). The exact
+/// content is equal, so the address is one; both readings stay readable
+/// beside it, each sealed with its machine and method.
+#[test]
+fn two_machines_reading_lambda_2_a_bit_apart_give_one_address() {
+    let grain = Grain::default();
+    let here = observation(&A);
+    let mut there = observation(&A);
+    let value = here.fiedler_lambda_2.value();
+    let next = f64::from_bits(value.to_bits() + 1);
+    let other = Machine::new("riscv64", "elsewhere");
+    there.fiedler_lambda_2 = Measurement::on(other, next, FIXTURE);
+    assert_ne!(value, next, "the readings differ in the last bit");
+
+    let a = Splinter::observe(&rotation_altitude(), &here, &grain).splinter;
+    let b = Splinter::observe(&rotation_altitude(), &there, &grain).splinter;
+    assert_eq!(a.oid, b.oid, "one address across machines");
+    assert_eq!(a.fiedler_lambda_2().value(), value, "read beside");
+    assert_eq!(b.fiedler_lambda_2().value(), next, "read beside");
+    assert_eq!(a.fiedler_lambda_2().machine(), Machine::here());
+    assert_eq!(b.fiedler_lambda_2().machine(), other, "sealed with machine");
+    assert_eq!(b.fiedler_lambda_2().method(), FIXTURE, "sealed with method");
+}
+
+/// Not even a large difference in the reading moves the address: λ₂ is not
+/// content. What it is measured from is.
+#[test]
+fn lambda_2_is_not_content_its_substrate_is() {
+    let grain = Grain::default();
+    let mut far = observation(&A);
+    far.fiedler_lambda_2 = Measurement::here(2.0, FIXTURE);
+    assert_eq!(addr(&far, &grain), addr(&observation(&A), &grain));
+}
+
+/// Phase-lock is all-to-all, so two wedges of the same size rotate through
+/// the same phases tick by tick. Only the substrate tells their splinters
+/// apart: different graphs, different addresses, from the first deposit.
+#[test]
+fn two_wedges_of_one_size_rotate_alike_on_different_substrates() {
+    let a = graph_from_edges(&[(0, 1), (1, 2)]);
+    let path = graph_from_edges(&[(3, 4), (4, 5)]);
+    let triangle = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]);
+    let on = |b: &prismqueer::spectral::Graph| {
+        unsettled(infer_via_rotation(
+            &[a.clone(), b.clone()],
+            3,
+            RotationConfig::default(),
+        ))
+    };
+    let (p, t) = (on(&path), on(&triangle));
+    for (x, y) in p.splinters.iter().zip(&t.splinters) {
+        assert_eq!(x.relative_phases, y.relative_phases, "the same rotation");
+        assert_ne!(x.oid, y.oid, "on different graphs");
+    }
+    let wedge = kleinos(&a, &path).expect("disjoint paths compose");
+    assert_eq!(
+        p.splinters[0].fiedler_lambda_2().value(),
+        wedge.fiedler_lambda_2(),
+        "the wedge's λ₂, read beside"
+    );
 }
 
 #[test]
@@ -327,7 +412,7 @@ fn the_kuramoto_rotation_reaches_a_fixed_point() {
     };
     assert_eq!(rot.deposits.last().map(|d| d.tick), Some(Tick(at.0 + 1)));
     for s in &rot.splinters {
-        assert!(s.fiedler_lambda_2 > 0.0, "connected wedge");
+        assert!(s.fiedler_lambda_2().value() > 0.0, "connected wedge");
         assert!((0.0..=1.0).contains(&s.order_r));
     }
 }
