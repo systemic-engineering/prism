@@ -115,6 +115,13 @@
 //!   [`Measurement`], sealed with machine and method
 //!   ([`Splinter::fiedler_lambda_2`]). No decision about `λ₂` enters the
 //!   address.
+//! - **The Foerster gauge is uncertified** (prism-016 item 2, follow-up).
+//!   Its `<` compares raw `λ₂` floats across ticks, so a fall within float
+//!   error may refuse on one machine and pass on another. It enters no
+//!   address, but it decides whether a run is `Failure`. Phase 1 holds the
+//!   topology fixed, so today it compares a value with itself. To be
+//!   certified exactly or by an outward-rounded bound, with `Undecided` in
+//!   between.
 //! - **Stopping** (Prop. 1.9): on **consecutive** equality of addresses,
 //!   [`Stop::Fixed`]; on a recurrence at distance `p > 1`, [`Stop::Cycle`]
 //!   with `period = p`, never fixed; at the end of the budget,

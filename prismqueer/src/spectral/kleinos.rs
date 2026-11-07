@@ -261,13 +261,17 @@ impl Composition {
 
 impl Addressable for Composition {
     fn oid(&self) -> Oid {
-        // Content-address per Rec #82: the underlying graph's address (its
-        // canonical vertices and edges) ‖ 0xFF ‖ the emergent third. Exact
-        // content only: λ₂ is a reading of the graph, kept beside.
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(self.underlying.oid().as_str().as_bytes());
-        bytes.push(0xFF);
-        bytes.extend_from_slice(&self.emergent_third.to_le_bytes());
+        // Content-address per Rec #82: `"composition\0" ‖ enc(content)`,
+        // `enc(b) = u64be(len b) ‖ b`, content = the underlying graph's
+        // address (hex; its canonical vertices and edges) ‖ u64be(emergent
+        // third). The shape prefix keeps it apart from every other kind (a
+        // bare graph's preimage spelled the old one). Exact content only: λ₂
+        // is a reading of the graph, kept beside.
+        let mut content = self.underlying.oid().as_str().as_bytes().to_vec();
+        content.extend_from_slice(&self.emergent_third.to_be_bytes());
+        let mut bytes = b"composition\0".to_vec();
+        bytes.extend_from_slice(&(content.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&content);
         Oid::hash(&Scope::public(), &bytes)
     }
 }
@@ -621,6 +625,13 @@ fn verify_emergent_third(
 /// Property 3: Fiedler λ₂ STRICT rise per PAPER §3.6.3 (Alex 2026-09-01
 /// Q-Mara-κ ratification: STRICT `>` for compose-emission commit tick;
 /// non-strict `=` for kintsugi settle to λ₀ harmonic-component at Phase 2+).
+///
+/// **Uncertified** (prism-016 item 2, follow-up). The `>` compares raw
+/// floats, so a composed λ₂ within float error of `max(λ₂(a), λ₂(b))` may
+/// pass on one machine and fail on another. It enters no address, but it
+/// decides whether a [`Composition`], and so its address, exists. To be
+/// certified exactly (`poly` root isolation on `room::charpoly`) or by an
+/// outward-rounded bound, with `Undecided` in between.
 fn verify_fiedler_rise(lambda_a: f64, lambda_b: f64, lambda_composed: f64) -> PropertyVerdict {
     let max_ab = lambda_a.max(lambda_b);
     if lambda_composed > max_ab {

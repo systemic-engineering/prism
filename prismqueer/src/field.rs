@@ -359,24 +359,37 @@ fn ordered(a: VertexId, b: VertexId) -> EdgeKey {
 }
 
 /// The content address of the 1-complex with these vertices and edges, both
-/// given ascending. Canonical serialization: vertices, a separator, edges,
-/// each edge as its two ends, so `m` parallel edges are their ends `m`
-/// times. Content-address per Rec #82 β-normal AST OID. With no edges it is
-/// the address of a 0-skeleton, which is how [`room`](crate::room) addresses
-/// a vertex room by its vertex set alone.
+/// given ascending. Canonical serialization, self-delimiting:
+///
+/// `u64le(|V|) ‖ v₁ … v_|V| ‖ u64le(|E|) ‖ (a₁ ‖ b₁) … (a_|E| ‖ b_|E|)`,
+///
+/// every vertex and end a `u64le`, each edge as its two ends, so `m`
+/// parallel edges are their ends `m` times. Each list carries its length,
+/// so the bytes decode back to exactly one pair of lists, whatever their
+/// order. (Before prism-016 it was `vertices ‖ 0xFF ‖ edges`, which only
+/// the vertex order kept injective.) Content-address per Rec #82 β-normal
+/// AST OID. With no edges it is the address of a 0-skeleton, which is how
+/// [`room`](crate::room) addresses a vertex room by its vertex set alone.
 pub(crate) fn complex_oid(
     vertices: impl Iterator<Item = VertexId>,
     edges: impl Iterator<Item = EdgeKey>,
 ) -> Oid {
-    let mut bytes = Vec::new();
+    let mut bytes = vec![0; 8]; // |V|, filled below
+    let mut n = 0u64;
     for v in vertices {
         bytes.extend_from_slice(&v.to_le_bytes());
+        n += 1;
     }
-    bytes.push(0xFF); // separator
+    bytes[..8].copy_from_slice(&n.to_le_bytes());
+    let at = bytes.len();
+    bytes.extend_from_slice(&[0; 8]); // |E|, filled below
+    let mut m = 0u64;
     for e in edges {
         bytes.extend_from_slice(&e.0.to_le_bytes());
         bytes.extend_from_slice(&e.1.to_le_bytes());
+        m += 1;
     }
+    bytes[at..at + 8].copy_from_slice(&m.to_le_bytes());
     Oid::hash(&Scope::public(), &bytes)
 }
 
