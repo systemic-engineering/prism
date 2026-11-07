@@ -60,6 +60,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::band::Measurement;
 use crate::field::{complex_oid, Graph as Multigraph};
 use crate::oid::{Addressable, Oid, Scope};
 use crate::room::RoomError;
@@ -202,13 +203,20 @@ impl Addressable for Graph {
     }
 }
 
+/// How a [`Composition`]'s λ₂ is measured: [`fiedler_lambda_2_of_graph`].
+pub const FIEDLER_METHOD: &str = "L₀ = δ*δ (room), dsyev('N'), second eigenvalue";
+
 /// The composed sheaf carries the K_3-composed structure with accessor
 /// methods on the emergent-third stalk + content-address per Rec #82.
+///
+/// Its address is its graph and its emergent third, exactly. λ₂ is a
+/// function of the graph, measured in floats: it sits beside the address,
+/// sealed ([`Composition::fiedler`]), never in it (prism-016 item 2).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Composition {
     underlying: Graph,
     emergent_third: VertexId,
-    fiedler_lambda_2_cached: f64,
+    fiedler: Measurement,
 }
 
 impl Composition {
@@ -239,23 +247,27 @@ impl Composition {
         self.underlying.edges()
     }
 
-    /// PAPER §3.6.3 Fiedler λ₂ accessor (cached at compose-time).
+    /// PAPER §3.6.3 Fiedler λ₂ accessor (measured at compose-time).
     pub fn fiedler_lambda_2(&self) -> f64 {
-        self.fiedler_lambda_2_cached
+        self.fiedler.value()
+    }
+
+    /// λ₂ as measured: the reading, sealed with machine and method. Beside
+    /// the address, never in it.
+    pub fn fiedler(&self) -> &Measurement {
+        &self.fiedler
     }
 }
 
 impl Addressable for Composition {
     fn oid(&self) -> Oid {
-        // Content-address per Rec #82: underlying sheaf OID + emergent third
-        // vertex + fiedler value bits for determinism per Q-Mara-κ both-
-        // moments discipline.
+        // Content-address per Rec #82: the underlying graph's address (its
+        // canonical vertices and edges) ‖ 0xFF ‖ the emergent third. Exact
+        // content only: λ₂ is a reading of the graph, kept beside.
         let mut bytes = Vec::new();
         bytes.extend_from_slice(self.underlying.oid().as_str().as_bytes());
         bytes.push(0xFF);
         bytes.extend_from_slice(&self.emergent_third.to_le_bytes());
-        bytes.push(0xFF);
-        bytes.extend_from_slice(&self.fiedler_lambda_2_cached.to_le_bytes());
         Oid::hash(&Scope::public(), &bytes)
     }
 }
@@ -510,7 +522,7 @@ fn compose_candidate(a: &Graph, b: &Graph) -> Composition {
     Composition {
         underlying: Graph::simple(vertices, edges),
         emergent_third,
-        fiedler_lambda_2_cached: 0.0, // filled at into_result
+        fiedler: Measurement::here(0.0, FIEDLER_METHOD), // filled at into_imperfect
     }
 }
 
@@ -648,7 +660,7 @@ fn into_imperfect(
 ) -> Imperfect<Green, Red, ConvergenceLoss> {
     match &verdict {
         Transparency::Clear => {
-            candidate.fiedler_lambda_2_cached = lambda_composed;
+            candidate.fiedler = Measurement::here(lambda_composed, FIEDLER_METHOD);
             Imperfect::Success(candidate)
         }
         Transparency::Opaque(_) => Imperfect::Failure(verdict, ConvergenceLoss::zero()),
@@ -717,7 +729,11 @@ mod tests {
         assert_eq!(there.fiedler_lambda_2(), next, "read beside");
         assert_eq!(here.fiedler().machine(), Machine::here());
         assert_eq!(there.fiedler().machine(), other, "sealed with machine");
-        assert_eq!(here.fiedler().method(), FIEDLER_METHOD, "sealed with method");
+        assert_eq!(
+            here.fiedler().method(),
+            FIEDLER_METHOD,
+            "sealed with method"
+        );
     }
 
     /// The composition's preimage: its graph's address (hex) ‖ 0xFF ‖ the
@@ -727,7 +743,10 @@ mod tests {
         let a = graph_from_edges(&[(0, 1), (1, 2)]);
         let b = graph_from_edges(&[(3, 4), (4, 5)]);
         let c = green(&a, &b);
-        let mut bytes = complex_oid(c.vertices(), c.edges()).as_str().as_bytes().to_vec();
+        let mut bytes = complex_oid(c.vertices(), c.edges())
+            .as_str()
+            .as_bytes()
+            .to_vec();
         bytes.push(0xFF);
         bytes.extend_from_slice(&6u64.to_le_bytes()); // max(0..=5) + 1
         assert_eq!(c.emergent_third_stalk(), 6);

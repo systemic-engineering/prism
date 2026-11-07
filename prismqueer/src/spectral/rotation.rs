@@ -97,16 +97,24 @@
 //!   address (Prop. 1.7). The same content at two ticks is one splinter
 //!   deposited twice, as `brain` keeps a fact's tick beside its tuple.
 //! - **Content is quotiented by common phase rotation** (Def. 1.8):
-//!   `((θᵢ − θ₀) mod 2π, r, λ₂)`. The reference is vertex 0, the first in the
+//!   `((θᵢ − θ₀) mod 2π, r, substrate)`. The reference is vertex 0, the first in the
 //!   graph's canonical (`BTreeSet`) vertex order, so there is no tie to break.
 //! - **The ruler is a [`Grain`]**: each relative phase is rounded to a
 //!   multiple of `2π / 2^bits`, and `r` to a multiple of `1 / 2^bits`. The
 //!   grain's bits are part of the content, so a change of ruler changes the
 //!   address. A value whose distance to a rounding boundary is within the
 //!   float error of computing it (read through `band::zeros::rotation`) is
-//!   ambiguous: it is reported, never silently rounded. `λ₂` is measured once
-//!   per run from the graph, not from the phases, and enters as its exact
-//!   `f64` bits.
+//!   ambiguous: it is reported, never silently rounded.
+//! - **`λ₂` is beside the address, never in it** (prism-016 item 2; Mara: a
+//!   measurement never enters the address of what it measures). It is
+//!   measured once per run from the graph, in floats, so two machines may
+//!   read it a last bit apart. The content holds the exact source instead:
+//!   the **substrate**, the address of what is rotated (for
+//!   [`infer_via_rotation`], the kleinos [`Composition`](crate::spectral::Composition),
+//!   which addresses its graph exactly). The float is kept beside as a
+//!   [`Measurement`], sealed with machine and method
+//!   ([`Splinter::fiedler_lambda_2`]). No decision about `λ₂` enters the
+//!   address.
 //! - **Stopping** (Prop. 1.9): on **consecutive** equality of addresses,
 //!   [`Stop::Fixed`]; on a recurrence at distance `p > 1`, [`Stop::Cycle`]
 //!   with `period = p`, never fixed; at the end of the budget,
@@ -118,7 +126,7 @@ use std::num::NonZeroU64;
 
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
-use crate::band::{zeros, Verdict};
+use crate::band::{zeros, Measurement, Verdict};
 use crate::brain::Tick;
 use crate::ffi::phase_lock;
 use crate::oid::{Addressable, Oid, Scope};
@@ -219,16 +227,18 @@ fn worse(a: Verdict, b: Verdict) -> Verdict {
 // Splinter, Observation, Deposit
 // ---------------------------------------------------------------------------
 
-/// What one tick observed: absolute phases, the order parameter, the
-/// Fiedler value, and the verdict about the observation.
+/// What one tick observed: absolute phases, the order parameter, what was
+/// rotated, the Fiedler reading, and the verdict about the observation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Observation {
     /// Absolute Kuramoto phases, in the graph's canonical vertex order.
     pub phases: Vec<f64>,
     /// Kuramoto order parameter `r ∈ [0, 1]`.
     pub order_r: f64,
-    /// Fiedler `λ₂` of the composed graph.
-    pub fiedler_lambda_2: f64,
+    /// The exact address of what is rotated: content.
+    pub substrate: Oid,
+    /// Fiedler `λ₂` of the composed graph, as measured. Not content.
+    pub fiedler_lambda_2: Measurement,
     /// The verdict about this observation. Not content.
     pub transparency: Transparency<Property>,
 }
@@ -249,9 +259,12 @@ pub struct Splinter {
     pub oid: Oid,
     /// `(θᵢ − θ₀) mod 2π`, as measured (before the grain).
     pub relative_phases: Vec<f64>,
+    /// The exact address of what was rotated: content.
+    pub substrate: Oid,
     /// Fiedler `λ₂` measured at the composed graph's basepoint (the apparatus
-    /// read across from Anna Jakobs's 2012 thesis, via LAPACK dsyev).
-    pub fiedler_lambda_2: f64,
+    /// read across from Anna Jakobs's 2012 thesis, via LAPACK dsyev): beside
+    /// the address, never in it.
+    fiedler: Measurement,
     /// Kuramoto order parameter `r ∈ [0, 1]`.
     pub order_r: f64,
     /// The verdict about the splinter, carried beside the address and never
@@ -275,6 +288,13 @@ impl Splinter {
     /// address: two splinters with one address may carry different ones.
     pub fn altitude(&self) -> &Altitude {
         &self.altitude
+    }
+
+    /// Fiedler `λ₂` as measured, sealed with machine and method. A reading
+    /// beside the address: two splinters with one address may carry
+    /// readings a last bit apart.
+    pub fn fiedler_lambda_2(&self) -> &Measurement {
+        &self.fiedler
     }
 
     /// The splinter an observation gives at `altitude` under `grain`.
@@ -305,7 +325,9 @@ impl Splinter {
         let (k_r, v) = grain.round(obs.order_r * steps, steps, n);
         boundary = worse(boundary, v);
         content.extend_from_slice(&k_r.to_be_bytes());
-        content.extend_from_slice(&obs.fiedler_lambda_2.to_bits().to_be_bytes());
+        let substrate = obs.substrate.as_str().as_bytes();
+        content.extend_from_slice(&(substrate.len() as u64).to_be_bytes());
+        content.extend_from_slice(substrate);
 
         let mut preimage = b"splinter\0".to_vec();
         preimage.extend_from_slice(&(content.len() as u64).to_be_bytes());
@@ -316,7 +338,8 @@ impl Splinter {
                 altitude: altitude.clone(),
                 oid: Oid::hash(&Scope::public(), &preimage),
                 relative_phases: relative,
-                fiedler_lambda_2: obs.fiedler_lambda_2,
+                substrate: obs.substrate.clone(),
+                fiedler: obs.fiedler_lambda_2,
                 order_r: obs.order_r,
                 transparency: obs.transparency.clone(),
             },
@@ -571,7 +594,9 @@ pub fn infer_via_rotation(
     // This IS the substrate-honest observation: the shape of the wedge doesn't
     // change while the phases evolve. Phase 2+ topology-evolving rotation would
     // exercise the Foerster gauge check meaningfully.
-    let fiedler_at_basepoint = composed.fiedler_lambda_2();
+    let fiedler = *composed.fiedler();
+    let fiedler_at_basepoint = fiedler.value();
+    let substrate = composed.oid();
 
     // Initialize Kuramoto phases + natural frequencies.
     // Phase 1: seed deterministically from vertex indices (canonical BTreeSet
@@ -615,7 +640,8 @@ pub fn infer_via_rotation(
         Ok(Observation {
             phases: phases.clone(),
             order_r,
-            fiedler_lambda_2: fiedler_at_basepoint,
+            substrate: substrate.clone(),
+            fiedler_lambda_2: fiedler,
             transparency: Transparency::Clear,
         })
     })
@@ -677,7 +703,7 @@ mod tests {
                 }
                 for s in &rot.splinters {
                     assert!(
-                        s.fiedler_lambda_2 > 0.0,
+                        s.fiedler_lambda_2().value() > 0.0,
                         "Fiedler must be positive for connected composed graph"
                     );
                     assert!(

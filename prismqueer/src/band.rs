@@ -190,3 +190,82 @@ pub mod zeros {
         Band::new(eps.clone(), eps, ScaleLaw::Absolute).expect("ordered")
     }
 }
+
+/// The machine a float was measured on: the target it ran as.
+///
+/// Two machines may read one exact quantity a last bit apart (libm,
+/// LAPACK and the FPU differ). The machine is part of a [`Measurement`]'s
+/// seal so the reading says where it was taken.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Machine {
+    arch: &'static str,
+    os: &'static str,
+}
+
+impl Machine {
+    /// A machine, by its target architecture and operating system.
+    pub fn new(arch: &'static str, os: &'static str) -> Self {
+        Machine { arch, os }
+    }
+
+    /// The machine this code runs on.
+    pub fn here() -> Self {
+        Machine::new(std::env::consts::ARCH, std::env::consts::OS)
+    }
+
+    /// Its target architecture.
+    pub fn arch(&self) -> &'static str {
+        self.arch
+    }
+
+    /// Its operating system.
+    pub fn os(&self) -> &'static str {
+        self.os
+    }
+}
+
+/// A float reading, sealed with the machine and the method it was taken by.
+///
+/// It sits **beside** an address, never in one (prism-016 item 2; Mara: a
+/// measurement never enters the address of what it measures). So it has no
+/// byte encoding and isn't [`Addressable`](crate::oid::Addressable): what
+/// an address hashes is the exact thing measured, and a decision about the
+/// reading enters only once certified exactly or by an outward-rounded
+/// bound, otherwise it is undecided.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Measurement {
+    value: f64,
+    method: &'static str,
+    machine: Machine,
+}
+
+impl Measurement {
+    /// `value`, measured here by `method`.
+    pub fn here(value: f64, method: &'static str) -> Self {
+        Measurement::on(Machine::here(), value, method)
+    }
+
+    /// `value`, measured on `machine` by `method`.
+    pub fn on(machine: Machine, value: f64, method: &'static str) -> Self {
+        Measurement {
+            value,
+            method,
+            machine,
+        }
+    }
+
+    /// The reading.
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+
+    /// How it was measured.
+    pub fn method(&self) -> &'static str {
+        self.method
+    }
+
+    /// Where it was measured.
+    pub fn machine(&self) -> Machine {
+        self.machine
+    }
+}

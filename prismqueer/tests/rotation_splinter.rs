@@ -23,12 +23,12 @@ use std::f64::consts::{PI, TAU};
 use prismqueer::band::{Machine, Measurement, Verdict};
 use prismqueer::brain::Tick;
 use prismqueer::oid::{Addressable, Oid, Scope};
-use prismqueer::spectral::{graph_from_edges, kleinos};
 use prismqueer::spectral::rotation::{
     infer_via_rotation, spin, Altitude, Grain, Observation, Period, Rotation, RotationConfig,
     Splinter, Stop, ROTATION,
 };
 use prismqueer::spectral::Property;
+use prismqueer::spectral::{graph_from_edges, kleinos};
 use terni::{Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 /// The method the fixtures' λ₂ is sealed with.
