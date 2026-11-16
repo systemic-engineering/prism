@@ -289,7 +289,7 @@ pub mod pillar {
     /// - [`cross`]`(enclosure, region)`: T1, In | Out | Undecided. A
     ///   magnitude arrives as an enclosure, from an instrument that ships
     ///   one; a bare float or a generic `Loss` can't be crossed.
-    /// - [`persist`]`(evidence, ruler)`: T2, Accept | Reject | Continue
+    /// - [`persist`]`(evidence, ruler, calibration)`: T2, Accept | Reject | Continue
     ///   over distinct contexts, under a signed ruler.
     pub use crate::algedonic::{cross, persist};
 

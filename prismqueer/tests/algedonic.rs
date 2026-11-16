@@ -700,7 +700,7 @@ fn decode(bytes: &[u8]) -> Option<Draft> {
 /// judgments never share a preimage.
 fn the_ruler_preimage_decodes_uniquely() {
     let mut mix = Mix(0x0b5e_55ed);
-    let wide = BigInt::from(1u8) << 70;
+    let wide: BigInt = BigInt::from(1u8) << 70u32;
     let mut seen = std::collections::BTreeMap::new();
     for i in 0..400 {
         let mut region = mix.region();

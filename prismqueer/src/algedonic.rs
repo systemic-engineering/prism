@@ -13,8 +13,10 @@
 //!   - **Theorem (Mara §5.1, PROVED):** two correct enclosures of one value
 //!     never give `In` and `Out`. They can differ as decided versus
 //!     `Undecided`, when one is tighter.
-//! - **T2, real: [`persist`]**`(evidence, ruler)`. Wald's sequential test over
-//!   **distinct contexts**, deciding `Accept`, `Reject` or `Continue`.
+//! - **T2, real: [`persist`]**`(evidence, ruler, calibration)`. Wald's
+//!   sequential test over **distinct contexts**, deciding `Accept`, `Reject`
+//!   or `Continue`, with the ruler's (α, β) and the instrument's
+//!   [`Calibration`] (p₀, p₁).
 //!   - **`Undecided` never counts as evidence** (§5.1 d), so float noise
 //!     can't accumulate into reality.
 //!   - Evidence is keyed by `(ruler, nbhd, instrument)` at one site
@@ -37,12 +39,24 @@
 //!
 //! # The ruler is a signed record (A2)
 //!
-//! A [`Ruler`] is `{ region, question, (α, β) with p₀/p₁, clock, signer }`.
+//! A [`Ruler`] is `{ region, question, (α, β), clock, signer }`.
 //! It has no default and no public constructor: a [`Draft`] holds the
 //! judgment, and only [`Draft::seal`] turns it into a ruler, minting the
 //! [`Signer`]. The signer sits **beside** the ruler's address
 //! ([`Ruler::oid`] hashes the draft, never the signer), so one judgment
 //! signed by two people has one address and two signers.
+//!
+//! Its address is the canonical one, a law for the whole stack
+//! (`docs/spec/ruler.md`, prism-Reed's lean, Alex's call):
+//! `"ruler\0" ‖ region ‖ question ‖ α ‖ β ‖ clock` in the public scope.
+//!
+//! # The calibration is a measurement, beside the ruler
+//!
+//! p₀ and p₁ (the chance a context certifies `In` when the tension isn't
+//! real, and when it is) are the instrument's operating characteristic: they
+//! are measured, not judged. They live in a [`Calibration`], a crystal with
+//! its own address, never in the ruler's. Recalibrating an instrument never
+//! moves a ruler, and every [`Verdict`] names the calibration it read.
 //!
 //! prism checks that a signer exists, never who it is: the signer's identity
 //! is an address the caller vouches for, as a [`Roots`](crate::brain::Roots)
@@ -68,12 +82,13 @@
 //! ```compile_fail,E0308
 //! use num_bigint::BigInt;
 //! use num_rational::BigRational;
-//! use prismqueer::algedonic::{persist, Clock, Draft, Evidence, Question, Region, Wald};
+//! use prismqueer::algedonic::{persist, Calibration, Clock, Draft, Evidence, Question, Region, Wald};
 //! use prismqueer::oid::Oid;
 //! let q = |n: i64, d: i64| BigRational::new(BigInt::from(n), BigInt::from(d));
-//! let wald = Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).unwrap();
+//! let wald = Wald::new(q(1, 20), q(1, 20)).unwrap();
+//! let knee = Calibration::new(Oid::new("knee"), q(1, 6), q(1, 2), "labelled").unwrap();
 //! let draft = Draft::new(Region::above(q(1, 1)), Question::Max, wald, Clock::agreed(10, 1, 100));
-//! let _ = persist(&Evidence::at(Oid::new("leg")), &draft);
+//! let _ = persist(&Evidence::at(Oid::new("leg")), &draft, &knee);
 //! ```
 //!
 //! The control: sealing is the only way to a ruler, and it persists.
@@ -81,14 +96,17 @@
 //! ```
 //! use num_bigint::BigInt;
 //! use num_rational::BigRational;
-//! use prismqueer::algedonic::{persist, Clock, Draft, Evidence, Persistence, Question, Region, Wald};
+//! use prismqueer::algedonic::{persist, Calibration, Clock, Draft, Evidence, Persistence, Question, Region, Wald};
 //! use prismqueer::oid::Oid;
 //! let q = |n: i64, d: i64| BigRational::new(BigInt::from(n), BigInt::from(d));
-//! let wald = Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).unwrap();
+//! let wald = Wald::new(q(1, 20), q(1, 20)).unwrap();
+//! let knee = Calibration::new(Oid::new("knee"), q(1, 6), q(1, 2), "labelled").unwrap();
 //! let draft = Draft::new(Region::above(q(1, 1)), Question::Max, wald, Clock::agreed(10, 1, 100));
 //! let ruler = draft.seal(Oid::new("engineer"));
 //! assert_eq!(ruler.signer().over(), &ruler.oid());
-//! assert_eq!(persist(&Evidence::at(Oid::new("leg")), &ruler), Persistence::Continue);
+//! let verdict = persist(&Evidence::at(Oid::new("leg")), &ruler, &knee);
+//! assert_eq!(verdict.persistence(), Persistence::Continue);
+//! assert_eq!((verdict.ruler(), verdict.calibration()), (&ruler.oid(), &knee.oid()));
 //! ```
 //!
 //! # Hashing a decision (§5.1 a)
@@ -399,44 +417,31 @@ impl Question {
 }
 
 /// Wald's sequential test, as the ruler signs it: the error rates `(α, β)`
-/// (a false alarm, a miss) and the two hypotheses it decides between, the
-/// chance `p₀` that a context certifies `In` when the tension isn't real and
-/// `p₁` when it is.
+/// (a false alarm, a miss), the signer's costs. The hypotheses' p₀/p₁ are
+/// the instrument's, in its [`Calibration`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Wald {
     alpha: BigRational,
     beta: BigRational,
-    p0: BigRational,
-    p1: BigRational,
 }
 
-/// The rates don't make a test: each must lie strictly between 0 and 1,
-/// `α + β < 1`, and `p₀ < p₁`.
+/// The rates don't make a test: each must lie strictly between 0 and 1, and
+/// `α + β < 1`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NotATest;
 
+/// Strictly between 0 and 1.
+fn unit(x: &BigRational) -> bool {
+    x.is_positive() && x < &BigRational::one()
+}
+
 impl Wald {
-    /// The test. Refused unless `0 < α, β, p₀, p₁ < 1`, `α + β < 1` and
-    /// `p₀ < p₁`.
-    pub fn new(
-        alpha: BigRational,
-        beta: BigRational,
-        p0: BigRational,
-        p1: BigRational,
-    ) -> Result<Self, NotATest> {
-        let unit = |x: &BigRational| x.is_positive() && x < &BigRational::one();
-        let valid = [&alpha, &beta, &p0, &p1].into_iter().all(unit)
-            && &alpha + &beta < BigRational::one()
-            && p0 < p1;
-        if !valid {
+    /// The test. Refused unless `0 < α, β < 1` and `α + β < 1`.
+    pub fn new(alpha: BigRational, beta: BigRational) -> Result<Self, NotATest> {
+        if !(unit(&alpha) && unit(&beta) && &alpha + &beta < BigRational::one()) {
             return Err(NotATest);
         }
-        Ok(Wald {
-            alpha,
-            beta,
-            p0,
-            p1,
-        })
+        Ok(Wald { alpha, beta })
     }
 
     /// α, the false-alarm rate.
@@ -448,6 +453,48 @@ impl Wald {
     pub fn beta(&self) -> &BigRational {
         &self.beta
     }
+}
+
+/// An instrument's operating characteristic (its d′): `p₀`, the chance a
+/// context certifies `In` when the tension isn't real, and `p₁` when it is,
+/// sealed with the method that measured them. A measurement, so a crystal of
+/// its own: its address is never folded into a ruler's (`docs/spec/ruler.md`).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Calibration {
+    instrument: Oid,
+    p0: BigRational,
+    p1: BigRational,
+    method: String,
+}
+
+/// The rates don't calibrate: `0 < p₀ < p₁ < 1` fails.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotACalibration;
+
+impl Calibration {
+    /// `instrument`'s calibration, measured by `method`. Refused unless
+    /// `0 < p₀ < p₁ < 1`.
+    pub fn new(
+        instrument: Oid,
+        p0: BigRational,
+        p1: BigRational,
+        method: impl Into<String>,
+    ) -> Result<Self, NotACalibration> {
+        if !(unit(&p0) && unit(&p1) && p0 < p1) {
+            return Err(NotACalibration);
+        }
+        Ok(Calibration {
+            instrument,
+            p0,
+            p1,
+            method: method.into(),
+        })
+    }
+
+    /// The instrument calibrated.
+    pub fn instrument(&self) -> &Oid {
+        &self.instrument
+    }
 
     /// p₀: a context certifies `In` though the tension isn't real.
     pub fn p0(&self) -> &BigRational {
@@ -457,6 +504,27 @@ impl Wald {
     /// p₁: a context certifies `In` and the tension is real.
     pub fn p1(&self) -> &BigRational {
         &self.p1
+    }
+
+    /// How p₀ and p₁ were measured.
+    pub fn method(&self) -> &str {
+        &self.method
+    }
+
+    /// The bytes addressed: `"calibration\0" ‖ bytes(instrument) ‖ p₀ ‖ p₁ ‖
+    /// bytes(method)` (`docs/spec/ruler.md`).
+    pub fn preimage(&self) -> Vec<u8> {
+        let mut bytes = b"calibration\0".to_vec();
+        delimited(&mut bytes, self.instrument.as_str().as_bytes());
+        rational(&mut bytes, &self.p0);
+        rational(&mut bytes, &self.p1);
+        delimited(&mut bytes, self.method.as_bytes());
+        bytes
+    }
+
+    /// Its own address, in the public scope.
+    pub fn oid(&self) -> Oid {
+        Oid::hash(&Scope::public(), &self.preimage())
     }
 }
 
@@ -524,9 +592,10 @@ impl Draft {
         }
     }
 
-    /// Its address: `"ruler\0" ‖ region ‖ question ‖ α ‖ β ‖ p₀ ‖ p₁ ‖ clock`
-    /// in the public scope, every rational sign-tagged and length-prefixed.
-    pub fn oid(&self) -> Oid {
+    /// The canonical ruler preimage (`docs/spec/ruler.md`): `"ruler\0" ‖
+    /// region ‖ question ‖ α ‖ β ‖ clock`, every field self-delimiting. The
+    /// signer and the calibration are never in it.
+    pub fn preimage(&self) -> Vec<u8> {
         let mut bytes = b"ruler\0".to_vec();
         for edge in [&self.region.lo, &self.region.hi] {
             match edge {
@@ -543,14 +612,19 @@ impl Draft {
         }
         bytes.push(self.question.tag());
         let w = &self.wald;
-        for r in [&w.alpha, &w.beta, &w.p0, &w.p1] {
+        for r in [&w.alpha, &w.beta] {
             rational(&mut bytes, r);
         }
         let c = &self.clock;
         for t in [c.reaction, c.importance, c.delay] {
             bytes.extend_from_slice(&t.to_le_bytes());
         }
-        Oid::hash(&Scope::public(), &bytes)
+        bytes
+    }
+
+    /// Its address: the preimage, in the public scope.
+    pub fn oid(&self) -> Oid {
+        Oid::hash(&Scope::public(), &self.preimage())
     }
 
     /// Seal the judgment as `by`'s: the only way to a [`Ruler`].
@@ -793,6 +867,15 @@ impl Evidence {
             .map(|(_, d)| *d)
     }
 
+    /// The decisions `instrument` made under `ruler`.
+    fn by<'a>(&'a self, ruler: &Ruler, instrument: &'a Oid) -> impl Iterator<Item = Decision> + 'a {
+        let oid = ruler.oid();
+        self.decisions
+            .iter()
+            .filter(move |((r, _, i), _)| *r == oid && i == instrument)
+            .map(|(_, d)| *d)
+    }
+
     /// The address of every recorded decision ([`decision_oid`]).
     pub fn oids(&self) -> Vec<Oid> {
         self.decisions
@@ -813,32 +896,66 @@ pub enum Persistence {
     Continue,
 }
 
-/// **T2.** Wald's sequential test over the distinct contexts decided under
-/// `ruler`. With `k` contexts certified `In` and `m` certified `Out`, the
-/// likelihood ratio is `Λ = (p₁/p₀)^k · ((1−p₁)/(1−p₀))^m`, exact. `Accept`
-/// when `Λ ≥ (1−β)/α`, `Reject` when `Λ ≤ β/(1−α)`, otherwise `Continue`.
-/// `Undecided` contexts are not observations: they don't enter Λ.
+/// A persistence verdict, with the two addresses it depended on side by
+/// side: the ruler's and the calibration's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Verdict {
+    persistence: Persistence,
+    ruler: Oid,
+    calibration: Oid,
+}
+
+impl Verdict {
+    /// Wald's decision.
+    pub fn persistence(&self) -> Persistence {
+        self.persistence
+    }
+
+    /// The ruler judged under.
+    pub fn ruler(&self) -> &Oid {
+        &self.ruler
+    }
+
+    /// The calibration read.
+    pub fn calibration(&self) -> &Oid {
+        &self.calibration
+    }
+}
+
+/// **T2.** Wald's sequential test over the distinct contexts that
+/// `calibration`'s instrument decided under `ruler`. With `k` contexts
+/// certified `In` and `m` certified `Out`, the likelihood ratio is
+/// `Λ = (p₁/p₀)^k · ((1−p₁)/(1−p₀))^m`, exact. `Accept` when
+/// `Λ ≥ (1−β)/α`, `Reject` when `Λ ≤ β/(1−α)`, otherwise `Continue`.
+/// `Undecided` contexts are not observations: they don't enter Λ. Another
+/// instrument's decisions don't either: this calibration doesn't speak for
+/// them.
 ///
 /// The boundaries are Wald's approximations, which Mara marks READING
 /// (secondary sources only).
-pub fn persist(evidence: &Evidence, ruler: &Ruler) -> Persistence {
-    let w = ruler.wald();
+pub fn persist(evidence: &Evidence, ruler: &Ruler, calibration: &Calibration) -> Verdict {
+    let (w, c) = (ruler.wald(), calibration);
     let one = BigRational::one();
     let (mut k, mut m) = (0i32, 0i32);
-    for d in evidence.under(ruler) {
+    for d in evidence.by(ruler, &c.instrument) {
         match d {
             Decision::In => k += 1,
             Decision::Out => m += 1,
             Decision::Undecided => {}
         }
     }
-    let ratio = (&w.p1 / &w.p0).pow(k) * ((&one - &w.p1) / (&one - &w.p0)).pow(m);
-    if ratio >= (&one - &w.beta) / &w.alpha {
+    let ratio = (&c.p1 / &c.p0).pow(k) * ((&one - &c.p1) / (&one - &c.p0)).pow(m);
+    let persistence = if ratio >= (&one - &w.beta) / &w.alpha {
         Persistence::Accept
     } else if ratio <= &w.beta / (&one - &w.alpha) {
         Persistence::Reject
     } else {
         Persistence::Continue
+    };
+    Verdict {
+        persistence,
+        ruler: ruler.oid(),
+        calibration: calibration.oid(),
     }
 }
 
