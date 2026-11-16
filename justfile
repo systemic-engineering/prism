@@ -104,13 +104,14 @@ bench filter="":
 
 # ── Worktrees ────────────────────────────────────────────────────────────────
 
-# A builder's worktree, warm: .worktrees/<name> on a new branch, terni checked
-# out (the submodule's local clone needs file transport), and target/ seeded
-# from this checkout's (seed-target).
+# A builder's worktree, warm: <main checkout>/.worktrees/<name> on a new
+# branch, terni checked out (the submodule's local clone needs file transport),
+# and target/ seeded from this checkout's (seed-target).
 worktree name branch=name base="HEAD":
     #!/usr/bin/env bash
     set -euo pipefail
-    dir="{{justfile_directory()}}/.worktrees/{{name}}"
+    main=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
+    dir="$main/.worktrees/{{name}}"
     git worktree add -b "{{branch}}" "$dir" "{{base}}"
     git -C "$dir" -c protocol.file.allow=always submodule update --init
     just --justfile "$dir/justfile" seed-target "{{justfile_directory()}}/target"
