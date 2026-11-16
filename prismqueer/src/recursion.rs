@@ -101,6 +101,7 @@ fn panic_helper_empty<T>() -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chaos::Unmeasured;
 
     #[test]
     fn recursion_tick_from_settled_reality_returns_observation() {
@@ -109,13 +110,42 @@ mod tests {
         let _obs = recursion.tick();
     }
 
+    // prism-019 #1: a fracture keeps every shard through tick. No first wins.
     #[test]
-    fn recursion_tick_from_fractured_reality_returns_first_shard_as_observation() {
-        let shards: Vec<Shard<&[u8]>> = vec![Shard::new(b"a"), Shard::new(b"b")];
-        let reality: Reality<&[u8]> = Reality::Fractured(shards);
-        let recursion = Recursion::from_reality(reality);
-        let obs = recursion.tick();
-        assert_eq!(obs.crystal.payload, b"a");
+    fn tick_keeps_every_shard_of_a_three_shard_fracture() {
+        let shards: Vec<Shard<&[u8]>> = vec![Shard::new(b"a"), Shard::new(b"b"), Shard::new(b"c")];
+        let obs = Recursion::from_reality(Reality::Fractured(shards))
+            .tick()
+            .ok()
+            .expect("a non-empty fracture is observed");
+        let payloads: Vec<&[u8]> = obs.crystals.iter().map(|c| c.payload).collect();
+        assert_eq!(payloads, vec![b"a" as &[u8], b"b", b"c"]);
+    }
+
+    // An empty fracture is a typed outcome, never a panic.
+    #[test]
+    fn tick_on_an_empty_fracture_is_a_typed_failure() {
+        let reality: Reality<&[u8]> = Reality::Fractured(vec![]);
+        let outcome = Recursion::from_reality(reality).tick();
+        assert_eq!(
+            outcome.err_with_loss(),
+            Some((EmptyFracture, Unmeasured)),
+            "nothing to observe, and nothing measured"
+        );
+    }
+
+    // tick measures no chaos, so it reports none: never a silent zero.
+    #[test]
+    fn tick_reports_no_chaos_it_did_not_measure() {
+        let fractured: Reality<&[u8]> =
+            Reality::Fractured(vec![Shard::new(b"a"), Shard::new(b"b")]);
+        let settled: Reality<&[u8]> = Reality::Settled(Crystal::new(b"c"));
+        for reality in [fractured, settled] {
+            let outcome = Recursion::from_reality(reality).tick();
+            assert_eq!(outcome.loss(), Unmeasured);
+            let obs = outcome.ok().expect("observed");
+            assert_eq!(obs.chaos, None);
+        }
     }
 
     #[test]
