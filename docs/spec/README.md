@@ -11,6 +11,8 @@
 | `gate-vectors.json` | 9 worked examples, checked against the rule by `prismqueer/tests/gate_vectors.rs` |
 | `identity.md` | Identity is scoped: `address = BLAKE3-keyed(K_scope, content)`, the public scope's derived key, why, and what's out of scope (key management) |
 | `identity-vectors.json` | `K_public` and 11 addresses computed with `b3sum` (cross-checked with Python's `blake3`), checked against prism by `prismqueer/tests/identity_vectors.rs` |
+| `ruler.md` | The canonical ruler address (`"ruler\0"` ‖ region ‖ question ‖ α ‖ β ‖ clock, public scope; signer and p₀/p₁ never in it) and the calibration crystal that carries p₀/p₁. prism-Reed's lean, Alex's call |
+| `ruler-vectors.json` | 4 ruler and 3 calibration preimages built by `ruler-vectors.py` from the spec, hashed with Python's `blake3` and `b3sum`, checked against prism by `prismqueer/tests/ruler_vectors.rs` |
 
 Regenerate the Imperfect vectors after an intended change in terni:
 
