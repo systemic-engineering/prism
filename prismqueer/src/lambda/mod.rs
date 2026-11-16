@@ -538,4 +538,19 @@ mod tests {
         let b: Lambda<String> = TestPhaseA.then(TestPhaseC);
         assert_ne!(a.oid(), b.oid());
     }
+
+    // `MerkleTree::data` is what `merkle::diff` reads when two addresses
+    // differ. It must answer with a value for every term, never panic.
+    #[test]
+    fn diff_of_two_terms_is_one_modified_leaf_never_a_panic() {
+        use crate::merkle::{diff, Delta};
+
+        let a = Lambda::<String>::bind(Oid::hash(&Scope::public(), b"x"));
+        let b = Lambda::<String>::abs(
+            Oid::hash(&Scope::public(), b"x"),
+            Lambda::bind(Oid::hash(&Scope::public(), b"x")),
+        );
+        assert_eq!(diff(&a, &b), vec![Delta::Modified(a.oid(), b.oid())]);
+        assert_eq!(diff(&b, &b.clone()), vec![]);
+    }
 }
