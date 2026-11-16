@@ -206,43 +206,25 @@ pub trait Composable<T: Clone + PartialEq>: Into<Lambda<T>> + Sized {
 }
 
 // ---------------------------------------------------------------------------
-// MerkleTree — Lambda is recursive via Box, children() returns empty
+// MerkleTree — a term is one leaf whose data is the whole term
 // ---------------------------------------------------------------------------
 
-/// Tag type for Lambda's `MerkleTree::Data`. Identifies the variant
-/// without recursion.
-#[derive(Clone, Debug, PartialEq)]
-pub enum LambdaTag {
-    /// A variable reference with the carried binding Oid.
-    Bind(Oid),
-    /// An abstraction with the carried parameter Oid.
-    Abs(Oid),
-    /// An application (children carry the function and argument).
-    Apply,
-    /// A pattern-match.
-    Case,
-}
-
+/// A lambda term as a merkle tree: **one leaf, whose data is the term
+/// itself.**
+///
+/// Lambda recurses through `Box`, not through `Vec<Self>`, so it has no
+/// child slice to lend. The subterm structure lives in the term and in its
+/// Oid (which hashes every subterm). `merkle::diff` of two terms is
+/// therefore empty when their addresses agree and one `Modified` leaf when
+/// they differ. It never reaches into subterms, and it never panics.
 impl<T: Clone + PartialEq> MerkleTree for Lambda<T> {
-    type Data = LambdaTag;
+    type Data = Lambda<T>;
 
-    fn data(&self) -> &LambdaTag {
-        // We need to store the tag. Since MerkleTree::data returns a reference,
-        // we cannot construct it on the fly. Instead, we use a thread-local or
-        // accept that Lambda stores its tag. For now, we use a different approach:
-        // we won't implement MerkleTree directly since Lambda's recursion is through
-        // Box, not Vec<Self>. The tree structure IS the term structure.
-        //
-        // Actually, MerkleTree requires returning &Self::Data. We need to store it.
-        // Let's skip MerkleTree impl for now — Addressable is the key trait.
-        unimplemented!(
-            "Lambda's tree structure is through Box, not Vec. Use Addressable::oid() instead."
-        )
+    fn data(&self) -> &Lambda<T> {
+        self
     }
 
     fn children(&self) -> &[Self] {
-        // Lambda is recursive via Box, not via Vec children.
-        // The tree structure IS the term structure, captured in the Oid.
         &[]
     }
 }
@@ -552,5 +534,7 @@ mod tests {
         );
         assert_eq!(diff(&a, &b), vec![Delta::Modified(a.oid(), b.oid())]);
         assert_eq!(diff(&b, &b.clone()), vec![]);
+        assert_eq!(a.data(), &a);
+        assert!(a.is_leaf());
     }
 }
