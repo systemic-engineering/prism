@@ -8,8 +8,8 @@ use num_bigint::BigInt;
 use num_rational::BigRational;
 
 use prismqueer::algedonic::{
-    cross, decision_oid, persist, Clock, Decision, Draft, Edge, Enclosure, Evidence, Membership,
-    Persistence, Question, Recorded, Region, Signal, Wald,
+    cross, decision_oid, persist, Calibration, Clock, Decision, Draft, Edge, Enclosure, Evidence,
+    Membership, Persistence, Question, Recorded, Region, Signal, Wald,
 };
 use prismqueer::oid::Oid;
 use prismqueer::poly::ZPoly;
@@ -31,16 +31,22 @@ fn oid(s: &str) -> Oid {
 }
 
 /// A ruler signed by `by`: crossing above `eps`, under a Wald test with
-/// α = β = 1/20, p₀ = 1/6, p₁ = 1/2 (so one In multiplies the likelihood
-/// ratio by 3, one Out by 3/5).
+/// α = β = 1/20. With [`knee`]'s calibration (p₀ = 1/6, p₁ = 1/2) one In
+/// multiplies the likelihood ratio by 3, one Out by 3/5.
 fn ruler_above(eps: BigRational, by: &str) -> prismqueer::algedonic::Ruler {
     Draft::new(
         Region::above(eps),
         Question::Max,
-        Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).expect("valid rates"),
+        Wald::new(q(1, 20), q(1, 20)).expect("valid rates"),
         Clock::agreed(10, 1, 100),
     )
     .seal(oid(by))
+}
+
+/// The knee instrument's calibration: p₀ = 1/6, p₁ = 1/2.
+fn knee() -> Calibration {
+    Calibration::new(oid("knee"), q(1, 6), q(1, 2), "600 labelled contexts")
+        .expect("valid calibration")
 }
 
 fn decision(c: &Membership<Enclosure, Enclosure, Enclosure>) -> Decision {
@@ -251,11 +257,18 @@ fn three_distinct_contexts_reach_accept() {
     let ruler = ruler_above(q(1, 1), "engineer");
     let mut ev = Evidence::at(oid("leg"));
     for (i, n) in ["song-a", "song-b", "song-c"].iter().enumerate() {
-        assert_eq!(persist(&ev, &ruler), Persistence::Continue, "after {i}");
+        assert_eq!(
+            persist(&ev, &ruler, &knee()).persistence(),
+            Persistence::Continue,
+            "after {i}"
+        );
         let r = ev.record(oid(n), oid("knee"), &ruler, Decision::In);
         assert_eq!(r, Ok(Recorded::New));
     }
-    assert_eq!(persist(&ev, &ruler), Persistence::Accept);
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Accept
+    );
 }
 
 #[test]
@@ -264,11 +277,18 @@ fn six_distinct_certified_outs_reach_reject() {
     let ruler = ruler_above(q(1, 1), "engineer");
     let mut ev = Evidence::at(oid("leg"));
     for i in 0..6 {
-        assert_eq!(persist(&ev, &ruler), Persistence::Continue, "after {i}");
+        assert_eq!(
+            persist(&ev, &ruler, &knee()).persistence(),
+            Persistence::Continue,
+            "after {i}"
+        );
         ev.record(oid(&format!("n{i}")), oid("knee"), &ruler, Decision::Out)
             .expect("new");
     }
-    assert_eq!(persist(&ev, &ruler), Persistence::Reject);
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Reject
+    );
 }
 
 #[test]
@@ -286,19 +306,25 @@ fn undecided_evidence_does_not_move_persist() {
         )
         .expect("new");
     }
-    assert_eq!(persist(&ev, &ruler), Persistence::Continue);
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Continue
+    );
     ev.record(oid("a"), oid("knee"), &ruler, Decision::In)
         .expect("new");
     ev.record(oid("b"), oid("knee"), &ruler, Decision::In)
         .expect("new");
     assert_eq!(
-        persist(&ev, &ruler),
+        persist(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue,
         "two Ins: 9 < 19"
     );
     ev.record(oid("c"), oid("knee"), &ruler, Decision::In)
         .expect("new");
-    assert_eq!(persist(&ev, &ruler), Persistence::Accept);
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Accept
+    );
 }
 
 #[test]
@@ -318,7 +344,10 @@ fn reusing_one_visit_does_not_count_twice() {
         );
     }
     assert_eq!(ev.contexts(&ruler), 1);
-    assert_eq!(persist(&ev, &ruler), Persistence::Continue);
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Continue
+    );
     // A repeat that disagrees with the first reading is refused: a
     // deterministic instrument over the same bytes reads the same.
     assert!(ev
@@ -343,7 +372,11 @@ fn evidence_from_two_instruments_stays_keyed_apart() {
         Ok(Recorded::New)
     );
     assert_eq!(ev.contexts(&ruler), 3);
-    assert_eq!(persist(&ev, &ruler), Persistence::Continue, "two Ins");
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Continue,
+        "two Ins"
+    );
     let ids: std::collections::BTreeSet<Oid> = ["knee", "ear", "hand"]
         .iter()
         .map(|i| {
@@ -371,8 +404,14 @@ fn evidence_is_kept_per_ruler() {
         ev.record(oid(n), oid("knee"), &stool, Decision::In)
             .expect("new");
     }
-    assert_eq!(persist(&ev, &stool), Persistence::Accept);
-    assert_eq!(persist(&ev, &engineer), Persistence::Continue);
+    assert_eq!(
+        persist(&ev, &stool, &knee()).persistence(),
+        Persistence::Accept
+    );
+    assert_eq!(
+        persist(&ev, &engineer, &knee()).persistence(),
+        Persistence::Continue
+    );
     assert_eq!(ev.contexts(&engineer), 0);
 }
 
@@ -453,7 +492,7 @@ fn the_signer_is_beside_the_ruler_address() {
     assert_eq!(a.signer().over(), &a.oid());
     // Every part of the record moves the address.
     let base = a.oid();
-    let wald = Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).expect("valid");
+    let wald = Wald::new(q(1, 20), q(1, 20)).expect("valid");
     let other = |region, question, wald, clock| Draft::new(region, question, wald, clock).oid();
     assert_ne!(
         base,
@@ -478,7 +517,16 @@ fn the_signer_is_beside_the_ruler_address() {
         other(
             Region::above(q(1, 1)),
             Question::Max,
-            Wald::new(q(1, 10), q(1, 20), q(1, 6), q(1, 2)).expect("valid"),
+            Wald::new(q(1, 10), q(1, 20)).expect("valid"),
+            Clock::agreed(10, 1, 100)
+        )
+    );
+    assert_ne!(
+        base,
+        other(
+            Region::above(q(1, 1)),
+            Question::Max,
+            Wald::new(q(1, 20), q(1, 10)).expect("valid"),
             Clock::agreed(10, 1, 100)
         )
     );
@@ -493,33 +541,227 @@ fn the_signer_is_beside_the_ruler_address() {
     );
 }
 
+// ─── The canonical address and the calibration (docs/spec/ruler.md) ─────────
+
+#[test]
+/// Recalibrating an instrument never moves a ruler: p₀/p₁ are a measurement
+/// of the instrument, kept beside the ruler's address. Two calibrations get
+/// two addresses of their own, and each verdict names the one it read.
+fn recalibration_does_not_move_the_ruler() {
+    let ruler = ruler_above(q(1, 1), "engineer");
+    let before = knee();
+    let after = Calibration::new(oid("knee"), q(1, 10), q(3, 5), "600 labelled contexts")
+        .expect("valid calibration");
+    assert_ne!(before.oid(), after.oid());
+    assert_ne!(before.oid(), ruler.oid());
+
+    let mut ev = Evidence::at(oid("leg"));
+    for n in ["a", "b", "c"] {
+        ev.record(oid(n), oid("knee"), &ruler, Decision::In)
+            .expect("new");
+    }
+    let (x, y) = (persist(&ev, &ruler, &before), persist(&ev, &ruler, &after));
+    // The ruler is the same ruler under both.
+    assert_eq!(x.ruler(), &ruler.oid());
+    assert_eq!(y.ruler(), &ruler.oid());
+    // Each verdict names its calibration.
+    assert_eq!(x.calibration(), &before.oid());
+    assert_eq!(y.calibration(), &after.oid());
+    // And the calibration is read: 3³ = 27 ≥ 19 accepts; 6³ = 216 too, but
+    // two Ins split them (9 < 19 ≤ 36).
+    assert_eq!(x.persistence(), Persistence::Accept);
+    assert_eq!(y.persistence(), Persistence::Accept);
+    let mut two = Evidence::at(oid("leg"));
+    for n in ["a", "b"] {
+        two.record(oid(n), oid("knee"), &ruler, Decision::In)
+            .expect("new");
+    }
+    assert_eq!(
+        persist(&two, &ruler, &before).persistence(),
+        Persistence::Continue
+    );
+    assert_eq!(
+        persist(&two, &ruler, &after).persistence(),
+        Persistence::Accept
+    );
+}
+
+#[test]
+/// Every part of the calibration moves its address, and none of it moves
+/// the ruler's.
+fn every_part_of_the_calibration_is_in_its_address() {
+    let base = knee().oid();
+    let cal = |i: &str, p0, p1, m: &str| Calibration::new(oid(i), p0, p1, m).expect("valid").oid();
+    let m = "600 labelled contexts";
+    assert_eq!(base, cal("knee", q(1, 6), q(1, 2), m));
+    for other in [
+        cal("ear", q(1, 6), q(1, 2), m),
+        cal("knee", q(1, 7), q(1, 2), m),
+        cal("knee", q(1, 6), q(1, 3), m),
+        cal("knee", q(1, 6), q(1, 2), "601 labelled contexts"),
+    ] {
+        assert_ne!(base, other);
+    }
+    // Self-delimiting: a byte moved from the instrument into the method.
+    assert_ne!(
+        cal("kneeX", q(1, 6), q(1, 2), "m"),
+        cal("knee", q(1, 6), q(1, 2), "Xm")
+    );
+}
+
+#[test]
+/// A calibration speaks for its instrument only: p₀/p₁ measured on the knee
+/// say nothing about what the ear certified. The ear's Ins don't enter the
+/// knee's verdict.
+fn a_calibration_reads_only_its_instruments_decisions() {
+    let ruler = ruler_above(q(1, 1), "engineer");
+    let mut ev = Evidence::at(oid("leg"));
+    for n in ["a", "b", "c"] {
+        ev.record(oid(n), oid("ear"), &ruler, Decision::In)
+            .expect("new");
+    }
+    assert_eq!(
+        persist(&ev, &ruler, &knee()).persistence(),
+        Persistence::Continue
+    );
+    let ear =
+        Calibration::new(oid("ear"), q(1, 6), q(1, 2), "600 labelled contexts").expect("valid");
+    assert_eq!(
+        persist(&ev, &ruler, &ear).persistence(),
+        Persistence::Accept
+    );
+}
+
+/// A decoder for the ruler preimage, written from `docs/spec/ruler.md`.
+/// It returns the judgment and refuses trailing bytes, so a preimage that
+/// decodes back to its judgment is self-delimiting.
+fn decode(bytes: &[u8]) -> Option<Draft> {
+    struct Cursor<'a>(&'a [u8]);
+    impl Cursor<'_> {
+        fn take(&mut self, n: usize) -> Option<&[u8]> {
+            (self.0.len() >= n).then(|| {
+                let (head, tail) = self.0.split_at(n);
+                self.0 = tail;
+                head
+            })
+        }
+        fn byte(&mut self) -> Option<u8> {
+            self.take(1).map(|b| b[0])
+        }
+        fn u64(&mut self) -> Option<u64> {
+            Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?))
+        }
+        fn field(&mut self) -> Option<&[u8]> {
+            let n = usize::try_from(self.u64()?).ok()?;
+            self.take(n)
+        }
+        fn rational(&mut self) -> Option<BigRational> {
+            let sign = self.byte()?;
+            let n = num_bigint::BigUint::from_bytes_le(self.field()?);
+            let d = num_bigint::BigUint::from_bytes_le(self.field()?);
+            let sign = match sign {
+                0 => num_bigint::Sign::NoSign,
+                1 => num_bigint::Sign::Plus,
+                2 => num_bigint::Sign::Minus,
+                _ => return None,
+            };
+            Some(BigRational::new(
+                BigInt::from_biguint(sign, n),
+                BigInt::from(d),
+            ))
+        }
+        fn edge(&mut self) -> Option<Edge> {
+            match self.byte()? {
+                1 => Some(Edge::Open(self.rational()?)),
+                2 => Some(Edge::Closed(self.rational()?)),
+                3 => Some(Edge::Unbounded),
+                _ => None,
+            }
+        }
+    }
+    let mut c = Cursor(bytes.strip_prefix(b"ruler\0")?);
+    let region = Region::new(c.edge()?, c.edge()?).ok()?;
+    let question = match c.byte()? {
+        1 => Question::Any,
+        2 => Question::Max,
+        3 => Question::Product,
+        4 => Question::Sum,
+        _ => return None,
+    };
+    let wald = Wald::new(c.rational()?, c.rational()?).ok()?;
+    let clock = Clock::agreed(c.u64()?, c.u64()?, c.u64()?);
+    c.0.is_empty()
+        .then(|| Draft::new(region, question, wald, clock))
+}
+
+#[test]
+/// The ruler preimage decodes uniquely: every random judgment decodes back
+/// to itself with no byte left over, and no proper prefix decodes. So two
+/// judgments never share a preimage.
+fn the_ruler_preimage_decodes_uniquely() {
+    let mut mix = Mix(0x0b5e_55ed);
+    let wide = BigInt::from(1u8) << 70;
+    let mut seen = std::collections::BTreeMap::new();
+    for i in 0..400 {
+        let mut region = mix.region();
+        if i % 5 == 0 {
+            // Edges wider than 64 bits.
+            region = Region::new(
+                Edge::Closed(mix.rational() * BigRational::from(wide.clone())),
+                Edge::Unbounded,
+            )
+            .expect("half-line");
+        }
+        let question = [
+            Question::Any,
+            Question::Max,
+            Question::Product,
+            Question::Sum,
+        ][(mix.next() % 4) as usize];
+        let alpha = q(1 + (mix.next() % 9) as i64, 20);
+        let beta = q(1 + (mix.next() % 9) as i64, 20);
+        let wald = Wald::new(alpha, beta).expect("α + β < 1");
+        let clock = Clock::agreed(mix.next(), mix.next() % 3, mix.next() >> (mix.next() % 64));
+        let draft = Draft::new(region, question, wald, clock);
+        let bytes = draft.preimage();
+        assert_eq!(decode(&bytes).as_ref(), Some(&draft), "case {i}");
+        for cut in 0..bytes.len() {
+            assert!(decode(&bytes[..cut]).is_none(), "case {i}: prefix {cut}");
+        }
+        assert_eq!(
+            draft.oid(),
+            prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), &bytes)
+        );
+        if let Some(earlier) = seen.insert(bytes, draft.clone()) {
+            assert_eq!(earlier, draft, "one preimage, two judgments");
+        }
+    }
+}
+
 // ─── The ruler record ───────────────────────────────────────────────────────
 
 #[test]
 fn the_wald_rates_are_validated() {
-    assert!(
-        Wald::new(q(0, 1), q(1, 20), q(1, 6), q(1, 2)).is_err(),
-        "α = 0"
-    );
-    assert!(
-        Wald::new(q(1, 20), q(1, 1), q(1, 6), q(1, 2)).is_err(),
-        "β = 1"
-    );
-    assert!(
-        Wald::new(q(1, 2), q(1, 2), q(1, 6), q(1, 2)).is_err(),
-        "α + β = 1"
-    );
-    assert!(
-        Wald::new(q(1, 20), q(1, 20), q(1, 2), q(1, 2)).is_err(),
-        "p₀ = p₁"
-    );
-    assert!(
-        Wald::new(q(1, 20), q(1, 20), q(0, 1), q(1, 2)).is_err(),
-        "p₀ = 0"
-    );
-    let w = Wald::new(q(1, 20), q(1, 10), q(1, 6), q(1, 2)).expect("valid");
+    assert!(Wald::new(q(0, 1), q(1, 20)).is_err(), "α = 0");
+    assert!(Wald::new(q(1, 20), q(1, 1)).is_err(), "β = 1");
+    assert!(Wald::new(q(1, 2), q(1, 2)).is_err(), "α + β = 1");
+    let w = Wald::new(q(1, 20), q(1, 10)).expect("valid");
     assert_eq!((w.alpha(), w.beta()), (&q(1, 20), &q(1, 10)));
-    assert_eq!((w.p0(), w.p1()), (&q(1, 6), &q(1, 2)));
+}
+
+#[test]
+/// p₀ and p₁ are validated where they live now, in the calibration:
+/// `0 < p₀ < p₁ < 1`.
+fn the_calibration_rates_are_validated() {
+    let cal = |p0, p1| Calibration::new(oid("knee"), p0, p1, "m");
+    assert!(cal(q(1, 2), q(1, 2)).is_err(), "p₀ = p₁");
+    assert!(cal(q(1, 2), q(1, 6)).is_err(), "p₀ > p₁");
+    assert!(cal(q(0, 1), q(1, 2)).is_err(), "p₀ = 0");
+    assert!(cal(q(1, 6), q(1, 1)).is_err(), "p₁ = 1");
+    let k = knee();
+    assert_eq!((k.p0(), k.p1()), (&q(1, 6), &q(1, 2)));
+    assert_eq!(k.instrument(), &oid("knee"));
+    assert_eq!(k.method(), "600 labelled contexts");
 }
 
 #[test]
@@ -546,7 +788,7 @@ fn the_question_picks_the_aggregate() {
         Draft::new(
             Region::above(eps),
             question,
-            Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).expect("valid"),
+            Wald::new(q(1, 20), q(1, 20)).expect("valid"),
             Clock::agreed(1, 1, 1),
         )
         .seal(oid("engineer"))
@@ -572,7 +814,7 @@ fn any_is_undecided_unless_some_crossing_is_in_or_all_are_out() {
         Draft::new(
             Region::above(q(1, 1)),
             Question::Any,
-            Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).expect("valid"),
+            Wald::new(q(1, 20), q(1, 20)).expect("valid"),
             Clock::agreed(1, 1, 1),
         )
         .seal(oid("engineer"))
@@ -593,7 +835,7 @@ fn the_product_question_is_an_interval_product() {
         Draft::new(
             Region::new(Edge::Closed(eps), Edge::Unbounded).expect("nonempty"),
             Question::Product,
-            Wald::new(q(1, 20), q(1, 20), q(1, 6), q(1, 2)).expect("valid"),
+            Wald::new(q(1, 20), q(1, 20)).expect("valid"),
             Clock::agreed(1, 1, 1),
         )
         .seal(oid("engineer"))
