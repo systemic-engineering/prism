@@ -66,6 +66,33 @@ pub use terni::{
 // Numeric Chaos impl via prismqueer::ScalarLoss re-export.
 pub use crate::ScalarLoss as ScalarChaos;
 
+/// The loss of a step that measures nothing.
+///
+/// A step that has not measured its chaos must not report a number:
+/// `ScalarChaos::zero()` there would be a judgment wearing a measurement's
+/// clothes. `Unmeasured` is the trivial monoid (one element, its own
+/// identity and its own absorber), so `Imperfect::loss()` on such a step
+/// answers `Unmeasured`, never `0.0`.
+///
+/// `is_zero` answers `false`: an unmeasured loss is never claimed lossless.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Unmeasured;
+
+impl Chaos for Unmeasured {
+    fn zero() -> Self {
+        Unmeasured
+    }
+    fn total() -> Self {
+        Unmeasured
+    }
+    fn is_zero(&self) -> bool {
+        false
+    }
+    fn combine(self, _other: Self) -> Self {
+        Unmeasured
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +119,13 @@ mod tests {
         let doubled = residual.combine(ConvergenceChaos::new(3));
         // Loss::combine is associative; monoid axiom preserved.
         let _residual_squared = doubled.combine(ConvergenceChaos::new(3));
+    }
+
+    #[test]
+    fn unmeasured_is_the_trivial_monoid_and_never_claims_lossless() {
+        assert_eq!(Unmeasured::zero(), Unmeasured::total());
+        assert_eq!(Unmeasured.combine(Unmeasured), Unmeasured);
+        assert!(!Unmeasured.is_zero());
     }
 
     #[test]

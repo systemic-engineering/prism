@@ -40,9 +40,13 @@ use prismqueer::observation::Observation;
 use prismqueer::observer::{Observer, PeerObserver, TuringObserver, VoidObserver};
 use prismqueer::question::Question;
 use prismqueer::reality::Reality;
-use prismqueer::recursion::Recursion;
+use prismqueer::recursion::{EmptyFracture, Recursion};
 use prismqueer::shard::Shard;
-use terni::Loss;
+
+/// The caller's chaos for the Question. tick measures none; this one is supplied here.
+fn caller_chaos() -> ScalarChaos {
+    ScalarChaos::new(0.5)
+}
 
 /// Full 6-arrow autopoietic loop — ONE tick fluent chain.
 #[test]
@@ -53,10 +57,15 @@ fn autopoietic_loop_one_tick_fluent_composition() {
 
     // Arrows 1-4: substrate side (fluent method-chain per Move 8+9)
     let question: Question = observer
-        .observe(reality) // arrow 1: Reality → Observation
-        .assert(model) // arrow 2: + Model → Assertion
-        .hypothesize() // arrow 3: → Hypothesis
-        .compose(ScalarChaos::zero()); // arrow 4: + Chaos → Question
+        .observe(reality) // arrow 1: Reality → Observation (or a typed empty fracture)
+        .map(|observation| {
+            observation
+                .assert(model) // arrow 2: + Model → Assertion
+                .hypothesize() // arrow 3: → Hypothesis
+                .compose(caller_chaos()) // arrow 4: + Chaos → Question
+        })
+        .ok()
+        .expect("settled reality is observed");
 
     assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
 }
@@ -72,7 +81,9 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
     // Tick 1: seed Reality
     let reality_0: Reality<String> = Reality::Settled(Crystal::new("initial".to_string()));
     let question_1: Question = Recursion::from_reality(reality_0)
-        .subject_driven_loop_tick(Model::empty(), ScalarChaos::zero());
+        .subject_driven_loop_tick(Model::empty(), caller_chaos())
+        .ok()
+        .expect("tick 1");
     assert_eq!(question_1.hypothesis.shape, KTQuestionShape::Reflexive);
 
     // Arrow 5: @subject inputs Choice (external subject-substrate boundary crossing)
@@ -83,7 +94,9 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
 
     // Tick 2: fold subject-input into next Recursion
     let question_2: Question = Recursion::from_reality(reality_1)
-        .subject_driven_loop_tick(Model::empty(), ScalarChaos::zero());
+        .subject_driven_loop_tick(Model::empty(), caller_chaos())
+        .ok()
+        .expect("tick 2");
     assert_eq!(question_2.hypothesis.shape, KTQuestionShape::Reflexive);
 
     // Arrow 5 again: subject inputs another Choice
@@ -92,7 +105,9 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
 
     // Tick 3: continues the loop
     let question_3: Question = Recursion::from_reality(reality_2)
-        .subject_driven_loop_tick(Model::empty(), ScalarChaos::zero());
+        .subject_driven_loop_tick(Model::empty(), caller_chaos())
+        .ok()
+        .expect("tick 3");
     assert_eq!(question_3.hypothesis.shape, KTQuestionShape::Reflexive);
 
     // The autopoietic loop demonstrably iterates: 3 Questions emitted; 2 Choices
@@ -100,10 +115,10 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
     // discipline.
 }
 
-/// Reality::Fractured (disconnected Shards) → Recursion.tick extracts first Shard
-/// as observation-crystal per Move 8 minimum-viable elegant closure.
+/// Reality::Fractured (disconnected Shards) → Recursion.tick keeps every Shard
+/// (prism-019 #1: no first-wins collapse).
 #[test]
-fn autopoietic_loop_fractured_reality_extracts_first_shard() {
+fn autopoietic_loop_fractured_reality_keeps_every_shard() {
     let observer: PeerObserver = Observer::new();
     let shards: Vec<Shard<&[u8]>> = vec![
         Shard::new(b"first"),
@@ -112,8 +127,18 @@ fn autopoietic_loop_fractured_reality_extracts_first_shard() {
     ];
     let reality: Reality<&[u8]> = Reality::Fractured(shards);
 
-    let observation: Observation<&[u8]> = observer.observe(reality);
-    assert_eq!(observation.crystal.payload, b"first");
+    let observation: Observation<&[u8]> = observer.observe(reality).ok().expect("observed");
+    let payloads: Vec<&[u8]> = observation.crystals.iter().map(|c| c.payload).collect();
+    assert_eq!(payloads, vec![b"first" as &[u8], b"second", b"third"]);
+    assert_eq!(observation.chaos, None);
+}
+
+/// An empty fracture closes no loop: a typed outcome, no Question, no panic.
+#[test]
+fn autopoietic_loop_empty_fracture_is_typed() {
+    let observer: PeerObserver = Observer::new();
+    let reality: Reality<&[u8]> = Reality::Fractured(vec![]);
+    assert_eq!(observer.observe(reality).err(), Some(EmptyFracture));
 }
 
 /// All three Observer<N> dimensionality altitudes compose the same fluent-pipeline
@@ -123,18 +148,24 @@ fn autopoietic_loop_all_three_canonical_observer_dimensions() {
     // N=1 Turing tape (degenerate; K_{1,n-1} pole)
     let _observer_1: TuringObserver = Observer::new();
     let question_1 = Recursion::from_reality(Reality::Settled(Crystal::new(b"t1" as &[u8])))
-        .subject_driven_loop_tick(Model::<&[u8]>::empty(), ScalarChaos::zero());
+        .subject_driven_loop_tick(Model::<&[u8]>::empty(), caller_chaos())
+        .ok()
+        .expect("N=1 tick");
     assert_eq!(question_1.hypothesis.shape, KTQuestionShape::Reflexive);
 
     // N=3 K_3 peer stability (past+now+future; @reality/object sufficient)
     let observer_3: PeerObserver = Observer::new();
-    let _obs: Observation<&[u8]> =
-        observer_3.observe(Reality::Settled(Crystal::new(b"t3" as &[u8])));
+    let _obs: Observation<&[u8]> = observer_3
+        .observe(Reality::Settled(Crystal::new(b"t3" as &[u8])))
+        .ok()
+        .expect("N=3 observes");
 
     // N=5 K_5 @void gauge basis (@reality/subject + hodobodo required)
     let observer_5: VoidObserver = Observer::new();
-    let _obs: Observation<&[u8]> =
-        observer_5.observe(Reality::Settled(Crystal::new(b"t5" as &[u8])));
+    let _obs: Observation<&[u8]> = observer_5
+        .observe(Reality::Settled(Crystal::new(b"t5" as &[u8])))
+        .ok()
+        .expect("N=5 observes");
 
     assert_eq!(Observer::<1>::dimensionality(), 1);
     assert_eq!(Observer::<3>::dimensionality(), 3);
@@ -150,7 +181,7 @@ fn autopoietic_loop_hawking_model_dependent_reality_explicit_at_type_level() {
     // we live an a model dependent reality. Let's make that explicit in prismqueer.").
     let observer: PeerObserver = Observer::new();
     let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"reality"));
-    let observation: Observation<&[u8]> = observer.observe(reality);
+    let observation: Observation<&[u8]> = observer.observe(reality).ok().expect("observed");
 
     let shard_model_a = Shard::new(b"model-frame-a" as &[u8]);
     let shard_model_b = Shard::new(b"model-frame-b" as &[u8]);

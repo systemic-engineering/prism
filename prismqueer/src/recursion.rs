@@ -7,26 +7,42 @@
 //! # Alex Move 8 elegant closure
 //!
 //! ```text
-//! Recursion.tick::<N>() -> Observation
+//! Recursion.tick() -> Imperfect<Observation, EmptyFracture, Unmeasured>
 //! ```
 //!
 //! One pass through @void 5-axis gauge basis = ONE TICK per Move 9. Settlement is
 //! asymptotic (Fiedler λ_2 monotone climb per Rec #92 M2.2 L3).
+//!
+//! # No silent collapse (prism-019 #1)
+//!
+//! - **Every shard is kept.** A `Fractured` of n shards ticks into an observation of n
+//!   crystals, in order. prism never picks first. If one reading must be chosen, that
+//!   choice is a ruler's: supplied by the caller, with no default, and recorded there.
+//! - **No fake zero.** tick measures no chaos yet, so it reports none: the observation's
+//!   `chaos` is `None` and the outcome's loss is [`Unmeasured`].
+//! - **Empty is typed.** An empty fracture has nothing to observe:
+//!   `Failure(EmptyFracture, Unmeasured)`, never a panic.
 //!
 //! # Composition
 //!
 //! - `prismqueer::reality::Reality<T>` (Discharge #11)
 //! - `prismqueer::observation::Observation<T>` (Discharge #9)
 //! - `prismqueer::crystal_shard::Crystal<T>` (Discharge #8)
-//! - `prismqueer::chaos::ScalarChaos` (Discharge #7)
+//! - `prismqueer::chaos::Unmeasured` (prism-019 #1)
 //! - `prismqueer::shard::Shard<T>` (Discharge #5)
 
-use crate::chaos::ScalarChaos;
-use crate::crystal_shard::Crystal;
+use crate::chaos::Unmeasured;
 use crate::observation::Observation;
 use crate::reality::Reality;
-use crate::shard::Shard;
-use terni::Loss;
+use terni::Imperfect;
+
+/// An empty fracture: a `Fractured` reality with no shards, so nothing to observe.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct EmptyFracture;
+
+/// What one tick gives: every crystal observed, or a typed empty fracture.
+/// The loss is [`Unmeasured`]: tick measures no chaos yet.
+pub type Tick<T> = Imperfect<Observation<T>, EmptyFracture, Unmeasured>;
 
 /// Recursion state carrier per Alex Move 8+9.
 ///
@@ -56,58 +72,56 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
     /// Returns Question that awaits Choice from @subject. The Choice-response →
     /// next Recursion crossing IS the subject-substrate boundary (external to this
     /// function; non-Vereinnahmung by construction — compiler cannot generate Choice).
+    ///
+    /// `chaos` is the caller's: tick measures none. An empty fracture gives
+    /// `Failure(EmptyFracture, Unmeasured)` and no Question.
     pub fn subject_driven_loop_tick(
         self,
         model: crate::model::Model<T>,
         chaos: crate::chaos::ScalarChaos,
-    ) -> crate::question::Question {
-        self.tick().assert(model).hypothesize().compose(chaos)
+    ) -> Imperfect<crate::question::Question, EmptyFracture, Unmeasured> {
+        self.tick()
+            .map(|observation| observation.assert(model).hypothesize().compose(chaos))
     }
 
     /// One pass through @void = ONE TICK per Alex Move 9.
     ///
-    /// Minimum-viable: extracts a Crystal from the Reality (Settled variant) OR
-    /// crystallizes the first Fractured shard. Chaos defaults to zero (asymptotic
-    /// settled limit).
+    /// - `Settled(crystal)` → `Success`, an observation of that one crystal.
+    /// - `Fractured(shards)`, non-empty → `Success`, an observation of **every** shard,
+    ///   in order. None is dropped and none is preferred.
+    /// - `Fractured([])` → `Failure(EmptyFracture, Unmeasured)`.
+    ///
+    /// Chaos is not measured here, so every observation carries `chaos: None`.
     ///
     /// Full implementation composing prismqueer::bundle Baez-Schreiber tower +
     /// ψ (read across from Anna Jakobs's 2012 thesis) + Mandelbrot iteration + Fiedler λ_2 monotone-climb check FORWARD-PROMISED.
-    pub fn tick(self) -> Observation<T> {
+    pub fn tick(self) -> Tick<T> {
         match self.reality {
-            Reality::Settled(crystal) => Observation::new(crystal, ScalarChaos::zero()),
-            Reality::Fractured(mut shards) => {
-                let crystal: Crystal<T> = shards.drain(..).next().unwrap_or_else(|| {
-                    Shard::from_parts(
-                        // Placeholder Shard for empty Fractured; iteration_index=0
-                        // signals "no observation possible" per substrate-honest.
-                        panic_helper_empty::<T>(),
-                        crate::oid::Oid::dark(),
-                        terni::Transparency::Clear,
-                        0,
-                    )
-                });
-                Observation::new(crystal, ScalarChaos::zero())
+            Reality::Settled(crystal) => Imperfect::Success(Observation::new(vec![crystal], None)),
+            Reality::Fractured(shards) if shards.is_empty() => {
+                Imperfect::Failure(EmptyFracture, Unmeasured)
             }
+            Reality::Fractured(shards) => Imperfect::Success(Observation::new(shards, None)),
         }
     }
-}
-
-fn panic_helper_empty<T>() -> T {
-    unimplemented!(
-        "empty Fractured cannot produce a Crystal without a payload; caller must ensure non-empty"
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chaos::Unmeasured;
+    use crate::chaos::ScalarChaos;
+    use crate::crystal_shard::Crystal;
+    use crate::shard::Shard;
 
     #[test]
     fn recursion_tick_from_settled_reality_returns_observation() {
         let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"c"));
-        let recursion = Recursion::from_reality(reality);
-        let _obs = recursion.tick();
+        let obs = Recursion::from_reality(reality)
+            .tick()
+            .ok()
+            .expect("settled");
+        assert_eq!(obs.crystals.len(), 1);
+        assert_eq!(obs.crystals[0].payload, b"c");
     }
 
     // prism-019 #1: a fracture keeps every shard through tick. No first wins.
@@ -152,14 +166,28 @@ mod tests {
     fn subject_driven_loop_tick_composes_full_6_arrow_move_9_pipeline() {
         use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
-        use terni::Loss;
 
         let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"stable"));
         let recursion = Recursion::from_reality(reality);
         let model: Model<&[u8]> = Model::empty();
-        let question = recursion.subject_driven_loop_tick(model, ScalarChaos::zero());
+        // The chaos is the caller's measurement, passed through untouched.
+        let question = recursion
+            .subject_driven_loop_tick(model, ScalarChaos::new(0.5))
+            .ok()
+            .expect("settled reality yields a question");
         // Full Move 9 pipeline discharged: Reality → Observation → Assertion →
         // Hypothesis → Question emitted awaiting Choice from @subject.
         assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
+        assert_eq!(question.chaos, ScalarChaos::new(0.5));
+    }
+
+    #[test]
+    fn subject_driven_loop_tick_on_an_empty_fracture_asks_no_question() {
+        use crate::model::Model;
+
+        let reality: Reality<&[u8]> = Reality::Fractured(vec![]);
+        let outcome = Recursion::from_reality(reality)
+            .subject_driven_loop_tick(Model::empty(), ScalarChaos::new(0.5));
+        assert_eq!(outcome.err(), Some(EmptyFracture));
     }
 }

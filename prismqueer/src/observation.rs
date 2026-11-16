@@ -6,11 +6,19 @@
 //! # Alex Move 8 shape
 //!
 //! ```text
-//! Observation = { crystal: Crystal, chaos: Chaos }
+//! Observation = { crystals: [Crystal], chaos: Chaos? }
 //! ```
 //!
 //! Straight product type. No verdict-enum. No branching. No duplication. Move 6b+7+8
 //! reflex-cascade fires all dissolved via this shape per Alex Move 8 elegant closure.
+//!
+//! # Every shard, and no unmeasured chaos (prism-019 #1)
+//!
+//! - `crystals` holds **every** crystal the tick saw, in the reality's order. A
+//!   fracture of three shards is an observation of three. prism never picks one;
+//!   choosing a single reading is a ruler's act, supplied and signed by the caller.
+//! - `chaos` is `None` when no chaos was measured. A `ScalarChaos` here is a
+//!   measurement, never a default.
 //!
 //! # Composition (grep-verified LANDED)
 //!
@@ -26,16 +34,18 @@ use crate::crystal_shard::Crystal;
 /// Crystal condenses; Chaos emerges as leftover harmonic residual.
 #[derive(Clone, Debug)]
 pub struct Observation<T> {
-    /// The settled Crystal deposited by this observation-tick.
-    pub crystal: Crystal<T>,
-    /// The leftover Chaos residual per Move 3+8 (encoded as ScalarChaos monoid).
-    pub chaos: ScalarChaos,
+    /// Every Crystal deposited by this observation-tick, in the reality's order.
+    /// None is dropped.
+    pub crystals: Vec<Crystal<T>>,
+    /// The leftover Chaos residual per Move 3+8, when it was measured.
+    /// `None`: not measured (never a silent zero).
+    pub chaos: Option<ScalarChaos>,
 }
 
 impl<T> Observation<T> {
-    /// Construct an Observation from Crystal + Chaos parts.
-    pub fn new(crystal: Crystal<T>, chaos: ScalarChaos) -> Self {
-        Self { crystal, chaos }
+    /// Construct an Observation from its crystals and, if measured, its chaos.
+    pub fn new(crystals: Vec<Crystal<T>>, chaos: Option<ScalarChaos>) -> Self {
+        Self { crystals, chaos }
     }
 
     /// Compose Observation with Model → Assertion per Alex Move 2 pipeline.
@@ -54,19 +64,18 @@ impl<T> Observation<T> {
 mod tests {
     use super::*;
     use crate::model::Model;
-    use terni::Loss;
 
     #[test]
-    fn observation_product_type_composes_crystal_and_chaos() {
+    fn observation_product_type_composes_crystals_and_measured_chaos() {
         let crystal: Crystal<&[u8]> = Crystal::new(b"settled");
-        let chaos = ScalarChaos::zero();
-        let obs = Observation::new(crystal, chaos);
-        assert_eq!(obs.crystal.iteration_index, 0);
+        let obs = Observation::new(vec![crystal], Some(ScalarChaos::new(1.5)));
+        assert_eq!(obs.crystals[0].iteration_index, 0);
+        assert_eq!(obs.chaos, Some(ScalarChaos::new(1.5)));
     }
 
     #[test]
     fn observation_assert_model_composes_to_assertion_per_alex_move_2() {
-        let obs: Observation<&[u8]> = Observation::new(Crystal::new(b"c"), ScalarChaos::zero());
+        let obs: Observation<&[u8]> = Observation::new(vec![Crystal::new(b"c")], None);
         let model: Model<&[u8]> = Model::empty();
         let assertion = obs.assert(model);
         assert_eq!(assertion.model.shards.len(), 0);

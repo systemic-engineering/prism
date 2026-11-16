@@ -46,13 +46,11 @@ impl<T> Assertion<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chaos::ScalarChaos;
     use crate::crystal_shard::Crystal;
-    use terni::Loss;
 
     #[test]
     fn assertion_composes_observation_and_model() {
-        let obs: Observation<&[u8]> = Observation::new(Crystal::new(b"c"), ScalarChaos::zero());
+        let obs: Observation<&[u8]> = Observation::new(vec![Crystal::new(b"c")], None);
         let model: Model<&[u8]> = Model::empty();
         let assertion = Assertion::new(obs, model);
         assert_eq!(assertion.model.shards.len(), 0);
@@ -61,7 +59,7 @@ mod tests {
     #[test]
     fn assertion_hypothesize_composes_to_hypothesis_per_alex_move_2() {
         use crate::hypothesis::KTQuestionShape;
-        let obs: Observation<&[u8]> = Observation::new(Crystal::new(b"c"), ScalarChaos::zero());
+        let obs: Observation<&[u8]> = Observation::new(vec![Crystal::new(b"c")], None);
         let model: Model<&[u8]> = Model::empty();
         let hypothesis = Assertion::new(obs, model).hypothesize();
         assert_eq!(hypothesis.shape, KTQuestionShape::Reflexive);

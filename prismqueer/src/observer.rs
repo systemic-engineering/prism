@@ -72,6 +72,20 @@ use crate::shard::Shard;
 ///
 /// Full [`Observer::observe`]`(Reality) -> Observation` per Move 8 pipeline FORWARD-PROMISED
 /// when Reality + Observation types land.
+///
+/// # What an Observer carries (prism-019 #1)
+///
+/// Today an `Observer<N>` carries only its dimension `N`, as a `PhantomData`. That
+/// is enough for [`Observer::observe`] to be honest, because observing **selects
+/// nothing**: every shard is kept and no chaos is invented. An observer that
+/// stands behind what it observes would carry, in later ticks:
+///
+/// - **who** observes (an address the observation can be recorded under);
+/// - its **model** (Hawking: no model-free observation; today the caller passes
+///   a `Model` to `assert`);
+/// - its **ruler**: the signed order it reads by, for any step that has to
+///   choose one reading. Such a choice is the ruler's, recorded with it, and has
+///   no default.
 #[derive(Clone, Debug)]
 pub struct Observer<const N: usize> {
     /// Type-level marker encoding N at compile time.
@@ -124,10 +138,10 @@ impl<const N: usize> Observer<N> {
     ///
     /// Full bundle-tower + ψ (read across from Anna Jakobs's 2012 thesis) + Fiedler λ_2 climb composition happens INSIDE
     /// Recursion.tick() per Move 8+9 pipeline; this method is the outer entry point.
-    pub fn observe<T>(
-        self,
-        reality: crate::reality::Reality<T>,
-    ) -> crate::observation::Observation<T>
+    ///
+    /// Every shard of a fractured reality is observed; an empty fracture is
+    /// `Failure(EmptyFracture, Unmeasured)`. See [`crate::recursion::Recursion::tick`].
+    pub fn observe<T>(self, reality: crate::reality::Reality<T>) -> crate::recursion::Tick<T>
     where
         T: AsRef<[u8]> + Clone,
     {
@@ -251,7 +265,6 @@ mod tests {
         use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
         use crate::reality::Reality;
-        use terni::Loss;
 
         // Full Move 8+9 fluent pipeline:
         //   Observer.observe(Reality) → Observation .assert(Model) → Assertion .hypothesize()
@@ -261,21 +274,28 @@ mod tests {
         let model: Model<&[u8]> = Model::empty();
         let question = observer
             .observe(reality)
-            .assert(model)
-            .hypothesize()
-            .compose(ScalarChaos::zero());
+            .map(|observation| {
+                observation
+                    .assert(model)
+                    .hypothesize()
+                    .compose(ScalarChaos::new(0.5))
+            })
+            .ok()
+            .expect("settled reality is observed");
         assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
     }
 
     #[test]
-    fn observer_observe_reality_fractured_extracts_first_shard_per_move_8_recursion_tick() {
+    fn observer_observe_reality_fractured_keeps_every_shard() {
         use crate::reality::Reality;
         use crate::shard::Shard;
 
         let observer: VoidObserver = Observer::new();
         let shards: Vec<Shard<&[u8]>> = vec![Shard::new(b"first"), Shard::new(b"second")];
         let reality: Reality<&[u8]> = Reality::Fractured(shards);
-        let observation = observer.observe(reality);
-        assert_eq!(observation.crystal.payload, b"first");
+        let observation = observer.observe(reality).ok().expect("observed");
+        let payloads: Vec<&[u8]> = observation.crystals.iter().map(|c| c.payload).collect();
+        assert_eq!(payloads, vec![b"first" as &[u8], b"second"]);
+        assert_eq!(observation.chaos, None);
     }
 }
