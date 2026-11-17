@@ -32,6 +32,7 @@ mod hypothesis;
 mod identity_vectors;
 mod instrument;
 mod integration;
+mod kleinos;
 mod lambda_integration;
 mod loss_laws;
 mod music;
