@@ -14,6 +14,7 @@ mod band;
 mod brain;
 mod build_hygiene;
 mod bundle_integration;
+mod crossing;
 mod declaration_round_trip;
 mod dependency;
 mod discoball;

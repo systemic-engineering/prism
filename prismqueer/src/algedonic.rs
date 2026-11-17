@@ -680,15 +680,23 @@ impl Draft {
 }
 
 /// Who signed a judgment (a ruler or an independence relation), and the
-/// address they signed. Minted only by [`Draft::seal`] and
-/// [`IndependenceDraft::seal`]. It sits beside the address, never in it.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// address they signed. Minted only by [`Draft::seal`],
+/// [`IndependenceDraft::seal`] and [`crate::crossing::attest`]. It sits beside
+/// the address, never in it. Ordered by signer, then address, so a set of
+/// seals has one order everywhere.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Signer {
     by: Oid,
     over: Oid,
 }
 
 impl Signer {
+    /// `by`'s seal over `over`. Crate-only: every public way to a signer is
+    /// an act of sealing something.
+    pub(crate) fn mint(by: Oid, over: Oid) -> Self {
+        Signer { by, over }
+    }
+
     /// The signer's identity, as the caller vouched for it.
     pub fn by(&self) -> &Oid {
         &self.by

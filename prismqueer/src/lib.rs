@@ -33,6 +33,7 @@ extern crate self as prismqueer;
 
 pub mod algedonic;
 pub mod beam;
+pub mod crossing;
 pub mod brain;
 pub mod coincidence;
 pub mod crystal;
