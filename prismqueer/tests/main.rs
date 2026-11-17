@@ -7,6 +7,7 @@
 //!
 //! Run one file's tests: `cargo test --features lapack,fate --test suite music::`.
 
+mod agreement;
 mod algedonic;
 mod audit;
 mod autopoietic_loop_integration;

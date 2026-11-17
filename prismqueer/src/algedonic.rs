@@ -681,7 +681,8 @@ impl Draft {
 
 /// Who signed a judgment (a ruler or an independence relation), and the
 /// address they signed. Minted only by [`Draft::seal`],
-/// [`IndependenceDraft::seal`] and [`crate::crossing::attest`]. It sits beside
+/// [`IndependenceDraft::seal`], [`crate::crossing::attest`] and
+/// [`crate::agreement::SelectionDraft::seal`]. It sits beside
 /// the address, never in it. Ordered by signer, then address, so a set of
 /// seals has one order everywhere.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

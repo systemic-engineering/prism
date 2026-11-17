@@ -102,6 +102,11 @@ pub mod band;
 #[cfg(feature = "lapack")]
 pub mod room;
 
+// The kernel check: a signed selection against the consistent readings of
+// exact relations (prism-019 ask 4).
+#[cfg(feature = "lapack")]
+pub mod agreement;
+
 // The disco ball: facets on a room, turned by unitaries over ℤ, read as the
 // measurement triple (prism-012 Ask 3).
 #[cfg(feature = "lapack")]
