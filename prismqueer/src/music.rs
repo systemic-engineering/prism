@@ -19,7 +19,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::field::{check_flat, Edge, Field, Flat, Flatness, Graph, Ratio};
-use crate::spectral::kleinos::VertexId;
+use crate::spectral::join::VertexId;
 
 /// A fact or a derived atom, by name.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

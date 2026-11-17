@@ -221,7 +221,7 @@ use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning, Walk};
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::VertexId;
+use crate::spectral::join::VertexId;
 
 // --- Kinds of room -----------------------------------------------------------
 

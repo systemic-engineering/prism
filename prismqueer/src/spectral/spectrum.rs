@@ -36,11 +36,11 @@
 //!
 //! # Composition (over LANDED per FLOOR Definition M8.1)
 //!
-//! - `prismqueer::spectral::kleinos::Graph` — input carrier
+//! - `prismqueer::spectral::join::Graph` — input carrier
 //! - `prismqueer::room` — L₀ = δ*δ, exact, and its spectrum by LAPACK dsyev('N')
 //!   via FLANG-compiled `native/spectral.f90`
 
-use crate::spectral::kleinos::{laplacian_spectrum, Graph};
+use crate::spectral::join::{laplacian_spectrum, Graph};
 
 /// Full non-trivial harmonic spectrum of the sheaf Laplacian.
 ///
@@ -217,7 +217,7 @@ impl DeltaCritical {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::kleinos::{graph_complete_of_order, graph_from_edges};
+    use crate::spectral::join::{graph_complete_of_order, graph_from_edges};
 
     /// K_5: Laplacian spectrum = {0, 5, 5, 5, 5} per void-dual-geometry.md.
     /// `Spectrum::of(K_5).eigenvalues → {5, 5, 5, 5}`.

@@ -51,7 +51,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::{EdgeKey, Graph as Shape, VertexId};
+use crate::spectral::join::{EdgeKey, Graph as Shape, VertexId};
 use crate::spectral::settle::Noise;
 
 // --- The value algebra -------------------------------------------------------

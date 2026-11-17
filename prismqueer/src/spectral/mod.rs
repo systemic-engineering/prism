@@ -1,7 +1,8 @@
 //! `prismqueer::spectral` — the spectral-sub-namespace for cellular-sheaf
 //! primitives at prismqueer altitude.
 //!
-//! Phase 1: hosts `kleinos` (the K_2→K_3 compose primitive per PAPER §3.6
+//! Phase 1: hosts `join` (formerly `kleinos`; a join with relations nobody
+//! signed, kept for `rotation`) (the K_2→K_3 compose primitive per PAPER §3.6
 //! four properties). Phase 2+ absorbs additional spectral primitives per
 //! Mara `ac80d23` §9 migration cascade + Mara Phase 2+ amendment (metalogue
 //! + Stalker + fractal + persistence + magic + eigenvalues + scheduler).
@@ -26,14 +27,14 @@
 
 pub mod commutator;
 pub mod instrument;
-pub mod kleinos;
+pub mod join;
 pub mod rotation;
 pub mod settle;
 pub mod spectrum;
 pub mod tension;
 
-pub use kleinos::{
-    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, kleinos, Composition,
+pub use join::{
+    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, join, Composition,
     EdgeKey, Graph, Green, Property, Red, VertexId, WhichSide,
 };
 

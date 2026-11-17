@@ -28,7 +28,7 @@ use prismqueer::spectral::rotation::{
     Splinter, Stop, ROTATION,
 };
 use prismqueer::spectral::Property;
-use prismqueer::spectral::{graph_from_edges, kleinos};
+use prismqueer::spectral::{graph_from_edges, join};
 use terni::{Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 /// The method the fixtures' λ₂ is sealed with.
@@ -239,7 +239,7 @@ fn two_wedges_of_one_size_rotate_alike_on_different_substrates() {
         assert_eq!(x.relative_phases, y.relative_phases, "the same rotation");
         assert_ne!(x.oid, y.oid, "on different graphs");
     }
-    let wedge = kleinos(&a, &path).expect("disjoint paths compose");
+    let wedge = join(&a, &path).expect("disjoint paths compose");
     assert_eq!(
         p.splinters[0].fiedler_lambda_2().value(),
         wedge.fiedler_lambda_2(),

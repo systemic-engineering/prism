@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 use crate::room::RoomError;
-use crate::spectral::kleinos::laplacian_spectrum;
+use crate::spectral::join::laplacian_spectrum;
 use crate::spectral::{Graph, Property, Red, VertexId};
 
 // ---------------------------------------------------------------------------

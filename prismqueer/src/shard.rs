@@ -48,7 +48,7 @@
 //! - `prismqueer::oid::Oid` — content-addressed via scoped BLAKE3 (LANDED)
 //! - `terni::Transparency<Property>` — LOVE-monoid per Rec #92 M2.1 (LANDED via prismqueer
 //!   re-export at `lib.rs`)
-//! - `prismqueer::spectral::kleinos::Property` — four LOVE properties enum (LANDED)
+//! - `prismqueer::spectral::join::Property` — four LOVE properties enum (LANDED)
 //!
 //! # Composition with today's terminal-form arc
 //!
@@ -70,7 +70,7 @@
 use terni::Transparency;
 
 use crate::oid::{Oid, Scope};
-use crate::spectral::kleinos::Property;
+use crate::spectral::join::Property;
 
 /// The prismqueer Shard<T> per Mara loving-lambda-calculus canonical §2.2.
 ///

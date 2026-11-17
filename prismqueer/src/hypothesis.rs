@@ -98,7 +98,7 @@ use crate::field::{check_flat, Edge, Field, FieldError, Flatness, Graph, Loop};
 use crate::gl::{Gl, Scalar};
 use crate::oid::{Oid, Scope};
 use crate::room::{Coefficient, Z};
-use crate::spectral::kleinos::VertexId;
+use crate::spectral::join::VertexId;
 
 // --- Frames, relations, faces ---------------------------------------------------
 

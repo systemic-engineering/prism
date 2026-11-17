@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::room::{self, Edges, Map, Modes, RoomError, Sum, Vertices};
 use crate::spectral::commutator::Unmeasured;
-use crate::spectral::kleinos::{EdgeKey, Graph, VertexId};
+use crate::spectral::join::{EdgeKey, Graph, VertexId};
 use crate::spectral::settle::Time;
 
 /// How far to rotate: the parameter of e^{i·angle·D}.

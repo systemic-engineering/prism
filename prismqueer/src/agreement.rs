@@ -63,7 +63,7 @@ use crate::oid::{Oid, Scope};
 use crate::room::{
     coboundary, solve, Cycle, Exactly, Exactness, QModOne, RingPart, RoomError, ZMod, Z,
 };
-use crate::spectral::kleinos::VertexId;
+use crate::spectral::join::VertexId;
 
 mod sealed {
     pub trait Sealed {}

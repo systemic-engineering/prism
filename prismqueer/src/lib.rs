@@ -80,7 +80,7 @@ pub mod ffi;
 // prismqueer::spectral — cellular-sheaf primitives per Mara canonical
 // (docs/specs/2026-08-31-mara-prismqueer-spectral-compose-phase-1-canonical-
 // spec.md + docs/math/2026-08-31-mara-prismqueer-spectral-compose-phase-1-
-// math-foundation.md at mirror-repo). Phase 1 hosts `kleinos` (K_2→K_3
+// math-foundation.md at mirror-repo). Phase 1 hosts `join` (formerly `kleinos`) (K_2→K_3
 // compose primitive per PAPER §3.6 four properties). Composes over LANDED
 // `ffi::eigenvalues` (LAPACK dsyev) + `oid::Addressable` + `terni::
 // Transparency<P>` LOVE-monoid per Rec #92. Alex 2026-09-01 ratifications

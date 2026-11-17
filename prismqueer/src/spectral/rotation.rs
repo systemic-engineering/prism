@@ -33,7 +33,7 @@
 //! Composes over LANDED per HARD RULE `feedback-rust-delivers-primitives-
 //! substrate-delivers-composition` (Alex 2026-08-05):
 //!
-//! - `prismqueer::spectral::kleinos` (Reed 4a3bbe7 ring-and-hub topology; 036abeb
+//! - `prismqueer::spectral::join`, formerly `kleinos` (Reed 4a3bbe7 ring-and-hub topology; 036abeb
 //!   ternary refactor) — wedge-at-K_3 basepoint compose
 //! - `prismqueer::ffi::phase_lock` (Reed dd2fbee 2026-07-20 Kuramoto integration;
 //!   LAPACK-adjacent via FLANG native/spectral.f90) — temporal rotation
@@ -137,7 +137,7 @@ use crate::band::{zeros, Measurement, Verdict};
 use crate::brain::Tick;
 use crate::ffi::phase_lock;
 use crate::oid::{Addressable, Oid, Scope};
-use crate::spectral::{kleinos, Graph, Property, Red};
+use crate::spectral::{join, Graph, Property, Red};
 
 // ---------------------------------------------------------------------------
 // Altitude
@@ -551,7 +551,8 @@ impl Default for RotationConfig {
 
 /// **Inference IS rotation observed through shared substrate.**
 ///
-/// Two-loop case (Phase 1): compose `loops[0]` and `loops[1]` via kleinos ring-and-hub
+/// Two-loop case (Phase 1): compose `loops[0]` and `loops[1]` via the [`join`] ring-and-hub
+/// (relations nobody signed; see [`crate::spectral::join`])
 /// → wedge-at-K_3 basepoint emergent (the shared NOW). Assign Kuramoto phase to each
 /// vertex of composed graph. Rotate for at most `ticks` steps via phase_lock (Kuramoto
 /// integration), through [`spin`]. Per tick:
@@ -590,7 +591,7 @@ pub fn infer_via_rotation(
 
     // Compose loops via kleinos: wedge-at-K_3 basepoint (Alex 2026-09-02 metaphor:
     // the shared NOW where all loops rotate through). Phase 1 uses first two loops.
-    let composed = match kleinos(&loops[0], &loops[1]) {
+    let composed = match join(&loops[0], &loops[1]) {
         Imperfect::Success(c) => c,
         Imperfect::Partial(c, _loss) => c,
         Imperfect::Failure(red, loss) => return Imperfect::Failure(red, loss),

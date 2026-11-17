@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 use terni::{Imperfect, Loss};
 
 use crate::room::{laplacian, Modes, RoomError, Vertices};
-use crate::spectral::kleinos::{Graph, VertexId};
+use crate::spectral::join::{Graph, VertexId};
 
 /// A value per vertex. Keyed by vertex, not by position.
 #[derive(Clone, Debug, PartialEq)]
@@ -302,7 +302,7 @@ fn harmonic_dimension(graph: &Graph) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::kleinos::graph_from_edges;
+    use crate::spectral::join::graph_from_edges;
     use crate::spectral::tension::{detect_tensions, TensionKind};
 
     const EPS: Noise = Noise(1e-6);
@@ -523,7 +523,7 @@ mod rewiring_property {
     use super::*;
     use crate::flux::pillar::{Arbitrary, Sample};
     use crate::spectral::commutator::Dissonance;
-    use crate::spectral::kleinos::graph_from_edges;
+    use crate::spectral::join::graph_from_edges;
 
     const S: f64 = 0.5;
     const BUDGET: usize = 256;

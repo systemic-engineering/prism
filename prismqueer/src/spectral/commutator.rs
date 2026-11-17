@@ -32,7 +32,7 @@
 //!
 //! # Composes over LANDED
 //!
-//! - `prismqueer::spectral::kleinos::Graph` — input carrier
+//! - `prismqueer::spectral::join::Graph` — input carrier
 //! - `prismqueer::room` — C⁰(V), δ out of it, exact composition
 //! - `prismqueer::ffi::singular_values` — LAPACK dgesdd via FLANG-compiled
 //!   `native/spectral.f90`
@@ -42,7 +42,7 @@ use std::collections::BTreeSet;
 use terni::Imperfect;
 
 use crate::room::{coboundary_over, Map, Room, RoomError, Vertices, Z};
-use crate::spectral::kleinos::{Graph, VertexId};
+use crate::spectral::join::{Graph, VertexId};
 
 /// Singular-value spectrum of the sheaf-Laplacian commutator `[L_A, L_B]`.
 ///
@@ -137,7 +137,7 @@ fn read(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spectral::kleinos::{graph_complete_of_order, graph_from_edges};
+    use crate::spectral::join::{graph_complete_of_order, graph_from_edges};
 
     /// `[L_A, L_A] = L_A L_A - L_A L_A = 0`. Self-commutator vanishes.
     /// Substrate-reading: composition of A with itself is trivially commutative.

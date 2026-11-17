@@ -55,8 +55,12 @@
 //! `prismqueer::spectral::kleinos` LANDED at `4bc2dcb` (Reed 2026-09-01). Primitive renamed
 //! `compose` → `kleinos` per Mara amendment `a96071c` + @kleinos family-root mint
 //! `shards/kleinos.mirror` `dcec19c`. This file's `todo!()` bodies now discharged with
-//! concrete `kleinos(&a, &b)` invocations + PAPER §3.6 four-property assertions. Filename
+//! concrete `join(&a, &b)` invocations + PAPER §3.6 four-property assertions. Filename
 //! retained pending Alex ratification of rename as separate refactor tick.
+//!
+//! 2026-11-17: the primitive is now `spectral::join` (prism-021 D4: it is a
+//! join, with relations nobody signed). The name `kleinos` belongs to the
+//! pushout along declared spans, `prismqueer::kleinos`.
 //!
 //! Empirical fire criterion: `cargo test --features "lapack bundle"` runs green. Blocked at
 //! FLANG linker environment-config (Task #396) which unblocks test EXECUTION; semantic
@@ -67,7 +71,7 @@
 
 use prismqueer::oid::Addressable;
 use prismqueer::spectral::{
-    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, kleinos,
+    fiedler_lambda_2_of_graph, graph_complete_of_order, graph_from_edges, join,
 };
 use terni::Imperfect;
 
@@ -99,7 +103,7 @@ use terni::Imperfect;
 fn compose_property_1_sovereignty_preservation() {
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
     let b = graph_from_edges(&[(3, 4), (4, 5)]);
-    let composed = kleinos(&a, &b).expect(
+    let composed = join(&a, &b).expect(
         "disjoint paths admit compose per PAPER §3.6.1 sovereignty preservation — expected Green",
     );
 
@@ -159,7 +163,7 @@ fn compose_property_1_sovereignty_preservation() {
 fn compose_property_2_emergent_third_admission() {
     let a = graph_from_edges(&[(0, 1), (1, 2)]);
     let b = graph_from_edges(&[(3, 4), (4, 5)]);
-    let composed = kleinos(&a, &b)
+    let composed = join(&a, &b)
         .expect("disjoint paths admit compose per emergent-third K_2→K_3 — expected Green");
 
     let emerged = composed.emergent_third_stalk();
@@ -214,7 +218,7 @@ fn compose_property_3_fiedler_lambda_2_strict_rise() {
     let a = graph_from_edges(&[(0, 1), (1, 2), (0, 2)]); // K_3
     let b = graph_from_edges(&[(3, 4), (4, 5), (3, 5)]); // K_3
     let composed =
-        kleinos(&a, &b).expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
+        join(&a, &b).expect("K_3 pair composes per Fiedler λ₂ strict rise — expected Green");
 
     let lambda_a = fiedler_lambda_2_of_graph(&a);
     let lambda_b = fiedler_lambda_2_of_graph(&b);
@@ -267,7 +271,7 @@ fn compose_property_3_fiedler_lambda_2_strict_rise() {
 fn compose_property_4_fusion_refusal() {
     let a = graph_complete_of_order(5); // K_5
     let b = a.clone(); // identical inputs — compose would fuse, not compose
-    let result = kleinos(&a, &b);
+    let result = join(&a, &b);
 
     // Ternary Red/Green/Yellow per Alex 2026-09-02: Red = Imperfect::Failure.
     match result {
@@ -325,9 +329,9 @@ fn compose_property_5_content_address_determinism() {
     let b = graph_from_edges(&[(3, 4), (4, 5)]);
 
     let composed_1 =
-        kleinos(&a, &b).expect("disjoint paths compose — expected Green (first invocation)");
+        join(&a, &b).expect("disjoint paths compose — expected Green (first invocation)");
     let composed_2 =
-        kleinos(&a, &b).expect("disjoint paths compose — expected Green (second invocation)");
+        join(&a, &b).expect("disjoint paths compose — expected Green (second invocation)");
 
     assert_eq!(
         composed_1.oid(),
@@ -353,7 +357,7 @@ fn compose_property_5_content_address_determinism() {
 /// signal becomes explicit.
 #[test]
 fn compose_meta_module_exposed() {
-    // Compile-time discharge: the `use prismqueer::spectral::{kleinos, ...};` at file top
+    // Compile-time discharge: the `use prismqueer::spectral::{join, ...};` at file top
     // succeeds iff the module + primitives are exposed at public API surface. That import
     // is exercised by tests 1-5 above; this test asserts the primitives are callable at
     // the public boundary.
@@ -362,7 +366,7 @@ fn compose_meta_module_exposed() {
     // Runtime discharge: invoking kleinos on trivially-disjoint two-vertex sheafs must
     // succeed (sovereignty trivially holds; emergent third admitted; Fiedler rises;
     // fusion refusal N/A for disjoint inputs).
-    let composed = kleinos(&a, &b)
+    let composed = join(&a, &b)
         .expect("trivial disjoint compose MUST succeed at API boundary — expected Green");
     assert!(
         composed.vertices().count() >= 4,

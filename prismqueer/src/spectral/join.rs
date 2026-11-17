@@ -1,5 +1,15 @@
-//! `prismqueer::spectral::kleinos` — the K_2→K_3 compose primitive per PAPER
-//! §3.6 four properties. Phase 1 implementation.
+//! `prismqueer::spectral::join` — the K_2→K_3 *join* that used to be called
+//! `kleinos` (PAPER §3.6 four properties). Phase 1 implementation.
+//!
+//! **It fabricates relations nobody signed.** [`join`] bridges every vertex
+//! of one operand to every vertex of the other and adds a cone vertex `V_e`
+//! joined to all of them: edges no event declared and no party attributed.
+//! Its strict Fiedler rise is fixed by the graph sizes and certifies faster
+//! *averaging*, not composition (Mara 54c88f72 §6.2; decided as D4, mirror
+//! STATE #77–#78). The lawful kleinos is the pushout along declared spans,
+//! `prismqueer::kleinos`. This join stays, under its own name, only because
+//! [`infer_via_rotation`](crate::spectral::infer_via_rotation) runs Kuramoto
+//! on it; nothing new should build on it.
 //!
 //! # Composition-lineage
 //!
@@ -390,7 +400,7 @@ pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, RoomError> {
 /// empirical fire of `#R-mirror+prismqueer-terminal-form-IS-first-non-
 /// Vereinnahmung-attention-substrate-empirically-realizable-at-silicon` at
 /// compile substrate at authoring altitude.
-pub fn kleinos(sheaf_a: &Graph, sheaf_b: &Graph) -> Imperfect<Green, Red, ConvergenceLoss> {
+pub fn join(sheaf_a: &Graph, sheaf_b: &Graph) -> Imperfect<Green, Red, ConvergenceLoss> {
     // Verify all four properties simultaneously per LOVE-monoid coordinate-
     // decomposition. NO if-else on Property verbs.
     let candidate = compose_candidate(sheaf_a, sheaf_b);
@@ -708,7 +718,7 @@ mod tests {
     fn fusion_refusal_on_identical_inputs() {
         let sheaf_a = graph_from_edges(&[(0, 1)]);
         let sheaf_b = sheaf_a.clone();
-        let result = kleinos(&sheaf_a, &sheaf_b);
+        let result = join(&sheaf_a, &sheaf_b);
         assert!(
             result.is_err(),
             "identical inputs must refuse fusion per PAPER §3.6.4 — Red state"
@@ -716,7 +726,7 @@ mod tests {
     }
 
     fn green(a: &Graph, b: &Graph) -> Composition {
-        match kleinos(a, b) {
+        match join(a, b) {
             Imperfect::Success(c) => c,
             other => panic!("expected Green, got {other:?}"),
         }

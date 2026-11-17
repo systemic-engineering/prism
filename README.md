@@ -74,7 +74,7 @@ Each stage's output type is the next stage's input type. A mismatch is a compile
 prismqueer/            the core crate
   src/beam.rs, optics/   Prism / Beam / Optic; classical optics (feature `optics`)
   src/bundle.rs          principal-bundle tower: Fiber → Connection → Gauge → Transport (feature `bundle`)
-  src/spectral/          (feature `lapack`) settle, instrument (Hodge–Dirac), commutator, kleinos (graph composition), tension
+  src/spectral/          (feature `lapack`) settle, instrument (Hodge–Dirac), commutator, join (the old kleinos: relations nobody signed), tension
   src/time/              Progression: histories in the trace monoid, Foata normal form
   src/flux.rs            property verdicts; pillar::search and pillar::steer (property search that keeps counterexamples)
   src/fate/              the five-mode selector (feature `fate`)
