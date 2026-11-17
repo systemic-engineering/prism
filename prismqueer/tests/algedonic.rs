@@ -704,9 +704,9 @@ fn persist_refuses_a_calibration_for_another_region() {
         persist(&ev, &ruler, &elsewhere),
         Err(Refused::Region {
             of: elsewhere.oid(),
-            holds: Region::above(q(1, 1)),
+            holds: Box::new(Region::above(q(1, 1))),
             ruler: ruler.oid(),
-            ruled: Region::above(q(3, 1)),
+            ruled: Box::new(Region::above(q(3, 1))),
         })
     );
     let here = knee_for(q(3, 1));
@@ -786,10 +786,7 @@ fn two_instruments_short_of_accept_combine_to_accept_under_independence() {
     assert_eq!(v.calibrations(), [ear().oid(), knee().oid()]);
     assert_eq!(v.independence(), Some(&both.oid()));
     // The order the calibrations are given in doesn't change the verdict.
-    assert_eq!(
-        persist_jointly(&ev, &ruler, &[ear(), knee()], &both),
-        Ok(v)
-    );
+    assert_eq!(persist_jointly(&ev, &ruler, &[ear(), knee()], &both), Ok(v));
 }
 
 #[test]
@@ -837,9 +834,9 @@ fn instruments_combine_only_under_an_independence_naming_exactly_them() {
         refused(&[far_knee.clone(), ear()], &both),
         Err(Refused::Region {
             of: far_knee.oid(),
-            holds: Region::above(q(3, 1)),
+            holds: Box::new(Region::above(q(3, 1))),
             ruler: ruler.oid(),
-            ruled: Region::above(q(1, 1)),
+            ruled: Box::new(Region::above(q(1, 1))),
         })
     );
     // And the relation holds in its own region.
@@ -850,9 +847,9 @@ fn instruments_combine_only_under_an_independence_naming_exactly_them() {
         refused(&[knee(), ear()], &far),
         Err(Refused::Region {
             of: far.oid(),
-            holds: Region::above(q(3, 1)),
+            holds: Box::new(Region::above(q(3, 1))),
             ruler: ruler.oid(),
-            ruled: Region::above(q(1, 1)),
+            ruled: Box::new(Region::above(q(1, 1))),
         })
     );
 }
@@ -898,10 +895,7 @@ fn the_independence_relation_is_a_sealed_judgment() {
     assert_ne!(draft.oid(), other(&["knee", "ear", "hand"], q(1, 1)));
     assert_ne!(draft.oid(), other(&["knee", "ear"], q(2, 1)));
     // Self-delimiting: a byte moved between two instruments.
-    assert_ne!(
-        other(&["ab", "c"], q(1, 1)),
-        other(&["a", "bc"], q(1, 1))
-    );
+    assert_ne!(other(&["ab", "c"], q(1, 1)), other(&["a", "bc"], q(1, 1)));
 }
 
 /// A decoder for the ruler preimage, written from `docs/spec/ruler.md`.

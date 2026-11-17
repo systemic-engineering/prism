@@ -58,6 +58,48 @@
 //! its own address, never in the ruler's. Recalibrating an instrument never
 //! moves a ruler, and every [`Verdict`] names the calibration it read.
 //!
+//! **Every value carries its domain of validity** (Alex, 2026-11-16). A
+//! calibration holds for the [`Region`] it was measured in, and that region
+//! is in its address. [`persist`] refuses a calibration for another region
+//! than the ruler's ([`Refused::Region`]); it never reads it silently.
+//!
+//! # One verdict per instrument, unless independence is signed
+//!
+//! A calibration speaks for its own instrument's decisions only. Two
+//! instruments' evidence combines only under an [`Independence`]: a signed
+//! judgment that their errors are independent in a region, sealed like a
+//! ruler, with no default. Under it, [`persist_jointly`] multiplies the
+//! instruments' likelihood ratios, and its verdict names every calibration
+//! and the relation.
+//!
+//! There is no independence by default:
+//!
+//! ```compile_fail,E0599
+//! use prismqueer::algedonic::Independence;
+//! let _ = Independence::default();
+//! ```
+//!
+//! The control: sealing a judgment is the only way to one, and it combines.
+//!
+//! ```
+//! use num_bigint::BigInt;
+//! use num_rational::BigRational;
+//! use prismqueer::algedonic::*;
+//! use prismqueer::oid::Oid;
+//! let q = |n: i64, d: i64| BigRational::new(BigInt::from(n), BigInt::from(d));
+//! let above = || Region::above(q(1, 1));
+//! let ruler = Draft::new(above(), Question::Max, Wald::new(q(1, 20), q(1, 20)).unwrap(), Clock::agreed(10, 1, 100))
+//!     .seal(Oid::new("engineer"));
+//! let knee = Calibration::new(Oid::new("knee"), above(), q(1, 6), q(1, 2), "labelled").unwrap();
+//! let ear = Calibration::new(Oid::new("ear"), above(), q(1, 4), q(3, 4), "labelled").unwrap();
+//! let both = IndependenceDraft::new([Oid::new("knee"), Oid::new("ear")], above())
+//!     .unwrap()
+//!     .seal(Oid::new("engineer"));
+//! let verdict = persist_jointly(&Evidence::at(Oid::new("leg")), &ruler, &[knee, ear], &both).unwrap();
+//! assert_eq!(verdict.persistence(), Persistence::Continue);
+//! assert_eq!(verdict.independence(), Some(&both.oid()));
+//! ```
+//!
 //! prism checks that a signer exists, never who it is: the signer's identity
 //! is an address the caller vouches for, as a [`Roots`](crate::brain::Roots)
 //! holder vouches for its roots. Verifying a signature is outside prism.
@@ -86,7 +128,7 @@
 //! use prismqueer::oid::Oid;
 //! let q = |n: i64, d: i64| BigRational::new(BigInt::from(n), BigInt::from(d));
 //! let wald = Wald::new(q(1, 20), q(1, 20)).unwrap();
-//! let knee = Calibration::new(Oid::new("knee"), q(1, 6), q(1, 2), "labelled").unwrap();
+//! let knee = Calibration::new(Oid::new("knee"), Region::above(q(1, 1)), q(1, 6), q(1, 2), "labelled").unwrap();
 //! let draft = Draft::new(Region::above(q(1, 1)), Question::Max, wald, Clock::agreed(10, 1, 100));
 //! let _ = persist(&Evidence::at(Oid::new("leg")), &draft, &knee);
 //! ```
@@ -100,13 +142,13 @@
 //! use prismqueer::oid::Oid;
 //! let q = |n: i64, d: i64| BigRational::new(BigInt::from(n), BigInt::from(d));
 //! let wald = Wald::new(q(1, 20), q(1, 20)).unwrap();
-//! let knee = Calibration::new(Oid::new("knee"), q(1, 6), q(1, 2), "labelled").unwrap();
+//! let knee = Calibration::new(Oid::new("knee"), Region::above(q(1, 1)), q(1, 6), q(1, 2), "labelled").unwrap();
 //! let draft = Draft::new(Region::above(q(1, 1)), Question::Max, wald, Clock::agreed(10, 1, 100));
 //! let ruler = draft.seal(Oid::new("engineer"));
 //! assert_eq!(ruler.signer().over(), &ruler.oid());
-//! let verdict = persist(&Evidence::at(Oid::new("leg")), &ruler, &knee);
+//! let verdict = persist(&Evidence::at(Oid::new("leg")), &ruler, &knee).unwrap();
 //! assert_eq!(verdict.persistence(), Persistence::Continue);
-//! assert_eq!((verdict.ruler(), verdict.calibration()), (&ruler.oid(), &knee.oid()));
+//! assert_eq!((verdict.ruler(), verdict.calibrations()), (&ruler.oid(), &[knee.oid()][..]));
 //! ```
 //!
 //! # Hashing a decision (§5.1 a)
@@ -455,13 +497,16 @@ impl Wald {
     }
 }
 
-/// An instrument's operating characteristic (its d′): `p₀`, the chance a
-/// context certifies `In` when the tension isn't real, and `p₁` when it is,
-/// sealed with the method that measured them. A measurement, so a crystal of
-/// its own: its address is never folded into a ruler's (`docs/spec/ruler.md`).
+/// An instrument's operating characteristic (its d′) in a region: `p₀`,
+/// the chance a context certifies `In` when the tension isn't real, and
+/// `p₁` when it is, sealed with the method that measured them. A
+/// measurement, so a crystal of its own: its address is never folded into a
+/// ruler's (`docs/spec/ruler.md`). It holds in the region it was measured
+/// for, and nowhere else.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Calibration {
     instrument: Oid,
+    region: Region,
     p0: BigRational,
     p1: BigRational,
     method: String,
@@ -472,10 +517,11 @@ pub struct Calibration {
 pub struct NotACalibration;
 
 impl Calibration {
-    /// `instrument`'s calibration, measured by `method`. Refused unless
-    /// `0 < p₀ < p₁ < 1`.
+    /// `instrument`'s calibration for `region`, measured by `method`.
+    /// Refused unless `0 < p₀ < p₁ < 1`.
     pub fn new(
         instrument: Oid,
+        region: Region,
         p0: BigRational,
         p1: BigRational,
         method: impl Into<String>,
@@ -485,6 +531,7 @@ impl Calibration {
         }
         Ok(Calibration {
             instrument,
+            region,
             p0,
             p1,
             method: method.into(),
@@ -494,6 +541,11 @@ impl Calibration {
     /// The instrument calibrated.
     pub fn instrument(&self) -> &Oid {
         &self.instrument
+    }
+
+    /// The region it was calibrated for: where it holds.
+    pub fn region(&self) -> &Region {
+        &self.region
     }
 
     /// p₀: a context certifies `In` though the tension isn't real.
@@ -511,11 +563,13 @@ impl Calibration {
         &self.method
     }
 
-    /// The bytes addressed: `"calibration\0" ‖ bytes(instrument) ‖ p₀ ‖ p₁ ‖
-    /// bytes(method)` (`docs/spec/ruler.md`).
+    /// The bytes addressed: `"calibration\0" ‖ bytes(instrument) ‖ region ‖
+    /// p₀ ‖ p₁ ‖ bytes(method)` (`docs/spec/ruler.md`). Its context, the
+    /// instrument and the region, is part of its address.
     pub fn preimage(&self) -> Vec<u8> {
         let mut bytes = b"calibration\0".to_vec();
         delimited(&mut bytes, self.instrument.as_str().as_bytes());
+        region(&mut bytes, &self.region);
         rational(&mut bytes, &self.p0);
         rational(&mut bytes, &self.p1);
         delimited(&mut bytes, self.method.as_bytes());
@@ -597,19 +651,7 @@ impl Draft {
     /// signer and the calibration are never in it.
     pub fn preimage(&self) -> Vec<u8> {
         let mut bytes = b"ruler\0".to_vec();
-        for edge in [&self.region.lo, &self.region.hi] {
-            match edge {
-                Edge::Open(a) => {
-                    bytes.push(1);
-                    rational(&mut bytes, a);
-                }
-                Edge::Closed(a) => {
-                    bytes.push(2);
-                    rational(&mut bytes, a);
-                }
-                Edge::Unbounded => bytes.push(3),
-            }
-        }
+        region(&mut bytes, &self.region);
         bytes.push(self.question.tag());
         let w = &self.wald;
         for r in [&w.alpha, &w.beta] {
@@ -637,8 +679,9 @@ impl Draft {
     }
 }
 
-/// Who signed a ruler, and the ruler address they signed. Minted only by
-/// [`Draft::seal`]. It sits beside the address, never in it.
+/// Who signed a judgment (a ruler or an independence relation), and the
+/// address they signed. Minted only by [`Draft::seal`] and
+/// [`IndependenceDraft::seal`]. It sits beside the address, never in it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Signer {
     by: Oid,
@@ -651,7 +694,7 @@ impl Signer {
         &self.by
     }
 
-    /// The ruler address signed.
+    /// The address signed.
     pub fn over(&self) -> &Oid {
         &self.over
     }
@@ -727,6 +770,111 @@ impl Ruler {
                 region,
             ),
         }
+    }
+}
+
+// --- Independence: the only way to combine instruments ---------------------
+
+/// An unsigned judgment that some instruments' errors are independent in a
+/// region: two or more distinct instruments, kept sorted. It combines
+/// nothing until sealed.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct IndependenceDraft {
+    instruments: Vec<Oid>,
+    region: Region,
+}
+
+/// Not an independence judgment: fewer than two instruments, or one
+/// instrument named twice (refused, never collapsed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotIndependent;
+
+impl IndependenceDraft {
+    /// `instruments` judged independent in `region`. Refused unless they are
+    /// two or more and distinct.
+    pub fn new(
+        instruments: impl IntoIterator<Item = Oid>,
+        region: Region,
+    ) -> Result<Self, NotIndependent> {
+        let mut instruments: Vec<Oid> = instruments.into_iter().collect();
+        let given = instruments.len();
+        instruments.sort();
+        instruments.dedup();
+        if instruments.len() < 2 || instruments.len() != given {
+            return Err(NotIndependent);
+        }
+        Ok(IndependenceDraft {
+            instruments,
+            region,
+        })
+    }
+
+    /// The instruments, sorted.
+    pub fn instruments(&self) -> &[Oid] {
+        &self.instruments
+    }
+
+    /// The region the judgment holds in.
+    pub fn region(&self) -> &Region {
+        &self.region
+    }
+
+    /// `"independence\0" ‖ u64le(n) ‖ bytes(instrument)… ‖ region`, the
+    /// instruments sorted by their UTF-8 bytes (`docs/spec/ruler.md`). The
+    /// signer is never in it.
+    pub fn preimage(&self) -> Vec<u8> {
+        let mut bytes = b"independence\0".to_vec();
+        bytes.extend_from_slice(&(self.instruments.len() as u64).to_le_bytes());
+        for i in &self.instruments {
+            delimited(&mut bytes, i.as_str().as_bytes());
+        }
+        region(&mut bytes, &self.region);
+        bytes
+    }
+
+    /// Its address: the preimage, in the public scope.
+    pub fn oid(&self) -> Oid {
+        Oid::hash(&Scope::public(), &self.preimage())
+    }
+
+    /// Seal the judgment as `by`'s: the only way to an [`Independence`].
+    pub fn seal(self, by: Oid) -> Independence {
+        let over = self.oid();
+        Independence {
+            draft: self,
+            signer: Signer { by, over },
+        }
+    }
+}
+
+/// A signed independence relation: an [`IndependenceDraft`] sealed by its
+/// [`Signer`]. No default, no public constructor. The only way two
+/// instruments' evidence combines ([`persist_jointly`]).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Independence {
+    draft: IndependenceDraft,
+    signer: Signer,
+}
+
+impl Independence {
+    /// Its address, the draft's: the signer is beside it.
+    pub fn oid(&self) -> Oid {
+        self.signer.over.clone()
+    }
+
+    /// The signer.
+    pub fn signer(&self) -> &Signer {
+        &self.signer
+    }
+
+    /// The instruments, sorted.
+    pub fn instruments(&self) -> &[Oid] {
+        &self.draft.instruments
+    }
+
+    /// The region the judgment holds in.
+    pub fn region(&self) -> &Region {
+        &self.draft.region
     }
 }
 
@@ -896,13 +1044,15 @@ pub enum Persistence {
     Continue,
 }
 
-/// A persistence verdict, with the two addresses it depended on side by
-/// side: the ruler's and the calibration's.
+/// A persistence verdict, with every address it depended on side by side:
+/// the ruler's, each calibration's, and the independence relation's when
+/// more than one instrument was read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Verdict {
     persistence: Persistence,
     ruler: Oid,
-    calibration: Oid,
+    calibrations: Vec<Oid>,
+    independence: Option<Oid>,
 }
 
 impl Verdict {
@@ -916,9 +1066,82 @@ impl Verdict {
         &self.ruler
     }
 
-    /// The calibration read.
-    pub fn calibration(&self) -> &Oid {
-        &self.calibration
+    /// The calibrations read, in instrument order: one for [`persist`].
+    pub fn calibrations(&self) -> &[Oid] {
+        &self.calibrations
+    }
+
+    /// The independence relation the instruments combined under; `None`
+    /// for one instrument, which needs none.
+    pub fn independence(&self) -> Option<&Oid> {
+        self.independence.as_ref()
+    }
+}
+
+/// Why persistence refused to read: never a silent use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// A calibration, or an independence relation, holds in another region
+    /// than the ruler judges.
+    Region {
+        /// The calibration's or the relation's address.
+        of: Oid,
+        /// The region it holds in.
+        holds: Box<Region>,
+        /// The ruler's address.
+        ruler: Oid,
+        /// The ruler's region.
+        ruled: Box<Region>,
+    },
+    /// The calibrations' instruments aren't exactly the relation's, each
+    /// once.
+    Instruments {
+        /// The relation's address.
+        independence: Oid,
+        /// The instruments it declares, sorted.
+        declared: Vec<Oid>,
+        /// The calibrations' instruments, sorted, repeats kept.
+        calibrated: Vec<Oid>,
+    },
+}
+
+/// `of` holds in `holds`; refused unless that is `ruler`'s region.
+fn holds(of: Oid, holds: &Region, ruler: &Ruler) -> Result<(), Refused> {
+    if holds == ruler.region() {
+        return Ok(());
+    }
+    Err(Refused::Region {
+        of,
+        holds: Box::new(holds.clone()),
+        ruler: ruler.oid(),
+        ruled: Box::new(ruler.region().clone()),
+    })
+}
+
+/// `calibration`'s likelihood ratio over its instrument's decisions under
+/// `ruler`: `(p₁/p₀)^k · ((1−p₁)/(1−p₀))^m`, exact.
+fn likelihood(evidence: &Evidence, ruler: &Ruler, c: &Calibration) -> BigRational {
+    let one = BigRational::one();
+    let (mut k, mut m) = (0i32, 0i32);
+    for d in evidence.by(ruler, &c.instrument) {
+        match d {
+            Decision::In => k += 1,
+            Decision::Out => m += 1,
+            Decision::Undecided => {}
+        }
+    }
+    (&c.p1 / &c.p0).pow(k) * ((&one - &c.p1) / (&one - &c.p0)).pow(m)
+}
+
+/// Wald's decision for `ratio` against `wald`'s boundaries.
+fn decide(ratio: &BigRational, w: &Wald) -> Persistence {
+    let one = BigRational::one();
+    if ratio >= &((&one - &w.beta) / &w.alpha) {
+        Persistence::Accept
+    } else if ratio <= &(&w.beta / (&one - &w.alpha)) {
+        Persistence::Reject
+    } else {
+        Persistence::Continue
     }
 }
 
@@ -929,34 +1152,64 @@ impl Verdict {
 /// `Λ ≥ (1−β)/α`, `Reject` when `Λ ≤ β/(1−α)`, otherwise `Continue`.
 /// `Undecided` contexts are not observations: they don't enter Λ. Another
 /// instrument's decisions don't either: this calibration doesn't speak for
-/// them.
+/// them ([`persist_jointly`] combines instruments).
+///
+/// A calibration for another region than the ruler's is
+/// [`Refused::Region`]: a measurement holds where it was taken.
 ///
 /// The boundaries are Wald's approximations, which Mara marks READING
 /// (secondary sources only).
-pub fn persist(evidence: &Evidence, ruler: &Ruler, calibration: &Calibration) -> Verdict {
-    let (w, c) = (ruler.wald(), calibration);
-    let one = BigRational::one();
-    let (mut k, mut m) = (0i32, 0i32);
-    for d in evidence.by(ruler, &c.instrument) {
-        match d {
-            Decision::In => k += 1,
-            Decision::Out => m += 1,
-            Decision::Undecided => {}
-        }
-    }
-    let ratio = (&c.p1 / &c.p0).pow(k) * ((&one - &c.p1) / (&one - &c.p0)).pow(m);
-    let persistence = if ratio >= (&one - &w.beta) / &w.alpha {
-        Persistence::Accept
-    } else if ratio <= &w.beta / (&one - &w.alpha) {
-        Persistence::Reject
-    } else {
-        Persistence::Continue
-    };
-    Verdict {
-        persistence,
+pub fn persist(
+    evidence: &Evidence,
+    ruler: &Ruler,
+    calibration: &Calibration,
+) -> Result<Verdict, Refused> {
+    holds(calibration.oid(), &calibration.region, ruler)?;
+    Ok(Verdict {
+        persistence: decide(&likelihood(evidence, ruler, calibration), ruler.wald()),
         ruler: ruler.oid(),
-        calibration: calibration.oid(),
+        calibrations: vec![calibration.oid()],
+        independence: None,
+    })
+}
+
+/// **T2 across instruments.** Wald's test over several instruments'
+/// decisions under `ruler`, combined by the signed `independence`: the
+/// likelihood ratio is the product of each calibration's own
+/// ([`persist`]'s Λ per instrument), against the ruler's boundaries.
+///
+/// Refused ([`Refused`]) when a calibration's region or the relation's
+/// isn't the ruler's, or when the calibrations' instruments aren't exactly
+/// the relation's, each once. The verdict names every calibration, in
+/// instrument order, and the relation.
+pub fn persist_jointly(
+    evidence: &Evidence,
+    ruler: &Ruler,
+    calibrations: &[Calibration],
+    independence: &Independence,
+) -> Result<Verdict, Refused> {
+    holds(independence.oid(), independence.region(), ruler)?;
+    let mut sorted: Vec<&Calibration> = calibrations.iter().collect();
+    sorted.sort_by(|a, b| a.instrument.cmp(&b.instrument));
+    let calibrated: Vec<Oid> = sorted.iter().map(|c| c.instrument.clone()).collect();
+    if calibrated != independence.instruments() {
+        return Err(Refused::Instruments {
+            independence: independence.oid(),
+            declared: independence.instruments().to_vec(),
+            calibrated,
+        });
     }
+    let mut ratio = BigRational::one();
+    for c in &sorted {
+        holds(c.oid(), &c.region, ruler)?;
+        ratio *= likelihood(evidence, ruler, c);
+    }
+    Ok(Verdict {
+        persistence: decide(&ratio, ruler.wald()),
+        ruler: ruler.oid(),
+        calibrations: sorted.iter().map(|c| c.oid()).collect(),
+        independence: Some(independence.oid()),
+    })
 }
 
 // --- Hashing ------------------------------------------------------------------
@@ -977,6 +1230,24 @@ pub fn decision_oid(
     }
     bytes.push(decision.tag());
     Oid::hash(&Scope::public(), &bytes)
+}
+
+/// `edge(lo) ‖ edge(hi)`, each edge a tag (01 open, 02 closed, 03
+/// unbounded) and, when bounded, its rational (`docs/spec/ruler.md`).
+fn region(bytes: &mut Vec<u8>, region: &Region) {
+    for edge in [&region.lo, &region.hi] {
+        match edge {
+            Edge::Open(a) => {
+                bytes.push(1);
+                rational(bytes, a);
+            }
+            Edge::Closed(a) => {
+                bytes.push(2);
+                rational(bytes, a);
+            }
+            Edge::Unbounded => bytes.push(3),
+        }
+    }
 }
 
 fn delimited(bytes: &mut Vec<u8>, field: &[u8]) {
