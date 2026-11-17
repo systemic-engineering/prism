@@ -35,6 +35,7 @@ mod integration;
 mod kleinos;
 mod lambda_integration;
 mod loss_laws;
+mod metrix;
 mod music;
 mod no_clock;
 mod one_graph;
