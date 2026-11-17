@@ -1,6 +1,6 @@
 # Ledger: what `ledger-verify` checks, under which assumptions
 
-*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged). `ledger-verify/tests/` holds the crate to both.*
+*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`). `ledger-verify/tests/` holds the crate to all three.*
 
 ## The crate
 
@@ -120,6 +120,53 @@ The proof is Mara's (`research-ledger-design.md` §2.3, PROVED): two Q-sets shar
 
 **Not yet the AND rule for witnesses.** prism-019's Log says the quorum "counts only cosignatures that pass the AND rule". The step that built this crate asked for ML-DSA-44 cosignatures only, which is C2SP's SHOULD. A witness that also signs Ed25519 (0x04) isn't required to. Whether witnesses must sign both is open (below).
 
+## 5. Commitments: Halevi–Micali over SHA-256, k = 256
+
+The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 2026-11-17, after Mara's grades (bullet-up-008). The source is S. Halevi and S. Micali, "Practical and Provably-Secure Commitment Schemes from Collision-Free Hashing", CRYPTO '96; page numbers are those of `shaih.github.io/pubs/hm96.pdf`, read as text for this section.
+
+**The construction, as the paper gives it** (MD = SHA-256, k = 256):
+
+| Step | Paper | Here |
+|---|---|---|
+| Commit to the digest, not the message | §4, p.15: "the Sender first computes the k-bit string s = MD(m), and then apply the above commitment string to the string s" | s = SHA-256(m); so n = k = 256, whatever \|m\| is |
+| Lengths | §3, p.11: L = 4k + 2n + 4; MD : {0,1}^L → {0,1}^k | L = 1540 = 6k + 4 |
+| Commit | §3, p.11: random r ∈ {0,1}^L, y = MD(r), a random h ∈ H with h(r) = s; c = ⟨h, y⟩, d = r | the same |
+| The universal family | §2.1, p.9: h_{A,b}(r) = A r + b over GF(2), A an n × L **Toeplitz** matrix, described by 2n + L − 1 bits | A[i][j] = t[i − j + L − 1], t of 1795 bits; b of 256 bits |
+| Choosing h | footnote 4, p.11: "picking A at random and computing b = m − Ax" | b = s ⊕ A r |
+| Receive | §3, p.11: "verifies that y = MD(r) and computes m = h(r)"; §4, p.15: "checks that s is the string being committed to … and that MD(m) = s" | `verify_opening`: y = SHA-256(r) and A r ⊕ b = SHA-256(m) |
+
+**prism's encodings** (the paper works on bit strings; these are ours, and **provisional**):
+- A bit string is packed most significant bit first; trailing pad bits are zero, and a set pad bit is refused (`Padding`), so each commitment and opening has one encoding.
+- MD on {0,1}^L is SHA-256 of r's 193-byte packing. The packing is injective, so a collision of this MD is a SHA-256 collision. The hiding proof (pp.12–15) holds for *every* function MD : {0,1}^L → {0,1}^k, so it holds for this one.
+- The diagonal indexing A[i][j] = t[i − j + L − 1] is a choice; every indexing gives the same family.
+- **Commitment** (290 bytes) = `0x01` ‖ t (225 bytes, 5 pad bits) ‖ b (32) ‖ y (32).
+- **Opening** = r (193 bytes, 4 pad bits); the message m is passed beside it.
+- **The scheme byte `0x01`** names "Halevi–Micali, SHA-256, k = 256, this layout", so a leaf says which scheme it is checked under. No registry assigns it.
+
+**Sizes, exactly:**
+- |h| + |y| = (2n + L − 1) + k = **9k + 3 = 2307 bits**. The paper's "9k" (p.15) and its "(L + 2k) + k = 7k + 2n" (p.12) drop the constants. Byte-aligned that is 289 bytes, 290 with the scheme byte, **not the 288** of the decision. Nothing in the construction can be dropped to reach 288 without leaving the paper's family.
+- |r| = 6k + 4 = 1540 bits, 193 bytes. The opening is m plus those 193 bytes.
+- Cost: two SHA-256 calls and one GF(2) product, about 770 XORs of 32-byte windows.
+
+**Assumptions:**
+- **Hiding: none.** Theorem 1 (p.12; proof pp.12–15): for all m₁, m₂, ‖C_k(m₁) − C_k(m₂)‖ < 2^−k = 2^−256, for every MD and every receiver. Information-theoretic: no computer, classical or quantum, changes it. Statistical, not perfect (the authors, p.4: "the Receiver may obtain some advantage, but this advantage is provably exponentially small").
+- **Binding: SHA-256 collision resistance** (p.12: "being able to open the commitment in two different ways implies that the Sender can find a collision in MD"). Two openings (m, r), (m′, r′) of one commitment with m ≠ m′: if r ≠ r′, SHA-256(r) = y = SHA-256(r′); if r = r′, SHA-256(m) = A r + b = SHA-256(m′). §4's version of this proof is "omitted from this extended abstract" (p.15); it is this one line. Post-quantum Category 2 (NIST IR 8547 Table 1), the same as the log.
+- One k drives both (Remark 1, p.11, allows two). Binding is classical; Unruh's collapse-binding is not claimed, and for a log, where cheating means publishing two openings, it isn't needed (Mara, bullet-up-008).
+
+**Erasure deletes r and m.** What stays is t, b and y. By Theorem 1 their joint distribution is within 2^−256 of the same for every m, so the commitment alone says that something was committed, and nothing about what. Keeping r and deleting only m is **not** erasure: SHA-256(m) = A r ⊕ b can then be recomputed and tested against guesses.
+
+**Not a property: non-malleability.** A diagonal bit of A that r never reads (only at A's corners: t[o] with o < 255 or o > 1539, read by ≤ 255 columns, each with probability 2^−(columns read) of being unread) can be flipped, and the new commit-string still opens, **to the same m with the same r**. Anyone holding r can also make other commit-strings that open to m. This is not ambiguity: binding is about two messages, and that holds. In the log the leaf holds the exact bytes, so a changed commitment is another leaf. The tests pin it (`a_flipped_bit_rejects_unless_r_never_reads_it`, and 8 such bits on the "empty" vector).
+
+**The EDPB reading** (Guidelines 02/2025 on blockchain, v2.0; **not legal advice**):
+- ¶52 accepts *computational* protection: a salted or keyed hash "should not be linkable … provided that the algorithm has not been broken", the keys and salt kept.
+- ¶53: "*If* the commitment has been computed using a perfectly hiding state-of-the art scheme, then once the original data and its witness are deleted, the commitment persisting in the blockchain is useless." That is a sufficient condition, not a requirement.
+- ¶96 asks that, for long retention, "the potential impact of technical advances such as cryptanalytically-relevant quantum computers" be weighed.
+- **Reading:** statistical hiding at 2^−256 meets what ¶52/¶53 ask: after erasure the commitment can be neither recovered nor recognised, except with probability below 2^−256, which is not operationally distinguishable from perfect. And because the hiding rests on no assumption, it removes the ¶96 risk class (a future break, quantum or not), which a salted hash keeps. ¶104 still holds for any scheme: where a commitment isn't needed, a pointer is better.
+
+**The committer lives in the tests only** (`ledger-verify/tests/commitment.rs`), with coins from a seeded SHA-256 stream. The library checks; it has no RNG and never commits, so the portable build (`checks.ledger-portable`) is unchanged in kind. A `std`-gated committing feature was the alternative; it would put a second, unchecked-by-the-portable-build code path into the library for a job that is spectral's (the side that holds m and r).
+
+**Vectors:** `commitment-vectors.json`, 4 commitments (m = "", "abc", 64 bytes, 1012 bytes) with fixed coins, written by `commitment-vectors.py` from the paper's text with `hashlib` only (it computes A r row by row from the definition and checks its own Receive). The Rust verifier accepts them; a changed m, every flipped bit (bar the unread corners, which open to the same m), and a truncated commitment or opening reject.
+
 ## Assumptions, all of them
 
 | Check | Rests on | Post-quantum |
@@ -128,6 +175,8 @@ The proof is Mara's (`research-ledger-design.md` §2.3, PROVED): two Q-sets shar
 | Checkpoint, AND rule | Ed25519 (discrete log) **and** ML-DSA-44 (Module-LWE/SIS) | holds while ML-DSA-44 holds: a forger must break both |
 | Anchor | SLH-DSA-SHA2-128s: SHA-256 only | Category 1, hash-only |
 | Quorum, Lemma B | ML-DSA-44 unforgeability, at most f dishonest witnesses, honest witnesses checking consistency (C2SP tlog-witness) | as ML-DSA-44 |
+| Commitment hiding (Theorem 1) | nothing: < 2^−256, information-theoretic | unconditional |
+| Commitment binding | SHA-256 collision resistance | Category 2 |
 | The crates | RustCrypto's implementations match FIPS 204/205 and RFC 8032 | none of them is FIPS 140-validated |
 
 ## Tests and mutations
@@ -141,6 +190,7 @@ The proof is Mara's (`research-ledger-design.md` §2.3, PROVED): two Q-sets shar
 | Checkpoint | 13: the body, its refusals, `CosignedSubtree`; both valid accepts (either order); Ed25519 alone, ML-DSA-44 alone, either one forged, other keys, another checkpoint all reject; duplicate lines, wrong key types and a malformed note are refused |
 | Anchor | 5: the sizes, a valid anchor, another checkpoint, flipped bits and a short signature, another key |
 | Quorum | 10: Q(7,2) = 5 and Mara's table; 4 reject, 5 accept; 5 with a duplicate, an unknown key, an imposter or a forgery reject; another checkpoint; cosignatures read from a note; unusable sets |
+| Commitment | 14: the sizes; the tests' committer against the row-by-row definition; the Python vectors open, and reject mutated; opens with its (m, r); the wrong m, the wrong r, truncated or extended inputs, another scheme byte reject; every flipped bit rejects with its reason, bar the unread corners; the check equals the paper's equation; the binding extractor; the hiding smoke check (per-bit frequencies over 200 + 200 commitments within 0.3; not a proof) |
 
 Each mutation was applied, run and reverted:
 
@@ -150,10 +200,14 @@ Each mutation was applied, run and reverted:
 | Counting lines, not distinct witnesses | `five_with_one_duplicate_rejects` |
 | No 0x00 leaf prefix | `leaf_and_node_hashes_carry_their_prefixes`, `mth_matches_the_published_roots_for_sizes_0_to_8`, `an_inner_node_cannot_pose_as_a_leaf` |
 | No 0x01 node prefix | 10 Merkle tests, among them every vector proof and both probe sets |
+| Commitment: drop the universal hash (compare b to SHA-256(m)) | 6, among them `the_python_vectors_open`, `the_check_is_the_papers_equation` |
+| Commitment: commit to m, not SHA-256(m) | the same 6 |
+| Commitment: accept a longer commitment or opening | `a_truncated_or_extended_commitment_or_opening_rejects` |
+| Commitment: no pad-bit check | `a_flipped_bit_rejects_unless_r_never_reads_it`, `mutated_python_vectors_reject` |
 
 ## Not done yet
 
-- **Halevi–Micali commitments** (SHA-256, k = 256; Alex, 2026-11-17) are next, in this crate. Openings are checked, never made.
+- **What a leaf holds around a commitment** (the scheme byte is there; the leaf format waits on the identity work), and whether 290 bytes, not 288, is fine (Alex).
 - **The exit-table verdict** for the quorum (clear / uncertain / unknown / paradox, prism-019 ask 2). The `Tally` carries what it needs (valid, invalid, unknown, Q, live); the mapping isn't defined yet.
 - **Whether witnesses must also sign Ed25519** (the AND rule for cosignatures).
 - **How an SLH-DSA anchor is carried** in or beside a note.
