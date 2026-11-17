@@ -264,8 +264,28 @@
               // {
                 cargoArtifacts = coverageDeps;
                 cargoLlvmCovExtraArgs = "--fail-under-lines ${coverageFloor} --lcov --output-path $out";
+                # The output is checked, not just produced: every SF: path
+                # repo-relative, so a rebuild gives the same bytes.
+                doInstallCheck = true;
+                installCheckPhase = "bash ${./nix/lcov-paths.sh} $out";
               }
             );
+
+            # The guard itself: it must reject an absolute or build-directory
+            # SF: path and an lcov with none, and accept relative ones.
+            lcov-paths = pkgs.runCommand "prism-lcov-paths" { } ''
+              guard=${./nix/lcov-paths.sh}
+              printf 'SF:prismqueer/src/lib.rs\nDA:1,1\nend_of_record\n' > good
+              printf 'SF:/nix/var/nix/builds/nix-1-0/source/prismqueer/src/lib.rs\nend_of_record\n' > build
+              printf 'SF:/build/source/prismqueer/src/lib.rs\nend_of_record\n' > absolute
+              printf 'SF:prismqueer/src/lib.rs\nSF:x/nix/var/nix/builds/y.rs\n' > embedded
+              printf 'DA:1,1\n' > empty
+              bash $guard good
+              for f in build absolute embedded empty; do
+                if bash $guard $f 2>/dev/null; then echo "lcov-paths accepted $f" >&2; exit 1; fi
+              done
+              touch $out
+            '';
 
             doctest = craneLib.cargoDocTest (gate // { cargoArtifacts = gateDeps; });
 
