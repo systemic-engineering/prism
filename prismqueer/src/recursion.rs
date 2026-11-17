@@ -65,7 +65,7 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
     ///
     /// ```text
     /// Recursion → tick → Observation → assert(Model) → Assertion →
-    ///   hypothesize → Hypothesis → compose(Chaos) → Question →
+    ///   question_shape → KTQuestionShape → compose(Chaos) → Question →
     ///   [Choice from @subject] → next Recursion
     /// ```
     ///
@@ -81,7 +81,7 @@ impl<T: AsRef<[u8]> + Clone> Recursion<T> {
         chaos: crate::chaos::ScalarChaos,
     ) -> Imperfect<crate::question::Question, EmptyFracture, Unmeasured> {
         self.tick()
-            .map(|observation| observation.assert(model).hypothesize().compose(chaos))
+            .map(|observation| observation.assert(model).question_shape().compose(chaos))
     }
 
     /// One pass through @void = ONE TICK per Alex Move 9.
@@ -164,8 +164,8 @@ mod tests {
 
     #[test]
     fn subject_driven_loop_tick_composes_full_6_arrow_move_9_pipeline() {
-        use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
+        use crate::question::KTQuestionShape;
 
         let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"stable"));
         let recursion = Recursion::from_reality(reality);
@@ -176,8 +176,8 @@ mod tests {
             .ok()
             .expect("settled reality yields a question");
         // Full Move 9 pipeline discharged: Reality → Observation → Assertion →
-        // Hypothesis → Question emitted awaiting Choice from @subject.
-        assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
+        // KTQuestionShape → Question emitted awaiting Choice from @subject.
+        assert_eq!(question.shape, KTQuestionShape::Reflexive);
         assert_eq!(question.chaos, ScalarChaos::new(0.5));
     }
 

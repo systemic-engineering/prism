@@ -31,15 +31,14 @@ impl<T> Assertion<T> {
         Self { observation, model }
     }
 
-    /// Compose Assertion → Hypothesis per Alex Move 2 pipeline.
+    /// The Karl Tomm question shape this assertion asks in (Alex Move 2).
     ///
-    /// > "from an Assertion you can form a Hypothesis which IS a Karl-Tomm question"
-    ///
-    /// Per Mara Def §3.4.1 karl_tomm(y) := rank_by_spectral_commutator(m) at altitude(y)+1.
-    /// Minimum-viable: defaults to Reflexive K-T shape (observer-recursive; K_3 stable
-    /// orbit); full spectral-commutator-ranking FORWARD-PROMISED.
-    pub fn hypothesize(self) -> crate::hypothesis::Hypothesis {
-        crate::hypothesis::Hypothesis::new(crate::hypothesis::KTQuestionShape::Reflexive)
+    /// A constant: always Reflexive (observer-recursive). It was once called a
+    /// `Hypothesis`; that name now belongs to
+    /// `prismqueer::hypothesis`: the unranked closures of a
+    /// composite's located loops (prism-021, Mara 54c88f72 §4.3).
+    pub fn question_shape(self) -> crate::question::KTQuestionShape {
+        crate::question::KTQuestionShape::Reflexive
     }
 }
 
@@ -57,11 +56,11 @@ mod tests {
     }
 
     #[test]
-    fn assertion_hypothesize_composes_to_hypothesis_per_alex_move_2() {
-        use crate::hypothesis::KTQuestionShape;
+    fn assertion_asks_in_the_reflexive_shape_per_alex_move_2() {
+        use crate::question::KTQuestionShape;
         let obs: Observation<&[u8]> = Observation::new(vec![Crystal::new(b"c")], None);
         let model: Model<&[u8]> = Model::empty();
-        let hypothesis = Assertion::new(obs, model).hypothesize();
-        assert_eq!(hypothesis.shape, KTQuestionShape::Reflexive);
+        let shape = Assertion::new(obs, model).question_shape();
+        assert_eq!(shape, KTQuestionShape::Reflexive);
     }
 }

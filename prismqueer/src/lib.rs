@@ -148,9 +148,6 @@ pub mod assertion;
 pub mod reality;
 
 #[cfg(feature = "lapack")]
-pub mod hypothesis;
-
-#[cfg(feature = "lapack")]
 pub mod question;
 
 #[cfg(feature = "lapack")]

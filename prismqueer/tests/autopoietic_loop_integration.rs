@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! Reality → Recursion.tick → Observation → assert(Model) → Assertion →
-//!   hypothesize → Hypothesis → compose(Chaos) → Question →
+//!   question_shape → KTQuestionShape → compose(Chaos) → Question →
 //!   [Choice from @subject] → Choice.into_reality → next Reality
 //! ```
 //!
@@ -21,7 +21,6 @@
 //! - `prismqueer::model::Model<T>` (Discharge #10 `30885b6`)
 //! - `prismqueer::assertion::Assertion<T>` (Discharge #11 `30885b6`)
 //! - `prismqueer::reality::Reality<T>` (Discharge #12 `30885b6`)
-//! - `prismqueer::hypothesis::Hypothesis` (Discharge #13 `30885b6`)
 //! - `prismqueer::question::Question` (Discharge #14 `30885b6`)
 //! - `prismqueer::choice::Choice` (Discharge #15 `30885b6`)
 //! - `prismqueer::recursion::Recursion<T>` (Discharge #16 `30885b6`)
@@ -34,10 +33,10 @@ use prismqueer::assertion::Assertion;
 use prismqueer::chaos::ScalarChaos;
 use prismqueer::choice::Choice;
 use prismqueer::crystal_shard::Crystal;
-use prismqueer::hypothesis::KTQuestionShape;
 use prismqueer::model::Model;
 use prismqueer::observation::Observation;
 use prismqueer::observer::{Observer, PeerObserver, TuringObserver, VoidObserver};
+use prismqueer::question::KTQuestionShape;
 use prismqueer::question::Question;
 use prismqueer::reality::Reality;
 use prismqueer::recursion::{EmptyFracture, Recursion};
@@ -61,13 +60,13 @@ fn autopoietic_loop_one_tick_fluent_composition() {
         .map(|observation| {
             observation
                 .assert(model) // arrow 2: + Model → Assertion
-                .hypothesize() // arrow 3: → Hypothesis
+                .question_shape() // arrow 3: → KTQuestionShape
                 .compose(caller_chaos()) // arrow 4: + Chaos → Question
         })
         .ok()
         .expect("settled reality is observed");
 
-    assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
+    assert_eq!(question.shape, KTQuestionShape::Reflexive);
 }
 
 /// Full 6-arrow loop — THREE sequential ticks with Choice-as-subject-input closing loop.
@@ -84,7 +83,7 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
         .subject_driven_loop_tick(Model::empty(), caller_chaos())
         .ok()
         .expect("tick 1");
-    assert_eq!(question_1.hypothesis.shape, KTQuestionShape::Reflexive);
+    assert_eq!(question_1.shape, KTQuestionShape::Reflexive);
 
     // Arrow 5: @subject inputs Choice (external subject-substrate boundary crossing)
     let choice_1 = Choice::new("observe");
@@ -97,7 +96,7 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
         .subject_driven_loop_tick(Model::empty(), caller_chaos())
         .ok()
         .expect("tick 2");
-    assert_eq!(question_2.hypothesis.shape, KTQuestionShape::Reflexive);
+    assert_eq!(question_2.shape, KTQuestionShape::Reflexive);
 
     // Arrow 5 again: subject inputs another Choice
     let choice_2 = Choice::new("reflect");
@@ -108,7 +107,7 @@ fn autopoietic_loop_three_ticks_iterated_closure() {
         .subject_driven_loop_tick(Model::empty(), caller_chaos())
         .ok()
         .expect("tick 3");
-    assert_eq!(question_3.hypothesis.shape, KTQuestionShape::Reflexive);
+    assert_eq!(question_3.shape, KTQuestionShape::Reflexive);
 
     // The autopoietic loop demonstrably iterates: 3 Questions emitted; 2 Choices
     // folded back; all composing at type-level per Alex Move 9 subject-driven-loop
@@ -151,7 +150,7 @@ fn autopoietic_loop_all_three_canonical_observer_dimensions() {
         .subject_driven_loop_tick(Model::<&[u8]>::empty(), caller_chaos())
         .ok()
         .expect("N=1 tick");
-    assert_eq!(question_1.hypothesis.shape, KTQuestionShape::Reflexive);
+    assert_eq!(question_1.shape, KTQuestionShape::Reflexive);
 
     // N=3 K_3 peer stability (past+now+future; @reality/object sufficient)
     let observer_3: PeerObserver = Observer::new();

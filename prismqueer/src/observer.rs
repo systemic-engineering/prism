@@ -262,13 +262,13 @@ mod tests {
     fn observer_observe_reality_settled_full_pipeline_composes_per_alex_move_8() {
         use crate::chaos::ScalarChaos;
         use crate::crystal_shard::Crystal;
-        use crate::hypothesis::KTQuestionShape;
         use crate::model::Model;
+        use crate::question::KTQuestionShape;
         use crate::reality::Reality;
 
         // Full Move 8+9 fluent pipeline:
-        //   Observer.observe(Reality) → Observation .assert(Model) → Assertion .hypothesize()
-        //   → Hypothesis .compose(Chaos) → Question
+        //   Observer.observe(Reality) → Observation .assert(Model) → Assertion .question_shape()
+        //   → KTQuestionShape .compose(Chaos) → Question
         let observer: PeerObserver = Observer::new();
         let reality: Reality<&[u8]> = Reality::Settled(Crystal::new(b"reality"));
         let model: Model<&[u8]> = Model::empty();
@@ -277,12 +277,12 @@ mod tests {
             .map(|observation| {
                 observation
                     .assert(model)
-                    .hypothesize()
+                    .question_shape()
                     .compose(ScalarChaos::new(0.5))
             })
             .ok()
             .expect("settled reality is observed");
-        assert_eq!(question.hypothesis.shape, KTQuestionShape::Reflexive);
+        assert_eq!(question.shape, KTQuestionShape::Reflexive);
     }
 
     #[test]
