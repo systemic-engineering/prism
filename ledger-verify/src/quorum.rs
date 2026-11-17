@@ -20,14 +20,13 @@ use crate::note::SignatureLine;
 
 /// Q = ⌊(N+f)/2⌋ + 1.
 pub fn required(n: usize, f: usize) -> usize {
-    let _ = (n, f);
-    0
+    (n + f) / 2 + 1
 }
 
 /// Corollary C: a quorum exists without the f liars iff N ≥ 3f + 1.
+#[expect(clippy::int_plus_one, reason = "written as Corollary C states it")]
 pub fn live(n: usize, f: usize) -> bool {
-    let _ = (n, f);
-    false
+    n >= 3 * f + 1
 }
 
 /// Why a witness set is not usable.
@@ -64,12 +63,26 @@ pub struct Tally {
 impl Tally {
     /// Accept iff the distinct valid witnesses reach Q.
     pub fn accepted(&self) -> bool {
-        false
+        self.valid >= self.required
     }
 }
 
 impl Witnesses {
     pub fn new(keys: Vec<MlDsaKey>, f: usize) -> Result<Witnesses, QuorumError> {
+        let (n, q) = (keys.len(), required(keys.len(), f));
+        if q > n {
+            return Err(QuorumError::Unreachable { n, f, q });
+        }
+        // One party, one vote: no (name, key ID) twice, no public key twice.
+        let publics: Vec<Vec<u8>> = keys.iter().map(MlDsaKey::public_key).collect();
+        for i in 0..n {
+            for j in i + 1..n {
+                let same_label = keys[i].name == keys[j].name && keys[i].id == keys[j].id;
+                if same_label || publics[i] == publics[j] {
+                    return Err(QuorumError::DuplicateWitness);
+                }
+            }
+        }
         Ok(Witnesses { keys, f })
     }
 
@@ -90,11 +103,23 @@ impl Witnesses {
 
     /// Count the cosignature lines over `checkpoint`.
     pub fn tally(&self, checkpoint: &Checkpoint, cosignatures: &[SignatureLine]) -> Tally {
-        let _ = (checkpoint, cosignatures);
+        // Which witnesses have a valid cosignature: a set, so a witness
+        // counts once however many lines it sent.
+        let mut cosigned = alloc::vec![false; self.keys.len()];
+        let (mut invalid, mut unknown) = (0, 0);
+        for line in cosignatures {
+            match self.keys.iter().position(|k| k.names(line)) {
+                None => unknown += 1,
+                Some(i) => match self.keys[i].verify(checkpoint, &line.signature) {
+                    Some(_) => cosigned[i] = true,
+                    None => invalid += 1,
+                },
+            }
+        }
         Tally {
-            valid: 0,
-            invalid: 0,
-            unknown: 0,
+            valid: cosigned.iter().filter(|&&c| c).count(),
+            invalid,
+            unknown,
             required: self.required(),
             live: live(self.keys.len(), self.f),
         }

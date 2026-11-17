@@ -13,3 +13,13 @@ codegen-units = 256
 
 [profile.test]
 codegen-units = 256
+
+# ledger-verify's tests sign SLH-DSA-SHA2-128s once per run (the anchor):
+# a few million SHA-256 compressions, ~40s unoptimised. Optimising the two
+# crates that do that hashing makes it about a second. Dependencies only; the
+# workspace crates keep the dev profile's checks.
+[profile.dev.package.slh-dsa]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3

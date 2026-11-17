@@ -32,13 +32,21 @@ pub struct AnchorKey(slh_dsa::VerifyingKey<slh_dsa::Sha2_128s>);
 
 impl AnchorKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<AnchorKey, AnchorError> {
-        let _ = bytes;
-        Err(AnchorError::Key)
+        slh_dsa::VerifyingKey::try_from(bytes)
+            .map(AnchorKey)
+            .map_err(|_| AnchorError::Key)
     }
 
     /// Verify an anchor signature over `checkpoint`.
     pub fn verify(&self, checkpoint: &Checkpoint, signature: &[u8]) -> Result<(), AnchorError> {
-        let _ = (checkpoint, signature, &self.0);
-        Err(AnchorError::Signature)
+        if signature.len() != SIGNATURE {
+            return Err(AnchorError::Length);
+        }
+        let signature =
+            slh_dsa::Signature::try_from(signature).map_err(|_| AnchorError::Signature)?;
+        // FIPS 205 slh_verify (Algorithm 24), pure, with the anchor context.
+        self.0
+            .try_verify_with_context(checkpoint.body().as_bytes(), CONTEXT, &signature)
+            .map_err(|_| AnchorError::Signature)
     }
 }

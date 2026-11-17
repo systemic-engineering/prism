@@ -123,12 +123,16 @@ fn mth_matches_the_published_roots_for_sizes_0_to_8() {
 fn an_inner_node_cannot_pose_as_a_leaf() {
     let leaves = leaf_hashes();
     let two = root(&leaves[..2]);
-    let mut forged = leaves[0].to_vec();
-    forged.extend_from_slice(&leaves[1]);
-    assert_eq!(
-        verify_inclusion(0, 1, &leaf_hash(&forged), &[], &two),
-        Err(ProofError::RootMismatch)
-    );
+    // The node's children, with and without its 0x01 prefix.
+    for prefix in [&[][..], &[0x01]] {
+        let mut forged = prefix.to_vec();
+        forged.extend_from_slice(&leaves[0]);
+        forged.extend_from_slice(&leaves[1]);
+        assert_eq!(
+            verify_inclusion(0, 1, &leaf_hash(&forged), &[], &two),
+            Err(ProofError::RootMismatch)
+        );
+    }
 }
 
 // ── Inclusion (§2.1.3.2) ─────────────────────────────────────────────────────────────
@@ -302,15 +306,49 @@ fn consistency_with_the_wrong_sizes_rejects() {
             )
             .is_err());
         }
-        assert!(verify_consistency(
-            c.first,
-            c.second + 1,
-            &c.first_root,
-            &c.second_root,
-            &c.path
-        )
-        .is_err());
     }
+}
+
+/// RFC 9162 §2.1.4.2 binds the two roots, not the second size: for 16 of
+/// the 28 pairs, the proof for (m, n) also verifies as (m, n + 1). The
+/// size is bound by the signed checkpoint, and no tree of n + 1 leaves has
+/// root MTH(D_n) without a SHA-256 collision across the 0x00 / 0x01
+/// domains. transparency-dev's verifier accepts the same (its proof-length
+/// check is equal for both sizes). Pinned, so a change shows.
+#[test]
+fn consistency_binds_the_roots_not_the_second_size() {
+    let leaves = leaf_hashes();
+    let mut also = vec![];
+    for c in consistencies() {
+        let up = c.second + 1;
+        if verify_consistency(c.first, up, &c.first_root, &c.second_root, &c.path).is_ok() {
+            also.push((c.first, c.second));
+            if up as usize <= leaves.len() {
+                assert_ne!(root(&leaves[..up as usize]), c.second_root);
+            }
+        }
+    }
+    assert_eq!(
+        also,
+        [
+            (1, 3),
+            (2, 3),
+            (1, 5),
+            (2, 5),
+            (3, 5),
+            (4, 5),
+            (1, 6),
+            (2, 6),
+            (3, 6),
+            (4, 6),
+            (1, 7),
+            (2, 7),
+            (3, 7),
+            (4, 7),
+            (5, 7),
+            (6, 7)
+        ]
+    );
 }
 
 #[test]
@@ -411,6 +449,13 @@ fn the_published_consistency_probes() {
             ),
             _ => Err(ProofError::RootMismatch),
         };
+        // The one probe a typed root can't express: equal sizes whose
+        // "roots" are 12 equal bytes ("don't care 2"). Equal sizes compare
+        // roots only, so it passes there; here nothing but 32 bytes is a root.
+        if p["file"] == "consistency/additional/sizes-are-equal-one-and-proof-is-empty.json" {
+            assert!(!want_err && verdict.is_err());
+            continue;
+        }
         assert_eq!(verdict.is_err(), want_err, "{}", p["file"]);
         if want_err {
             bad += 1
@@ -418,5 +463,5 @@ fn the_published_consistency_probes() {
             good += 1
         }
     }
-    assert_eq!((good, bad), (6, 92));
+    assert_eq!((good, bad), (5, 92));
 }
