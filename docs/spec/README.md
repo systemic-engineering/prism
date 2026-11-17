@@ -12,6 +12,7 @@
 | `identity.md` | Identity is scoped: `address = BLAKE3-keyed(K_scope, content)`, the public scope's derived key, why, and what's out of scope (key management) |
 | `identity-vectors.json` | `K_public` and 11 addresses computed with `b3sum` (cross-checked with Python's `blake3`), checked against prism by `prismqueer/tests/identity_vectors.rs` |
 | `ruler.md` | The canonical ruler address (`"ruler\0"` ‖ region ‖ question ‖ α ‖ β ‖ clock, public scope; signer and p₀/p₁ never in it) and the calibration crystal that carries p₀/p₁. prism-Reed's lean, Alex's call |
+| `hypothesis.md` | Frames, their composite and the hypothesis over it (prism-021, Mara 54c88f72): `Gl<R>` over exact ℚ/ℤ, the composite's interpretation (agreement, located holonomy, curvature, provenance), the unranked closures per loop, D1/D2 |
 | `ruler-vectors.json` | 4 ruler and 3 calibration preimages built by `ruler-vectors.py` from the spec, hashed with Python's `blake3` and `b3sum`, checked against prism by `prismqueer/tests/ruler_vectors.rs` |
 
 Regenerate the Imperfect vectors after an intended change in terni:
