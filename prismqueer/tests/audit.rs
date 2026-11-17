@@ -127,13 +127,7 @@ fn a_claim_outside_the_open_unit_interval_is_refused() {
         (q(1, 2), q(0, 1)),
         (q(1, 2), q(1, 1)),
     ] {
-        assert_eq!(
-            bounds_rate(10, &p, &c),
-            Err(Refusal::NotAClaim {
-                rate: p.clone(),
-                confidence: c.clone()
-            })
-        );
+        assert_eq!(bounds_rate(10, &p, &c), Err(Refusal::NotAClaim));
         assert!(smallest_sample(&p, &c).is_err());
     }
 }
