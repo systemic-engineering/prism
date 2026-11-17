@@ -28,6 +28,7 @@ mod field_prism;
 mod flux_ouroboros;
 mod gate_vectors;
 mod hodge;
+mod hypothesis;
 mod identity_vectors;
 mod instrument;
 mod integration;
