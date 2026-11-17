@@ -78,7 +78,7 @@ prismqueer/            the core crate
   src/time/              Progression: histories in the trace monoid, Foata normal form
   src/flux.rs            property verdicts; pillar::search and pillar::steer (property search that keeps counterexamples)
   src/fate/              the five-mode selector (feature `fate`)
-  src/oid.rs, store.rs, merkle.rs   content addressing
+  src/oid.rs, merkle.rs  content addressing
   src/pq/                typed query DSL with JSON Schema (feature `pq`)
   native/                Fortran wrappers compiled by build.rs for the LAPACK path
   tests/                 24 integration test files, RED batteries included
@@ -96,7 +96,7 @@ docs/specs/            pq, lambda and coincidence-hash specs
 - **Settle = where the recursion stops moving.** `spectral::settle` runs heat flow `e^{-tL}` on a graph Laplacian in closed form from the eigenbasis. It returns Success if the input was already harmonic, Partial with what is still moving if not, and Failure if the eigensolver could not certify the answer. It fails closed: an unmeasured answer is never reported as settled.
 - **Hodge–Dirac operator.** `spectral::instrument` builds `D = δ + δ*` on vertex ⊕ edge values. `ker D = H⁰ ⊕ H¹` separates agreements that settle from disagreements no assignment of vertex values can remove.
 - **Histories up to reordering.** `time::Progression` stores a history as an element of a trace monoid in Foata normal form, so independent steps commute and every observer's ordering gets the same address.
-- **Content addressing.** OIDs are content hashes; `Store` and `MerkleTree` are typed over them.
+- **Content addressing.** OIDs are content hashes; `MerkleTree` is typed over them, and `brain::Backend` is the one content-store port (checked on every read).
 - **`fate`, a small fixed selector.** It is 425 `u8` parameters: five weight sets, each a 5-way linear classifier over 16 features (5×16 weights + 5 biases). It is interpreted by a fixed Brainfuck program over a 256-byte tape. The f64 training form has 450 parameters. Code: `prismqueer/src/fate/weights.rs`, `runtime.rs`.
 - **Sub-Turing by design.** The intent is that inference runs in a state space bounded up front. This is a design constraint, argued in `docs/math/FLOOR.md` §1.3. It is not machine-checked.
 
