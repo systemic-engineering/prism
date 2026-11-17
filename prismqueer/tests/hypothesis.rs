@@ -225,9 +225,10 @@ fn three_frames_with_a_rotation_agree_on_nothing_and_hold_one_located_loop() {
 #[test]
 fn no_metric_is_referenced_on_the_composition_path() {
     type Out = Imperfect<Hypothesis, CompositionError, BTreeSet<Obstruction>>;
-    let _: fn(&[Frame], &[Relation<Q>], &[Face]) -> Out = hypothesize::<Q>;
-    let _: fn(&[Frame], &[Relation<Q>], &[Face]) -> Result<Composite<Q>, CompositionError> =
-        compose::<Q>;
+    type Hypothesize = fn(&[Frame], &[Relation<Q>], &[Face]) -> Out;
+    type Compose = fn(&[Frame], &[Relation<Q>], &[Face]) -> Result<Composite<Q>, CompositionError>;
+    let _: Hypothesize = hypothesize::<Q>;
+    let _: Compose = compose::<Q>;
 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for file in ["gl.rs", "hypothesis.rs"] {
@@ -369,7 +370,9 @@ fn f5_a_face_carrying_cs_report_is_curvature_on_the_face_and_no_open_loop() {
     );
     assert!(c.provenance().contains(face.signer()));
 
-    let Imperfect::Partial(h, loss) = hypothesize(&t.frames, &t.relations, &[face.clone()]) else {
+    let Imperfect::Partial(h, loss) =
+        hypothesize(&t.frames, &t.relations, std::slice::from_ref(&face))
+    else {
         panic!("curvature is not flat");
     };
     assert!(h.alternatives().is_empty(), "no comma left to close");

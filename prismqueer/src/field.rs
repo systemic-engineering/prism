@@ -670,6 +670,17 @@ impl<V: Group> Field<Graph, V> {
         }
     }
 
+    /// [`Field::multigraph`] with these vertices too: a vertex no transport
+    /// touches is still a vertex of the base (an isolated frame).
+    pub(crate) fn multigraph_over(
+        vertices: impl IntoIterator<Item = VertexId>,
+        given: impl IntoIterator<Item = (EdgeKey, V)>,
+    ) -> Self {
+        let mut field = Self::multigraph(given);
+        field.base.vertices.extend(vertices);
+        field
+    }
+
     /// Declare filled triangles (2-cells), named by their corners. A loop
     /// that bounds faces is no longer a hole; a face that doesn't close is
     /// curvature on that face. Refused if a side isn't in the graph, or has

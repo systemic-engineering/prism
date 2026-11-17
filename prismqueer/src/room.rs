@@ -216,6 +216,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use num_bigint::{BigInt, Sign};
+use num_rational::BigRational;
 use num_traits::{One, ToPrimitive, Zero};
 
 use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning, Walk};
@@ -894,6 +895,75 @@ pub fn clear_denominators(c: &[QModOne]) -> (Modulus, Vec<ZMod>) {
         .collect();
     (m, reduced)
 }
+
+/// A rational, exactly: the field ℚ, reduced with a positive denominator.
+///
+/// The smallest exact field prism needs: the entries of a frame's
+/// transports ([`crate::gl::Gl`]), where invertible means det ≠ 0. Not
+/// [`QModOne`] (which is ℚ/ℤ, no product) and not `f64` (which rounds).
+/// Arbitrary-precision, so no arithmetic leaves its range.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Q(BigRational);
+
+impl Q {
+    /// num/den, reduced. `None` when den is 0.
+    pub fn new(num: impl Into<BigInt>, den: impl Into<BigInt>) -> Option<Self> {
+        let den = den.into();
+        (!den.is_zero()).then(|| Q(BigRational::new(num.into(), den)))
+    }
+
+    /// The rational itself.
+    pub fn value(&self) -> &BigRational {
+        &self.0
+    }
+
+    /// 1/self, unless self is 0.
+    pub fn recip(&self) -> Option<Self> {
+        (!self.0.is_zero()).then(|| Q(self.0.recip()))
+    }
+}
+
+impl From<i64> for Q {
+    fn from(n: i64) -> Self {
+        Q(BigRational::from_integer(BigInt::from(n)))
+    }
+}
+
+impl From<BigRational> for Q {
+    fn from(r: BigRational) -> Self {
+        Q(r)
+    }
+}
+
+impl Coefficient for Q {
+    type Ring = ();
+    fn ring(&self) -> &() {
+        &()
+    }
+    fn zero(_: &()) -> Self {
+        Q(BigRational::zero())
+    }
+    fn add(&self, other: &Self) -> Self {
+        Q(&self.0 + &other.0)
+    }
+    fn neg(&self) -> Self {
+        Q(-&self.0)
+    }
+    fn times(&self, n: &BigInt) -> Self {
+        Q(&self.0 * BigRational::from_integer(n.clone()))
+    }
+}
+
+impl Entry for Q {
+    fn one(_: &()) -> Self {
+        Q(BigRational::one())
+    }
+    fn mul(&self, other: &Self) -> Self {
+        Q(&self.0 * &other.0)
+    }
+}
+
+impl Exactly for Q {}
 
 impl Coefficient for f64 {
     type Ring = ();
