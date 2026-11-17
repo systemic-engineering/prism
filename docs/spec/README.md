@@ -13,6 +13,9 @@
 | `identity-vectors.json` | `K_public` and 11 addresses computed with `b3sum` (cross-checked with Python's `blake3`), checked against prism by `prismqueer/tests/identity_vectors.rs` |
 | `ruler.md` | The canonical ruler address (`"ruler\0"` ‖ region ‖ question ‖ α ‖ β ‖ clock, public scope; signer and p₀/p₁ never in it) and the calibration crystal that carries p₀/p₁. prism-Reed's lean, Alex's call |
 | `hypothesis.md` | Frames, their composite and the hypothesis over it (prism-021, Mara 54c88f72): `Gl<R>` over exact ℚ/ℤ, the composite's interpretation (agreement, located holonomy, curvature, provenance), the unranked closures per loop, D1/D2 |
+| `ledger.md` | What `ledger-verify` checks and under which assumptions (prism-019): RFC 9162 Merkle proofs over SHA-256, checkpoints under Ed25519 **AND** ML-DSA-44, the SLH-DSA-SHA2-128s anchor, Lemma B's witness quorum; crate versions, the mutations, what's not done (Halevi–Micali commitments next) |
+| `ledger-vectors.json` | 36 inclusion and 28 consistency proofs (sizes ≤ 8, RFC 6962's test leaves) generated from RFC 9162's text by `ledger-vectors.py`, roots checked against transparency-dev's; checked by `ledger-verify/tests/merkle.rs` |
+| `ledger-probes.json` | transparency-dev/merkle's published inclusion and consistency probes (98 + 98, Apache-2.0), bundled unchanged by `ledger-vectors.py --probes` |
 | `ruler-vectors.json` | 4 ruler and 3 calibration preimages built by `ruler-vectors.py` from the spec, hashed with Python's `blake3` and `b3sum`, checked against prism by `prismqueer/tests/ruler_vectors.rs` |
 
 Regenerate the Imperfect vectors after an intended change in terni:
