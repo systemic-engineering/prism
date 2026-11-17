@@ -733,6 +733,35 @@ impl Reach {
     }
 }
 
+/// Read a crystal back by address through any [`Backend`], checked: fetch,
+/// rehash under `scope`, and refuse bytes that aren't the address's.
+///
+/// This is the one read through the port (A2 in `docs/spec/brain.md`:
+/// integrity checked on every read; durability is the adapter's
+/// obligation). [`Brain::crystal`] reads through it on a cache miss. It is a
+/// free function, not a trait method, so no adapter can override it and
+/// skip the rehash.
+///
+/// - bytes that hash to `address`: the crystal;
+/// - no bytes: [`Recall::Lost`], never an empty value;
+/// - other bytes: [`Recall::Forged`], never believed;
+/// - the backend failed: [`Recall::Backend`].
+pub fn recall<B: Backend + ?Sized>(
+    backend: &B,
+    scope: &Scope,
+    address: &Oid,
+) -> Result<Crystal, Recall<B::Error>> {
+    let bytes = backend
+        .fetch(address)
+        .map_err(Recall::Backend)?
+        .ok_or_else(|| Recall::Lost(address.clone()))?;
+    let crystal = Crystal::settle(scope, bytes);
+    if &crystal.address != address {
+        return Err(Recall::Forged(address.clone()));
+    }
+    Ok(crystal)
+}
+
 /// Why a crystal couldn't be read back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Recall<E> {
@@ -1032,15 +1061,7 @@ impl<B: Backend> Brain<B> {
         if let Some(c) = self.crystals.get(address) {
             return Ok(c.clone());
         }
-        let bytes = self
-            .backend
-            .fetch(address)
-            .map_err(Recall::Backend)?
-            .ok_or_else(|| Recall::Lost(address.clone()))?;
-        let crystal = Crystal::settle(&self.scope, bytes);
-        if &crystal.address != address {
-            return Err(Recall::Forged(address.clone()));
-        }
+        let crystal = recall(&self.backend, &self.scope, address)?;
         self.recalled.set(self.recalled.get() + 1);
         Ok(crystal)
     }
