@@ -260,7 +260,7 @@ fn there_is_no_default_metrix() {
     assert!(!(&Probe::<Metrix>(PhantomData)).has_default());
     assert!(!(&Probe::<MetrixDraft>(PhantomData)).has_default());
     assert!(
-        (&Probe::<Vec<Q>>(PhantomData)).has_default(),
+        Probe::<Vec<Q>>(PhantomData).has_default(),
         "the probe works"
     );
 }
@@ -285,7 +285,7 @@ fn inertia_of_diagonal_forms_counts_signs() {
         inertia(2, 1, 1)
     );
     assert_eq!(
-        Form::new(vec![]).expect("empty").inertia(),
+        Form::new(Vec::<Vec<Q>>::new()).expect("empty").inertia(),
         inertia(0, 0, 0)
     );
 }
@@ -366,7 +366,7 @@ impl Mix {
     }
     /// A small integer in −k..=k, zero one time in three.
     fn small(&mut self, k: i64) -> i64 {
-        if self.next() % 3 == 0 {
+        if self.next().is_multiple_of(3) {
             0
         } else {
             (self.next() % (2 * k as u64 + 1)) as i64 - k
@@ -378,14 +378,13 @@ impl Arbitrary for Congruence {
     fn arbitrary(sample: &mut Sample) -> Self {
         let mut mix = Mix(u64::arbitrary(sample));
         let n = 1 + (mix.next() % 4) as usize;
-        let mut f = vec![vec![Q::from(0); n]; n];
-        for i in 0..n {
-            for j in i..n {
-                let x = Q::from(mix.small(3));
-                f[i][j] = x.clone();
-                f[j][i] = x;
-            }
-        }
+        // Drawn row by row; the upper triangle is read on both sides.
+        let drawn: Vec<Vec<i64>> = (0..n)
+            .map(|_| (0..n).map(|_| mix.small(3)).collect())
+            .collect();
+        let f = (0..n)
+            .map(|i| (0..n).map(|j| Q::from(drawn[i.min(j)][i.max(j)])).collect())
+            .collect();
         let p = loop {
             let rows = (0..n)
                 .map(|_| {

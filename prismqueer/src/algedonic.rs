@@ -683,8 +683,9 @@ impl Draft {
 /// address they signed. Minted only by [`Draft::seal`],
 /// [`IndependenceDraft::seal`], [`crate::crossing::attest`],
 /// [`crate::agreement::SelectionDraft::seal`],
-/// [`crate::hypothesis::RelationDraft::seal`] and
-/// [`crate::hypothesis::FaceDraft::seal`]. It sits beside
+/// [`crate::hypothesis::RelationDraft::seal`],
+/// [`crate::hypothesis::FaceDraft::seal`] and
+/// [`crate::metrix::MetrixDraft::seal`]. It sits beside
 /// the address, never in it. Ordered by signer, then address, so a set of
 /// seals has one order everywhere.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

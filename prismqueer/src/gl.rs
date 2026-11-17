@@ -229,22 +229,7 @@ impl<R: Scalar> Gl<R> {
     pub fn charpoly(&self, n: usize) -> Charpoly {
         let n = n.max(self.n);
         let a: Vec<Q> = padded(&self.m, self.n, n).iter().map(R::rational).collect();
-        let mut coefficients = vec![Q::from(1)];
-        let mut m = vec![Q::from(0); n * n];
-        for k in 1..=n {
-            // M_k = A·M_{k−1} + c_{n−k+1}·I; c_{n−k} = −tr(A·M_k)/k.
-            let mut next = product(&a, &m, n);
-            let c = coefficients[k - 1].clone();
-            for i in 0..n {
-                next[i * n + i] = next[i * n + i].add(&c);
-            }
-            let am = product(&a, &next, n);
-            let trace = (0..n).fold(Q::from(0), |s, i| s.add(&am[i * n + i]));
-            let k = Q::from(k as i64);
-            coefficients.push(trace.neg().mul(&k.recip().unwrap_or(k)));
-            m = next;
-        }
-        Charpoly { coefficients }
+        Charpoly::of(&a, n)
     }
 
     /// Its canonical bytes: `u64le(n)`, then the n² entries row by row,
@@ -322,6 +307,27 @@ pub struct Charpoly {
 }
 
 impl Charpoly {
+    /// det(xI − A) of the n × n row-major matrix `a` over ℚ, by
+    /// Faddeev–LeVerrier: any square matrix, invertible or not.
+    pub(crate) fn of(a: &[Q], n: usize) -> Charpoly {
+        let mut coefficients = vec![Q::from(1)];
+        let mut m = vec![Q::from(0); n * n];
+        for k in 1..=n {
+            // M_k = A·M_{k−1} + c_{n−k+1}·I; c_{n−k} = −tr(A·M_k)/k.
+            let mut next = product(a, &m, n);
+            let c = coefficients[k - 1].clone();
+            for i in 0..n {
+                next[i * n + i] = next[i * n + i].add(&c);
+            }
+            let am = product(a, &next, n);
+            let trace = (0..n).fold(Q::from(0), |s, i| s.add(&am[i * n + i]));
+            let k = Q::from(k as i64);
+            coefficients.push(trace.neg().mul(&k.recip().unwrap_or(k)));
+            m = next;
+        }
+        Charpoly { coefficients }
+    }
+
     /// The n + 1 coefficients, leading first (the first is 1).
     pub fn coefficients(&self) -> &[Q] {
         &self.coefficients
@@ -339,7 +345,7 @@ impl Charpoly {
 }
 
 /// `sign ‖ bytes(|numerator|) ‖ bytes(denominator)`, as `ruler.md`.
-fn rational(out: &mut Vec<u8>, r: &BigRational) {
+pub(crate) fn rational(out: &mut Vec<u8>, r: &BigRational) {
     let (sign, numer) = r.numer().to_bytes_le();
     out.push(match sign {
         Sign::Minus => 2,

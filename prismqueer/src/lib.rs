@@ -158,6 +158,12 @@ pub mod hypothesis;
 #[cfg(feature = "lapack")]
 pub mod kleinos;
 
+// metrix: a frame's ruler for length (positive definite, certified by an
+// exact LDLᵀ, signed, no default) and a Form of any signature (prism-021 D5;
+// Mara 54c88f72 §8–§9).
+#[cfg(feature = "lapack")]
+pub mod metrix;
+
 #[cfg(feature = "lapack")]
 pub mod question;
 
