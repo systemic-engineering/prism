@@ -29,13 +29,13 @@ The old `kleinos` was a **join**: it bridged every vertex of one operand to ever
 
 `kleinos(a: &Party<R>, b: &Party<R>, spans: &[Span<R>]) -> Result<Pushout<R>, KleinosError>`.
 
-- **`Party`** is a set of frames, the relations among them and the faces it reports. It is never empty (`EmptyParty`), it names only its own frames (`UnknownFrame`), and it is canonical: frames by address, relations and faces by (address, signer), each once.
+- **`Party`** is a set of frames, the relations among them and the faces it reports. It may be empty: the empty party is the unit (L3). It names only its own frames (`UnknownFrame`), and it is canonical: frames by address, relations and faces by (address, signer), each once.
 - **The glue is a keyed union.**
   - Frames with one address are one frame (overlapping parties glue).
   - Every relation and every span is its own edge, keyed by its address. A span's key includes its full id, so k spans between two frames are k parallel edges, even with one reading and colliding labels.
   - Nothing else is added: no cone, no bridge.
 - **Refused, typed, never a panic:**
-  - a span to a frame neither party holds (`UnknownFrame`);
+  - a span to a frame neither party holds (`UnknownFrame`), so a span into the empty party is refused: a span needs a frame on each side;
   - one span id with two pairs of endpoints (`Collision`: a collision, not an edge), including against a span already inside a glued party;
   - one id, one pair of endpoints, two readings (`TwoReadings`);
   - anything `hypothesis::compose` refuses (`Composition`).
@@ -79,7 +79,7 @@ The old `kleinos` was a **join**: it bridged every vertex of one operand to ever
 - Dropping B→A: zero loops.
 - S3d: `aaaa0000…f` → `bbbb1111…0` and `aaaa0000…e` → `bbbb1111…1` share the label `aaaa0000bbbb1111`, yet they are two events, two edges and one bigon.
 
-**Refusals.** Every `KleinosError` variant, the two `GlError`s, and the idempotent duplicate.
+**Refusals.** Every `KleinosError` variant, the two `GlError`s, and the idempotent duplicate. A span into the empty party, from either side, is `UnknownFrame`.
 
 **λ₂.** For k = 1…5, with B→A read as I or as `not`: λ₂ = 2k (to 1e−9), and k − 1 loops.
 
@@ -89,7 +89,7 @@ The old `kleinos` was a **join**: it bridged every vertex of one operand to ever
 - **The laws as tested.**
   - **L1, associativity:** (a ⊔ b) ⊔ c and a ⊔ (b ⊔ c) give one address and one event set, both equal to the plain union.
   - **L2, commutativity:** a ⊔ b = b ⊔ a, third included.
-  - **L3, identity:** with no spans, the result is the union, with no third and no events. Identities are units for `Path::then`.
+  - **L3, the unit:** the empty party is the unit (the frames note's L3; `hypothesize`'s "empty input = unit"). ∅ ⊔ a = a = a ⊔ ∅: one address with the party alone, the same party and events, and no third, on a drawn party and on a glued one that carries spans. Alongside: with no spans, the result is the union, with no third and no events, and identities are units for `Path::then`.
   - **L4, sovereignty:** every relation and every edge is a's, b's or a span's. Every edge between a frame only a holds and a frame only b holds is a span.
   - **L5, the third:** |third| = b₁(pushout) − b₁(a ∪ b). Every loop is closed and is closed by a fresh span. commas = the loops with non-identity holonomy.
   - **L6, idempotence and no fusion:** a ⊔ a = a with no third. Events = distinct full ids, even under label collisions.
@@ -99,10 +99,10 @@ The old `kleinos` was a **join**: it bridged every vertex of one operand to ever
 - **Keying by the short label** (encoding the label instead of the full ids). Fails 4 tests: the S3d falsifier, λ₂, L1 and L6.
 - **Accepting a duplicate id with different endpoints.** Fails 2 tests: the collision test and the across-a-glued-party collision.
 - **Adding a cone edge nobody declared.** Fails 10 tests, including the main test and L1–L6.
+- **Refusing an empty party** (the old `EmptyParty`). Fails 2 tests: the L3 unit law and the span into the empty party.
 
 ## Open, for Mara and Alex
 
-- **L3 vs refusing an empty party.** The frames note's L3 makes the empty frame-graph the unit. This build refuses an empty party (per the build brief), so L3 is tested as "no spans ⇒ the union", not as "the empty party is the unit". The two are reconciled if an empty party is allowed and is the unit.
 - **The fusion-refusal *policy* (L6) is not implemented.** a ⊔ a = a is the law. The old join refused identical operands; the pushout doesn't.
 - **Faces are triangles only**, as in `hypothesis`. A party cannot report a filled bigon over two spans yet.
 - **Loops from overlap gluing** are in the composite, not the third (see above). Whether they belong to "the emergent third" is a reading for Mara.
