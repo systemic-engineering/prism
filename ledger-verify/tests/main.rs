@@ -9,6 +9,7 @@ mod common;
 
 mod anchor;
 mod checkpoint;
+mod commitment;
 mod merkle;
 mod note;
 mod quorum;

@@ -20,6 +20,7 @@ extern crate alloc;
 
 pub mod anchor;
 pub mod checkpoint;
+pub mod commitment;
 pub mod merkle;
 pub mod note;
 pub mod quorum;
