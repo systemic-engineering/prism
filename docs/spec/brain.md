@@ -26,8 +26,11 @@ So `Capacity` (with the ruler that orders eviction) is **kind 2**: it can't chan
   (completeness). *This is the tenant's obligation.* For mirror's parser it is Lemma G
   (deposits are the original naive ranks) together with a window-local re-run.
 - **A2 (faithful backend).** `Backend::fetch` returns the bytes `persist` was given.
-  *This is checked on every read.* `crystal()` rehashes what it reads back and returns
-  `Recall::Forged` on a mismatch.
+  *Integrity checked on every read; durability is the adapter's obligation.* Every
+  read through the port is `recall` (which `crystal()` uses on a cache miss): it
+  rehashes what it reads back and returns `Recall::Forged` on a mismatch, and
+  `Recall::Lost` when the bytes are gone, never `Ok` with other bytes. Integrity is
+  prism's to check; keeping the bytes is the adapter's to promise.
 - **A3 (blind tenant).** The tenant's control flow depends only on values returned by
   `deposit`, `contains`, `scan`, `commit`, `settle` and `crystal`. It never reads
   `stats()` or hot bytes. *This is the tenant's obligation.*
@@ -80,8 +83,9 @@ By induction on the calls. Initially K = H = ∅ and all counters are 0.
 - **`settle(bytes)`.** The address depends on the bytes alone (F6). The bytes are the
   tenant's, and by A3 and (iv) they are the same in both runs. Persisting, then evicting
   the cached copy, changes nothing a later `crystal()` returns, by A2 (checked).
-- **`crystal(a)`.** It returns the cached bytes, or the backend's bytes rehashed to a
-  (A2). These are identical whichever way they're obtained.
+- **`crystal(a)`.** It returns the cached bytes, or `recall(backend, scope, a)`: the
+  backend's bytes rehashed to a (A2). These are identical whichever way they're
+  obtained.
 
 So (iv) holds for every call, which is claim 1. Claim 2 follows from (iii), because
 `lums` reads only the counters. Claim 3 follows from the `settle` case. ∎
@@ -89,6 +93,31 @@ So (iv) holds for every call, which is claim 1. Claim 2 follows from (iii), beca
 **Why lums is right, not only equal.** By F3 the counters grow by exactly one per element
 added to K, and F1 and F2 never move them. So lums = |K at the committed tick|: evicted
 facts still count, and restored facts are never counted twice.
+
+## One port (prism-017 ask 7, prism-019)
+
+`Backend` is prism's one content-store port; `store::Store` is retired. What `Store`
+did that was real is done through `Backend` without changing the trait:
+
+- **`Store::put`** is `Backend::persist` of a `Crystal`. The address comes from the
+  bytes (F6), never from the adapter.
+- **`Store::get`** is `brain::recall(backend, scope, address)`: fetch, rehash, refuse.
+  It is a free function over any `Backend`, **not a trait method**, so no adapter can
+  override it and skip the rehash. `Brain::crystal` reads through it on a cache miss,
+  so there is one checked read, not two that could drift.
+- **`Store::has`** (luminosity) and the typed get (a `MerkleTree` back from an
+  address) had no caller outside their own test doubles, and are deleted. A presence
+  check that doesn't read the bytes would believe the adapter, which A2 forbids; the
+  checked form is `recall(..).is_ok()`.
+- **`merkle::diff`** was never a store capability. It stays in `merkle`, over trees.
+  A Merkle tree persists through the port as one crystal per node, whose canonical
+  bytes name its children by address, so a node's crystal address is its tree address.
+
+**Why the proof still holds.** The trait's methods are unchanged, so A2 still names
+the same obligation (`fetch` returns what `persist` was given), and `crystal(a)`
+returns exactly what it did before: `recall` is the same fetch-then-rehash, moved out
+of `Brain` so a read outside a brain is checked the same way. No step of the
+induction reads the backend except through `crystal`, so nothing else changes.
 
 ## Where it breaks: what each assumption costs
 
@@ -105,7 +134,7 @@ facts still count, and restored facts are never counted twice.
 
 ## The named tests that guard the proof
 
-| test (`prismqueer/tests/brain.rs`) | guards |
+| test (`prismqueer/tests/brain.rs`; `port::` is `tests/port.rs`) | guards |
 |---|---|
 | `threshold_independence_tiny_and_unbounded_give_the_same_light` | F1–F5 as implemented, end to end, with eviction proven to happen |
 | `warmer_never_truer_priority_and_threshold_never_change_the_light` | the ruler's freedom (any eviction order) |
@@ -114,6 +143,8 @@ facts still count, and restored facts are never counted twice.
 | `an_uncommitted_fact_is_never_evicted` | F1's open-tick clause |
 | `without_a_recompute_no_fact_is_ever_forgotten` | F1's no-recompute clause |
 | `a_backend_that_loses_or_forges_is_named_never_believed` | A2's check |
+| `port::a_backend_that_hands_back_other_bytes_is_forged_never_believed` | A2's check on `recall`, the read outside a brain |
+| `port::a_merkle_tree_persists_and_reads_back_through_the_port` | the one port: `Store`'s round trip, through `Backend` |
 
 **Status:** Capacity's verdict-neutrality is **proved relative to A1–A3**. A2 is checked on
 every read. A1 and A3 are the tenant's obligations, so a tenant that can't meet A1 keeps
