@@ -42,7 +42,11 @@ fn the_library_reads_no_clock() {
     rust_files(&src, &mut files);
     let mut reads = Vec::new();
     for file in &files {
-        let rel = file.strip_prefix(&src).unwrap().to_string_lossy().into_owned();
+        let rel = file
+            .strip_prefix(&src)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
         if ALLOWED.contains(&rel.as_str()) {
             continue;
         }
