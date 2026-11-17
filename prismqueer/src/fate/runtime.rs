@@ -463,6 +463,49 @@ mod tests {
         );
     }
 
+    /// The interpreter's cost, counted in BF steps rather than timed: every
+    /// transition of the cycle, with quiet and loud features, halts inside a
+    /// fixed budget. 100k steps is the deterministic form of the old "under
+    /// 1 ms per inference" (at most 10 ns a step).
+    #[test]
+    fn runtime_halts_within_its_step_budget() {
+        let rt = FateRuntime::new();
+        let mut loud = zero_features();
+        loud[0] = 20.0;
+        for features in [zero_features(), loud] {
+            for model in [
+                Model::Abyss,
+                Model::Introject,
+                Model::Cartographer,
+                Model::Explorer,
+                Model::Fate,
+            ] {
+                let steps = rt.steps(model, &features);
+                assert!(steps > 0, "{model:?}: the program ran no steps");
+                assert!(
+                    steps <= 100_000,
+                    "{model:?}: {steps} steps, over the 100k budget"
+                );
+            }
+        }
+    }
+
+    /// The compiled runtime's advantage, stated as structure: build.rs folds
+    /// fate.bf into at most half as many operations as it has instructions.
+    /// The wall-clock speedup is measured by `just bench` (benches/timing.rs).
+    #[test]
+    fn compiled_program_folds_to_at_most_half_the_instructions() {
+        let (instructions, operations) = (
+            crate::fate::compiled::FATE_BF_INSTRUCTIONS,
+            crate::fate::compiled::FATE_BF_OPERATIONS,
+        );
+        assert!(operations > 0, "the compiled program is empty");
+        assert!(
+            operations * 2 <= instructions,
+            "{instructions} instructions folded only to {operations} operations"
+        );
+    }
+
     #[test]
     fn runtime_matches_native_fate() {
         // The BF runtime should produce the same results as the native Rust Fate

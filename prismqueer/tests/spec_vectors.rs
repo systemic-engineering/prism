@@ -6,7 +6,9 @@
 //! behaviour ever drift apart.
 //!
 //! Regenerate after an intended change:
-//! `PRISM_SPEC_UPDATE=1 cargo test -p prismqueer --test spec_vectors`
+//! `PRISM_SPEC_UPDATE=1 cargo test --features lapack,fate --test suite spec_vectors::`.
+//! Update mode writes the file and then fails: review the diff, and re-run
+//! without the variable for the verdict.
 
 use serde_json::{json, Value};
 use terni::{Eh, Imperfect, Loss};
@@ -227,18 +229,60 @@ fn document() -> Value {
     })
 }
 
+/// What one run of the vectors test concludes.
+#[derive(Debug, PartialEq)]
+enum Vectors {
+    /// The committed file is what the crate generates.
+    Agree,
+    /// It isn't, and nothing was written.
+    Drifted,
+    /// Update mode wrote the file. Never a pass: a run must not check its
+    /// own output (docs/spec/checks.md, to-fix 6).
+    Rewritten,
+}
+
+/// The verdict, given whether update mode is on and the file as read back.
+fn judge(update: bool, committed: &str, generated: &str) -> Vectors {
+    let committed = if update { generated } else { committed };
+    if committed == generated {
+        Vectors::Agree
+    } else {
+        Vectors::Drifted
+    }
+}
+
+#[test]
+fn update_mode_never_reports_success() {
+    assert_eq!(judge(true, "old", "new"), Vectors::Rewritten);
+    assert_eq!(judge(true, "same", "same"), Vectors::Rewritten);
+}
+
+#[test]
+fn compare_mode_agrees_only_on_equal_vectors() {
+    assert_eq!(judge(false, "same", "same"), Vectors::Agree);
+    assert_eq!(judge(false, "old", "new"), Vectors::Drifted);
+}
+
 #[test]
 fn imperfect_vectors_match_the_crate() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../docs/spec/imperfect-vectors.json");
     let generated = serde_json::to_string_pretty(&document()).expect("json") + "\n";
-    if std::env::var("PRISM_SPEC_UPDATE").is_ok() {
+    let update = std::env::var("PRISM_SPEC_UPDATE").is_ok();
+    if update {
         std::fs::write(&path, &generated).expect("write vectors");
     }
     let committed =
         std::fs::read_to_string(&path).expect("docs/spec/imperfect-vectors.json must exist");
-    assert!(
-        committed == generated,
-        "vectors drifted from terni; regenerate with PRISM_SPEC_UPDATE=1"
-    );
+    match judge(update, &committed, &generated) {
+        Vectors::Agree => {}
+        Vectors::Drifted => panic!(
+            "vectors drifted from terni; regenerate with PRISM_SPEC_UPDATE=1, review the diff, \
+             and re-run without it"
+        ),
+        Vectors::Rewritten => panic!(
+            "vectors rewritten at {}; review the diff and re-run without PRISM_SPEC_UPDATE",
+            path.display()
+        ),
+    }
 }

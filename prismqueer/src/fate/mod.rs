@@ -1403,6 +1403,17 @@ mod tests {
     }
 
     #[test]
+    fn two_excited_instances_from_two_seeds_differ() {
+        let features = [1.0f64; FEATURE_DIM];
+        let a = Fate::excited(1).tick(&features);
+        let b = Fate::excited(2).tick(&features);
+        assert_ne!(
+            a.decision.distribution, b.decision.distribution,
+            "two seeds should explore different regions"
+        );
+    }
+
+    #[test]
     fn excited_produces_valid_fate() {
         let fate = Fate::excited();
         let features = [0.0f64; FEATURE_DIM];
