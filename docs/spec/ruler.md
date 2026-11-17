@@ -1,5 +1,7 @@
 # Ruler: the canonical ruler address, and the calibration beside it
 
+*Amended 2026-11-17 (Alex, 2026-11-16: "it matches"): **every value carries its domain of validity.** A calibration carries the region it was calibrated for, and combining instruments needs a signed independence relation.*
+
 *prism, 2026-11-16. **prism-Reed's lean; Alex has the final call** (prism-018 ask 1, prism-017 ask 5, prism-019 order item 2). The one ruler address for the whole stack, defined once, here. Test vectors: `ruler-vectors.json`, whose preimages are built by `ruler-vectors.py` from this text (not from prism), hashed with Python's `blake3` and recomputed with the `b3sum` CLI (1.8.7). `prismqueer/tests/ruler_vectors.rs` holds prism to them.*
 
 ## The law
@@ -52,17 +54,40 @@ Example, the first vector (`(1, ∞)`, max, α = β = 1/20, clock (10, 1, 100)):
 
 ## The calibration
 
-p₀ is the chance that a context certifies `In` when the tension isn't real, and p₁ the chance when it is: the instrument's operating characteristic (its d′ in signal-detection terms). That is measured, not judged. It lives in its own crystal:
+p₀ is the chance that a context certifies `In` when the tension isn't real, and p₁ the chance when it is: the instrument's operating characteristic (its d′ in signal-detection terms). That is measured, not judged, and a measurement holds where it was taken: p₀ and p₁ are the instrument's **for a region**. The calibration lives in its own crystal, its context (instrument and region) in its address:
 
 ```
-calibration_oid = BLAKE3-keyed(K_public, "calibration\0" ‖ bytes(instrument) ‖ rational(p₀) ‖ rational(p₁) ‖ bytes(method))
+calibration_oid = BLAKE3-keyed(K_public, "calibration\0" ‖ bytes(instrument) ‖ region ‖ rational(p₀) ‖ rational(p₁) ‖ bytes(method))
 ```
 
-- `instrument` is the instrument's address as its UTF-8 string; `method` is how the calibration was measured, UTF-8.
-- It is valid when `0 < p₀ < p₁ < 1`. The ruler's own validity is `0 < α, β < 1` and `α + β < 1`.
+- `instrument` is the instrument's address as its UTF-8 string; `region` is encoded as in a ruler; `method` is how the calibration was measured, UTF-8.
+- One instrument calibrated for two regions is two calibrations, with two addresses.
+- It is valid when `0 < p₀ < p₁ < 1` and its region is non-empty. The ruler's own validity is `0 < α, β < 1` and `α + β < 1`.
 - Its address is its own. It is never folded into the ruler's.
 
-**Persistence reads both.** `persist(evidence, ruler, calibration)` runs Wald's test with the ruler's α, β and the calibration's p₀, p₁, over the decisions the calibration's instrument made under the ruler. Its verdict carries the ruler's address and the calibration's side by side, so a reader knows which calibration the verdict depended on. Decisions (T1 crossings) depend on the region only and don't carry a calibration.
+**Persistence reads both, and refuses a mismatch.** `persist(evidence, ruler, calibration)` runs Wald's test with the ruler's α, β and the calibration's p₀, p₁, over the decisions the calibration's instrument made under the ruler.
+
+- A calibration whose region isn't the ruler's region is **refused**, naming both addresses and both regions. It is never silently used.
+- Its verdict carries the ruler's address and the calibration's side by side, so a reader knows which calibration the verdict depended on.
+- Decisions (T1 crossings) depend on the region only and don't carry a calibration.
+
+## Independence: the only way to combine instruments
+
+By default there is **one verdict per instrument**: a calibration speaks for its own instrument's decisions and no other's. Two instruments' evidence combines only under a signed judgment that their errors are independent in a region, sealed like a ruler (no default, the signer beside the address):
+
+```
+independence_oid = BLAKE3-keyed(K_public, "independence\0" ‖ u64le(n) ‖ bytes(instrument₁) ‖ … ‖ bytes(instrumentₙ) ‖ region)
+```
+
+- The instruments are distinct, at least two, sorted ascending by their UTF-8 bytes; `n` is how many.
+- Independence is a judgment, so it is signed. It holds in its region, like everything else here.
+
+**Combined persistence.** `persist_jointly(evidence, ruler, calibrations, independence)` multiplies the instruments' likelihood ratios: `Λ = ∏ᵢ (p₁ᵢ/p₀ᵢ)^kᵢ · ((1−p₁ᵢ)/(1−p₀ᵢ))^mᵢ`, each instrument's `kᵢ` Ins and `mᵢ` Outs read under its own calibration, against the ruler's boundaries. It is refused when:
+
+- a calibration's region, or the independence's, isn't the ruler's region;
+- the calibrations' instruments aren't exactly the instruments the independence declares, each once.
+
+Its verdict names every calibration it read and the independence relation it used.
 
 ## mirror's `rust/ruler`
 
@@ -74,7 +99,8 @@ mirror's `rust/ruler` (on `reed/ship`) also hashes under `"ruler\0"`, but it is 
 
 - `k_public`, as in `identity-vectors.json`;
 - `rulers`: four judgments covering every edge kind, all four questions (one per case), a negative edge, a zero edge, a numerator wider than 64 bits and a delay of `2⁶⁴ − 1`; each with its `preimage_hex` and `address`;
-- `calibrations`: one instrument calibrated twice (two addresses, same rulers), and a multi-byte method with an empty instrument.
+- `calibrations`: one instrument calibrated twice for one region (two addresses, same rulers), the same instrument and rates calibrated for a second region (a third address), and a multi-byte method with an empty instrument;
+- `independences`: two instruments over `(1, ∞)`, given out of order (the encoding sorts them), and three instruments, one of them multi-byte, over a closed region.
 
 Rationals are written `"n/d"` (or `"n"`), reduced. To recompute an address with the CLI:
 
