@@ -153,6 +153,11 @@ pub mod gl;
 #[cfg(feature = "lapack")]
 pub mod hypothesis;
 
+// kleinos: two parties' frames glued along declared spans, a pushout
+// (prism-021 D4; Mara 34f70d6d). The old join lives at `spectral::join`.
+#[cfg(feature = "lapack")]
+pub mod kleinos;
+
 #[cfg(feature = "lapack")]
 pub mod question;
 

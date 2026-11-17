@@ -96,6 +96,7 @@ use terni::Imperfect;
 use crate::algedonic::Signer;
 use crate::field::{check_flat, Edge, Field, FieldError, Flatness, Graph, Loop};
 use crate::gl::{Gl, Scalar};
+use crate::kleinos::SpanId;
 use crate::oid::{Oid, Scope};
 use crate::room::{Coefficient, Z};
 use crate::spectral::join::VertexId;
@@ -148,6 +149,7 @@ pub struct RelationDraft<R: Scalar> {
     from: Oid,
     to: Oid,
     transport: Gl<R>,
+    span: Option<SpanId>,
 }
 
 impl<R: Scalar> RelationDraft<R> {
@@ -157,16 +159,35 @@ impl<R: Scalar> RelationDraft<R> {
             from,
             to,
             transport,
+            span: None,
         }
     }
 
-    /// Its address: `"relation\0" ‖ bytes(from) ‖ bytes(to) ‖ transport`.
-    /// The signer is never in it.
+    /// A relation witnessed by an event: span `span` read at `to` as
+    /// `transport` · what `from` sent ([`kleinos`](crate::kleinos)). Two
+    /// spans with one reading between one pair of frames are two relations.
+    pub fn along(span: SpanId, from: Oid, to: Oid, transport: Gl<R>) -> Self {
+        RelationDraft {
+            from,
+            to,
+            transport,
+            span: Some(span),
+        }
+    }
+
+    /// Its address: `"relation\0" ‖ bytes(from) ‖ bytes(to) ‖ transport`,
+    /// then, for a span's, `"span\0" ‖ bytes(emit) ‖ bytes(receive)` (full
+    /// hashes; the transport is self-delimiting, so the two forms never
+    /// share a preimage). The signer is never in it.
     pub fn oid(&self) -> Oid {
         let mut bytes = b"relation\0".to_vec();
         delimited(&mut bytes, self.from.as_str().as_bytes());
         delimited(&mut bytes, self.to.as_str().as_bytes());
         self.transport.encode(&mut bytes);
+        if let Some(span) = &self.span {
+            bytes.extend_from_slice(b"span\0");
+            span.encode(&mut bytes);
+        }
         Oid::hash(&Scope::public(), &bytes)
     }
 
@@ -212,6 +233,11 @@ impl<R: Scalar> Relation<R> {
     /// The transport.
     pub fn transport(&self) -> &Gl<R> {
         &self.draft.transport
+    }
+
+    /// The span that witnesses it, if it is a span's.
+    pub fn span(&self) -> Option<&SpanId> {
+        self.draft.span.as_ref()
     }
 }
 

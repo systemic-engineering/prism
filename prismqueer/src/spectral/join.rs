@@ -7,7 +7,7 @@
 //! Its strict Fiedler rise is fixed by the graph sizes and certifies faster
 //! *averaging*, not composition (Mara 54c88f72 §6.2; decided as D4, mirror
 //! STATE #77–#78). The lawful kleinos is the pushout along declared spans,
-//! `prismqueer::kleinos`. This join stays, under its own name, only because
+//! [`crate::kleinos`]. This join stays, under its own name, only because
 //! [`infer_via_rotation`](crate::spectral::infer_via_rotation) runs Kuramoto
 //! on it; nothing new should build on it.
 //!

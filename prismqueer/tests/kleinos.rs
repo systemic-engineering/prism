@@ -538,6 +538,11 @@ fn draw_spans(
             continue;
         };
         last = Some(receive);
+        // An id drawn for another pair of parties would name frames these
+        // two don't hold: skip it (one id stays one span everywhere).
+        if seen.contains_key(&id) && !spans.iter().any(|s: &Span<Z>| s.id() == &id) {
+            continue;
+        }
         let s = seen.entry(id.clone()).or_insert_with(|| {
             let (u, v) = (&from[mix.below(from.len())], &to[mix.below(to.len())]);
             let forward = mix.below(2) == 0;
