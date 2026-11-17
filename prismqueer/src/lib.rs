@@ -111,6 +111,10 @@ pub mod discoball;
 // isolated by Sturm sequences. No floats, no LAPACK.
 pub mod poly;
 
+// S3*, the sampled audit of a verdict cache: exact hypergeometric miss
+// probabilities and rate bounds (docs/spec/audit.md). No floats, no LAPACK.
+pub mod audit;
+
 #[cfg(feature = "lapack")]
 pub mod music;
 
