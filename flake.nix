@@ -263,7 +263,15 @@
               gate
               // {
                 cargoArtifacts = coverageDeps;
-                cargoLlvmCovExtraArgs = "--fail-under-lines ${coverageFloor} --lcov --output-path $out";
+                # --remap-path-prefix: rustc maps the workspace root (the
+                # per-build directory) to "" in the workspace crates only
+                # (cargo-llvm-cov's wrapper; dependencies keep their flags, so
+                # coverageDeps still serves), and the SF: paths come out
+                # repo-relative. llvm-cov's -path-equivalence would not do:
+                # it locates sources, the exported SF: names stay absolute.
+                # Relative, the build script's out/ under target/ slips past
+                # cargo-llvm-cov's own target-dir filter; ^target/ keeps it out.
+                cargoLlvmCovExtraArgs = "--remap-path-prefix --ignore-filename-regex ^target/ --fail-under-lines ${coverageFloor} --lcov --output-path $out";
                 # The output is checked, not just produced: every SF: path
                 # repo-relative, so a rebuild gives the same bytes.
                 doInstallCheck = true;
@@ -272,16 +280,18 @@
             );
 
             # The guard itself: it must reject an absolute or build-directory
-            # SF: path and an lcov with none, and accept relative ones.
+            # SF: path, a file under target/ (generated, not source), and an
+            # lcov with none, and accept relative ones.
             lcov-paths = pkgs.runCommand "prism-lcov-paths" { } ''
               guard=${./nix/lcov-paths.sh}
               printf 'SF:prismqueer/src/lib.rs\nDA:1,1\nend_of_record\n' > good
               printf 'SF:/nix/var/nix/builds/nix-1-0/source/prismqueer/src/lib.rs\nend_of_record\n' > build
               printf 'SF:/build/source/prismqueer/src/lib.rs\nend_of_record\n' > absolute
               printf 'SF:prismqueer/src/lib.rs\nSF:x/nix/var/nix/builds/y.rs\n' > embedded
+              printf 'SF:prismqueer/src/lib.rs\nSF:target/llvm-cov-target/debug/build/p-0/out/gen.rs\n' > generated
               printf 'DA:1,1\n' > empty
               bash $guard good
-              for f in build absolute embedded empty; do
+              for f in build absolute embedded generated empty; do
                 if bash $guard $f 2>/dev/null; then echo "lcov-paths accepted $f" >&2; exit 1; fi
               done
               touch $out
