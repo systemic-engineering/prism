@@ -115,8 +115,6 @@ pub enum KleinosError {
     NotACommit(String),
     /// A span from a commit to itself: an identity, not an event.
     SameCommit(Commit),
-    /// A party with no frames holds no event.
-    EmptyParty,
     /// A relation, face or span names a frame no party holds.
     UnknownFrame(Oid),
     /// One span id between two different pairs of frames: a collision, not
@@ -321,7 +319,8 @@ impl<R: Scalar> Span<R> {
 // --- Parties ----------------------------------------------------------------------------
 
 /// A party: frames, the relations among them, and the faces it reports.
-/// Never empty, and it names only its own frames. Canonical: frames by
+/// It names only its own frames; the empty party is the unit of
+/// [`kleinos`] (L3). Canonical: frames by
 /// address, relations and faces by address and signer, each once.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Party<R: Scalar> {
@@ -331,16 +330,13 @@ pub struct Party<R: Scalar> {
 }
 
 impl<R: Scalar> Party<R> {
-    /// The party with these frames, relations and faces, if it holds a
-    /// frame and every relation and face stays inside its frames.
+    /// The party with these frames, relations and faces, if every relation
+    /// and face stays inside its frames. No frames is the empty party.
     pub fn new(
         frames: Vec<Frame>,
         relations: Vec<Relation<R>>,
         faces: Vec<Face>,
     ) -> Result<Self, KleinosError> {
-        if frames.is_empty() {
-            return Err(KleinosError::EmptyParty);
-        }
         let held: BTreeSet<&Oid> = frames.iter().map(Frame::oid).collect();
         let named = relations
             .iter()
