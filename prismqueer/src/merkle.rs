@@ -100,11 +100,8 @@ pub fn diff<M: MerkleTree>(a: &M, b: &M) -> Vec<Delta> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::luminosity::Luminosity;
+    use crate::brain::{recall, Backend, Crystal, Memory, Recall};
     use crate::oid::Scope;
-    use crate::store::Store;
-    use std::collections::HashMap;
-    use terni::{Imperfect, Loss};
 
     // A simple test tree
     #[derive(Clone, Debug, PartialEq)]
@@ -115,11 +112,7 @@ mod tests {
 
     impl Addressable for TestNode {
         fn oid(&self) -> Oid {
-            let mut content = self.name.clone();
-            for child in &self.children {
-                content.push_str(&format!(":{}", child.oid()));
-            }
-            Oid::hash(&Scope::public(), content.as_bytes())
+            Oid::hash(&Scope::public(), &canonical(self))
         }
     }
 
@@ -314,105 +307,55 @@ mod tests {
         assert!(d.is_empty());
     }
 
-    // --- Store typed over MerkleTree ---
+    // --- Persisted through the one port (brain::Backend) ---
+    //
+    // A node's canonical bytes are what its address hashes, so a node
+    // settles as a crystal at its tree address. Reads are brain::recall:
+    // checked, never believed.
 
-    #[derive(Debug, Clone, Default, PartialEq)]
-    struct TestLoss(u32);
-
-    impl Loss for TestLoss {
-        fn zero() -> Self {
-            TestLoss(0)
+    fn canonical(node: &TestNode) -> Vec<u8> {
+        let mut content = node.name.clone();
+        for child in &node.children {
+            content.push_str(&format!(":{}", child.oid()));
         }
-        fn total() -> Self {
-            TestLoss(u32::MAX)
-        }
-        fn is_zero(&self) -> bool {
-            self.0 == 0
-        }
-        fn combine(self, other: Self) -> Self {
-            TestLoss(self.0 + other.0)
-        }
+        content.into_bytes()
     }
 
-    struct MemStore {
-        data: HashMap<Oid, TestNode>,
-    }
-
-    impl Store for MemStore {
-        type Tree = TestNode;
-        type Error = String;
-        type L = TestLoss;
-
-        fn get(&self, oid: &Oid) -> Imperfect<TestNode, String, TestLoss> {
-            match self.data.get(oid) {
-                Some(node) => Imperfect::Success(node.clone()),
-                None => Imperfect::Failure("not found".into(), TestLoss::zero()),
-            }
+    fn persist(node: &TestNode, backend: &mut Memory) -> Oid {
+        for child in &node.children {
+            persist(child, backend);
         }
-
-        fn put(&mut self, tree: TestNode) -> Imperfect<Oid, String, TestLoss> {
-            let oid = tree.oid();
-            self.data.insert(oid.clone(), tree);
-            Imperfect::Success(oid)
-        }
-
-        fn has(&self, oid: &Oid) -> Imperfect<Luminosity, String, TestLoss> {
-            if self.data.contains_key(oid) {
-                Imperfect::Success(Luminosity::Light)
-            } else {
-                Imperfect::Success(Luminosity::Dark)
-            }
-        }
+        let crystal = Crystal::settle(&Scope::public(), canonical(node));
+        let Ok(()) = backend.persist(&crystal);
+        crystal.address().clone()
     }
 
     #[test]
-    fn store_put_get_roundtrip() {
-        let mut store = MemStore {
-            data: HashMap::new(),
-        };
+    fn a_node_persists_at_its_tree_address() {
+        let mut backend = Memory::default();
         let node = TestNode {
             name: "hello".into(),
             children: vec![],
         };
-        let oid = store.put(node.clone()).ok().unwrap();
-        let got = store.get(&oid).ok().unwrap();
-        assert_eq!(got, node);
+        let oid = persist(&node, &mut backend);
+        assert_eq!(oid, node.oid());
+        let got = recall(&backend, &Scope::public(), &oid).unwrap();
+        assert_eq!(got.bytes(), canonical(&node).as_slice());
     }
 
     #[test]
-    fn store_get_missing_is_failure() {
-        let store = MemStore {
-            data: HashMap::new(),
-        };
-        let result = store.get(&Oid::hash(&Scope::public(), b"nonexistent"));
-        assert!(result.is_err());
+    fn an_address_never_persisted_is_lost() {
+        let backend = Memory::default();
+        let never = Oid::hash(&Scope::public(), b"nonexistent");
+        assert_eq!(
+            recall(&backend, &Scope::public(), &never),
+            Err(Recall::Lost(never))
+        );
     }
 
     #[test]
-    fn store_has_returns_luminosity() {
-        let mut store = MemStore {
-            data: HashMap::new(),
-        };
-        let node = TestNode {
-            name: "test".into(),
-            children: vec![],
-        };
-        let oid = node.oid();
-
-        let before = store.has(&oid);
-        assert_eq!(before.ok(), Some(Luminosity::Dark));
-
-        let _ = store.put(node);
-
-        let after = store.has(&oid);
-        assert_eq!(after.ok(), Some(Luminosity::Light));
-    }
-
-    #[test]
-    fn store_put_tree_with_children() {
-        let mut store = MemStore {
-            data: HashMap::new(),
-        };
+    fn a_tree_with_children_persists_node_by_node() {
+        let mut backend = Memory::default();
         let tree = TestNode {
             name: "root".into(),
             children: vec![
@@ -426,9 +369,11 @@ mod tests {
                 },
             ],
         };
-        let oid = store.put(tree.clone()).ok().unwrap();
-        let got = store.get(&oid).ok().unwrap();
-        assert_eq!(got.degree(), 2);
-        assert_eq!(got, tree);
+        let oid = persist(&tree, &mut backend);
+        assert_eq!(oid, tree.oid());
+        assert_eq!(backend.len(), 3);
+        for node in [&tree, &tree.children[0], &tree.children[1]] {
+            assert!(recall(&backend, &Scope::public(), &node.oid()).is_ok());
+        }
     }
 }
