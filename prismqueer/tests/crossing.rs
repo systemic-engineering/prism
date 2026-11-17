@@ -95,7 +95,11 @@ fn a_replay_that_disagrees_is_not_a_proof() {
 fn a_proof_of_another_value_is_refused() {
     let (edge, _) = edge();
     assert_eq!(
-        Claim::new(oid("elsewhere"), Some(edge), [attest(&oid("elsewhere"), oid("o"))]),
+        Claim::new(
+            oid("elsewhere"),
+            Some(edge),
+            [attest(&oid("elsewhere"), oid("o"))]
+        ),
         Err(Refusal::Elsewhere),
     );
 }
@@ -103,7 +107,11 @@ fn a_proof_of_another_value_is_refused() {
 #[test]
 fn several_signers_are_all_kept() {
     let v = oid("v");
-    let seals = [attest(&v, oid("ana")), attest(&v, oid("bo")), attest(&v, oid("cy"))];
+    let seals = [
+        attest(&v, oid("ana")),
+        attest(&v, oid("bo")),
+        attest(&v, oid("cy")),
+    ];
     let claim = Claim::new(v, None, seals.clone()).expect("sealed");
     assert_eq!(claim.seals().len(), 3);
     for seal in &seals {
@@ -114,8 +122,12 @@ fn several_signers_are_all_kept() {
 #[test]
 fn one_signer_twice_over_one_address_is_one_seal() {
     let v = oid("v");
-    let claim = Claim::new(v.clone(), None, [attest(&v, oid("ana")), attest(&v, oid("ana"))])
-        .expect("sealed");
+    let claim = Claim::new(
+        v.clone(),
+        None,
+        [attest(&v, oid("ana")), attest(&v, oid("ana"))],
+    )
+    .expect("sealed");
     assert_eq!(claim.seals().len(), 1, "a union is idempotent");
 }
 
@@ -130,9 +142,17 @@ fn a_trigger_rulers_signer_joins_as_it_is() {
     )
     .seal(oid("ana"));
     let v = oid("v");
-    let claim = Claim::new(v.clone(), None, [trigger.signer().clone(), attest(&v, oid("ana"))])
-        .expect("sealed");
-    assert_eq!(claim.seals().len(), 2, "one signer over two addresses: two seals");
+    let claim = Claim::new(
+        v.clone(),
+        None,
+        [trigger.signer().clone(), attest(&v, oid("ana"))],
+    )
+    .expect("sealed");
+    assert_eq!(
+        claim.seals().len(),
+        2,
+        "one signer over two addresses: two seals"
+    );
     assert!(claim.seals().contains(trigger.signer()));
     assert!(claim
         .seals()

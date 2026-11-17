@@ -129,8 +129,9 @@ impl Edge {
     /// Replay `law` on `input`'s bytes; an edge to `output` if the result is
     /// `output`'s bytes, refused otherwise. The only way to an edge.
     pub fn replay(law: &impl Law, input: &Crystal, output: &Crystal) -> Result<Self, NotAProof> {
-        // 🔴 stub: no replay, so every edge is a proof.
-        let _ = law.apply(input.bytes());
+        if law.apply(input.bytes()) != output.bytes() {
+            return Err(NotAProof);
+        }
         Ok(Edge {
             from: input.address().clone(),
             via: law.oid(),
@@ -204,9 +205,13 @@ impl Claim {
         proof: Option<Edge>,
         seals: impl IntoIterator<Item = Signer>,
     ) -> Result<Self, Refusal> {
-        // 🔴 stub: refuses nothing and keeps no seal.
-        let _ = seals.into_iter().count();
-        let seals: BTreeSet<Signer> = BTreeSet::new();
+        let seals: BTreeSet<Signer> = seals.into_iter().collect();
+        if proof.is_none() && seals.is_empty() {
+            return Err(Refusal::Anonymous);
+        }
+        if proof.as_ref().is_some_and(|edge| edge.to != value) {
+            return Err(Refusal::Elsewhere);
+        }
         Ok(Claim {
             value,
             proof,
@@ -231,7 +236,10 @@ impl Claim {
 
     /// The claim's shape.
     pub fn grade(&self) -> Grade {
-        // 🔴 stub: every claim reads as a law.
-        Grade::Law
+        match (&self.proof, self.seals.is_empty()) {
+            (Some(_), true) => Grade::Law,
+            (Some(_), false) => Grade::Measured,
+            (None, _) => Grade::Sealed,
+        }
     }
 }
