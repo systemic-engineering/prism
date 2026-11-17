@@ -113,6 +113,33 @@
 //! Not here yet: keyed private scopes (and so erasure, and purge), and
 //! windowed input.
 //!
+//! # One port
+//!
+//! [`Backend`] is prism's one content-store port (prism-017 ask 7,
+//! prism-019): it is the port with a proof (`docs/spec/brain.md`).
+//! `store::Store` is retired. A read by address outside a [`Brain`] is
+//! [`recall`], which checks integrity the same way [`Brain::crystal`] does.
+//! The control compiles: the port resolves, and bounds an adapter.
+//!
+//! ```
+//! use prismqueer::brain::Backend as Port;
+//! fn adapter<P: Port>(_: &P) {}
+//! ```
+//!
+//! The retired trait doesn't resolve:
+//!
+//! ```compile_fail,E0432
+//! use prismqueer::store::Store as Port;
+//! fn adapter<P: Port>(_: &P) {}
+//! ```
+//!
+//! nor does its re-export:
+//!
+//! ```compile_fail,E0432
+//! use prismqueer::Store as Port;
+//! fn adapter<P: Port>(_: &P) {}
+//! ```
+//!
 //! # Crystals are immutable
 //!
 //! The control compiles: a crystal's bytes and address can be read.
