@@ -1,0 +1,35 @@
+[package]
+name = "ledger-verify"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Verify-only checks for prism's ledger: RFC 9162 Merkle proofs, hybrid (Ed25519 AND ML-DSA-44) checkpoints, an SLH-DSA anchor, and the witness quorum. no_std, no keys."
+repository = "https://github.com/systemic-engineering/prism"
+publish = false
+
+# One integration-test binary (tests/main.rs), as prismqueer does.
+autotests = false
+
+[[test]]
+name = "main"
+path = "tests/main.rs"
+
+# Verify only: every dependency without default features, so no OS RNG, no
+# std, no key generation is linked into the library.
+[dependencies]
+sha2 = { version = "0.11.1", default-features = false }
+base64ct = { version = "1.8.3", default-features = false, features = ["alloc"] }
+ed25519-dalek = { version = "3.0.0", default-features = false }
+ml-dsa = { version = "0.1.2", default-features = false }
+# slh-dsa has no stable release on the signature-3 / sha2-0.11 line yet:
+# 0.1.0 (2024-08-18, FIPS 205 final) sits on signature 2 / sha2 0.10 and a
+# hybrid-array release candidate. Pinned exactly; see docs/spec/ledger.md.
+slh-dsa = { version = "=0.2.0-rc.5", default-features = false }
+
+# Tests only: throwaway keypairs from fixed seeds. The library never sees a
+# private key.
+[dev-dependencies]
+ed25519-dalek = { version = "3.0.0" }
+ml-dsa = { version = "0.1.2" }
+slh-dsa = { version = "=0.2.0-rc.5" }
+serde_json = "1"
