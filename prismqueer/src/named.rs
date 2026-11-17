@@ -238,21 +238,6 @@ mod tests {
         assert_eq!(format!("{}", Simple), "@test/simple");
     }
 
-    #[test]
-    fn benchmark_derive_prism_hash() {
-        // Warm up
-        let _ = Simple.oid();
-
-        let start = std::time::Instant::now();
-        for _ in 0..1_000 {
-            let _ = Simple.oid();
-        }
-        let elapsed = start.elapsed();
-        eprintln!("--- derive(Prism) oid: 1k calls in {:?} ---", elapsed);
-        // Each call runs one keyed BLAKE3 over the name (scoped identity).
-        // No LazyLock in the derive — each call recomputes the hash.
-    }
-
     // -----------------------------------------------------------------------
     // Optic field annotation tests
     // -----------------------------------------------------------------------

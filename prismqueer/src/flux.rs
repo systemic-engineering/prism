@@ -56,8 +56,6 @@
 // is sufficient for the trait-solver to reach `act_on` via the supertrait chain.
 use crate::bundle::Transport;
 use sha2::{Digest, Sha256};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 use terni::{Diagnostic, Loss, Metric, PropertyVerdict};
 
 // ──────────────────────────────────────────────────────────────────
@@ -399,8 +397,6 @@ pub mod pillar {
     // tests. All state paths are admitted by pillar::forall verdicts.
     // ─────────────────────────────────────────────────────────────────
 
-    static SAMPLE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
     /// SplitMix64 — deterministic 64-bit PRNG for on-demand buffer
     /// extension. Zero-deps; standard splitmix64 constants from
     /// Steele-Lea-Flood 2014 "Fast Splittable Pseudorandom Number
@@ -417,8 +413,8 @@ pub mod pillar {
     ///
     /// The buffer IS the trace of decisions the property test made.
     /// `Sample::from_bytes(bytes)` replays those decisions byte-for-
-    /// byte; `Sample::new()` seeds fresh from time+counter for random
-    /// exploration; both extend the buffer via SplitMix64 when a draw
+    /// byte; `Sample::new(seed)` starts empty and draws a stream fixed
+    /// by the caller's seed; both extend the buffer via SplitMix64 when a draw
     /// exceeds the current buffer.
     ///
     /// Two Samples with byte-equal buffers produce byte-equal draws
@@ -430,8 +426,8 @@ pub mod pillar {
         buffer: Vec<u8>,
         position: usize,
         /// Seed for SplitMix64 extension when position exceeds buffer.
-        /// Derived from initial buffer hash (`from_bytes`) or from
-        /// time+counter (`new`). Persists across draws so extension
+        /// Derived from the initial buffer's hash (`from_bytes`) or the
+        /// caller's seed (`new`). Persists across draws so extension
         /// is deterministic-per-Sample.
         seed: u64,
         /// Optional Fate bias distribution (composition seam for
@@ -442,16 +438,17 @@ pub mod pillar {
     }
 
     impl Sample {
-        /// Fresh Sample seeded from time+counter. Non-deterministic
-        /// across process runs (by design — random exploration). Use
-        /// [`Sample::from_bytes`] for deterministic replay.
-        pub fn new() -> Self {
-            let counter = SAMPLE_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos() as u64)
-                .unwrap_or(0);
-            let seed = splitmix64(time.wrapping_add(counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        /// A fresh, empty Sample whose draws are a stream fixed by
+        /// `seed`: the same seed gives the same draws in every process.
+        /// The library reads no clock, so fresh entropy for exploration
+        /// is the caller's to supply (a test passes its own name). Use
+        /// [`Sample::from_bytes`] to replay a recorded choice sequence.
+        pub fn new(seed: &[u8]) -> Self {
+            let mut hasher = Sha256::new();
+            hasher.update(b"prismqueer::flux::pillar::Sample::new");
+            hasher.update(seed);
+            let hash = hasher.finalize();
+            let seed = u64::from_le_bytes(hash[0..8].try_into().unwrap());
             Self {
                 buffer: Vec::new(),
                 position: 0,
@@ -556,12 +553,6 @@ pub mod pillar {
             assert!(!choices.is_empty(), "draw_from requires non-empty choices");
             let idx = self.draw_integer(0, (choices.len() - 1) as i64) as usize;
             choices[idx]
-        }
-    }
-
-    impl Default for Sample {
-        fn default() -> Self {
-            Self::new()
         }
     }
 

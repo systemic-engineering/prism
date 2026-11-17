@@ -75,3 +75,9 @@ path = "tests/main.rs"
 [[bench]]
 name = "beam_pipeline"
 harness = false
+
+# Wall-clock claims moved out of the gate (docs/spec/checks.md, to-fix 3, 4, 7).
+[[bench]]
+name = "timing"
+harness = false
+required-features = ["fate"]

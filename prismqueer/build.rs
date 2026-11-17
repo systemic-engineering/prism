@@ -341,6 +341,15 @@ fn main() {
             let rust_code = codegen(&name, &optimized);
             generated.push_str(&rust_code);
             generated.push('\n');
+            // The fold, as data: tests state the compiled runtime's
+            // advantage as op counts, not wall time.
+            let konst = name.replace('-', "_").to_uppercase();
+            generated.push_str(&format!(
+                "/// BF instructions in `{name}.bf`.\n\
+                 pub const {konst}_BF_INSTRUCTIONS: usize = {original_count};\n\
+                 /// Operations after build.rs folds them.\n\
+                 pub const {konst}_BF_OPERATIONS: usize = {optimized_count};\n\n"
+            ));
 
             eprintln!(
                 "  fate build.rs: {} — {} instructions -> {} optimized operations",

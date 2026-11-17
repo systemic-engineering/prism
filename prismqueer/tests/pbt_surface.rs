@@ -23,7 +23,7 @@ use terni::PropertyVerdict;
 
 #[test]
 fn sample_new_starts_at_position_zero() {
-    let s = Sample::new();
+    let s = Sample::new(b"sample_new_starts_at_position_zero");
     assert_eq!(s.depth(), 0);
 }
 
@@ -53,8 +53,14 @@ fn sample_draw_integer_covers_full_range_across_samples() {
     // Draw many values; verify we see both low and high half of range.
     let mut low_count = 0;
     let mut high_count = 0;
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"sample_draw_integer_covers_full_range_across_samples".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         let v = s.draw_integer(0, 100);
         if v < 50 {
             low_count += 1;
@@ -90,8 +96,14 @@ fn sample_extends_buffer_when_exhausted() {
 fn sample_draw_bool_produces_both_values() {
     let mut trues = 0;
     let mut falses = 0;
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"sample_draw_bool_produces_both_values".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         if s.draw_bool() {
             trues += 1;
         } else {
@@ -106,8 +118,14 @@ fn sample_draw_bool_produces_both_values() {
 #[test]
 fn sample_draw_from_returns_element_from_choices() {
     let choices = [10i32, 20, 30, 40, 50];
-    for _ in 0..50 {
-        let mut s = Sample::new();
+    for i in 0u32..50 {
+        let mut s = Sample::new(
+            &[
+                b"sample_draw_from_returns_element_from_choices".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         let v = s.draw_from(&choices);
         assert!(
             choices.contains(&v),
@@ -120,8 +138,14 @@ fn sample_draw_from_returns_element_from_choices() {
 fn sample_draw_from_covers_all_choices() {
     let choices = [1i32, 2, 3, 4];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"sample_draw_from_covers_all_choices".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         seen.insert(s.draw_from(&choices));
     }
     assert_eq!(seen.len(), 4, "expected to see all 4 choices, saw {seen:?}");
@@ -150,8 +174,14 @@ fn sample_buffer_oid_content_addresses_the_buffer() {
 fn arbitrary_i32_generates_full_range() {
     let mut positives = 0;
     let mut negatives = 0;
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"arbitrary_i32_generates_full_range".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         let v = i32::arbitrary(&mut s);
         if v > 0 {
             positives += 1;
@@ -168,8 +198,14 @@ fn arbitrary_i32_generates_full_range() {
 fn arbitrary_bool_generates_both_values() {
     let mut trues = 0;
     let mut falses = 0;
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"arbitrary_bool_generates_both_values".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         if bool::arbitrary(&mut s) {
             trues += 1;
         } else {
@@ -183,8 +219,14 @@ fn arbitrary_bool_generates_both_values() {
 fn arbitrary_u64_generates_full_range() {
     let mut small = 0;
     let mut large = 0;
-    for _ in 0..200 {
-        let mut s = Sample::new();
+    for i in 0u32..200 {
+        let mut s = Sample::new(
+            &[
+                b"arbitrary_u64_generates_full_range".as_slice(),
+                &i.to_le_bytes(),
+            ]
+            .concat(),
+        );
         let v = u64::arbitrary(&mut s);
         if v < u64::MAX / 2 {
             small += 1;

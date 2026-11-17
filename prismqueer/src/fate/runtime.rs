@@ -16,8 +16,8 @@ use crate::{Beam, Optic, Prism as PrismTrait};
 // ---------------------------------------------------------------------------
 
 /// Execute a Brainfuck program with given input bytes.
-/// Returns the output bytes.
-fn bf_execute(program: &[u8], input: &[u8]) -> Vec<u8> {
+/// Returns the output bytes and the number of steps executed.
+fn bf_execute(program: &[u8], input: &[u8]) -> (Vec<u8>, usize) {
     let mut tape = vec![0u8; 256];
     let mut dp: usize = 0; // data pointer
     let mut ip: usize = 0; // instruction pointer
@@ -72,7 +72,7 @@ fn bf_execute(program: &[u8], input: &[u8]) -> Vec<u8> {
         steps += 1;
     }
 
-    output
+    (output, steps)
 }
 
 // ---------------------------------------------------------------------------
@@ -151,8 +151,14 @@ impl FateRuntime {
     /// Run the selector: (current model, features) → next model.
     pub fn select(&self, current: Model, features: &Features) -> Model {
         let input = Self::encode_input(current, features);
-        let output = bf_execute(&self.program, &input);
+        let (output, _) = bf_execute(&self.program, &input);
         Self::decode_output(&output)
+    }
+
+    /// How many interpreter steps one selection takes: the runtime's cost,
+    /// counted rather than timed, so it is the same on every machine.
+    pub fn steps(&self, current: Model, features: &Features) -> usize {
+        bf_execute(&self.program, &Self::encode_input(current, features)).1
     }
 
     /// The instruction count of the embedded program.
@@ -179,7 +185,7 @@ impl PrismTrait for FateRuntime {
 
     fn project(&self, beam: Self::Focused) -> Self::Projected {
         let input_bytes = beam.result().ok().expect("project: Err beam");
-        let output = bf_execute(&self.program, input_bytes);
+        let (output, _) = bf_execute(&self.program, input_bytes);
         beam.next(Self::decode_output(&output))
     }
 
@@ -436,43 +442,17 @@ mod tests {
             .select(Model::Abyss, &zero_features());
     }
 
-    #[test]
-    fn runtime_performance() {
-        let rt = FateRuntime::new();
-        let features = zero_features();
-        let iterations = 10_000;
-
-        let start = std::time::Instant::now();
-        for _ in 0..iterations {
-            let _ = rt.select(Model::Abyss, &features);
-        }
-        let elapsed = start.elapsed();
-        let per_call = elapsed / iterations as u32;
-        eprintln!("  FateRuntime: {} iterations in {:?}", iterations, elapsed);
-        eprintln!("  Per inference: {:?}", per_call);
-        eprintln!(
-            "  Inferences/sec: {:.0}",
-            iterations as f64 / elapsed.as_secs_f64()
-        );
-
-        // Should be under 1ms per inference (generous — likely under 100μs)
-        assert!(
-            per_call.as_millis() < 1,
-            "BF inference should be under 1ms, got {:?}",
-            per_call
-        );
-    }
-
     /// The interpreter's cost, counted in BF steps rather than timed: every
-    /// transition of the cycle, with quiet and loud features, halts inside a
-    /// fixed budget. 100k steps is the deterministic form of the old "under
+    /// transition of the cycle, with quiet, loud and saturated features, halts
+    /// inside a fixed budget (measured 2026-11-17: 163-167 steps quiet, about
+    /// 1,050 with one loud feature). 100k steps is the deterministic form of the old "under
     /// 1 ms per inference" (at most 10 ns a step).
     #[test]
     fn runtime_halts_within_its_step_budget() {
         let rt = FateRuntime::new();
         let mut loud = zero_features();
         loud[0] = 20.0;
-        for features in [zero_features(), loud] {
+        for features in [zero_features(), loud, [255.0; 16]] {
             for model in [
                 Model::Abyss,
                 Model::Introject,
@@ -654,46 +634,6 @@ mod tests {
             .ok()
             .unwrap()
             .select(Model::Abyss, &zero_features());
-    }
-
-    #[test]
-    fn compiled_performance() {
-        let compiled = CompiledFateRuntime::new();
-        let features = zero_features();
-        let iterations = 10_000;
-
-        let start = std::time::Instant::now();
-        for _ in 0..iterations {
-            let _ = compiled.select(Model::Abyss, &features);
-        }
-        let compiled_elapsed = start.elapsed();
-        let compiled_per = compiled_elapsed / iterations as u32;
-
-        let interpreted = FateRuntime::new();
-        let start = std::time::Instant::now();
-        for _ in 0..iterations {
-            let _ = interpreted.select(Model::Abyss, &features);
-        }
-        let interp_elapsed = start.elapsed();
-        let interp_per = interp_elapsed / iterations as u32;
-
-        let speedup = interp_elapsed.as_nanos() as f64 / compiled_elapsed.as_nanos() as f64;
-
-        eprintln!(
-            "  Interpreted: {:?}/call ({} iterations in {:?})",
-            interp_per, iterations, interp_elapsed
-        );
-        eprintln!(
-            "  Compiled:    {:?}/call ({} iterations in {:?})",
-            compiled_per, iterations, compiled_elapsed
-        );
-        eprintln!("  Speedup:     {:.1}x", speedup);
-
-        assert!(
-            speedup > 2.0,
-            "compiled should be at least 2x faster, got {:.1}x",
-            speedup
-        );
     }
 
     // -----------------------------------------------------------------------

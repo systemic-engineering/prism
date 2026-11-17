@@ -243,8 +243,9 @@ enum Vectors {
 
 /// The verdict, given whether update mode is on and the file as read back.
 fn judge(update: bool, committed: &str, generated: &str) -> Vectors {
-    let committed = if update { generated } else { committed };
-    if committed == generated {
+    if update {
+        Vectors::Rewritten
+    } else if committed == generated {
         Vectors::Agree
     } else {
         Vectors::Drifted

@@ -284,24 +284,20 @@ impl Fate {
 
     /// Create Fate with random weights for manifold exploration.
     ///
-    /// Each call produces a different instance — different initial exploration trajectory.
-    /// Uses xorshift64 seeded from system time for zero-dependency randomness.
+    /// The seed fixes the instance: one seed, one set of weights, in every
+    /// process. Different seeds give different exploration trajectories. The
+    /// library reads no clock (docs/spec/checks.md), so a caller that wants a
+    /// fresh trajectory per run supplies its own entropy as the seed.
+    /// Weights are drawn by xorshift64 for zero-dependency randomness.
     ///
     /// Weight ranges match the quantization scheme:
     /// - biases: [0.0, 20.0]
     /// - feature weights: [0.0, 5.0]
     /// - depth weights: [0.0, 5.0]
-    pub fn excited() -> Self {
-        // Xorshift64 seeded from system time. Zero external deps.
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0x1234_5678_9abc_def0);
-
-        // Mix the seed further so two rapid calls differ even if nanos resolution is coarse.
-        // Combine nanos with a compile-time address for additional entropy.
-        let addr = Self::excited as *const () as usize as u64;
-        let mut state = seed ^ addr.wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    pub fn excited(seed: u64) -> Self {
+        // Xorshift64 from the caller's seed, spread so neighbouring seeds
+        // start far apart. Xorshift has no zero state; map it away.
+        let mut state = (seed ^ 0x5851_f42d_4c95_7f2d).wrapping_mul(0x9e37_79b9_7f4a_7c15);
         if state == 0 {
             state = 0xdead_beef_cafe_1234;
         }
@@ -1415,7 +1411,7 @@ mod tests {
 
     #[test]
     fn excited_produces_valid_fate() {
-        let fate = Fate::excited();
+        let fate = Fate::excited(0);
         let features = [0.0f64; FEATURE_DIM];
         let output = fate.tick(&features);
         // Should not crash, should produce a valid model
@@ -1428,7 +1424,7 @@ mod tests {
     #[test]
     fn excited_differs_from_untrained() {
         let untrained = Fate::untrained();
-        let excited = Fate::excited();
+        let excited = Fate::excited(0);
         let features = [1.0f64; FEATURE_DIM];
         let u_out = untrained.tick(&features);
         let e_out = excited.tick(&features);
@@ -1439,25 +1435,12 @@ mod tests {
     }
 
     #[test]
-    fn two_excited_instances_differ() {
-        let a = Fate::excited();
-        let b = Fate::excited();
-        let features = [1.0f64; FEATURE_DIM];
-        let a_out = a.tick(&features);
-        let b_out = b.tick(&features);
-        assert_ne!(
-            a_out.decision.distribution, b_out.decision.distribution,
-            "two excited instances should explore different regions"
-        );
-    }
-
-    #[test]
     fn excited_explores_different_models() {
         // Create many excited instances, verify we see multiple models selected
         let features = [5.0f64; FEATURE_DIM];
         let mut models_seen = std::collections::HashSet::new();
-        for _ in 0..50 {
-            let fate = Fate::excited();
+        for seed in 0..50 {
+            let fate = Fate::excited(seed);
             let output = fate.tick(&features);
             models_seen.insert(format!("{:?}", output.decision.model));
         }

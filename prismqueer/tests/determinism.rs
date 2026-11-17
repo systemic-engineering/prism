@@ -11,15 +11,22 @@ fn draws(seed: &[u8]) -> Vec<i64> {
 
 #[test]
 fn a_sample_seeded_alike_draws_alike() {
-    assert_eq!(
-        draws(b"determinism::alike"),
-        draws(b"determinism::alike")
-    );
+    assert_eq!(draws(b"determinism::alike"), draws(b"determinism::alike"));
 }
 
 #[test]
 fn samples_seeded_apart_draw_apart() {
     assert_ne!(draws(b"determinism::one"), draws(b"determinism::two"));
+}
+
+/// The stream for a seed is fixed across processes and machines, not just
+/// within one run: SHA-256 and SplitMix64 are integer-only.
+#[test]
+fn a_seeded_sample_draws_its_recorded_stream() {
+    assert_eq!(
+        draws(b"determinism::pinned"),
+        [865330, 585579, 60592, 191527, 101925, 583078, 975058, 344211]
+    );
 }
 
 #[test]
@@ -43,6 +50,29 @@ mod fate {
     #[test]
     fn an_excited_fate_seeded_alike_decides_alike() {
         assert_eq!(distribution(17), distribution(17));
+    }
+
+    /// The model each seed picks, recorded. Discrete, so it holds across
+    /// platforms whose float rounding differs in the last bit.
+    #[test]
+    fn excited_fates_pick_their_recorded_models() {
+        use prismqueer::fate::Model::{Abyss, Cartographer, Explorer, Introject};
+        let models: Vec<_> = (0..8u64)
+            .map(|seed| Fate::excited(seed).tick(&[1.0; FEATURE_DIM]).decision.model)
+            .collect();
+        assert_eq!(
+            models,
+            [
+                Abyss,
+                Introject,
+                Abyss,
+                Cartographer,
+                Cartographer,
+                Explorer,
+                Explorer,
+                Abyss
+            ]
+        );
     }
 
     #[test]
