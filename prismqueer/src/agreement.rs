@@ -60,9 +60,9 @@ use num_bigint::BigInt;
 use crate::algedonic::Signer;
 use crate::field::{Edge, Graph};
 use crate::oid::{Oid, Scope};
-#[allow(unused_imports)]
-use crate::room::{coboundary, solve, Exactness};
-use crate::room::{Cycle, Exactly, QModOne, RingPart, RoomError, ZMod, Z};
+use crate::room::{
+    coboundary, solve, Cycle, Exactly, Exactness, QModOne, RingPart, RoomError, ZMod, Z,
+};
 use crate::spectral::kleinos::VertexId;
 
 mod sealed {
@@ -174,12 +174,43 @@ impl<V: Reading> Relations<V> {
     }
 
     /// The consistent readings, {s : δs = c}, as data.
+    ///
+    /// [`solve`] decides it: a potential g gives the coset g + H⁰, g 0 at
+    /// each component's smallest item; genuine cycles give none. Refused only
+    /// as `solve` refuses, which these relations, built in their ring, never
+    /// are.
     pub fn consistent(&self) -> Result<Consistent<V>, RoomError> {
-        Ok(Consistent::Readings {
-            particular: BTreeMap::new(),
-            free: Vec::new(),
+        Ok(match solve(&self.ring, &self.graph, &self.required)? {
+            Exactness::Genuine(cycles) => Consistent::Empty(cycles),
+            Exactness::Exact(g) => Consistent::Readings {
+                particular: self.graph.vertices().zip(g).collect(),
+                free: components(&self.graph),
+            },
         })
     }
+}
+
+/// H⁰ of the graph over any ring: the locally constant readings, one free
+/// direction per component, by smallest item. Union by smaller root, so
+/// each root is its component's smallest item.
+fn components(graph: &Graph) -> Vec<Direction> {
+    let mut parent: BTreeMap<VertexId, VertexId> = graph.vertices().map(|v| (v, v)).collect();
+    let root = |parent: &BTreeMap<VertexId, VertexId>, mut v: VertexId| {
+        while parent[&v] != v {
+            v = parent[&v];
+        }
+        v
+    };
+    for edge in graph.edges() {
+        let (a, b) = edge.ends();
+        let (ra, rb) = (root(&parent, a), root(&parent, b));
+        parent.insert(ra.max(rb), ra.min(rb));
+    }
+    let mut by: BTreeMap<VertexId, Vec<VertexId>> = BTreeMap::new();
+    for v in graph.vertices() {
+        by.entry(root(&parent, v)).or_default().push(v);
+    }
+    by.into_values().map(|items| Direction { items }).collect()
 }
 
 /// The consistent readings of a set of relations. Never a scalar.
@@ -353,10 +384,60 @@ pub enum Refused {
 }
 
 /// Check a signed selection against the relations, exactly, in their ring.
+///
+/// The selection must read exactly the relations' items, in their ring
+/// ([`Refused`]). Then: no consistent readings is
+/// [`NeedsRuling`](Verdict::NeedsRuling) whatever the selection; otherwise
+/// δs is compared with c on every edge, `In` when all hold and `Out` with
+/// those that don't.
 pub fn check<V: Reading>(
     relations: &Relations<V>,
     selection: &Selection<V>,
 ) -> Result<Verdict<V>, Refused> {
-    let _ = (relations, selection);
-    Ok(Verdict::Out(Vec::new()))
+    let s = selection.readings();
+    let graph = &relations.graph;
+    if let Some(v) = graph.vertices().find(|v| !s.contains_key(v)) {
+        return Err(Refused::Missing(v));
+    }
+    if let Some(&v) = s.keys().find(|&&v| !graph.contains_vertex(v)) {
+        return Err(Refused::Unknown(v));
+    }
+    // The same items, both ascending: s is a vector of C⁰.
+    let readings: Vec<V> = s.values().cloned().collect();
+    let found = coboundary(graph)
+        .act(&relations.ring, &readings)
+        .map_err(Refused::Room)?;
+    let (particular, free) = match relations.consistent().map_err(Refused::Room)? {
+        Consistent::Empty(cycles) => return Ok(Verdict::NeedsRuling(cycles)),
+        Consistent::Readings { particular, free } => (particular, free),
+    };
+    let checked: Vec<Checked<V>> = graph
+        .edges()
+        .zip(&relations.required)
+        .zip(found)
+        .map(|((edge, required), found)| Checked {
+            edge,
+            required: required.clone(),
+            found,
+        })
+        .collect();
+    let broken: Vec<Checked<V>> = checked
+        .iter()
+        .filter(|c| c.found != c.required)
+        .cloned()
+        .collect();
+    if !broken.is_empty() {
+        return Ok(Verdict::Out(broken));
+    }
+    // In: on each component s − particular is constant; read it at the
+    // component's smallest item.
+    let coordinates = free
+        .iter()
+        .filter_map(|d| d.items.first())
+        .map(|v| s[v].add(&particular[v].neg()))
+        .collect();
+    Ok(Verdict::In(Certificate {
+        checked,
+        coordinates,
+    }))
 }

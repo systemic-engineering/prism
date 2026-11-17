@@ -26,7 +26,7 @@ use prismqueer::agreement::{
 };
 use prismqueer::field::{Edge, Graph};
 use prismqueer::oid::Oid;
-use prismqueer::room::{coboundary, pair, Coefficient, Cycle, Modulus, RoomError, ZMod, Z};
+use prismqueer::room::{coboundary, pair, Cycle, Modulus, RoomError, ZMod, Z};
 
 fn z(x: i64) -> Z {
     Z::from(x)
