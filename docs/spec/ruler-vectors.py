@@ -54,9 +54,13 @@ def edge(e):
     return out
 
 
+def region(r):
+    return edge(r["lo"]) + edge(r["hi"])
+
+
 def ruler(case):
     out = b"ruler\x00"
-    out += edge(case["region"]["lo"]) + edge(case["region"]["hi"])
+    out += region(case["region"])
     out += bytes([QUESTION[case["question"]]])
     out += rational(case["alpha"]) + rational(case["beta"])
     c = case["clock"]
@@ -67,8 +71,19 @@ def ruler(case):
 def calibration(case):
     out = b"calibration\x00"
     out += field(case["instrument"].encode("utf-8"))
+    out += region(case["region"])
     out += rational(case["p0"]) + rational(case["p1"])
     out += field(case["method"].encode("utf-8"))
+    return out
+
+
+def independence(case):
+    names = sorted(set(i.encode("utf-8") for i in case["instruments"]))
+    assert len(names) == len(case["instruments"]) >= 2, case["name"]
+    out = b"independence\x00" + u64le(len(names))
+    for n in names:
+        out += field(n)
+    out += region(case["region"])
     return out
 
 
@@ -133,27 +148,53 @@ RULERS = [
     },
 ]
 
+ABOVE_1 = {"lo": e("open", "1"), "hi": e("unbounded")}
+
 CALIBRATIONS = [
     {
-        "name": "knee, p0 = 1/6, p1 = 1/2",
+        "name": "knee for (1, inf), p0 = 1/6, p1 = 1/2",
         "instrument": "knee",
+        "region": ABOVE_1,
         "p0": "1/6",
         "p1": "1/2",
         "method": "600 labelled contexts",
     },
     {
-        "name": "knee recalibrated, p0 = 1/10, p1 = 3/5",
+        "name": "knee recalibrated for (1, inf), p0 = 1/10, p1 = 3/5",
         "instrument": "knee",
+        "region": ABOVE_1,
         "p0": "1/10",
         "p1": "3/5",
         "method": "600 labelled contexts",
     },
     {
-        "name": "multi-byte method, empty instrument",
+        "name": "knee for (3, inf), the first case's rates in another region",
+        "instrument": "knee",
+        "region": {"lo": e("open", "3"), "hi": e("unbounded")},
+        "p0": "1/6",
+        "p1": "1/2",
+        "method": "600 labelled contexts",
+    },
+    {
+        "name": "multi-byte method, empty instrument, (-inf, 0]",
         "instrument": "",
+        "region": {"lo": e("unbounded"), "hi": e("closed", "0")},
         "p0": "1/1000",
         "p1": "999/1000",
         "method": "Grüße, 世界 \U0001f308",
+    },
+]
+
+INDEPENDENCES = [
+    {
+        "name": "knee and ear for (1, inf), given out of order",
+        "instruments": ["knee", "ear"],
+        "region": ABOVE_1,
+    },
+    {
+        "name": "three instruments, one multi-byte, for [-3/2, 7/4]",
+        "instruments": ["hand", "ärä", "ear"],
+        "region": {"lo": e("closed", "-3/2"), "hi": e("closed", "7/4")},
     },
 ]
 
@@ -166,6 +207,7 @@ out = {
     "k_public": K_PUBLIC.hex(),
     "rulers": [seal(c, ruler) for c in RULERS],
     "calibrations": [seal(c, calibration) for c in CALIBRATIONS],
+    "independences": [seal(c, independence) for c in INDEPENDENCES],
 }
 
 here = os.path.dirname(os.path.abspath(__file__))

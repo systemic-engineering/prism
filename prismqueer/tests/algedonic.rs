@@ -8,8 +8,9 @@ use num_bigint::BigInt;
 use num_rational::BigRational;
 
 use prismqueer::algedonic::{
-    cross, decision_oid, persist, Calibration, Clock, Decision, Draft, Edge, Enclosure, Evidence,
-    Membership, Persistence, Question, Recorded, Region, Signal, Wald,
+    cross, decision_oid, persist, persist_jointly, Calibration, Clock, Decision, Draft, Edge,
+    Enclosure, Evidence, IndependenceDraft, Membership, NotIndependent, Persistence, Question,
+    Recorded, Refused, Region, Ruler, Signal, Verdict, Wald,
 };
 use prismqueer::oid::Oid;
 use prismqueer::poly::ZPoly;
@@ -43,10 +44,26 @@ fn ruler_above(eps: BigRational, by: &str) -> prismqueer::algedonic::Ruler {
     .seal(oid(by))
 }
 
-/// The knee instrument's calibration: p₀ = 1/6, p₁ = 1/2.
+/// The knee instrument's calibration for `(1, ∞)`: p₀ = 1/6, p₁ = 1/2.
 fn knee() -> Calibration {
-    Calibration::new(oid("knee"), q(1, 6), q(1, 2), "600 labelled contexts")
-        .expect("valid calibration")
+    knee_for(q(1, 1))
+}
+
+/// The knee's rates (p₀ = 1/6, p₁ = 1/2), calibrated for `(eps, ∞)`.
+fn knee_for(eps: BigRational) -> Calibration {
+    Calibration::new(
+        oid("knee"),
+        Region::above(eps),
+        q(1, 6),
+        q(1, 2),
+        "600 labelled contexts",
+    )
+    .expect("valid calibration")
+}
+
+/// `persist`, where the calibration's region is the ruler's.
+fn verdict(ev: &Evidence, ruler: &Ruler, cal: &Calibration) -> Verdict {
+    persist(ev, ruler, cal).expect("calibrated for the ruler's region")
 }
 
 fn decision(c: &Membership<Enclosure, Enclosure, Enclosure>) -> Decision {
@@ -258,7 +275,7 @@ fn three_distinct_contexts_reach_accept() {
     let mut ev = Evidence::at(oid("leg"));
     for (i, n) in ["song-a", "song-b", "song-c"].iter().enumerate() {
         assert_eq!(
-            persist(&ev, &ruler, &knee()).persistence(),
+            verdict(&ev, &ruler, &knee()).persistence(),
             Persistence::Continue,
             "after {i}"
         );
@@ -266,7 +283,7 @@ fn three_distinct_contexts_reach_accept() {
         assert_eq!(r, Ok(Recorded::New));
     }
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Accept
     );
 }
@@ -278,7 +295,7 @@ fn six_distinct_certified_outs_reach_reject() {
     let mut ev = Evidence::at(oid("leg"));
     for i in 0..6 {
         assert_eq!(
-            persist(&ev, &ruler, &knee()).persistence(),
+            verdict(&ev, &ruler, &knee()).persistence(),
             Persistence::Continue,
             "after {i}"
         );
@@ -286,7 +303,7 @@ fn six_distinct_certified_outs_reach_reject() {
             .expect("new");
     }
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Reject
     );
 }
@@ -307,7 +324,7 @@ fn undecided_evidence_does_not_move_persist() {
         .expect("new");
     }
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue
     );
     ev.record(oid("a"), oid("knee"), &ruler, Decision::In)
@@ -315,14 +332,14 @@ fn undecided_evidence_does_not_move_persist() {
     ev.record(oid("b"), oid("knee"), &ruler, Decision::In)
         .expect("new");
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue,
         "two Ins: 9 < 19"
     );
     ev.record(oid("c"), oid("knee"), &ruler, Decision::In)
         .expect("new");
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Accept
     );
 }
@@ -345,7 +362,7 @@ fn reusing_one_visit_does_not_count_twice() {
     }
     assert_eq!(ev.contexts(&ruler), 1);
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue
     );
     // A repeat that disagrees with the first reading is refused: a
@@ -373,7 +390,7 @@ fn evidence_from_two_instruments_stays_keyed_apart() {
     );
     assert_eq!(ev.contexts(&ruler), 3);
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue,
         "two Ins"
     );
@@ -394,7 +411,8 @@ fn evidence_from_two_instruments_stays_keyed_apart() {
 
 #[test]
 /// Evidence under one ruler says nothing under another: two rulers at one
-/// site judge separately (s9).
+/// site judge separately (s9). Each reads the knee as calibrated for its
+/// own region.
 fn evidence_is_kept_per_ruler() {
     let stool = ruler_above(q(1, 1), "stool");
     let engineer = ruler_above(q(3, 1), "engineer");
@@ -405,11 +423,11 @@ fn evidence_is_kept_per_ruler() {
             .expect("new");
     }
     assert_eq!(
-        persist(&ev, &stool, &knee()).persistence(),
+        verdict(&ev, &stool, &knee()).persistence(),
         Persistence::Accept
     );
     assert_eq!(
-        persist(&ev, &engineer, &knee()).persistence(),
+        verdict(&ev, &engineer, &knee_for(q(3, 1))).persistence(),
         Persistence::Continue
     );
     assert_eq!(ev.contexts(&engineer), 0);
@@ -550,8 +568,14 @@ fn the_signer_is_beside_the_ruler_address() {
 fn recalibration_does_not_move_the_ruler() {
     let ruler = ruler_above(q(1, 1), "engineer");
     let before = knee();
-    let after = Calibration::new(oid("knee"), q(1, 10), q(3, 5), "600 labelled contexts")
-        .expect("valid calibration");
+    let after = Calibration::new(
+        oid("knee"),
+        Region::above(q(1, 1)),
+        q(1, 10),
+        q(3, 5),
+        "600 labelled contexts",
+    )
+    .expect("valid calibration");
     assert_ne!(before.oid(), after.oid());
     assert_ne!(before.oid(), ruler.oid());
 
@@ -560,13 +584,15 @@ fn recalibration_does_not_move_the_ruler() {
         ev.record(oid(n), oid("knee"), &ruler, Decision::In)
             .expect("new");
     }
-    let (x, y) = (persist(&ev, &ruler, &before), persist(&ev, &ruler, &after));
+    let (x, y) = (verdict(&ev, &ruler, &before), verdict(&ev, &ruler, &after));
     // The ruler is the same ruler under both.
     assert_eq!(x.ruler(), &ruler.oid());
     assert_eq!(y.ruler(), &ruler.oid());
-    // Each verdict names its calibration.
-    assert_eq!(x.calibration(), &before.oid());
-    assert_eq!(y.calibration(), &after.oid());
+    // Each verdict names its calibration, and no independence: one
+    // instrument needs none.
+    assert_eq!(x.calibrations(), [before.oid()]);
+    assert_eq!(y.calibrations(), [after.oid()]);
+    assert_eq!((x.independence(), y.independence()), (None, None));
     // And the calibration is read: 3³ = 27 ≥ 19 accepts; 6³ = 216 too, but
     // two Ins split them (9 < 19 ≤ 36).
     assert_eq!(x.persistence(), Persistence::Accept);
@@ -577,11 +603,11 @@ fn recalibration_does_not_move_the_ruler() {
             .expect("new");
     }
     assert_eq!(
-        persist(&two, &ruler, &before).persistence(),
+        verdict(&two, &ruler, &before).persistence(),
         Persistence::Continue
     );
     assert_eq!(
-        persist(&two, &ruler, &after).persistence(),
+        verdict(&two, &ruler, &after).persistence(),
         Persistence::Accept
     );
 }
@@ -591,10 +617,15 @@ fn recalibration_does_not_move_the_ruler() {
 /// the ruler's.
 fn every_part_of_the_calibration_is_in_its_address() {
     let base = knee().oid();
-    let cal = |i: &str, p0, p1, m: &str| Calibration::new(oid(i), p0, p1, m).expect("valid").oid();
+    let cal = |i: &str, p0, p1, m: &str| {
+        Calibration::new(oid(i), Region::above(q(1, 1)), p0, p1, m)
+            .expect("valid")
+            .oid()
+    };
     let m = "600 labelled contexts";
     assert_eq!(base, cal("knee", q(1, 6), q(1, 2), m));
     for other in [
+        knee_for(q(3, 1)).oid(),
         cal("ear", q(1, 6), q(1, 2), m),
         cal("knee", q(1, 7), q(1, 2), m),
         cal("knee", q(1, 6), q(1, 3), m),
@@ -621,14 +652,255 @@ fn a_calibration_reads_only_its_instruments_decisions() {
             .expect("new");
     }
     assert_eq!(
-        persist(&ev, &ruler, &knee()).persistence(),
+        verdict(&ev, &ruler, &knee()).persistence(),
         Persistence::Continue
     );
-    let ear =
-        Calibration::new(oid("ear"), q(1, 6), q(1, 2), "600 labelled contexts").expect("valid");
+    let ear = Calibration::new(
+        oid("ear"),
+        Region::above(q(1, 1)),
+        q(1, 6),
+        q(1, 2),
+        "600 labelled contexts",
+    )
+    .expect("valid");
     assert_eq!(
-        persist(&ev, &ruler, &ear).persistence(),
+        verdict(&ev, &ruler, &ear).persistence(),
         Persistence::Accept
+    );
+}
+
+// ─── Every value carries its domain of validity (Alex, 2026-11-16) ──────────
+
+#[test]
+/// The region is part of the calibration's address: the knee with the same
+/// rates and method, calibrated for `(1, ∞)` and for `(3, ∞)`, is two
+/// calibrations with two addresses.
+fn one_instrument_calibrated_for_two_regions_has_two_addresses() {
+    let (low, high) = (knee_for(q(1, 1)), knee_for(q(3, 1)));
+    assert_eq!(low.instrument(), high.instrument());
+    assert_eq!((low.p0(), low.p1()), (high.p0(), high.p1()));
+    assert_eq!(low.method(), high.method());
+    assert_eq!(low.region(), &Region::above(q(1, 1)));
+    assert_eq!(high.region(), &Region::above(q(3, 1)));
+    assert_ne!(low.oid(), high.oid());
+    assert_ne!(low.preimage(), high.preimage());
+}
+
+#[test]
+/// A measurement holds where it was taken: the knee calibrated for `(1, ∞)`
+/// says nothing about `(3, ∞)`. `persist` refuses it, naming the
+/// calibration, its region, the ruler and the ruler's region, and never
+/// reads it silently. The same evidence under the knee calibrated for
+/// `(3, ∞)` is read.
+fn persist_refuses_a_calibration_for_another_region() {
+    let ruler = ruler_above(q(3, 1), "engineer");
+    let mut ev = Evidence::at(oid("leg"));
+    for n in ["a", "b", "c"] {
+        ev.record(oid(n), oid("knee"), &ruler, Decision::In)
+            .expect("new");
+    }
+    let elsewhere = knee_for(q(1, 1));
+    assert_eq!(
+        persist(&ev, &ruler, &elsewhere),
+        Err(Refused::Region {
+            of: elsewhere.oid(),
+            holds: Region::above(q(1, 1)),
+            ruler: ruler.oid(),
+            ruled: Region::above(q(3, 1)),
+        })
+    );
+    let here = knee_for(q(3, 1));
+    let v = persist(&ev, &ruler, &here).expect("same region");
+    assert_eq!(v.persistence(), Persistence::Accept);
+    assert_eq!(v.calibrations(), [here.oid()]);
+}
+
+/// The ear's calibration for `(1, ∞)`: p₀ = 1/4, p₁ = 3/4. An In
+/// multiplies its ratio by (3/4)/(1/4) = 3, an Out by (1/4)/(3/4) = 1/3.
+fn ear() -> Calibration {
+    Calibration::new(
+        oid("ear"),
+        Region::above(q(1, 1)),
+        q(1, 4),
+        q(3, 4),
+        "400 labelled contexts",
+    )
+    .expect("valid calibration")
+}
+
+/// `instruments` judged independent over `(1, ∞)` by the engineer.
+fn independent(instruments: &[&str]) -> prismqueer::algedonic::Independence {
+    IndependenceDraft::new(instruments.iter().map(|i| oid(i)), Region::above(q(1, 1)))
+        .expect("two or more distinct instruments")
+        .seal(oid("engineer"))
+}
+
+/// The knee's two Ins and the ear's two Ins and one Out, under the ruler
+/// above 1.
+fn knee_and_ear_evidence(ruler: &Ruler) -> Evidence {
+    let mut ev = Evidence::at(oid("leg"));
+    for (n, i, d) in [
+        ("a", "knee", Decision::In),
+        ("b", "knee", Decision::In),
+        ("a", "ear", Decision::In),
+        ("c", "ear", Decision::In),
+        ("d", "ear", Decision::Out),
+    ] {
+        ev.record(oid(n), oid(i), ruler, d).expect("new");
+    }
+    ev
+}
+
+#[test]
+/// Two instruments short of Accept on their own combine to Accept, under a
+/// signed independence relation only. The arithmetic, exact:
+///
+/// - The ruler: α = β = 1/20, so A = (1 − β)/α = 19 and
+///   B = β/(1 − α) = 1/19.
+/// - The knee (p₀ = 1/6, p₁ = 1/2): an In is ×(1/2)/(1/6) = ×3. Two Ins:
+///   Λ_knee = 3² = 9. 1/19 < 9 < 19: Continue.
+/// - The ear (p₀ = 1/4, p₁ = 3/4): an In is ×3, an Out
+///   ×(1/4)/(3/4) = ×1/3. Two Ins, one Out: Λ_ear = 3² · 1/3 = 3.
+///   1/19 < 3 < 19: Continue.
+/// - Jointly, under independence: Λ = 9 · 3 = 27 ≥ 19: Accept.
+///
+/// The verdict names both calibrations, in instrument order (ear before
+/// knee), and the relation.
+fn two_instruments_short_of_accept_combine_to_accept_under_independence() {
+    let ruler = ruler_above(q(1, 1), "engineer");
+    let ev = knee_and_ear_evidence(&ruler);
+    assert_eq!(
+        verdict(&ev, &ruler, &knee()).persistence(),
+        Persistence::Continue,
+        "knee: 9"
+    );
+    assert_eq!(
+        verdict(&ev, &ruler, &ear()).persistence(),
+        Persistence::Continue,
+        "ear: 3"
+    );
+    let both = independent(&["knee", "ear"]);
+    let v = persist_jointly(&ev, &ruler, &[knee(), ear()], &both).expect("independent");
+    assert_eq!(v.persistence(), Persistence::Accept, "9 · 3 = 27 ≥ 19");
+    assert_eq!(v.ruler(), &ruler.oid());
+    assert_eq!(v.calibrations(), [ear().oid(), knee().oid()]);
+    assert_eq!(v.independence(), Some(&both.oid()));
+    // The order the calibrations are given in doesn't change the verdict.
+    assert_eq!(
+        persist_jointly(&ev, &ruler, &[ear(), knee()], &both),
+        Ok(v)
+    );
+}
+
+#[test]
+/// One verdict per instrument by default: instruments combine only under an
+/// independence relation that declares exactly them. A relation over other
+/// instruments, over more, a calibration given twice, or a relation for
+/// another region is refused, typed and named, never a silent product.
+fn instruments_combine_only_under_an_independence_naming_exactly_them() {
+    let ruler = ruler_above(q(1, 1), "engineer");
+    let ev = knee_and_ear_evidence(&ruler);
+    let refused = |cals: &[Calibration], rel: &prismqueer::algedonic::Independence| {
+        persist_jointly(&ev, &ruler, cals, rel)
+    };
+
+    let knee_hand = independent(&["knee", "hand"]);
+    assert_eq!(
+        refused(&[knee(), ear()], &knee_hand),
+        Err(Refused::Instruments {
+            independence: knee_hand.oid(),
+            declared: vec![oid("hand"), oid("knee")],
+            calibrated: vec![oid("ear"), oid("knee")],
+        })
+    );
+    let three = independent(&["knee", "ear", "hand"]);
+    assert_eq!(
+        refused(&[knee(), ear()], &three),
+        Err(Refused::Instruments {
+            independence: three.oid(),
+            declared: vec![oid("ear"), oid("hand"), oid("knee")],
+            calibrated: vec![oid("ear"), oid("knee")],
+        })
+    );
+    let both = independent(&["knee", "ear"]);
+    assert_eq!(
+        refused(&[knee(), knee()], &both),
+        Err(Refused::Instruments {
+            independence: both.oid(),
+            declared: vec![oid("ear"), oid("knee")],
+            calibrated: vec![oid("knee"), oid("knee")],
+        })
+    );
+    // Each calibration's region is checked under the relation too.
+    let far_knee = knee_for(q(3, 1));
+    assert_eq!(
+        refused(&[far_knee.clone(), ear()], &both),
+        Err(Refused::Region {
+            of: far_knee.oid(),
+            holds: Region::above(q(3, 1)),
+            ruler: ruler.oid(),
+            ruled: Region::above(q(1, 1)),
+        })
+    );
+    // And the relation holds in its own region.
+    let far = IndependenceDraft::new([oid("knee"), oid("ear")], Region::above(q(3, 1)))
+        .expect("two instruments")
+        .seal(oid("engineer"));
+    assert_eq!(
+        refused(&[knee(), ear()], &far),
+        Err(Refused::Region {
+            of: far.oid(),
+            holds: Region::above(q(3, 1)),
+            ruler: ruler.oid(),
+            ruled: Region::above(q(1, 1)),
+        })
+    );
+}
+
+#[test]
+/// An independence relation is a judgment between two or more distinct
+/// instruments. Its address is the instruments, sorted, and the region;
+/// its signer sits beside it, as a ruler's does.
+fn the_independence_relation_is_a_sealed_judgment() {
+    let region = Region::above(q(1, 1));
+    assert_eq!(
+        IndependenceDraft::new([oid("knee")], region.clone()),
+        Err(NotIndependent)
+    );
+    assert_eq!(
+        IndependenceDraft::new([oid("knee"), oid("knee")], region.clone()),
+        Err(NotIndependent),
+        "a repeat is refused, never collapsed"
+    );
+    let draft = IndependenceDraft::new([oid("knee"), oid("ear")], region.clone()).expect("two");
+    assert_eq!(draft.instruments(), [oid("ear"), oid("knee")]);
+    assert_eq!(draft.region(), &region);
+    let swapped = IndependenceDraft::new([oid("ear"), oid("knee")], region.clone()).expect("two");
+    assert_eq!(draft.oid(), swapped.oid(), "a set, not a list");
+
+    let (a, b) = (
+        draft.clone().seal(oid("engineer")),
+        swapped.seal(oid("stool")),
+    );
+    assert_eq!(a.oid(), b.oid(), "one judgment, one address");
+    assert_ne!(a.signer(), b.signer(), "two signers");
+    assert_eq!(a.signer().over(), &a.oid());
+    assert_eq!(a.signer().by(), &oid("engineer"));
+    assert_eq!(a.instruments(), [oid("ear"), oid("knee")]);
+    assert_eq!(a.region(), &region);
+    // Every part moves the address.
+    let other = |is: &[&str], eps| {
+        IndependenceDraft::new(is.iter().map(|i| oid(i)), Region::above(eps))
+            .expect("two")
+            .oid()
+    };
+    assert_ne!(draft.oid(), other(&["knee", "hand"], q(1, 1)));
+    assert_ne!(draft.oid(), other(&["knee", "ear", "hand"], q(1, 1)));
+    assert_ne!(draft.oid(), other(&["knee", "ear"], q(2, 1)));
+    // Self-delimiting: a byte moved between two instruments.
+    assert_ne!(
+        other(&["ab", "c"], q(1, 1)),
+        other(&["a", "bc"], q(1, 1))
     );
 }
 
@@ -753,7 +1025,7 @@ fn the_wald_rates_are_validated() {
 /// p₀ and p₁ are validated where they live now, in the calibration:
 /// `0 < p₀ < p₁ < 1`.
 fn the_calibration_rates_are_validated() {
-    let cal = |p0, p1| Calibration::new(oid("knee"), p0, p1, "m");
+    let cal = |p0, p1| Calibration::new(oid("knee"), Region::above(q(1, 1)), p0, p1, "m");
     assert!(cal(q(1, 2), q(1, 2)).is_err(), "p₀ = p₁");
     assert!(cal(q(1, 2), q(1, 6)).is_err(), "p₀ > p₁");
     assert!(cal(q(0, 1), q(1, 2)).is_err(), "p₀ = 0");
