@@ -320,11 +320,25 @@ fn a_collision_with_a_span_already_glued_is_refused() {
     assert_eq!(got.err(), Some(KleinosError::Collision(s1)));
 }
 
+/// The empty party holds no frame, so a span into it names a frame no
+/// party holds: a span needs a frame on each side.
 #[test]
-fn an_empty_party_is_refused() {
+fn a_span_into_the_empty_party_is_refused() {
+    let Chain { a, b, s1, s2 } = chain();
+    let empty = Party::<Z>::new(vec![], vec![], vec![]);
+    let only_a = party(&[&a]);
     assert_eq!(
-        Party::<Z>::new(vec![], vec![], vec![]).err(),
-        Some(KleinosError::EmptyParty)
+        empty
+            .clone()
+            .and_then(|e| kleinos(&e, &only_a, &[span(&s1, &a, &b, eye())]))
+            .err(),
+        Some(KleinosError::UnknownFrame(b.oid().clone()))
+    );
+    assert_eq!(
+        empty
+            .and_then(|e| kleinos(&only_a, &e, &[span(&s2, &b, &a, not())]))
+            .err(),
+        Some(KleinosError::UnknownFrame(b.oid().clone()))
     );
 }
 
@@ -668,6 +682,42 @@ fn l3_no_spans_is_the_union() {
                 && units,
             "L3: kleinos(a, b, ∅) ≠ a ⊔ b",
         )
+    }));
+}
+
+/// L3, the unit (54c88f72 §6.3; `hypothesize`: empty input = unit): the
+/// empty frame-graph is a party, and ∅ ⊔ a = a = a ⊔ ∅. One address (the
+/// party alone), its events, and no third. Checked on a drawn party and on
+/// a glued one, which carries spans.
+#[test]
+fn l3_the_empty_party_is_the_unit() {
+    passes(forall::<World, _>(b"kleinos L3 unit", SEED_RUNS, |w| {
+        let Ok(empty) = Party::<Z>::new(vec![], vec![], vec![]) else {
+            return check(false, "L3: the empty party is refused");
+        };
+        let glued = ok(kleinos(&w.a, &w.b, &w.ab)).party().clone();
+        let holds = [&w.a, &glued].into_iter().all(|a| {
+            let alone = union(&[a], &[]);
+            let events: BTreeMap<SpanId, (Oid, Oid)> = a
+                .relations()
+                .iter()
+                .filter_map(|r| {
+                    r.span()
+                        .map(|id| (id.clone(), (r.from().clone(), r.to().clone())))
+                })
+                .collect();
+            [kleinos(&empty, a, &[]), kleinos(a, &empty, &[])]
+                .into_iter()
+                .all(|p| {
+                    p.is_ok_and(|p| {
+                        p.oid() == alone.oid()
+                            && p.party() == a
+                            && *p.events() == events
+                            && p.third().is_empty()
+                    })
+                })
+        });
+        check(holds, "L3: ∅ ⊔ a ≠ a or a ⊔ ∅ ≠ a")
     }));
 }
 
