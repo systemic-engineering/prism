@@ -111,7 +111,11 @@ fn a_merkle_tree_persists_and_reads_back_through_the_port() {
 
     let root = tree.persist(&mut backend).unwrap();
 
-    assert_eq!(root, tree.oid(), "a node's crystal address is its tree address");
+    assert_eq!(
+        root,
+        tree.oid(),
+        "a node's crystal address is its tree address"
+    );
     assert_eq!(backend.len(), 4, "one crystal per node");
     let back = Node::recall(&backend, &root).unwrap();
     assert_eq!(back, tree);
