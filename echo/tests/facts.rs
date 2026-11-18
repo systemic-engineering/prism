@@ -46,7 +46,7 @@ fn header_lines_at_the_top_are_headers() {
     assert_eq!(f.facts[0].line, 4);
 }
 
-/// Headers vs comments is an open question (docs/spec/echo.md §7 Q3); the
+/// Headers vs comments is an open question (docs/spec/echo.md §9 Q3); the
 /// reading here: only the leading block of `#` lines holds headers, and only
 /// a line shaped `# <key> <value>` is one.
 #[test]

@@ -77,7 +77,7 @@ fn near_misses_are_not_the_seam() {
 
 /// The seam's bytes are `2d 2d 2d 0a`: a CR before the LF makes the line
 /// `---\r`, which isn't exactly `---`. (Open question for Mara: does a CRLF
-/// file have a seam? docs/spec/echo.md §7 Q1.)
+/// file have a seam? docs/spec/echo.md §9 Q1.)
 #[test]
 fn crlf_is_not_the_seam() {
     assert_eq!(
@@ -87,7 +87,7 @@ fn crlf_is_not_the_seam() {
 }
 
 /// `---` at the end of the file with no LF is not `2d 2d 2d 0a`. (Open
-/// question for Mara: docs/spec/echo.md §7 Q2.)
+/// question for Mara: docs/spec/echo.md §9 Q2.)
 #[test]
 fn three_hyphens_at_eof_without_their_lf_do_not_cut() {
     assert_eq!(parts(b"a\n---"), unreflected(b"a\n---"));

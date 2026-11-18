@@ -24,7 +24,7 @@
 //! 5. **`H(a)`** is computed, BLAKE3 of the bytes above the seam (seam note
 //!    §2.1), and returned. No pinned header carries it yet (§4.1's
 //!    `reflect above …` is "a proposal"), so there is nothing in `r` to
-//!    match it against: docs/spec/echo.md §7 Q12.
+//!    match it against: docs/spec/echo.md §9 Q12.
 
 use core::fmt;
 

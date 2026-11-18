@@ -10,8 +10,8 @@
 //! - §5.0 and §5.0.1 items 10–11: an atom's content is
 //!   `enc(p) ‖ u64(k) ‖ arg₀ ‖ …`, each argument `tag ‖ enc(bytes)`.
 //!
-//! The hash `H` over this content (the address law, prism-020 P2) is not
-//! here yet.
+//! The hash `H` over this content (the address law, prism-020 P2) is
+//! `crate::address`.
 
 use alloc::string::String;
 use alloc::vec::Vec;

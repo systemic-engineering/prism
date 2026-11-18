@@ -136,7 +136,7 @@ pub fn read_reflection(s: &[u8]) -> Result<Option<Facts>, Refusal> {
 pub(crate) fn read_from(input: &[u8], first_line: usize) -> Result<Facts, Refusal> {
     let mut out = Facts::default();
     // Headers are the `# <key> <value>` lines of the leading block of `#`
-    // lines; any other `#` line is a comment (docs/spec/echo.md §7 Q3).
+    // lines; any other `#` line is a comment (docs/spec/echo.md §9 Q3).
     let mut leading = true;
     for (i, bytes) in lines(input).enumerate() {
         let line = first_line + i;

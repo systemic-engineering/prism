@@ -87,7 +87,7 @@ fn malformed_records() {
 
 /// §16.10 item 1: `int` and `ratio` are reserved, refused until pinned. A
 /// type word without its value, and `not` / `requires`, are not names
-/// (pact-eval §1.2; the type words: docs/spec/echo.md §7 Q5).
+/// (pact-eval §1.2; the type words: docs/spec/echo.md §9 Q5).
 #[test]
 fn keywords_and_reserved_types() {
     check(&[
