@@ -1,6 +1,8 @@
 //! Certificate replay (prism-022 S1, S2): slice R1, the surface
-//! (docs/spec/echo.md §10.1), and slice R2, the source and the Dark-2
-//! report (§10.4; `crate::source`, `crate::dark2`).
+//! (docs/spec/echo.md §10.1); slice R2, the source and the Dark-2 report
+//! (§10.4; `crate::source`, `crate::dark2`); and slice R3, P, F and check
+//! 1 (§10.6; `crate::program`). The intervals of every slice print as one
+//! list, by stratum, then by bytes (Note §6.2).
 //!
 //! The output is Note v3.3.2 §6.3's, as mirror's v3.2 contract delta
 //! (`docs/pin-batch/2026-10-30-tune-exit-contract-v3.2.md`) gives it: the
@@ -26,19 +28,20 @@ use crate::address::{self, Address, Tau};
 use crate::certificate::{self, Performance};
 use crate::dark2;
 use crate::facts::Position;
-use crate::interval::Interval;
+use crate::interval::{self, Interval};
+use crate::program;
 use crate::record;
 use crate::source;
 
-/// The prism commit whose `docs/spec/echo.md` echo implements: `1e7eb3a`,
-/// version 3, §10's decomposition with R1 as built. Full and lowercase
-/// (Note §4.2, Q2: prism's repository is SHA-1). Always an earlier commit
-/// than the one that sets it (the self-reference rule).
-pub const SPEC: &str = "1e7eb3a402060c253bdb70305dac8c46554e92b1";
+/// The prism commit whose `docs/spec/echo.md` echo implements: `3d00a4e`,
+/// version 4, §10 with R2 as built. Full and lowercase (Note §4.2, Q2:
+/// prism's repository is SHA-1). Always an earlier commit than the one
+/// that sets it (the self-reference rule).
+pub const SPEC: &str = "3d00a4ecea49d9908c7c03d6973e6484f03075da";
 
 /// The git tree of `docs/spec/echo-vectors` echo was verified against: the
-/// tree at `d7a3fb5`, the R2 red commit that added Taut's Dark-2 triples.
-pub const VECTORS: &str = "8c1c52ae9fd7fb4720e79044ef58ef4464535e59";
+/// tree at `72d1b88`, the R3 red commit that added Taut's 68.
+pub const VECTORS: &str = "5bead5f96f6497e5e2d7a1bba62a4f33973ff18c";
 
 /// The work budget, in ground rule instances considered (certificate §3.2
 /// UNKNOWN: "a work count … fixed as a constant in the checker's own
@@ -52,9 +55,13 @@ pub const STRATA: [&str; 8] = [
     "source", "program", "model", "contexts", "verdict", "budget", "address", "score",
 ];
 
-/// How many of [`STRATA`] echo replays so far: R2 retired `source`. Each
-/// slice removes its word from the front.
-const REPLAYED: usize = 1;
+/// How many of [`STRATA`] echo replays so far: R2 retired `source`, R3
+/// `program`. Each slice removes its word from the front.
+const REPLAYED: usize = 2;
+
+/// `source`'s place in [`STRATA`]: check 2, whose interval bytes are open
+/// (docs/spec/echo.md Q26), is still the source stratum's.
+const SOURCE: usize = 0;
 
 /// echo's four inputs, in the order every list of them is printed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -265,12 +272,33 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
     }
     // R2: the source and its Dark-2 report. The source is never
     // `unreadable`: a line that doesn't read is a hole (Note §5; Seam row
-    // 8). Where R2 can't tell, or agrees, the next stratum answers.
-    let report = dark2::report(&source::read(source));
+    // 8).
+    let source = source::read(source);
+    let report = dark2::report(&source);
+    let mut intervals = Vec::new();
+    // The first stratum some check couldn't replay, in [`STRATA`]'s order.
+    let mut waiting: Option<usize> = None;
+    let mut wait = |stratum: usize| waiting = Some(waiting.map_or(stratum, |w| w.min(stratum)));
     match dark2::judge(&report, &performance, &record) {
-        Some(intervals) if !intervals.is_empty() => Verdict::Dissonant(intervals),
-        _ => conclude(&STRATA[REPLAYED..]),
+        Some(found) => intervals.extend(found),
+        // Check 2, a model printed for a Dark source: the source stratum's
+        // own check, whose bytes are open (Q26).
+        None if report.light == dark2::Light::Dark => wait(SOURCE),
+        // Light R2 can't tell without a run.
+        None => wait(REPLAYED),
     }
+    // R3: P and F, check 1. Where the header turns on light R2 can't
+    // tell, the run decides.
+    match program::expected(&source, &report) {
+        Some(expected) => intervals.extend(program::judge(&expected, &performance.header)),
+        None => wait(REPLAYED),
+    }
+    if !intervals.is_empty() {
+        // One list across strata: by stratum, then by bytes (Note §6.2).
+        interval::sort(&mut intervals);
+        return Verdict::Dissonant(intervals);
+    }
+    conclude(&STRATA[waiting.unwrap_or(REPLAYED)..])
 }
 
 /// R1's replay: every ground rule instance the certificate prints (its

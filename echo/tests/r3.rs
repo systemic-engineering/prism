@@ -297,8 +297,12 @@ fn the_header_vectors() {
 }
 
 /// Every correct fixture's certificate and Taut's thirteen certificates
-/// claim exactly the P and F echo recomputes. Only `ct-a4` claims another
-/// F (its spurious fact); no fixture claims another P.
+/// claim exactly the P and F echo recomputes, with five exceptions. `ct-a4`
+/// claims another F (its spurious fact). Four hand-written fixtures whose
+/// cheat is elsewhere claim `none` for both where the source calls for P
+/// and F: `ct-a5` (a readable source claimed Dark), `ct-a12` and both
+/// `e1-false-budget-*` (budget stops). Certificate §3.2: "a `none` where
+/// the checker computes an address fails check 1" (Q35).
 #[test]
 fn the_certificates_claim_the_recomputed_addresses() {
     let mut triples: Vec<(String, Vec<u8>, Vec<u8>)> = fixtures()
@@ -328,6 +332,7 @@ fn the_certificates_claim_the_recomputed_addresses() {
         read("68-certificate-stray.cert"),
     ));
     let mut decided = 0;
+    let mut differ = Vec::new();
     for (name, source, cert) in &triples {
         let src = source::read(source);
         let report = dark2::report(&src);
@@ -336,13 +341,26 @@ fn the_certificates_claim_the_recomputed_addresses() {
             continue;
         };
         decided += 1;
-        assert_eq!(header.program, want.program, "{name}: program");
+        if header.program == want.program && header.facts == want.facts {
+            continue;
+        }
+        differ.push(name.as_str());
         if name == "ct-a4-spurious-fact" {
-            assert_ne!(header.facts, want.facts, "{name}");
+            assert_eq!(header.program, want.program, "{name}");
         } else {
-            assert_eq!(header.facts, want.facts, "{name}: facts");
+            assert_eq!((header.program, header.facts), (None, None), "{name}");
         }
     }
+    assert_eq!(
+        differ,
+        [
+            "ct-a12-budget-stop",
+            "ct-a4-spurious-fact",
+            "ct-a5-readable-dark",
+            "e1-false-budget-clear",
+            "e1-false-budget-opaque",
+        ]
+    );
     // Every one: none of them has a reader hole with light R2 can't tell.
     assert_eq!(decided, triples.len());
     assert_eq!(decided, 38 + 13);
@@ -379,7 +397,7 @@ fn sym(s: &str) -> Term {
 #[test]
 fn the_canonical_line() {
     let src = source::read(
-        b"rule  r1   p(?x,a)   requires q(?x),not  s ,  t(b,?x)\n\
+        b"rule  r1   p(?x,a)   requires q(?x),not  s,  t(b,?x)\n\
           functional  f(1,22)  ->   3\n\
           query   p(a,b)\n\
           query z\n\
@@ -661,27 +679,62 @@ fn a_dark_source_with_a_model() {
 
 // ------------------------------------------------- the fixtures, under R3
 
-/// Every fixture the tune refuses for a reason in R2's or R3's strata is
-/// refused by echo for that reason; every other fixture answers `unknown
-/// unreplayed model`, and none rings.
+/// R3's answer on all 38 fixtures. The `source` lines are exact (the
+/// addresses are echo's P and F, checked against Taut's 32 program and
+/// facts vectors; `3e705fdd…`/`a9eea834…` are 20a/20b); R2's `verdict`
+/// lines are `r2::the_fixture_table`'s; `dissonant <n>` counts both. Every
+/// other fixture answers `unknown unreplayed model`, and none rings.
 #[test]
 fn the_fixture_table() {
-    let refused = [
-        "a1-record-dark-disagrees",
-        "a1-record-dark-in-clear",
-        "ct-a4-spurious-fact",
-        "ct-a5-readable-dark",
-        "ct-a6-unsafe-with-model",
-        "dark2-not-canonical",
-        "p8-one-line",
+    let p20 = field("20a-program.vector", "blake3");
+    let f20 = field("20b-facts.vector", "blake3");
+    // pos-diamond's F, and the budget fixtures' P.
+    let f_diamond = "41e704fc2491b14581ee6de6c7f0636161b36255ade624bd5214c04a42976356";
+    let p_a12 = "ab6e744ee40a1ee9c4e86cbe701f97ee5added2b7baa1e9cc93cd93ac6895384";
+    let p_e1 = "d4e8f59b9b68d4f26cbedf616f33749788d4ed3dc89812382749c1bfea05c3f5";
+    let none_claimed = |p: &str, f: &str| {
+        let mut v = vec![source_line("none", p), source_line("none", f)];
+        v.sort();
+        v
+    };
+    let refused: Vec<(&str, Vec<String>, usize)> = vec![
+        ("a1-record-dark-disagrees", vec![], 2),
+        ("a1-record-dark-in-clear", vec![], 1),
+        ("ct-a12-budget-stop", none_claimed(p_a12, f_diamond), 0),
+        (
+            "ct-a4-spurious-fact",
+            vec![source_line(
+                "cdcde6e982f1790afd8d19bc0644cedb5c8898e663b7289ba12bf35e16f437aa",
+                &f20,
+            )],
+            0,
+        ),
+        ("ct-a5-readable-dark", none_claimed(&p20, &f20), 1),
+        ("ct-a6-unsafe-with-model", vec![], 2),
+        ("dark2-not-canonical", vec![], 1),
+        ("e1-false-budget-clear", none_claimed(p_e1, f_diamond), 0),
+        ("e1-false-budget-opaque", none_claimed(p_e1, f_diamond), 0),
+        ("p8-one-line", vec![], 1),
     ];
     let names = fixtures();
     assert_eq!(names.len(), 38);
     for name in &names {
         let a = run(&fixture(name).0);
         assert_ne!(a.verdict, Verdict::Rings, "{name}");
-        if refused.contains(&name.as_str()) {
-            assert!(lines(&a)[0].starts_with("dissonant "), "{name}");
+        if let Some((_, source, r2)) = refused.iter().find(|(n, _, _)| n == name) {
+            let l = intervals(&a);
+            assert_eq!(
+                lines(&a)[0],
+                format!("dissonant {}", source.len() + r2),
+                "{name}"
+            );
+            assert_eq!(&l[..source.len()], &source[..], "{name}");
+            assert!(
+                l[source.len()..]
+                    .iter()
+                    .all(|i| i.starts_with("interval verdict ")),
+                "{name}"
+            );
             assert_eq!(a.exit(), 1, "{name}");
         } else {
             assert_eq!(lines(&a)[0], NEXT, "{name}");
@@ -692,12 +745,17 @@ fn the_fixture_table() {
 }
 
 /// The kinds echo prints, R2's (`hole`, `dark`) and R3's (`source`):
-/// wherever the tune's `expect` names one, echo prints it; echo prints no
-/// kind the tune doesn't; no fixture the tune rings is dissonant in echo.
+/// wherever the tune's `expect` names one, echo prints it; no fixture the
+/// tune rings is dissonant in echo. An `expect` is a lower bound ("each
+/// kind must appear among the printed intervals", the tune's test
+/// docstring), so a kind beyond it is no disagreement; echo's are listed
+/// exactly: `source` on the four fixtures that claim `none` for P and F
+/// (Q35).
 #[test]
 fn the_kinds_agree_with_the_tune() {
     const OWNED: [&str; 4] = ["hole", "dark", "dark-source", "source"];
     let mut matched = Vec::new();
+    let mut beyond = Vec::new();
     for name in fixtures() {
         let (t, expect) = fixture(&name);
         let a = run(&t);
@@ -708,7 +766,9 @@ fn the_kinds_agree_with_the_tune() {
         match expect.strip_prefix("dissonant ") {
             Some(kinds) => {
                 let tune: BTreeSet<String> = kinds.split(' ').map(str::to_string).collect();
-                assert!(echo.is_subset(&tune), "{name}: {echo:?} not in {tune:?}");
+                for k in echo.difference(&tune) {
+                    beyond.push(format!("{name} {k}"));
+                }
                 let owned: BTreeSet<String> = tune
                     .iter()
                     .filter(|k| OWNED.contains(&k.as_str()))
@@ -732,6 +792,15 @@ fn the_kinds_agree_with_the_tune() {
             "ct-a6-unsafe-with-model",
             "dark2-not-canonical",
             "p8-one-line",
+        ]
+    );
+    assert_eq!(
+        beyond,
+        [
+            "ct-a12-budget-stop source",
+            "ct-a5-readable-dark source",
+            "e1-false-budget-clear source",
+            "e1-false-budget-opaque source",
         ]
     );
 }

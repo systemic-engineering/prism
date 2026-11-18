@@ -63,6 +63,15 @@ impl Tau {
         }
     }
 
+    /// `@pact/program` with the root flag: the program fragment and its
+    /// record atoms (certificate §3.1.1 A).
+    pub fn pact_program() -> Tau {
+        Tau {
+            name: "@pact/program".into(),
+            grammar: None,
+        }
+    }
+
     /// `@mirror/certificate` with the root flag: every atom and fragment
     /// the certificate itself introduces (certificate §3.1.1 A).
     pub fn mirror_certificate() -> Tau {

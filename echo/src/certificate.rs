@@ -131,6 +131,16 @@ pub struct Performance {
 }
 
 impl Performance {
+    /// Whether the performance prints a model: a `result`, a layer, a
+    /// derivation or a context. A Dark source's performance prints none
+    /// (check 2).
+    pub fn carries_model(&self) -> bool {
+        self.header.result.is_some()
+            || !self.layers.is_empty()
+            || !self.derives.is_empty()
+            || !self.contexts.is_empty()
+    }
+
     /// The model's address, recomputed from the layers: the positive run's
     /// atoms, or W's under-run's, as `fragment(@pact/fact root, "model",
     /// sorted)` (certificate §3.1 contexts and `result`; §3.1.1 A). `None`

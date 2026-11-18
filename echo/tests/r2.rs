@@ -117,9 +117,11 @@ fn hole_atom(words: &[&str]) -> String {
 
 const NEXT: &str = "unknown unreplayed model";
 
-/// R2's answer on all 38 fixtures. The interval lines are exact: the hole
-/// texts' digests are b3sum 1.8.7's, run by hand; the atoms' addresses are
-/// echo's encoder (checked against Taut's 48a, 71c, 73–77, 81, 90, 91).
+/// R2's lines (stratum `verdict`) on all 38 fixtures. The interval lines
+/// are exact: the hole texts' digests are b3sum 1.8.7's, run by hand; the
+/// atoms' addresses are echo's encoder (checked against Taut's 48a, 71c,
+/// 73–77, 81, 90, 91). The whole answer, R3's `source` lines and the
+/// count included, is `r3::the_fixture_table`.
 #[test]
 fn the_fixture_table() {
     let hole = |left: &str, right: &str, about: &str| {
@@ -161,15 +163,6 @@ fn the_fixture_table() {
                 "record",
             )],
         ),
-        // R3's (check 1): `r3::ct_a4_is_refused_for_its_spurious_fact`.
-        (
-            "ct-a4-spurious-fact",
-            vec![format!(
-                "interval source source {} {} about none at none 0 by 1",
-                "cdcde6e982f1790afd8d19bc0644cedb5c8898e663b7289ba12bf35e16f437aa",
-                "a9eea8347186d088f5c9e48104f3ace60acef6b6d2b9212829b21211d094a104"
-            )],
-        ),
         ("ct-a5-readable-dark", vec![dark(&dark_at(3, 5), "none")]),
         ("ct-a6-unsafe-with-model", ct_a6),
         (
@@ -185,11 +178,17 @@ fn the_fixture_table() {
             )],
         ),
     ];
+    let r2_lines = |a: &Answer| -> Vec<String> {
+        intervals(a)
+            .into_iter()
+            .filter(|l| l.starts_with("interval verdict "))
+            .collect()
+    };
     let names: BTreeSet<&str> = dissonant.iter().map(|(n, _)| *n).collect();
     for (name, want) in &dissonant {
         let a = run(&fixture(name).0);
-        assert_eq!(lines(&a)[0], format!("dissonant {}", want.len()), "{name}");
-        assert_eq!(&intervals(&a), want, "{name}");
+        assert!(lines(&a)[0].starts_with("dissonant "), "{name}");
+        assert_eq!(&r2_lines(&a), want, "{name}");
         assert_eq!(a.exit(), 1, "{name}");
     }
     for entry in fs::read_dir(data("fixtures")).expect("fixtures") {
@@ -202,14 +201,14 @@ fn the_fixture_table() {
             continue;
         }
         let a = run(&fixture(&name).0);
-        assert_eq!(lines(&a)[0], NEXT, "{name}");
-        assert_eq!(lines(&a).len(), 3, "{name}");
+        assert!(r2_lines(&a).is_empty(), "{name}");
     }
 }
 
 /// The kinds R2 prints: `hole`, `dark`. Wherever the tune's `expect` names
-/// one of them, echo prints it; echo prints no kind the tune doesn't; and
-/// no fixture the tune rings is dissonant in echo.
+/// one of them, echo prints it; echo prints none of them where the tune's
+/// `expect` doesn't; and no fixture the tune rings is dissonant in echo.
+/// (R3's `source` is `r3::the_kinds_agree_with_the_tune`'s.)
 #[test]
 fn r2_kinds_agree_with_the_tune() {
     const R2: [&str; 3] = ["hole", "dark", "dark-source"];
@@ -222,9 +221,14 @@ fn r2_kinds_agree_with_the_tune() {
             .expect("name");
         let (t, expect) = fixture(&name);
         let a = run(&t);
-        let echo: BTreeSet<String> = intervals(&a)
+        let all: BTreeSet<String> = intervals(&a)
             .iter()
             .map(|l| l.split(' ').nth(2).expect("kind").to_string())
+            .collect();
+        let echo: BTreeSet<String> = all
+            .iter()
+            .filter(|k| R2.contains(&k.as_str()))
+            .cloned()
             .collect();
         match expect.strip_prefix("dissonant ") {
             Some(kinds) => {
@@ -240,7 +244,7 @@ fn r2_kinds_agree_with_the_tune() {
                     matched += 1;
                 }
             }
-            None => assert!(echo.is_empty(), "{name}: {echo:?}"),
+            None => assert!(all.is_empty(), "{name}: {all:?}"),
         }
     }
     // a1-record-dark-disagrees, a1-record-dark-in-clear, ct-a5, ct-a6,

@@ -506,15 +506,11 @@ pub fn judge(
     performance: &Performance,
     record: &RecordLines,
 ) -> Option<Vec<Interval>> {
-    let carries_model = performance.header.result.is_some()
-        || !performance.layers.is_empty()
-        || !performance.derives.is_empty()
-        || !performance.contexts.is_empty();
     match report.light {
         Light::Open => return None,
         // Check 2: a model printed for a Dark source. Its interval's bytes
         // are open (docs/spec/echo.md Q26).
-        Light::Dark if carries_model => return None,
+        Light::Dark if performance.carries_model() => return None,
         _ => {}
     }
     let expected: Vec<String> = report.holes.iter().map(Hole::text).collect();
