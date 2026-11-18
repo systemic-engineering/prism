@@ -7,7 +7,7 @@ description = "prism's second reader of mirror's reflections (prism-022): it nev
 repository = "https://github.com/systemic-engineering/prism"
 publish = false
 
-# One integration-test binary (tests/main.rs), as ledger-verify does.
+# One integration-test binary (tests/main.rs), as chorus does.
 autotests = false
 
 [[test]]

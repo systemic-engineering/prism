@@ -1,10 +1,10 @@
 //! The hybrid AND rule: a checkpoint verifies only if Ed25519 *and*
 //! ML-DSA-44 both verify, under the given keys.
 
-use ledger_verify::checkpoint::{
+use chorus::checkpoint::{
     verify, Checkpoint, CheckpointError, Ed25519Key, LogKeys, MlDsaKey, Verified, MLDSA44_SIGNATURE,
 };
-use ledger_verify::note::{NoteError, Vkey};
+use chorus::note::{NoteError, Vkey};
 
 use crate::common::{body, cosigned_subtree, flip, line, log_keys, note, tree, Ed, Ml, ORIGIN};
 

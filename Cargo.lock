@@ -166,6 +166,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "chorus"
+version = "0.1.0"
+dependencies = [
+ "base64ct",
+ "ed25519-dalek",
+ "ml-dsa",
+ "serde_json",
+ "sha2 0.11.1",
+ "slh-dsa",
+]
+
+[[package]]
 name = "ciborium"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -846,18 +858,6 @@ name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
-
-[[package]]
-name = "ledger-verify"
-version = "0.1.0"
-dependencies = [
- "base64ct",
- "ed25519-dalek",
- "ml-dsa",
- "serde_json",
- "sha2 0.11.1",
- "slh-dsa",
-]
 
 [[package]]
 name = "libc"

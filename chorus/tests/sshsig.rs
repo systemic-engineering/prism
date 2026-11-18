@@ -9,7 +9,7 @@
 //! Each `.sig` was checked with `ssh-keygen -Y verify` before check-in.
 
 use base64ct::{Base64, Encoding as _};
-use ledger_verify::sshsig::{
+use chorus::sshsig::{
     verify, SealKey, SshsigError, COMPOSITE_LABEL, COMPOSITE_PREFIX, KEY_TYPE, MLDSA44_PUBLIC_KEY,
     MLDSA44_SIGNATURE, PUBLIC_KEY, SIGNATURE,
 };

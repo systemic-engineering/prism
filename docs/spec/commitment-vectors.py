@@ -1,4 +1,4 @@
-"""Reference vectors for ledger-verify's Halevi-Micali commitments, written from the paper, not from prism.
+"""Reference vectors for chorus's Halevi-Micali commitments, written from the paper, not from prism.
 
 S. Halevi and S. Micali, "Practical and Provably-Secure Commitment Schemes
 from Collision-Free Hashing", CRYPTO '96 (shaih.github.io/pubs/hm96.pdf; page

@@ -1,4 +1,4 @@
-"""Reference vectors for ledger-verify's Merkle checks, written from RFC 9162, not from prism.
+"""Reference vectors for chorus's Merkle checks, written from RFC 9162, not from prism.
 
 Writes two files next to this script:
 

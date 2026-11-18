@@ -2,9 +2,9 @@
 //! Ed25519 (0x04) **and** ML-DSA-44 (0x06) cosignatures both verify reach
 //! Q = ⌊(N+f)/2⌋ + 1.
 
-use ledger_verify::checkpoint::{Checkpoint, Ed25519CosignerKey, Ed25519Key};
-use ledger_verify::note::{SignatureLine, SignedNote, Vkey};
-use ledger_verify::quorum::{live, required, QuorumError, Tally, Witness, Witnesses};
+use chorus::checkpoint::{Checkpoint, Ed25519CosignerKey, Ed25519Key};
+use chorus::note::{SignatureLine, SignedNote, Vkey};
+use chorus::quorum::{live, required, QuorumError, Tally, Witness, Witnesses};
 
 use crate::common::{
     cosignature_v1, flip, hash_hex, note, tree, vkey, witnesses, Witness as W, ORIGIN,

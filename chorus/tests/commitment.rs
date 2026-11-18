@@ -7,7 +7,7 @@
 //! docs/spec/ledger.md §5, not from the library. Independent vectors:
 //! docs/spec/commitment-vectors.json, made by commitment-vectors.py (hashlib).
 
-use ledger_verify::commitment::{
+use chorus::commitment::{
     verify_opening, OpeningError, COMMITMENT, DIAGONALS, K, L, N, OPENING, SCHEME,
 };
 use serde_json::Value;

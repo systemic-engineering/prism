@@ -3,8 +3,8 @@
 use std::sync::OnceLock;
 
 use base64ct::Encoding as _;
-use ledger_verify::anchor::{AnchorError, AnchorKey, CONTEXT, PUBLIC_KEY, SIGNATURE, SPKI_PREFIX};
-use ledger_verify::checkpoint::Checkpoint;
+use chorus::anchor::{AnchorError, AnchorKey, CONTEXT, PUBLIC_KEY, SIGNATURE, SPKI_PREFIX};
+use chorus::checkpoint::Checkpoint;
 use slh_dsa::{Sha2_128s, SigningKey};
 
 use crate::common::{flip, tree, ORIGIN};

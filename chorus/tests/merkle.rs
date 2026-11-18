@@ -2,7 +2,7 @@
 //! the RFC 6962 leaves, sizes 1..8, from the RFC's text) and ledger-probes.json
 //! (transparency-dev/merkle's published probes, good and bad).
 
-use ledger_verify::merkle::{
+use chorus::merkle::{
     empty_root, leaf_hash, node_hash, root, verify_consistency, verify_inclusion, ProofError,
 };
 use serde_json::Value;

@@ -1,8 +1,8 @@
 //! C2SP signed-note: the spec's own Ed25519 example, key IDs, vkeys, and
 //! the parse rules.
 
-use ledger_verify::checkpoint::Ed25519Key;
-use ledger_verify::note::{
+use chorus::checkpoint::Ed25519Key;
+use chorus::note::{
     decode_base64, encode_base64, key_id, valid_key_name, NoteError, SignedNote, Vkey, ED25519,
     MLDSA44_COSIGNATURE,
 };

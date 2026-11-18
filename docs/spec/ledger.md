@@ -1,14 +1,14 @@
-# Ledger: what `ledger-verify` checks, under which assumptions
+# Ledger: what `chorus` checks, under which assumptions
 
-*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`), and `seal-vectors/` (the stock tools' raw output, 2026-11-18: OpenSSL 4.1.0's SLH-DSA anchor and OpenSSH 10.6p1's `ssh-mldsa44-ed25519` SSHSIGs, throwaway keys, §3 and §6). `ledger-verify/tests/` holds the crate to all four.*
+*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`), and `seal-vectors/` (the stock tools' raw output, 2026-11-18: OpenSSL 4.1.0's SLH-DSA anchor and OpenSSH 10.6p1's `ssh-mldsa44-ed25519` SSHSIGs, throwaway keys, §3 and §6). `chorus/tests/` holds the crate to all four.*
 
 ## The crate
 
-`ledger-verify/` is a workspace crate of its own:
+`chorus/` is a workspace crate of its own:
 
 - **`#![no_std]` + `alloc`, `#![forbid(unsafe_code)]`.** No I/O, no clock, no RNG, no LAPACK, no dependency on prismqueer.
 - **Every dependency without default features**, so nothing that generates keys or reads the OS is linked into the library.
-- **Portable, and checked:** the flake's `checks.ledger-portable` builds it in release for `wasm32-unknown-unknown` (a reader's browser) and for `thumbv7em-none-eabihf`, a target with no `std` at all. A dependency that pulled in `std` would fail the second build. It uses a toolchain of its own (the same rustc 1.94.0 with those two targets), so the gate's toolchain and its cache are unchanged.
+- **Portable, and checked:** the flake's `checks.chorus-portable` builds it in release for `wasm32-unknown-unknown` (a reader's browser) and for `thumbv7em-none-eabihf`, a target with no `std` at all. A dependency that pulled in `std` would fail the second build. It uses a toolchain of its own (the same rustc 1.94.0 with those two targets), so the gate's toolchain and its cache are unchanged.
 
 | Crate | Version | Used for | Standard |
 |---|---|---|---|
@@ -112,13 +112,13 @@ openssl pkeyutl -verify -rawin -pubin -inkey anchor.pub.pem -in checkpoint.txt \
   -sigfile anchor.sig -pkeyopt 'context-string:prism ledger anchor v1'
 ```
 
-- **The context option works on SLH-DSA in 4.1.0.** `-pkeyopt context-string:<text>` sets the FIPS 205 context (`OSSL_SIGNATURE_PARAM_CONTEXT_STRING`, at most 255 bytes, default empty; `EVP_SIGNATURE-SLH-DSA(7)`). A signature made with it verifies only with it, and one made without it doesn't verify with it (both checked with the CLI and in the tests). So the context stays, and the flag is part of the format: **forgetting it makes a valid FIPS 205 signature that is not an anchor,** and `ledger-verify` rejects it (`an_openssl_anchor_without_the_context_rejects`).
+- **The context option works on SLH-DSA in 4.1.0.** `-pkeyopt context-string:<text>` sets the FIPS 205 context (`OSSL_SIGNATURE_PARAM_CONTEXT_STRING`, at most 255 bytes, default empty; `EVP_SIGNATURE-SLH-DSA(7)`). A signature made with it verifies only with it, and one made without it doesn't verify with it (both checked with the CLI and in the tests). So the context stays, and the flag is part of the format: **forgetting it makes a valid FIPS 205 signature that is not an anchor,** and `chorus` rejects it (`an_openssl_anchor_without_the_context_rejects`).
 - **`-rawin` is pure SLH-DSA, not a prehash.** With the default `message-encoding` of 1, OpenSSL signs `M′ = 0x00 ‖ |ctx| ‖ ctx ‖ M` over the file's bytes as given (`EVP_SIGNATURE-SLH-DSA(7)`: "OpenSSL does not support Pre Hash SLH-DSA"). The tests confirm it: a pure FIPS 205 verifier (RustCrypto `slh-dsa`, `try_verify_with_context`) accepts the CLI's signature. `-digest` is not used.
 - The signature is randomized (OpenSSL's default `deterministic` is 0), so two signatures over one checkpoint differ; both verify.
 
 **Vectors** (`seal-vectors/`): `anchor-body.txt` (the tests' checkpoint, RFC 6962's eight leaves at size 8), `anchor.pub.pem`, `anchor.sig` (with the context), `anchor-empty-context.sig` (the same command without `-pkeyopt`). The private key was deleted after signing.
 
-**Alex's seal key is a deployment gate** (prism-019, 2026-11-17). The tooling is no longer the blocker (spectral-003's Response, 2026-11-17): this anchor and the SSHSIG seal (§6) are made with stock tools, and `ledger-verify` verifies what they produce. Nothing signs with Alex's keys until Alex has generated and cross-signed them. This crate only verifies.
+**Alex's seal key is a deployment gate** (prism-019, 2026-11-17). The tooling is no longer the blocker (spectral-003's Response, 2026-11-17): this anchor and the SSHSIG seal (§6) are made with stock tools, and `chorus` verifies what they produce. Nothing signs with Alex's keys until Alex has generated and cross-signed them. This crate only verifies.
 
 ## 4. The witness quorum (Lemma B), under the AND rule
 
@@ -195,7 +195,7 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 - ¶96 asks that, for long retention, "the potential impact of technical advances such as cryptanalytically-relevant quantum computers" be weighed.
 - **Reading:** statistical hiding at 2^−256 meets what ¶52/¶53 ask: after erasure the commitment can be neither recovered nor recognised, except with probability below 2^−256, which is not operationally distinguishable from perfect. And because the hiding rests on no assumption, it removes the ¶96 risk class (a future break, quantum or not), which a salted hash keeps. ¶104 still holds for any scheme: where a commitment isn't needed, a pointer is better.
 
-**The committer lives in the tests only** (`ledger-verify/tests/commitment.rs`), with coins from a seeded SHA-256 stream. The library checks; it has no RNG and never commits, so the portable build (`checks.ledger-portable`) is unchanged in kind. A `std`-gated committing feature was the alternative; it would put a second, unchecked-by-the-portable-build code path into the library for a job that is spectral's (the side that holds m and r).
+**The committer lives in the tests only** (`chorus/tests/commitment.rs`), with coins from a seeded SHA-256 stream. The library checks; it has no RNG and never commits, so the portable build (`checks.chorus-portable`) is unchanged in kind. A `std`-gated committing feature was the alternative; it would put a second, unchecked-by-the-portable-build code path into the library for a job that is spectral's (the side that holds m and r).
 
 **Vectors:** `commitment-vectors.json`, 4 commitments (m = "", "abc", 64 bytes, 1012 bytes) with fixed coins, written by `commitment-vectors.py` from the paper's text with `hashlib` only (it computes A r row by row from the definition and checks its own Receive). The Rust verifier accepts them; a changed m, every flipped bit (bar the unread corners, which open to the same m), and a truncated commitment or opening reject.
 
@@ -253,7 +253,7 @@ ssh-keygen -Y verify -f allowed_signers -I <identity> -n spectral-seal \
 
 ## Tests and mutations
 
-`ledger-verify/tests/` (one binary). Keys are throwaway keypairs from fixed seeds, made in the tests, except the stock tools' vectors in `seal-vectors/`, made by OpenSSL and OpenSSH with keys deleted after.
+`chorus/tests/` (one binary). Keys are throwaway keypairs from fixed seeds, made in the tests, except the stock tools' vectors in `seal-vectors/`, made by OpenSSL and OpenSSH with keys deleted after.
 
 | Area | Tests |
 |---|---|

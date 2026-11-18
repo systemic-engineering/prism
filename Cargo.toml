@@ -1,5 +1,5 @@
 [workspace]
-members = ["imperfect", "ledger-verify", "echo", "prismqueer", "projections"]
+members = ["imperfect", "chorus", "echo", "prismqueer", "projections"]
 resolver = "2"
 
 # Per Taut's profiling survey (mirror #286 Win 1, mirrored here on
@@ -14,7 +14,7 @@ codegen-units = 256
 [profile.test]
 codegen-units = 256
 
-# ledger-verify's tests sign SLH-DSA-SHA2-128s once per run (the anchor):
+# chorus's tests sign SLH-DSA-SHA2-128s once per run (the anchor):
 # a few million SHA-256 compressions, ~40s unoptimised. Optimising the two
 # crates that do that hashing makes it about a second. Dependencies only; the
 # workspace crates keep the dev profile's checks.

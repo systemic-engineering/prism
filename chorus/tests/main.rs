@@ -1,4 +1,4 @@
-//! ledger-verify's tests, one binary.
+//! chorus's tests, one binary.
 //!
 //! Vectors come from docs/spec (ledger-vectors.json, generated from RFC 9162's
 //! text by ledger-vectors.py; ledger-probes.json, transparency-dev/merkle's

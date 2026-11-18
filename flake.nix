@@ -46,7 +46,7 @@
         ./prismqueer
         ./imperfect
         ./projections
-        ./ledger-verify
+        ./chorus
         ./echo
       ];
       sourceExts = [
@@ -148,7 +148,7 @@
           craneLib = (crane.mkLib pkgs).overrideToolchain (_: toolchain);
 
           # The same rustc with std for wasm32-unknown-unknown and core/alloc
-          # for a bare-metal target, for ledger-verify's portability check
+          # for a bare-metal target, for chorus's portability check
           # only. A toolchain of its own, so the gate's toolchain (and every
           # cached build under it) stays as it is.
           portableTargets = [
@@ -320,12 +320,12 @@
 
             doctest = craneLib.cargoDocTest (gate // { cargoArtifacts = gateDeps; });
 
-            # ledger-verify builds where a reader's browser runs it
+            # chorus builds where a reader's browser runs it
             # (wasm32-unknown-unknown) and where no std exists at all
             # (thumbv7em-none-eabihf: core + alloc only, so a dependency that
             # pulls in std fails here). Release, as a page would ship it.
-            ledger-portable = craneLibPortable.mkCargoDerivation {
-              pname = "ledger-verify-portable";
+            chorus-portable = craneLibPortable.mkCargoDerivation {
+              pname = "chorus-portable";
               inherit version;
               src = packageSrc;
               strictDeps = true;
@@ -333,7 +333,7 @@
               cargoVendorDir = craneLibPortable.vendorCargoDeps { cargoLock = ./Cargo.lock; };
               doInstallCargoArtifacts = false;
               buildPhaseCargoCommand = lib.concatMapStringsSep "\n" (
-                t: "cargo build --locked --release -p ledger-verify --target ${t}"
+                t: "cargo build --locked --release -p chorus --target ${t}"
               ) portableTargets;
               installPhaseCommand = "touch $out";
             };
@@ -411,7 +411,7 @@
                     ./target
                     ./prismqueer/tests
                     ./imperfect/tests
-                    ./ledger-verify/tests
+                    ./chorus/tests
                     ./echo/tests
                   ]
                 );
