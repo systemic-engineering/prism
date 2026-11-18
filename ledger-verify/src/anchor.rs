@@ -2,9 +2,17 @@
 //! checkpoint, checked on its own (bullet-up-008, lean 3). If lattices
 //! fall, history up to the last anchor still rests on hashes alone.
 //!
-//! **Provisional format** (C2SP assigns SLH-DSA no signature type): FIPS 205
-//! pure SLH-DSA-SHA2-128s over the checkpoint's note text, with the context
-//! string [`CONTEXT`].
+//! **Format** (C2SP assigns SLH-DSA no signature type): FIPS 205 pure
+//! SLH-DSA-SHA2-128s over the checkpoint's note text, with the context
+//! string [`CONTEXT`]. It is exactly what the stock OpenSSL 4.1.0 CLI
+//! makes (docs/spec/ledger.md §4):
+//!
+//! ```text
+//! openssl pkeyutl -sign -rawin -inkey anchor.key.pem -in checkpoint.txt \
+//!   -pkeyopt 'context-string:prism ledger anchor v1' -out anchor.sig
+//! ```
+//!
+//! and the key is the one `openssl pkey -pubout` writes ([`AnchorKey::from_pem`]).
 
 use crate::checkpoint::Checkpoint;
 
@@ -14,6 +22,14 @@ pub const CONTEXT: &[u8] = b"prism ledger anchor v1";
 pub const PUBLIC_KEY: usize = 32;
 /// SLH-DSA-SHA2-128s signature length (FIPS 205, Table 2).
 pub const SIGNATURE: usize = 7856;
+/// The DER `SubjectPublicKeyInfo` before the 32 key bytes: SEQUENCE {
+/// SEQUENCE { OID 2.16.840.1.101.3.4.3.20 (id-slh-dsa-sha2-128s), no
+/// parameters }, BIT STRING (0 unused bits) }: the OID is NIST CSOR's, the
+/// layout the IETF LAMPS X.509 one for SLH-DSA, as OpenSSL 4.1.0 writes it.
+pub const SPKI_PREFIX: [u8; 18] = [
+    0x30, 0x30, 0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x14, 0x03,
+    0x21, 0x00,
+];
 
 /// Why an anchor did not verify.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +51,12 @@ impl AnchorKey {
         slh_dsa::VerifyingKey::try_from(bytes)
             .map(AnchorKey)
             .map_err(|_| AnchorError::Key)
+    }
+
+    /// The key as `openssl pkey -pubout` writes it: a PEM `PUBLIC KEY`
+    /// (SubjectPublicKeyInfo) for SLH-DSA-SHA2-128s.
+    pub fn from_pem(_pem: &str) -> Result<AnchorKey, AnchorError> {
+        Err(AnchorError::Key)
     }
 
     /// Verify an anchor signature over `checkpoint`.

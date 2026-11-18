@@ -84,11 +84,16 @@
       );
 
       # What the checks read: the packages' sources, the tests, and the spec
-      # vectors the tests load from docs/spec (gate_vectors, spec_vectors).
+      # vectors the tests load from docs/spec (gate_vectors, spec_vectors),
+      # and the stock tools' raw output (docs/spec/seal-vectors: openssl and
+      # ssh-keygen keys, messages and signatures, byte for byte).
       testFileset = fs.unions (
         [ packageFileset ]
         ++ map (d: fs.intersection (fs.maybeMissing (d + "/tests")) (fs.fileFilter (f: f.hasExt "rs") d)) crates
-        ++ [ (fs.fileFilter (f: f.hasExt "json") ./docs/spec) ]
+        ++ [
+          (fs.fileFilter (f: f.hasExt "json") ./docs/spec)
+          ./docs/spec/seal-vectors
+        ]
       );
 
       toSource = fileset: fs.toSource { root = ./.; inherit fileset; };
