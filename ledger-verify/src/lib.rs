@@ -6,8 +6,8 @@
 //! - [`checkpoint`]: C2SP `tlog-checkpoint` bodies, verified under the
 //!   hybrid **AND** rule: Ed25519 *and* ML-DSA-44 must both verify.
 //! - [`anchor`]: the SLH-DSA-SHA2-128s anchor over a checkpoint.
-//! - [`quorum`]: Lemma B's witness quorum, counting distinct valid
-//!   ML-DSA-44 cosignatures.
+//! - [`quorum`]: Lemma B's witness quorum, counting distinct witnesses
+//!   whose Ed25519 *and* ML-DSA-44 cosignatures both verify.
 //!
 //! It never holds a private key: every check takes public keys and
 //! signatures. No I/O, no clock, no RNG: `#![no_std]` with `alloc`, so the

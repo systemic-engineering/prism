@@ -108,10 +108,9 @@ impl Tally {
     }
 }
 
-/// The AND rule for one witness.
+/// The AND rule for one witness: both, never either.
 fn counts(ed25519: bool, mldsa44: bool) -> bool {
-    let _ = ed25519;
-    mldsa44
+    ed25519 && mldsa44
 }
 
 impl Witnesses {
