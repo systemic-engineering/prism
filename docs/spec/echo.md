@@ -219,3 +219,72 @@ Added with P2 and P4:
 - **Q17. The blake3 pin** (for mirror-Reed and Alex, not a spec question). prism pins `=1.8.7`. mirror's engine asks for `"1.8"` (seam note A1). The vectors agree at 1.8.7, so A1.7 P2's "or the vectors prove they don't need to" holds today. Should mirror pin exactly too, so that a future `1.8.x` is a visible change and not a silent one?
 - **Q18. `H` and prismqueer's identity.** These are different laws (fixpoint §5), and echo uses only `H`. No place was found where they must agree. The nearest is spectral's crystal content hash: if prism ever stores mirror atoms as crystals, one atom would have two addresses, and they must stay two named fields, never one. Is there a place they *should* agree?
 - **Q19. `# format-grammar` is 40 hex** (§16.10 item 1: "the signed grammar blob"). That is SHA-1. In a SHA-256 repository (§7: "the repository's object format"), would it be 64? V0 accepts only 40 today.
+
+## 10. Certificate replay, in slices (S1, S2)
+
+Certificate replay (prism-022 S1/S2; certificate §4; Note v3.3.2 §6) recomputes, from the source alone, P, F, the model, the depths, the first-tick derivations, W's context sequence, every functional declaration, the verdict, the record, the Dark-2 report and every address, and compares each with what the performance, the record and the score claim. It is built in slices, in dependency order. Each slice names the spec sections it implements and the mirror data (fixtures and vectors, read as data) that test it.
+
+**The floor, for every slice:** `rings` is printed only when every stratum the inputs call for has been replayed and agreed. Until then, the first stratum echo can't replay yet answers `unknown unreplayed <stratum>` (exit 2). echo never claims a ring it didn't check.
+
+| Slice | What it replays | Spec | Data that tests it | `<stratum>` it retires |
+|---|---|---|---|---|
+| **R1. The surface** | the entry `prism echo <source> <certificate> <record> [<score>]`; the `heard`, `implements` and verdict lines; exits 0/1/2; `unknown io`; the work budget and `uncertain budget`; reading the certificate (§3.2's printed form, typed constants included) and the record's line form, so an unreadable one is `unknown unreadable <where>`; every atom the certificate prints addressed under `H`, and the model's address recomputed from its layers | Note §4.2 (`heard`, B8; the listener; Q2's widths; the self-reference rule), §6.3, §6.4 (a) (the record's `dark`/`hole` text is opaque); mirror `docs/pin-batch/2026-10-30-tune-exit-contract-v3.2.md`; certificate §3.2 (the printed form, UNKNOWN), §3.1.1 A, §4.3 (the shape and what the checker may not do) | vector 50 (`heard`, exact bytes); 27's halves; every fixture: none may ring; `typed-corpus-unheard` (echo reads it: S4, beyond the tune) | none: it prints `unknown unreplayed source` |
+| **R2. The source and the Dark-2 report** | pact text (`fact`, `rule`, `functional`, `query`, comments, blanks); the reader checks (a repeated rule id, a non-ground query, query arity); the engine checks (arity, safety, declaration positions); `@mirror/dark-order`'s merge; `basis`; check 2 and check 10 | Seam's pact-eval audit §1.2; certificate §2.4, §3.1 (Dark atoms), §3.1.1 F, J, J′, M4 (OPEN: both readings recorded); Note §6.4, §6.5 G7, G8, §6.7 H1, H4 | `pos-dark2-engine`, `pos-dark2-reader`, `taut-22`, `taut-24`, `taut-48`, `p8-swapped`, `p8-one-line`, `a1-record-dark-*`, `dark2-not-canonical`, `ct-a5`, `ct-a6`; vectors 37, 48, 55, 56, 71 | `source` |
+| **R3. P, F and the interval** | the program fragment (canonical record lines) and the facts fragment (check 1); the interval atom, its text, its order and `dissonant <n>` | certificate §3.1, §3.1.1 B, G; Note §6.2 (bytes, text, order, distance), §6.5 R2 | `ct-a4`; vectors 20–24 (headers), 45, 46, 46a, 68 | `program` |
+| **R4. The positive run** | naive evaluation; depths (§1's conventions); all first-tick derivations; checks 3, 4, 5, 8; `stray`, `unlayered`, `depth`, `missing`, `extra`. The budget's real charge point: each ground rule instance attempted | certificate §1, §2.1, §3.1 (layers, derivations), §3.2, §4.1–§4.2; Note §6.2's structure rows | `ct-a2`, `ct-a8`, `ct-a9`, `ct-a10`, `pos-v01`, `pos-diamond`, `pos-v03`, `taut-20`; vector 27 | `model` |
+| **R5. W** | the alternating fixpoint; the whole context sequence (check 6); under- and over-layers and derivations; `context`; `unknown shadow under W` | certificate §1 (W's layers), §2.3, §3.1 (contexts), §3.1.1 H, I; Note §6.7 H1 (C3) | `ct-a1`, `pos-v04`, `taut-23`; vector 28 | `contexts` |
+| **R6. Declarations, the verdict, the record** | every `functional` declaration on every result (check 7); holes, light, shadow and the verdict words; the derived record; `verdict`, `record` and `dark` intervals | certificate §2.4, §3.1 (dark), §3.1.1 D, E, §3.2 (violating; N1, N2); Note §6.5 R1–R3, §6.7 H1–H5 | `ct-a3`, `pos-v05`, `pos-v05-control`, `taut-21`; vectors 29, 36, 54, 66, 77–86 | `verdict` |
+| **R7. Budget claims** | the `erasure … budget` line; E1's true and false claims; the stopped set; `budget`; `unknown budget <run> <unit>` | Note §6.5 R4–R7, E1, S1, S2, §7 | `ct-a12`, `e1-false-budget-*`, `a8-budget-query-unknown`; vectors 49, 67, 69, 70 | `budget` |
+| **R8. The certificate's address and the instrument** | the certificate fragment (check 9) and the `address` interval; the header's `engine` / `dark-order` (E4) and `instrument` | certificate §3, §3.1; Note §4.3, §6.5 E3, E4 | `ct-a11`, `e4-dark-order`; vectors 20h–24h, 30, 31, 35 | `address` |
+| **R9. The score** | the score's header, Notes, gazes, piece intervals (clash hub, flux) and completeness | Note §2, §4.2, §4.2.1, §6.2 (piece rows), §6.5 G2, G3 | `pos-v04`, `pos-v05` (with their scores), `score-missing-note`; vectors 38–44a, 47, 51, 52 | `score` |
+| **R10. Parity** | every fixture's `expect`, and Taut's tune KAT (41 cases) as data, byte for byte against the tune in the overlap (S7) | prism-022 S2, S7 | all of the above | none |
+
+`rings` becomes reachable at R8 for a run without a score, and at R9 with one. The order follows the data: R2 comes first because every later stratum is judged over the lines that read, and a Dark-2 source has no model. R3 comes before R4 because the first dissonance needs the interval's bytes.
+
+### 10.1 R1, the surface, exactly
+
+**The entry.** `prism echo <source> <certificate> <record> [<score>]`, a `std` binary target in the `echo` package; the library stays `no_std` (`checks.echo-portable` builds `--lib`).
+- It reads **its arguments and nothing else**: one `std::fs::read` per path given, and no environment variable, clock, network, process or other file (certificate §4.3). The library takes bytes, so it can't open anything. The source of the binary is tested for the absence of those calls.
+- Any other argument count, or a first word other than `echo`, prints `usage: prism echo <source> <certificate> <record> [<score>]` on stderr, nothing on stdout, and exits 2 (the contract delta's last row).
+
+**The lines** (Note §6.3; the contract delta: "`heard` and `implements` stay the second and third lines in every case"), each ending in LF, on stdout:
+
+```text
+<verdict line>
+heard source <addr | none> certificate <addr | none> record <addr | none> score <addr | none>
+implements spec <commit> vectors <tree> rig none
+```
+
+- **`heard`**: each slot is plain BLAKE3 of the input's raw bytes, 64 lowercase hex (B8); `none` for an input that couldn't be read, and `score none` when no score was given.
+- **`implements`**: constants compiled into echo, never computed at run time, and never naming echo's own tree (the self-reference rule):
+  - `spec` is the prism commit whose `docs/spec/echo.md` echo implements: the full 40-hex id (Q2: the repository's native object id; prism's repository is SHA-1);
+  - `vectors` is the git tree id of `docs/spec/echo-vectors` that echo was verified against, also 40 hex. Both name commits earlier than the one that sets them;
+  - `rig none`: echo is pinned to no rig (Note §4.3; M6, B1: `none` in this pin).
+- **The verdict line**, and its exit:
+
+| line | exit | when |
+|---|---|---|
+| `rings` | 0 | every stratum replayed and agreed. **Not reachable in R1** |
+| `dissonant <n>` | 1 | from R3 on |
+| `uncertain budget <n> ground rule instances` | 1 | echo's own work budget, `<n>`, ran out |
+| `unknown io <input> …` | 2 | every input that couldn't be read, in the order `source certificate record score` |
+| `unknown unreadable <input>:<L>:<C>` | 2 | the first input, in that order, that doesn't read, at its first unread byte (Q22) |
+| `unknown unreplayed <stratum>` | 2 | the first stratum, in §10's order, that echo can't replay yet (Q20) |
+
+  Precedence: `io`, then `unreadable`, then the budget, then `unreplayed`. The source never makes the answer `unreadable`: a source that doesn't read is a Dark-2 source, and a correct Dark-2 performance rings (Note §5, Seam row 8).
+
+**What R1 reads.**
+- **The certificate**, by §3.2: `#` comments at column 1 and blank lines anywhere; every other line is a key, one or more spaces, and a value. The keys are the header's six (`certificate 1`, then `result`, `program`, `facts`, `engine`, `dark-order`, each `<64 hex>` or `none`, once each), `layer`, `derive`, `context`, `dark`, `violating`, `erasure` (R5's form, Note §6.5) and `hole` (Note §6.7 H5). Atoms are read with echo's typed facts reader (§4), so `bytes "…"`, `addr …` and `nat …` constants read: that is S4, beyond the tune (`typed-corpus-unheard`). An unknown key, a malformed value or a missing header key is unreadable at its `L:C`.
+- **The record**, by its line form only (certificate §3.2 N2; Note §6.7 H4): a key from `verdict`, `file`, `shaped_by`, `true`, `undefined`, `false`, `findings`, `finding`, `hole`, `shadow`, `basis`, `dark`, `rounds`; one or more spaces; a value; `verdict` one of `clear`, `uncertain`, `unknown`, `paradox`. A `hole` or `dark` value is split at its first ` #`, and what follows is opaque bytes (§6.4 (a)). Every other byte is printable ASCII. The values themselves are read in R6.
+- **The source and the score** are hashed for `heard`, and read from R2 and R9.
+
+**What R1 replays.** Every atom the certificate prints is addressed under `H` at the store's `τ` (`@pact/fact` root; §3.1.1 A), and the model's address is recomputed from the layers (the positive run's atoms, or W's under-run atoms) as `fragment(@pact/fact, "model", sorted)`. That is compared with nothing in R1's verdict: the `result` it should equal is a claim, and the model it should be the address of comes from the source (R4). It is tested against Taut's data instead.
+
+**The budget.** One pinned constant, `10 000 000` ground rule instances (prism-022 S1: the tune's figure; Q21), counted, never timed. The library takes the budget as an argument so tests can lower it; the binary has no flag and always passes the constant. In R1 the only ground rule instances echo considers are the certificate's own `derive` lines: one unit each. R4 moves the charge point to every instance its own evaluation attempts.
+
+### 10.2 Questions R1 adds for Mara
+
+- **Q20. A line for "no method yet".** §6.3 has no line for a stratum the checker can't replay. echo prints `unknown unreplayed <stratum>` (exit 2, by the litmus: there is no step to take). Should it be one of §6.3's forms instead, or a new pinned form? It exists only until R9, but the overlap (S7) will see it.
+- **Q21. The budget's number.** The certificate spec fixes the budget as "a constant in the checker's own tree" and names its unit (ground rule instances considered). prism-022 quotes the tune's 10M. Is the number pinned in any spec text, and must echo's equal the tune's for parity (S2)? Where both run out at different points, they print different lines.
+- **Q22. The form of `<where>`.** §6.3 has `unknown unreadable <where>`; the `typed-corpus-unheard` fixture records the tune's answer as `certificate:8, expected ',' or ')'`, and the T1 pin-move proposal writes `unknown unreadable record`. echo prints `<input>:<L>:<C>` and no free text. What is pinned, byte for byte?
+- **Q23. `unknown budget` exits 2 or 1?** §6.3 (v3.2) and the contract delta say 2; §6.5 R5 and vector 67's README row still say 1. echo follows §6.3.
