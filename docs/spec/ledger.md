@@ -99,26 +99,37 @@ An offline key signs a checkpoint at genesis and periodically after that (bullet
 
 **Alex's seal key is a deployment gate** (prism-019, 2026-11-17). Nothing deploys signing with it until a post-quantum seal tool is chosen. This crate only verifies.
 
-## 4. The witness quorum (Lemma B)
+## 4. The witness quorum (Lemma B), under the AND rule
 
-Given N witnesses' ML-DSA-44 verifier keys, a tolerance f, and cosignature lines over a checkpoint:
+**Decision** (Alex, bullet-up-008 log, 2026-11-16): hybrid signatures use AND-composition everywhere; the weaker scheme never decides alone. For witnesses that means: each witness is declared with **two** verifier keys, Ed25519 (C2SP type 0x04) and ML-DSA-44 (0x06), under one cosigner name, and counts toward Q **only if both** its cosignatures over the checkpoint verify.
+
+Given N such witnesses, a tolerance f, and cosignature lines over a checkpoint:
 
 ```
-accept  ⟺  #{distinct configured witnesses with a valid cosignature}  ≥  Q = ⌊(N+f)/2⌋ + 1
+accept  ⟺  #{distinct configured witnesses whose 0x04 AND 0x06 cosignatures both verify}  ≥  Q = ⌊(N+f)/2⌋ + 1
 ```
 
-- **The cosignature** is C2SP `tlog-cosignature` type 0x06 (`timestamp ‖ ML-DSA-44 over CosignedSubtree`, with the witness's name as `cosigner_name`). Its body format is C2SP's, not provisional.
+The two cosignatures, both C2SP `tlog-cosignature` (read at C2SP/C2SP@`b2dd989`, 2026-10-07), neither provisional:
+
+| Type | Line | Signed message |
+|---|---|---|
+| 0x04, Ed25519 | `key ID ‖ u64 timestamp ‖ 64-byte signature` | RFC 8032 Ed25519 over the lines `cosignature/v1`, `time <timestamp as ASCII decimal>`, origin, size (ASCII decimal), base64(root), each ending in `\n`; no extension lines (checkpoints with extensions are refused) |
+| 0x06, ML-DSA-44 | `key ID ‖ u64 timestamp ‖ 2420-byte signature` | FIPS 204 ML-DSA-44, empty context, over `CosignedSubtree` (§2), `cosigner_name` = the witness's name, `start = 0`, `end = size` |
+
+- **A witness is declared with both keys** (`Witness::from_vkeys`, either order): one 0x04 and one 0x06 vkey under one name. Two keys of one type, an Ed25519 *log* key (0x01), a malformed key, or two names are refused (`WitnessKeys`). A witness with one key can't be declared, so it counts zero.
+- **A witness with only one valid cosignature counts zero.** Either one missing, or either one failing. It is reported as `partial` in the `Tally`.
 - **A witness counts once,** however many lines it sent.
-- **A line under no configured (name, key ID) counts zero.** That covers an unknown key, and a known name under another key.
-- **A known witness's failing line counts zero.** It is reported as `invalid`.
-- **A witness set is refused** if Q > N (f ≥ N, or no witnesses), or if it holds one (name, key ID) or one public key twice.
+- **A line under no configured (name, key ID) counts zero** (`unknown`). That covers an unknown key, and a known name under another key.
+- **A known key's failing line counts zero** (`invalid`).
+- **A witness set is refused** if Q > N (f ≥ N, or no witnesses), or if it holds one (name, key ID) or one public key twice, in either scheme.
+- **The two timestamps aren't compared** with each other or with a clock. Each cosignature is a full C2SP checkpoint cosignature on its own.
 - **Liveness** (Corollary C, N ≥ 3f + 1) is reported in the `Tally`, not required.
+
+**The 0x04 body is the C2SP text, checked twice:** the crate's `Checkpoint::cosignature_v1` equals the spec's worked example byte for byte (`example.com/behind-the-sofa`, `20852163`, `time 1679315147`), and equals the tests' own encoder, written from the spec's line list. No published 0x04 signature vector was found; signatures come from seeded `ed25519-dalek` keys.
 
 The proof is Mara's (`research-ledger-design.md` §2.3, PROVED): two Q-sets share at least 2Q − N ≥ f + 1 witnesses, so an honest one cosigned both checkpoints, and they lie on one history. Meiklejohn et al. Lemma 4.1 is the special case; Malkhi–Reiter is the general counting.
 
-**The quorum is exactly as post-quantum as its cosignature scheme** (Mara, BROKEN on "nothing to break"). Lemma B assumes the cosignatures can't be forged. Here they are ML-DSA-44, so the count rests on Module-LWE/SIS. With Ed25519 cosignatures a quantum adversary forges Q of them.
-
-**Not yet the AND rule for witnesses.** prism-019's Log says the quorum "counts only cosignatures that pass the AND rule". The step that built this crate asked for ML-DSA-44 cosignatures only, which is C2SP's SHOULD. A witness that also signs Ed25519 (0x04) isn't required to. Whether witnesses must sign both is open (below).
+**The quorum is as strong as the stronger of its two schemes, until both fall.** Lemma B assumes the cosignatures can't be forged (Mara, BROKEN on "nothing to break"). Counting a witness takes a valid Ed25519 *and* a valid ML-DSA-44 cosignature, so forging Q witnesses takes forging both schemes: a quantum adversary who breaks Ed25519 still faces ML-DSA-44 (Module-LWE/SIS), and a break of ML-DSA-44 alone still faces Ed25519 (discrete log). Under OR it would be the weaker of the two.
 
 ## 5. Commitments: Halevi–Micali over SHA-256, k = 256
 
@@ -174,7 +185,7 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 | Merkle inclusion and consistency, Lemma A | SHA-256 collision resistance | Category 2 (NIST IR 8547 Table 1) |
 | Checkpoint, AND rule | Ed25519 (discrete log) **and** ML-DSA-44 (Module-LWE/SIS) | holds while ML-DSA-44 holds: a forger must break both |
 | Anchor | SLH-DSA-SHA2-128s: SHA-256 only | Category 1, hash-only |
-| Quorum, Lemma B | ML-DSA-44 unforgeability, at most f dishonest witnesses, honest witnesses checking consistency (C2SP tlog-witness) | as ML-DSA-44 |
+| Quorum, Lemma B, AND rule | Ed25519 **and** ML-DSA-44 cosignatures, both per witness (a forger must break both); at most f dishonest witnesses; honest witnesses checking consistency (C2SP tlog-witness) | as the stronger of the two: holds while either holds, falls only when both fall |
 | Commitment hiding (Theorem 1) | nothing: < 2^−256, information-theoretic | unconditional |
 | Commitment binding | SHA-256 collision resistance | Category 2 |
 | The crates | RustCrypto's implementations match FIPS 204/205 and RFC 8032 | none of them is FIPS 140-validated |
@@ -189,7 +200,7 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 | Note | 8: the C2SP example, key IDs, vkey refusals, canonical base64, key names, the parse rules |
 | Checkpoint | 13: the body, its refusals, `CosignedSubtree`; both valid accepts (either order); Ed25519 alone, ML-DSA-44 alone, either one forged, other keys, another checkpoint all reject; duplicate lines, wrong key types and a malformed note are refused |
 | Anchor | 5: the sizes, a valid anchor, another checkpoint, flipped bits and a short signature, another key |
-| Quorum | 10: Q(7,2) = 5 and Mara's table; 4 reject, 5 accept; 5 with a duplicate, an unknown key, an imposter or a forgery reject; another checkpoint; cosignatures read from a note; unusable sets |
+| Quorum | 19: Q(7,2) = 5 and Mara's table; the 0x04 body against the C2SP example and an independent encoder; a 0x04 cosignature verifies, and rejects retimed, flipped, short or as a plain note signature; 0x01 and 0x04 keys kept apart; a witness with only its ML-DSA-44 or only its Ed25519 cosignature counts 0; 4 reject, 5 with both accept; 5 where one has only one scheme, or one forged Ed25519 or ML-DSA-44, reject; 5 with a duplicate, an unknown witness or an imposter reject; another checkpoint; both cosignatures read from a note; witness declarations; unusable sets |
 | Commitment | 14: the sizes; the tests' committer against the row-by-row definition; the Python vectors open, and reject mutated; opens with its (m, r); the wrong m, the wrong r, truncated or extended inputs, another scheme byte reject; every flipped bit rejects with its reason, bar the unread corners; the check equals the paper's equation; the binding extractor; the hiding smoke check (per-bit frequencies over 200 + 200 commitments within 0.3; not a proof) |
 
 Each mutation was applied, run and reverted:
@@ -198,6 +209,7 @@ Each mutation was applied, run and reverted:
 |---|---|
 | OR instead of AND (`ed25519 \|\| mldsa44`) | `ed25519_alone_never_verifies`, `mldsa44_alone_never_verifies`, `a_forged_ed25519_beside_a_valid_mldsa44_rejects`, `a_forged_mldsa44_beside_a_valid_ed25519_rejects` |
 | Counting lines, not distinct witnesses | `five_with_one_duplicate_rejects` |
+| Quorum: OR instead of AND per witness (`ed25519 \|\| mldsa44`) | `a_witness_with_only_its_ed25519_cosignature_counts_zero`, `a_witness_with_only_its_mldsa44_cosignature_counts_zero`, `five_where_one_has_only_its_ed25519_rejects`, `five_where_one_has_only_its_mldsa44_rejects`, `five_with_one_forged_ed25519_rejects`, `five_with_one_forged_mldsa44_rejects` |
 | No 0x00 leaf prefix | `leaf_and_node_hashes_carry_their_prefixes`, `mth_matches_the_published_roots_for_sizes_0_to_8`, `an_inner_node_cannot_pose_as_a_leaf` |
 | No 0x01 node prefix | 10 Merkle tests, among them every vector proof and both probe sets |
 | Commitment: drop the universal hash (compare b to SHA-256(m)) | 6, among them `the_python_vectors_open`, `the_check_is_the_papers_equation` |
@@ -208,8 +220,7 @@ Each mutation was applied, run and reverted:
 ## Not done yet
 
 - **What a leaf holds around a commitment** (the scheme byte is there; the leaf format waits on the identity work), and whether 290 bytes, not 288, is fine (Alex).
-- **The exit-table verdict** for the quorum (clear / uncertain / unknown / paradox, prism-019 ask 2). The `Tally` carries what it needs (valid, invalid, unknown, Q, live); the mapping isn't defined yet.
-- **Whether witnesses must also sign Ed25519** (the AND rule for cosignatures).
+- **The exit-table verdict** for the quorum (clear / uncertain / unknown / paradox, prism-019 ask 2). The `Tally` carries what it needs (valid, partial, invalid, unknown, Q, live); the mapping isn't defined yet.
 - **How an SLH-DSA anchor is carried** in or beside a note.
 - **The `@nix` tool** that wraps the crate for spectral.
 - **A red test running these vectors under wasm.** Today the crate *builds* for wasm32; it isn't *run* there.
