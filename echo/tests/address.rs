@@ -23,7 +23,7 @@ fn dir() -> PathBuf {
 }
 
 fn unhex(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "odd hex {s}");
+    assert!(s.len().is_multiple_of(2), "odd hex {s}");
     (0..s.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex"))
@@ -190,7 +190,12 @@ fn every_mirror_atom_reproduces_from_its_text() {
         if r.must("kind").contains("(negative)") {
             assert_ne!(got, r.digest(), "{}", r.name());
         } else {
-            assert_eq!(hex(&address::atom_preimage(&t, &a)), r.must("preimage"), "{}", r.name());
+            assert_eq!(
+                hex(&address::atom_preimage(&t, &a)),
+                r.must("preimage"),
+                "{}",
+                r.name()
+            );
             assert_eq!(got, r.digest(), "{}", r.name());
         }
         n += 1;
@@ -205,7 +210,12 @@ fn every_mirror_fact_line_reproduces() {
     for r in mirror() {
         for line in r.all("fact") {
             let (text, h) = line.rsplit_once(' ').expect("fact line");
-            assert_eq!(hex(&address::atom(&tau(r.must("tau")), &atom(text))), h, "{}: {line}", r.name());
+            assert_eq!(
+                hex(&address::atom(&tau(r.must("tau")), &atom(text))),
+                h,
+                "{}: {line}",
+                r.name()
+            );
             n += 1;
         }
     }
@@ -222,30 +232,55 @@ fn every_mirror_composite_reproduces_from_its_parts() {
     let mut n = 0;
     for r in &all {
         let kind = r.must("kind");
-        let Some(l) = r.get("label").map(|_| label(r)) else { continue };
+        let Some(l) = r.get("label").map(|_| label(r)) else {
+            continue;
+        };
         let t = tau(r.must("tau"));
         let got = if let Some(c) = r.get("children") {
-            let kids: Vec<Address> = if let Some(rest) = c.strip_prefix("child i = addr of n(nat i) at ") {
-                let (at, range) = rest.split_once(", i = 0..").expect("range");
-                let last: u64 = range.parse().expect("last");
-                let ct = tau(at);
-                (0..=last)
-                    .map(|i| address::atom(&ct, &Atom { pred: "n".into(), args: vec![Value::Nat(i)] }))
-                    .collect()
-            } else if c == "none" {
-                vec![]
-            } else {
-                let k = refs(c, &known);
-                if k.is_empty() {
-                    continue; // the certificate's named children: not stated as parts
-                }
-                k
-            };
+            let kids: Vec<Address> =
+                if let Some(rest) = c.strip_prefix("child i = addr of n(nat i) at ") {
+                    let (at, range) = rest.split_once(", i = 0..").expect("range");
+                    let last: u64 = range.parse().expect("last");
+                    let ct = tau(at);
+                    (0..=last)
+                        .map(|i| {
+                            address::atom(
+                                &ct,
+                                &Atom {
+                                    pred: "n".into(),
+                                    args: vec![Value::Nat(i)],
+                                },
+                            )
+                        })
+                        .collect()
+                } else if c == "none" {
+                    vec![]
+                } else {
+                    let k = refs(c, &known);
+                    if k.is_empty() {
+                        continue; // the certificate's named children: not stated as parts
+                    }
+                    k
+                };
             address::fragment(&t, &l, &kids)
         } else if let Some(ts) = r.get("targets") {
             address::lens(&t, &l, &refs(ts, &known))
         } else if r.get("entry").is_some() {
-            let kids: Vec<Address> = r.all("entry").map(|e| address::atom(&t, &atom(e))).collect();
+            // 25's note: "payload text shows a newline as \n; the bytes are
+            // 0x0a". A display convention of the vector file, not the
+            // canonical text, so it is undone here, around echo's reader.
+            let kids: Vec<Address> = r
+                .all("entry")
+                .map(|e| {
+                    let mut a = atom(&e.replace("\\n", "\u{2424}"));
+                    for v in &mut a.args {
+                        if let Value::Sym(s) = v {
+                            *s = s.replace('\u{2424}', "\n");
+                        }
+                    }
+                    address::atom(&t, &a)
+                })
+                .collect();
             address::fragment(&t, &l, &kids)
         } else if let Some(m) = r.get("members") {
             let by_number = refs(m, &known);
@@ -254,7 +289,9 @@ fn every_mirror_composite_reproduces_from_its_parts() {
             } else if m.is_empty() {
                 vec![]
             } else {
-                m.split(" & ").map(|a| address::atom(&tau(r.must("tau")), &atom(a))).collect()
+                m.split(" & ")
+                    .map(|a| address::atom(&tau(r.must("tau")), &atom(a)))
+                    .collect()
             };
             address::set(&t, &l, &members).expect("a set")
         } else if kind == "certificate: facts" {
@@ -302,7 +339,12 @@ fn our_vectors_reproduce() {
                 let a = atom(r.must("atom"));
                 assert_eq!(hex(&t.bytes()), r.must("tau_hex"), "{}", r.name());
                 assert_eq!(hex(&a.content()), r.must("content"), "{}", r.name());
-                assert_eq!(hex(&address::atom_preimage(&t, &a)), r.must("preimage"), "{}", r.name());
+                assert_eq!(
+                    hex(&address::atom_preimage(&t, &a)),
+                    r.must("preimage"),
+                    "{}",
+                    r.name()
+                );
                 address::atom(&t, &a)
             }
             kind @ ("fragment" | "lens" | "set") => {
@@ -312,11 +354,17 @@ fn our_vectors_reproduce() {
                 };
                 match kind {
                     "fragment" => {
-                        assert_eq!(hex(&address::fragment_preimage(&t, &label(r), &kids)), r.must("preimage"));
+                        assert_eq!(
+                            hex(&address::fragment_preimage(&t, &label(r), &kids)),
+                            r.must("preimage")
+                        );
                         address::fragment(&t, &label(r), &kids)
                     }
                     "lens" => {
-                        assert_eq!(hex(&address::lens_preimage(&t, &label(r), &kids)), r.must("preimage"));
+                        assert_eq!(
+                            hex(&address::lens_preimage(&t, &label(r), &kids)),
+                            r.must("preimage")
+                        );
                         address::lens(&t, &label(r), &kids)
                     }
                     _ => address::set(&t, &label(r), &kids).expect("a set"),
@@ -325,7 +373,8 @@ fn our_vectors_reproduce() {
             "set (F_G)" => {
                 let src = fs::read(dir().join("mirror/mirror.facts")).expect("mirror.facts");
                 let f = read(&src).expect("reads");
-                let kids: Vec<Address> = f.facts.iter().map(|x| address::atom(&t, &x.atom)).collect();
+                let kids: Vec<Address> =
+                    f.facts.iter().map(|x| address::atom(&t, &x.atom)).collect();
                 assert_eq!(kids.len().to_string(), r.must("k"));
                 address::set(&t, &label(r), &kids).expect("a set")
             }
@@ -356,16 +405,29 @@ fn typed_and_plain_have_different_addresses() {
     let typed = atom(&format!("node(addr {HEXNAME}, seq)"));
     let plain = atom(&format!("node({HEXNAME}, seq)"));
     let quoted = atom(&format!("node(sym \"{HEXNAME}\", seq)"));
-    assert_eq!(plain, quoted, "a bare name is sym \"<name>\" (§16.10 item 1)");
+    assert_eq!(
+        plain, quoted,
+        "a bare name is sym \"<name>\" (§16.10 item 1)"
+    );
     assert_eq!(address::atom(&t, &plain), address::atom(&t, &quoted));
     assert_ne!(address::atom(&t, &typed), address::atom(&t, &plain));
-    for (a, b) in [("q(nat 7)", "q(sym \"7\")"), ("q(bytes \"2f\")", "q(sym \"2f\")"), ("q(bytes \"2f\")", "q(nat 47)")] {
-        assert_ne!(address::atom(&t, &atom(a)), address::atom(&t, &atom(b)), "{a} vs {b}");
+    for (a, b) in [
+        ("q(nat 7)", "q(sym \"7\")"),
+        ("q(bytes \"2f\")", "q(sym \"2f\")"),
+        ("q(bytes \"2f\")", "q(nat 47)"),
+    ] {
+        assert_ne!(
+            address::atom(&t, &atom(a)),
+            address::atom(&t, &atom(b)),
+            "{a} vs {b}"
+        );
     }
-    // the bytes differ exactly at the tag
-    let (pa, pp) = (address::atom_preimage(&t, &typed), address::atom_preimage(&t, &plain));
-    let at = pa.iter().zip(&pp).position(|(x, y)| x != y).expect("they differ");
-    assert_eq!((pa[at], pp[at]), (0x02, 0x00));
+    // the arguments differ from their first byte, the tag
+    let (mut ea, mut ep) = (Vec::new(), Vec::new());
+    typed.args[0].encode(&mut ea);
+    plain.args[0].encode(&mut ep);
+    assert_eq!((ea[0], ep[0]), (0x02, 0x00));
+    assert_eq!((ea.len(), ep.len()), (1 + 8 + 32, 1 + 8 + 64));
 }
 
 /// A one-byte change anywhere in an encoding moves the address: every
@@ -373,7 +435,10 @@ fn typed_and_plain_have_different_addresses() {
 /// content, τ and ℓ.
 #[test]
 fn one_byte_moves_the_address() {
-    let v = mirror().into_iter().find(|r| r.name() == "02-atom-sym-nat-addr").expect("02");
+    let v = mirror()
+        .into_iter()
+        .find(|r| r.name() == "02-atom-sym-nat-addr")
+        .expect("02");
     let pre = unhex(v.must("preimage"));
     let base = address::hash(&pre);
     assert_eq!(base, v.digest());
@@ -383,18 +448,30 @@ fn one_byte_moves_the_address() {
         assert_ne!(address::hash(&p), base, "byte {i}");
     }
     let t = Tau::root("@datalog/fact").expect("tau");
-    assert_ne!(address::atom(&t, &atom("p(sym \"a\")")), address::atom(&t, &atom("p(sym \"b\")")));
-    assert_ne!(address::atom(&t, &atom("p(nat 6)")), address::atom(&t, &atom("p(nat 7)")));
+    assert_ne!(
+        address::atom(&t, &atom("p(sym \"a\")")),
+        address::atom(&t, &atom("p(sym \"b\")"))
+    );
+    assert_ne!(
+        address::atom(&t, &atom("p(nat 6)")),
+        address::atom(&t, &atom("p(nat 7)"))
+    );
     let u = Tau::root("@datalog/facu").expect("tau");
     assert_ne!(address::atom(&t, &atom("p")), address::atom(&u, &atom("p")));
-    assert_ne!(address::fragment(&t, "shard", &[]), address::fragment(&t, "share", &[]));
+    assert_ne!(
+        address::fragment(&t, "shard", &[]),
+        address::fragment(&t, "share", &[])
+    );
 }
 
 /// τ (§5.0): the name, NUL, then the flag; a NUL in the name is refused.
 #[test]
 fn tau_bytes_and_nul() {
     let g: Address = core::array::from_fn(|i| i as u8);
-    assert_eq!(hex(&Tau::root("@mirror").expect("tau").bytes()), "406d6972726f720000");
+    assert_eq!(
+        hex(&Tau::root("@mirror").expect("tau").bytes()),
+        "406d6972726f720000"
+    );
     let under = Tau::under("@x", g).expect("tau");
     assert_eq!(under.bytes()[..4], [b'@', b'x', 0x00, 0x01]);
     assert_eq!(under.bytes()[4..], g);
@@ -410,9 +487,21 @@ fn tau_bytes_and_nul() {
 fn order_kind_and_sets() {
     let t = Tau::root("@mirror").expect("tau");
     let (x, y) = ([1u8; 32], [2u8; 32]);
-    assert_ne!(address::fragment(&t, "f", &[x, y]), address::fragment(&t, "f", &[y, x]));
-    assert_ne!(address::fragment(&t, "f", &[x, y]), address::lens(&t, "f", &[x, y]));
-    assert_eq!(address::set(&t, "s", &[y, x]), Ok(address::fragment(&t, "s", &[x, y])));
+    assert_ne!(
+        address::fragment(&t, "f", &[x, y]),
+        address::fragment(&t, "f", &[y, x])
+    );
+    assert_ne!(
+        address::fragment(&t, "f", &[x, y]),
+        address::lens(&t, "f", &[x, y])
+    );
+    assert_eq!(
+        address::set(&t, "s", &[y, x]),
+        Ok(address::fragment(&t, "s", &[x, y]))
+    );
     assert_eq!(address::set(&t, "s", &[x, y, x]), Err(Repeated(x)));
-    assert_eq!(address::set(&t, "s", &[]), Ok(address::fragment(&t, "s", &[])));
+    assert_eq!(
+        address::set(&t, "s", &[]),
+        Ok(address::fragment(&t, "s", &[]))
+    );
 }

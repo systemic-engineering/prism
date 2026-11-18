@@ -36,14 +36,19 @@ impl Tau {
     /// `name` with the root flag (`0x00`). `None` if the name holds a NUL,
     /// which would make `τ` ambiguous (§5.0: "a name never contains NUL").
     pub fn root(name: &str) -> Option<Tau> {
-        let _ = name;
-        None
+        Tau::new(name, None)
     }
 
     /// `name` under a format grammar (`0x01 ‖ addr(G)`). `None` on a NUL.
     pub fn under(name: &str, grammar: Address) -> Option<Tau> {
-        let _ = (name, grammar);
-        None
+        Tau::new(name, Some(grammar))
+    }
+
+    fn new(name: &str, grammar: Option<Address>) -> Option<Tau> {
+        (!name.as_bytes().contains(&0)).then(|| Tau {
+            name: name.into(),
+            grammar,
+        })
     }
 
     /// The altitude's `@`-ref.
@@ -58,7 +63,16 @@ impl Tau {
 
     /// `τ`'s bytes.
     pub fn bytes(&self) -> Vec<u8> {
-        Vec::new()
+        let mut out = Vec::from(self.name.as_bytes());
+        out.push(0x00);
+        match &self.grammar {
+            None => out.push(0x00),
+            Some(g) => {
+                out.push(0x01);
+                out.extend_from_slice(g);
+            }
+        }
+        out
     }
 }
 
@@ -68,14 +82,36 @@ pub struct Repeated(pub Address);
 
 /// `H`: BLAKE3, default mode, 32 bytes.
 pub fn hash(bytes: &[u8]) -> Address {
-    let _ = bytes;
-    [0; 32]
+    *blake3::hash(bytes).as_bytes()
+}
+
+/// The kind prefixes (§5.0). Never stored; only hashed.
+const SPLINTER: &[u8] = b"splinter\0";
+const FRAGMENT: &[u8] = b"fragment\0";
+const LENS: &[u8] = b"lens\0";
+
+/// `enc(b) = u64(len(b)) ‖ b`.
+fn enc(b: &[u8], out: &mut Vec<u8>) {
+    out.extend_from_slice(&(b.len() as u64).to_be_bytes());
+    out.extend_from_slice(b);
+}
+
+/// `kind ‖ τ ‖ enc(ℓ) ‖ u64(k) ‖ addr₀ ‖ …`, the shape fragments and lenses share.
+fn tree(kind: &[u8], tau: &Tau, label: &str, children: &[Address]) -> Vec<u8> {
+    let mut out = Vec::from(kind);
+    out.extend_from_slice(&tau.bytes());
+    enc(label.as_bytes(), &mut out);
+    out.extend_from_slice(&(children.len() as u64).to_be_bytes());
+    children.iter().for_each(|c| out.extend_from_slice(c));
+    out
 }
 
 /// An atom's preimage, `"splinter\0" ‖ τ ‖ enc(content)`.
 pub fn atom_preimage(tau: &Tau, atom: &Atom) -> Vec<u8> {
-    let _ = (tau, atom);
-    Vec::new()
+    let mut out = Vec::from(SPLINTER);
+    out.extend_from_slice(&tau.bytes());
+    enc(&atom.content(), &mut out);
+    out
 }
 
 /// An atom's address.
@@ -85,8 +121,7 @@ pub fn atom(tau: &Tau, atom: &Atom) -> Address {
 
 /// A fragment's preimage; the children are in the order given.
 pub fn fragment_preimage(tau: &Tau, label: &str, children: &[Address]) -> Vec<u8> {
-    let _ = (tau, label, children);
-    Vec::new()
+    tree(FRAGMENT, tau, label, children)
 }
 
 /// A fragment's address.
@@ -96,8 +131,7 @@ pub fn fragment(tau: &Tau, label: &str, children: &[Address]) -> Address {
 
 /// A lens's preimage; the targets are in the order given.
 pub fn lens_preimage(tau: &Tau, label: &str, targets: &[Address]) -> Vec<u8> {
-    let _ = (tau, label, targets);
-    Vec::new()
+    tree(LENS, tau, label, targets)
 }
 
 /// A lens's address.
@@ -106,6 +140,13 @@ pub fn lens(tau: &Tau, label: &str, targets: &[Address]) -> Address {
 }
 
 /// `set_addr`: the fragment over `members` sorted strictly ascending.
+/// Ascending, unsigned, byte-wise (§5.0.1 item 1), which is `[u8; 32]`'s
+/// own order; a repeated member is refused (item 2).
 pub fn set(tau: &Tau, label: &str, members: &[Address]) -> Result<Address, Repeated> {
-    Ok(fragment(tau, label, members))
+    let mut sorted = Vec::from(members);
+    sorted.sort_unstable();
+    if let Some(w) = sorted.windows(2).find(|w| w[0] == w[1]) {
+        return Err(Repeated(w[0]));
+    }
+    Ok(fragment(tau, label, &sorted))
 }
