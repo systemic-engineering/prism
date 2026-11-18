@@ -1,6 +1,6 @@
 # echo: prism's second reader of mirror
 
-*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 2: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`) and P4 (V0 integrity). Crate `echo`, no_std; the binary `prism echo …` comes later.*
+*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 3: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slice R1 (the surface, §10). Crate `echo`: a no_std library and the std binary `prism echo …`.*
 
 Echo can only give back the last words she was given, and she never speaks first. The checker never authors: it replays the engine's own record from the text and gives it back exactly, so where the two differ, the difference is named and located.
 
@@ -15,7 +15,9 @@ Echo can only give back the last words she was given, and she never speaks first
 | **P2, the address law `H`** | `echo::address` (`Tau`, `hash`, `atom`, `fragment`, `lens`, `set`) | fixpoint §5.0, §5.0.1 items 1, 2, 10, 11, §4.1 (fact store bytes), §15.2 (the altitude), §16.10 item 1 (`bytes`, `set_addr`); certificate §4.1 item 9, §4.2, §4.3 (the known-answer vectors) |
 | **P4, V0 integrity** | `echo::integrity::{check_facts, check_reflection}` | seam note amendment 1, A1.3 and A1.7 P4; fixpoint §16.10 item 1 |
 
-Not yet: P5 (V2, the second reading), certificate replay (S1, S2), the output lines and exit codes of Note §6.3, the `implements` line, the budget.
+| **S1/S2, certificate replay, R1** | `echo::replay`, `echo::certificate`, `echo::record`; the binary `prism` (`echo/src/bin/prism.rs`) | Note v3.3.2 §4.2, §6.3, §6.4 (a); mirror's v3.2 contract delta; certificate §3.2, §3.1.1 A and J, §4.3 (§10 here) |
+
+Not yet: P5 (V2, the second reading), and certificate replay's R2–R10 (§10).
 
 ## 2. Independence
 
@@ -187,6 +189,9 @@ Each of these was applied, killed by the suite, and reverted:
 | `H` by `blake3::derive_key` with a context | the same 6 |
 | V0 without the address check | `integrity::a_wrong_claimed_address_is_refused_at_the_claim`, `integrity::a_dropped_fact_is_refused_at_the_claim` |
 | V0's order check lets a repeat through (`<` for `<=`) | `integrity::order_and_repeats_are_refused_at_their_line` |
+| R1: replay defaults to `rings` when nothing failed (`Verdict::Rings` for `conclude(&UNREPLAYED)`) | 8 tests: `replay::what_echo_cannot_replay_is_unknown_never_rings`, `replay::no_fixture_rings`, four more `replay::` tests that expect `unknown unreplayed source`, the budget's boundary, and `bin::the_binary_prints_the_library_answer` |
+| R1: the record dropped from `heard` (its slot `none`) | `replay::heard_names_each_input_by_blake3_of_its_raw_bytes`, `replay::vector_50_heard_line_byte_for_byte` |
+| R1: the binary takes its budget from the clock (`SystemTime` nanoseconds mod 10) | `bin::the_binary_source_reads_only_its_arguments`, `bin::the_binary_prints_the_library_answer` |
 
 ## 9. Open questions for Mara
 
@@ -288,3 +293,63 @@ implements spec <commit> vectors <tree> rig none
 - **Q21. The budget's number.** The certificate spec fixes the budget as "a constant in the checker's own tree" and names its unit (ground rule instances considered). prism-022 quotes the tune's 10M. Is the number pinned in any spec text, and must echo's equal the tune's for parity (S2)? Where both run out at different points, they print different lines.
 - **Q22. The form of `<where>`.** §6.3 has `unknown unreadable <where>`; the `typed-corpus-unheard` fixture records the tune's answer as `certificate:8, expected ',' or ')'`, and the T1 pin-move proposal writes `unknown unreadable record`. echo prints `<input>:<L>:<C>` and no free text. What is pinned, byte for byte?
 - **Q23. `unknown budget` exits 2 or 1?** §6.3 (v3.2) and the contract delta say 2; §6.5 R5 and vector 67's README row still say 1. echo follows §6.3.
+
+### 10.3 R1, as built
+
+`73df7f0` 🔴 → `b030c7f` 🟢. The `implements` line reads `implements spec 7a6dd355564cffaf6c47bb4f650390a9725352f4 vectors ce646bf56a9f00a9309522d3178e4de4ca482060 rig none`: the §10 commit, and `docs/spec/echo-vectors` at the red commit, which added mirror's fixtures. Both are earlier than the green commit that sets them. They move by hand, at the commit after a spec or vectors change, never to the commit that holds them.
+
+**What the tests hold** (`echo/tests/replay.rs`, `echo/tests/bin.rs`):
+- `heard`: b3sum's digests of pos-v01's three files, byte for byte; vector 50's second line over corpus 01's source and 27's halves; `none` for every input that couldn't be read; `score none` when no score was given, which is not `io`.
+- `implements`: seven words, the two ids 40 lowercase hex, `rig none`.
+- The exits and first lines of all five R1 outcomes; three lines, in §6.3's order, each ending in LF.
+- **The floor:** all 38 fixtures answer `unknown unreplayed source` and exit 2; `rings` only from `conclude(&[])`.
+- `unreadable`: certificate and record lines refused at their `L:C` (a lowercase predicate, a missing `)`, a leading zero, an unknown run or key, a CR, uppercase or short hex, `certificate 2`, separators cut short where they stop, a header key missing or repeated, every `dark`/`context`/`erasure`/`violating`/`hole` form); the record's `verdict` word, a TAB, non-ASCII outside a hole's utterance; the order `io`, then certificate, then record, then the budget; the source never `unreadable`.
+- **The budget:** pinned at 10 000 000; pos-v01's 9 derivations fit a budget of 9, and 8, 1 and 0 run out with `uncertain budget <n> ground rule instances`, exit 1, the same bytes in 50 runs; a budget of 1 runs out on exactly the 22 real inputs that print more than one derivation.
+- **Addresses:** the model's address recomputes from the layers and equals the claimed `result` on pos-v01, pos-diamond, pos-v03, pos-v04 and pos-v05 (W), pos-v05-control, taut-20, taut-21, taut-23 and typed-corpus-unheard (typed `bytes`). On CT-A11 it differs from the claim and equals vector 01's. A repeated layer atom has no model address.
+- **The binary:** it prints the library's answer for the same bytes; the same bytes with `env_clear()` from an empty directory; it writes nothing into its working directory (under coverage, only `LLVM_PROFILE_FILE` is kept, for the instrumentation's own runtime); a nonexistent score path is `unknown io score`; five paths (the fifth nonexistent), two paths, none, or a first word other than `echo` print usage on stderr, nothing on stdout, exit 2; its source has no `env::var`, `current_dir`, `std::net`, `Command`, `Instant`, `SystemTime`, `read_dir`, `File::open`, `OpenOptions` or `include_`, and one `fs::read(`.
+
+**How "nothing but its arguments" holds by construction:** the library is `no_std`, takes bytes, and can open nothing (`checks.echo-portable` builds it for wasm32 and thumbv7em). The binary is the only code with `std`: it reads `argv`, opens each path given with one `fs::read`, and hands the bytes to the library. There is no flag, so the budget can't be set from outside.
+
+**mirror's checker fixtures under R1** (the binary, each fixture's `expect` redirections followed; the tune's answer from its `expect` file):
+
+| fixture | the tune | echo R1 |
+|---|---|---|
+| `a1-record-dark-disagrees` | dissonant hole | `unknown unreplayed source` (2) |
+| `a1-record-dark-engine` | rings | `unknown unreplayed source` (2) |
+| `a1-record-dark-in-clear` | dissonant hole | `unknown unreplayed source` (2) |
+| `a1-record-dark-reader` | rings | `unknown unreplayed source` (2) |
+| `a8-budget-query-unknown` | rings | `unknown unreplayed source` (2) |
+| `ct-a1-stable-model-witness` | dissonant context | `unknown unreplayed source` (2) |
+| `ct-a10-truncated-claims-fixed` | dissonant unlayered | `unknown unreplayed source` (2) |
+| `ct-a11-model-text-sorted` | dissonant address | `unknown unreplayed source` (2) |
+| `ct-a12-budget-stop` | dissonant budget verdict | `unknown unreplayed source` (2) |
+| `ct-a2-missing-derivation` | dissonant missing | `unknown unreplayed source` (2) |
+| `ct-a3-clear-hides-functional` | dissonant verdict | `unknown unreplayed source` (2) |
+| `ct-a4-spurious-fact` | dissonant source | `unknown unreplayed source` (2) |
+| `ct-a5-readable-dark` | dissonant dark | `unknown unreplayed source` (2) |
+| `ct-a6-unsafe-with-model` | dissonant hole verdict shadowed | `unknown unreplayed source` (2) |
+| `ct-a8-layer-off-by-one` | dissonant depth | `unknown unreplayed source` (2) |
+| `ct-a9-circular-pair` | dissonant stray | `unknown unreplayed source` (2) |
+| `dark2-not-canonical` | dissonant dark | `unknown unreplayed source` (2) |
+| `e1-false-budget-clear` | dissonant budget | `unknown unreplayed source` (2) |
+| `e1-false-budget-opaque` | dissonant budget verdict | `unknown unreplayed source` (2) |
+| `e4-dark-order` | dissonant instrument | `unknown unreplayed source` (2) |
+| `p8-one-line` | dissonant hole | `unknown unreplayed source` (2) |
+| `p8-swapped` | rings | `unknown unreplayed source` (2) |
+| `pos-dark2-engine` | rings | `unknown unreplayed source` (2) |
+| `pos-dark2-reader` | rings | `unknown unreplayed source` (2) |
+| `pos-diamond` | rings | `unknown unreplayed source` (2) |
+| `pos-v01` | rings | `unknown unreplayed source` (2) |
+| `pos-v03` | rings | `unknown unreplayed source` (2) |
+| `pos-v04` | rings | `unknown unreplayed source` (2) |
+| `pos-v05` | rings | `unknown unreplayed source` (2) |
+| `pos-v05-control` | rings | `unknown unreplayed source` (2) |
+| `score-missing-note` | dissonant missing | `unknown unreplayed source` (2) |
+| `taut-20` … `taut-24`, `taut-48` | rings | `unknown unreplayed source` (2) |
+| `typed-corpus-unheard` | unreadable (the tune can't read typed constants) | `unknown unreplayed source` (2): echo reads it (S4) |
+
+Nothing rings; every cheat is "not pass". No cheat is refused *for its reason* yet: that is R2–R9, and parity with the tune's reasons is R10.
+
+**What R1 does not do, on purpose:** it reads the record's line form, not its values (R6); it doesn't read the score (R9); it doesn't compare the recomputed model address with the `result` claim in its verdict, because the interval for that is check 9's, against a model from the source (R4, R8).
+
+**Gates at `b030c7f`:** `just check` clean; `checks.coverage` 96.07% of lines (the ratchet is 94; echo 98.88%, 1148 of 1161); `checks.doctest`; `checks.echo-independent` (the binary adds no dependency); `checks.echo-portable`, which now builds `--lib`.
