@@ -9,6 +9,7 @@
 mod address;
 mod cut;
 mod facts;
+mod integrity;
 mod refusals;
 mod typed;
 mod vectors;
