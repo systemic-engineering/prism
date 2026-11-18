@@ -1,8 +1,9 @@
 //! Certificate replay (prism-022 S1, S2): slice R1, the surface
 //! (docs/spec/echo.md §10.1); slice R2, the source and the Dark-2 report
-//! (§10.4; `crate::source`, `crate::dark2`); and slice R3, P, F and check
-//! 1 (§10.6; `crate::program`). The intervals of every slice print as one
-//! list, by stratum, then by bytes (Note §6.2).
+//! (§10.4; `crate::source`, `crate::dark2`); slice R3, P, F and check 1
+//! (§10.6; `crate::program`); and slice R4, the positive run and checks 3,
+//! 4, 5 and 8 (§10.8; `crate::model`). The intervals of every slice print
+//! as one list, by stratum, then by bytes (Note §6.2).
 //!
 //! The output is Note v3.3.2 §6.3's, as mirror's v3.2 contract delta
 //! (`docs/pin-batch/2026-10-30-tune-exit-contract-v3.2.md`) gives it: the
@@ -24,24 +25,26 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Write;
 
-use crate::address::{self, Address, Tau};
-use crate::certificate::{self, Performance};
+use crate::address::{self, Address};
+use crate::certificate;
 use crate::dark2;
 use crate::facts::Position;
 use crate::interval::{self, Interval};
+use crate::model::{self, Meter};
 use crate::program;
 use crate::record;
 use crate::source;
 
-/// The prism commit whose `docs/spec/echo.md` echo implements: `3d00a4e`,
-/// version 4, §10 with R2 as built. Full and lowercase (Note §4.2, Q2:
+/// The prism commit whose `docs/spec/echo.md` echo implements: `fa96f40`,
+/// version 5, §10 with R3 as built. Full and lowercase (Note §4.2, Q2:
 /// prism's repository is SHA-1). Always an earlier commit than the one
 /// that sets it (the self-reference rule).
-pub const SPEC: &str = "3d00a4ecea49d9908c7c03d6973e6484f03075da";
+pub const SPEC: &str = "fa96f40b3436a71490173fb99a513c03cb7199a7";
 
 /// The git tree of `docs/spec/echo-vectors` echo was verified against: the
-/// tree at `72d1b88`, the R3 red commit that added Taut's 68.
-pub const VECTORS: &str = "5bead5f96f6497e5e2d7a1bba62a4f33973ff18c";
+/// tree at `575d55b`, the R4 red commit that added Taut's Notes (38, 41,
+/// 44a).
+pub const VECTORS: &str = "49698ad6c68df77eefedd4e19336e2675c0e9ae0";
 
 /// The work budget, in ground rule instances considered (certificate §3.2
 /// UNKNOWN: "a work count … fixed as a constant in the checker's own
@@ -56,8 +59,8 @@ pub const STRATA: [&str; 8] = [
 ];
 
 /// How many of [`STRATA`] echo replays so far: R2 retired `source`, R3
-/// `program`. Each slice removes its word from the front.
-const REPLAYED: usize = 2;
+/// `program`, R4 `model`. Each slice removes its word from the front.
+const REPLAYED: usize = 3;
 
 /// `source`'s place in [`STRATA`]: check 2, whose interval bytes are open
 /// (docs/spec/echo.md Q26), is still the source stratum's.
@@ -197,20 +200,6 @@ pub fn conclude(unreplayed: &[&'static str]) -> Verdict {
     }
 }
 
-/// The work meter: counts ground rule instances considered, never time.
-struct Meter {
-    left: u64,
-}
-
-struct Exhausted;
-
-impl Meter {
-    fn spend(&mut self) -> Result<(), Exhausted> {
-        self.left = self.left.checked_sub(1).ok_or(Exhausted)?;
-        Ok(())
-    }
-}
-
 /// Replay the inputs within `budget` ground rule instances. The binary
 /// always passes [`BUDGET`].
 pub fn replay(inputs: &Inputs<'_>, budget: u64) -> Answer {
@@ -266,15 +255,18 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
             }
         }
     };
-    let mut meter = Meter { left: budget };
-    if consider(&performance, &mut meter).is_err() {
-        return Verdict::Uncertain { budget };
-    }
     // R2: the source and its Dark-2 report. The source is never
     // `unreadable`: a line that doesn't read is a hole (Note §5; Seam row
     // 8).
     let source = source::read(source);
     let report = dark2::report(&source);
+    // R4: echo's own run, before anything is judged, so a budget that runs
+    // out is `uncertain` whatever else differs. A positive source runs its
+    // eval program; a W source only its positive core, and only where the
+    // header turns on a certain paradox (H3 v3.3; Taut's 95, 97).
+    let Ok(r4) = model::replay(&source, &report, &mut Meter::new(budget)) else {
+        return Verdict::Uncertain { budget };
+    };
     let mut intervals = Vec::new();
     // The first stratum some check couldn't replay, in [`STRATA`]'s order.
     let mut waiting: Option<usize> = None;
@@ -287,11 +279,25 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
         // Light R2 can't tell without a run.
         None => wait(REPLAYED),
     }
-    // R3: P and F, check 1. Where the header turns on light R2 can't
-    // tell, the run decides.
-    match program::expected(&source, &report) {
+    // R3: P and F, check 1, where R2's light, or R4's run, decides which
+    // header the source calls for.
+    match r4.header {
         Some(expected) => intervals.extend(program::judge(&expected, &performance.header)),
         None => wait(REPLAYED),
+    }
+    // R4: checks 3, 4, 5 and 8 over a positive run the performance should
+    // print: not `unknown` (a Dark source prints no model; an open light
+    // could still be `unknown`, unless a paradox is certain), with no W
+    // line, no budget and no `dark 2` claim (R5's, R7's, check 10's).
+    match &r4.run {
+        Some(run) if r4.positive && r4.lit && model::judgeable(&performance) => {
+            let judged = model::judge(&source, &r4.rules, run, &performance);
+            intervals.extend(judged.intervals);
+            if judged.undecided {
+                wait(REPLAYED);
+            }
+        }
+        _ => wait(REPLAYED),
     }
     if !intervals.is_empty() {
         // One list across strata: by stratum, then by bytes (Note §6.2).
@@ -299,18 +305,4 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
         return Verdict::Dissonant(intervals);
     }
     conclude(&STRATA[waiting.unwrap_or(REPLAYED)..])
-}
-
-/// R1's replay: every ground rule instance the certificate prints (its
-/// `derive` lines) is considered once, its head and premises addressed
-/// under `H` at the store's `τ`. One unit of budget each.
-fn consider(p: &Performance, meter: &mut Meter) -> Result<Vec<Address>, Exhausted> {
-    let tau = Tau::pact_fact();
-    let mut addresses = Vec::new();
-    for d in &p.derives {
-        meter.spend()?;
-        addresses.push(address::atom(&tau, &d.head));
-        addresses.extend(d.premises.iter().map(|a| address::atom(&tau, a)));
-    }
-    Ok(addresses)
 }

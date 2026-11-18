@@ -34,9 +34,9 @@ use alloc::vec::Vec;
 use crate::address::{self, Address, Tau};
 use crate::certificate::{Dark, Performance, Run as Beat};
 use crate::dark2::{Hole, Light, Report};
-use crate::interval::Interval;
+use crate::interval::{Interval, Side};
 use crate::program::{self, Expected};
-use crate::source::{Literal, Pattern, Record, Source};
+use crate::source::{Literal, Pattern, Record, Source, Term};
 use crate::value::{Atom, Value};
 
 /// The work meter: ground rule instances, counted, never timed.
@@ -150,6 +150,86 @@ pub fn program<'a>(source: &'a Source, report: &Report, core: bool) -> (Vec<Atom
     (facts, rules)
 }
 
+type Binding = BTreeMap<String, Value>;
+
+/// Match `pattern` against `atom` under `binding`; the extended binding, or
+/// `None`.
+fn unify(pattern: &Pattern, atom: &Atom, binding: &Binding) -> Option<Binding> {
+    if pattern.pred != atom.pred || pattern.args.len() != atom.args.len() {
+        return None;
+    }
+    let mut out = binding.clone();
+    for (t, v) in pattern.args.iter().zip(&atom.args) {
+        match t {
+            Term::Const(c) => {
+                if c != v {
+                    return None;
+                }
+            }
+            Term::Var(x) => match out.get(x) {
+                Some(bound) if bound != v => return None,
+                Some(_) => {}
+                None => {
+                    out.insert(x.clone(), v.clone());
+                }
+            },
+        }
+    }
+    Some(out)
+}
+
+/// `pattern` under `binding`; `None` if a variable is unbound (an unsafe
+/// rule, which the eval program never holds).
+fn ground(pattern: &Pattern, binding: &Binding) -> Option<Atom> {
+    let args = pattern
+        .args
+        .iter()
+        .map(|t| match t {
+            Term::Const(c) => Some(c.clone()),
+            Term::Var(x) => binding.get(x).cloned(),
+        })
+        .collect::<Option<Vec<Value>>>()?;
+    Some(Atom {
+        pred: pattern.pred.clone(),
+        args,
+    })
+}
+
+/// Every ground instance of `rule` whose positive premises are all in the
+/// stage, in a fixed order (body order, then the stage's atom order).
+fn instances(
+    rule: &Rule<'_>,
+    index: &BTreeMap<&str, Vec<&Atom>>,
+    out: &mut Vec<(Atom, Vec<Atom>)>,
+) {
+    let positive: Vec<&Pattern> = rule
+        .body
+        .iter()
+        .filter(|l| !l.negative)
+        .map(|l| &l.atom)
+        .collect();
+    let mut partial: Vec<(Binding, Vec<Atom>)> = Vec::from([(Binding::new(), Vec::new())]);
+    for p in &positive {
+        let candidates = index.get(p.pred.as_str()).map_or(&[][..], |v| v.as_slice());
+        let mut next = Vec::new();
+        for (binding, premises) in &partial {
+            for a in candidates {
+                if let Some(b) = unify(p, a, binding) {
+                    let mut ps = premises.clone();
+                    ps.push((*a).clone());
+                    next.push((b, ps));
+                }
+            }
+        }
+        partial = next;
+    }
+    for (binding, premises) in partial {
+        if let Some(head) = ground(rule.head, &binding) {
+            out.push((head, premises));
+        }
+    }
+}
+
 /// The least model of `facts` and `rules`' positive literals, by naive
 /// evaluation, with depths and first-tick derivations. Every instance
 /// formed is charged to `meter`.
@@ -158,13 +238,42 @@ pub fn evaluate(
     rules: &[Rule<'_>],
     meter: &mut Meter,
 ) -> Result<Positive, Exhausted> {
-    // 🔴 R4 red: the facts alone, nothing derived, nothing charged.
-    let _ = (rules, meter);
     let mut run = Positive::default();
     for f in facts {
         run.depth.insert(f.clone(), 0);
     }
-    Ok(run)
+    let mut round = 0;
+    loop {
+        round += 1;
+        let mut index: BTreeMap<&str, Vec<&Atom>> = BTreeMap::new();
+        for a in run.depth.keys() {
+            index.entry(a.pred.as_str()).or_default().push(a);
+        }
+        let mut added: BTreeSet<Atom> = BTreeSet::new();
+        let mut found: Vec<Instance> = Vec::new();
+        for (r, rule) in rules.iter().enumerate() {
+            let mut formed = Vec::new();
+            instances(rule, &index, &mut formed);
+            for (head, premises) in formed {
+                meter.spend()?;
+                if !run.depth.contains_key(&head) {
+                    added.insert(head.clone());
+                    found.push(Instance {
+                        head,
+                        rule: r,
+                        premises,
+                    });
+                }
+            }
+        }
+        if added.is_empty() {
+            return Ok(run);
+        }
+        for a in added {
+            run.depth.insert(a, round);
+        }
+        run.derivations.extend(found);
+    }
 }
 
 /// Whether a declaration of the eval program is violated in `stable`: some
@@ -172,8 +281,29 @@ pub fn evaluate(
 /// different values, both in the stable set"). A trivial declaration (its
 /// value among its keys) governs nothing.
 pub fn certain_paradox(source: &Source, report: &Report, stable: &BTreeMap<Atom, u64>) -> bool {
-    let _ = (source, report, stable);
-    false
+    report.eval.iter().any(|&i| match &source.lines[i].record {
+        Record::Functional { pred, key, value } => {
+            let pos = |s: &String| s.parse::<usize>().ok().and_then(|p| p.checked_sub(1));
+            let (Some(keys), Some(v)) = (
+                key.iter().map(pos).collect::<Option<Vec<usize>>>(),
+                pos(value),
+            ) else {
+                return false;
+            };
+            if keys.contains(&v) {
+                return false;
+            }
+            let mut groups: BTreeMap<Vec<&Value>, BTreeSet<&Value>> = BTreeMap::new();
+            for a in stable.keys().filter(|a| &a.pred == pred) {
+                let k: Option<Vec<&Value>> = keys.iter().map(|&p| a.args.get(p)).collect();
+                if let (Some(k), Some(val)) = (k, a.args.get(v)) {
+                    groups.entry(k).or_default().insert(val);
+                }
+            }
+            groups.values().any(|vals| vals.len() > 1)
+        }
+        _ => false,
+    })
 }
 
 /// `negs` for a positive rule: the empty set (Note §2.1; Taut's 41).
@@ -231,8 +361,98 @@ pub fn judge(
     run: &Positive,
     performance: &Performance,
 ) -> Judged {
-    let _ = (source, rules, run, performance);
-    Judged::default()
+    let tau = Tau::pact_fact();
+    let addr = |a: &Atom| Side::Addr(address::atom(&tau, a));
+    let mut out = Judged::default();
+
+    // Checks 3 and 4: every layer line against the model.
+    let mut agreed: BTreeSet<&Atom> = BTreeSet::new();
+    let mut layered: BTreeSet<&Atom> = BTreeSet::new();
+    for l in &performance.layers {
+        layered.insert(&l.atom);
+        match run.depth.get(&l.atom) {
+            None => out.intervals.push(Interval::structure(
+                "stray",
+                addr(&l.atom),
+                Side::None,
+                l.tick,
+                1,
+            )),
+            Some(&d) if d != l.tick => out.intervals.push(Interval::structure(
+                "depth",
+                addr(&l.atom),
+                Side::None,
+                l.tick,
+                l.tick.abs_diff(d),
+            )),
+            Some(_) => {
+                // The same line twice: a repeat in a set (§3.2), whose
+                // interval has no pinned kind (Q42).
+                if !agreed.insert(&l.atom) {
+                    out.undecided = true;
+                }
+            }
+        }
+    }
+    // Checks 4 and 5: every model atom is layered.
+    for (a, &d) in &run.depth {
+        if !layered.contains(a) {
+            out.intervals
+                .push(Interval::structure("unlayered", Side::None, addr(a), d, 1));
+        }
+    }
+
+    // Check 8: the derivations, as Notes, heads in the model only.
+    let derived: BTreeMap<Address, &Atom> = run
+        .derivations
+        .iter()
+        .map(|i| (note(&i.head, &rules[i.rule].line, &i.premises), &i.head))
+        .collect();
+    let mut matched: BTreeSet<Address> = BTreeSet::new();
+    for d in &performance.derives {
+        let Some(&depth) = run.depth.get(&d.head) else {
+            // Not in the model: `stray` names it by its layer. A head that
+            // isn't layered either has no pinned interval (Q40).
+            if !layered.contains(&d.head) {
+                out.undecided = true;
+            }
+            continue;
+        };
+        let mut named = source.lines.iter().filter_map(|l| match &l.record {
+            Record::Rule { id, .. } if id == &d.rule => program::canonical(&l.record),
+            _ => None,
+        });
+        let (Some(line), None) = (named.next(), named.next()) else {
+            // No rule, or two, with that id: the Note has no rule address
+            // (Q41).
+            out.undecided = true;
+            continue;
+        };
+        let n = note(&d.head, &line, &d.premises);
+        if derived.contains_key(&n) && matched.insert(n) {
+            continue;
+        }
+        out.intervals.push(Interval::structure(
+            "extra",
+            Side::Addr(n),
+            Side::None,
+            depth,
+            1,
+        ));
+    }
+    for (n, head) in &derived {
+        if !matched.contains(n) {
+            let depth = run.depth.get(*head).copied().unwrap_or_default();
+            out.intervals.push(Interval::structure(
+                "missing",
+                Side::None,
+                Side::Addr(*n),
+                depth,
+                1,
+            ));
+        }
+    }
+    out
 }
 
 /// Whether the performance is one R4 judges as a positive run: no W line
