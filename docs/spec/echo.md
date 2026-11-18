@@ -1,6 +1,6 @@
 # echo: prism's second reader of mirror
 
-*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 4: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface) and R2 (the source and the Dark-2 report, §10.4). Crate `echo`: a no_std library and the std binary `prism echo …`.*
+*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 5: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface), R2 (the source and the Dark-2 report, §10.4) and R3 (P, F and the interval, §10.6). Crate `echo`: a no_std library and the std binary `prism echo …`.*
 
 Echo can only give back the last words she was given, and she never speaks first. The checker never authors: it replays the engine's own record from the text and gives it back exactly, so where the two differ, the difference is named and located.
 
@@ -198,6 +198,12 @@ Each of these was applied, killed by the suite, and reverted:
 | R2: the Dark-2 report skipped (the record's `hole` lines never compared) | 7 tests: 5 `r2::` (the fixture table, the tune's kinds, the multiset, 76/76a, the sort), 2 `replay::` |
 | R2: decide where R2 can't tell (`Light::Open` judged) | `r2::what_r2_cannot_tell_is_left_to_the_next_stratum` |
 | R2: the `dark` kind never pairs | `r2::dark_atoms_pair_only_one_for_one`, `r2::the_fixture_table` (dark2-not-canonical) |
+| R3: check 1 skipped (the header's `program` and `facts` never compared) | 7 tests: `r3::ct_a4_is_refused_for_its_spurious_fact`, `r3::dark_headers_are_judged`, `r3::a_dark_source_with_a_model`, `r3::strata_compose_in_one_list`, `r3::the_fixture_table`, `r3::the_kinds_agree_with_the_tune`, `replay::an_unreadable_source_is_not_unreadable` |
+| R3: F over the wrong set (queries' atoms in it) | 6 tests: `r3::p_and_f_are_sets_of_the_lines_that_read`, `r3::the_certificates_claim_the_recomputed_addresses` (pos-v03, a8, p8-swapped carry queries), `r3::the_fixture_table`, `r3::the_kinds_agree_with_the_tune`, 2 `r2::` |
+| R3: the intervals left unsorted (R2's `verdict` lines before R3's `source` lines) | `r3::strata_compose_in_one_list`, `r3::the_fixture_table` (ct-a5) |
+| R3: sorted by the line alone, not by the stratum's enumeration | `r3::intervals_sort_by_stratum_then_bytes` (`grammar` before `engine`) |
+| R3: a reader-Dark source's header expected to be P and F | 14 tests, among them `r3::the_header_vectors` (24g), `r3::dark_headers_are_judged`, Taut's triples (55, 56) |
+| R3: check 1 decided where it turns on light R2 can't tell | 4 tests: `r3::check_1_waits_for_the_light_it_needs`, `r3::the_expected_header_follows_the_light`, `r3::the_header_vectors` (95, 97), `r2::what_r2_cannot_tell_is_left_to_the_next_stratum` |
 | R2: check 2 ignored (a Dark source printed with a model judged) | `r2::what_r2_cannot_tell_is_left_to_the_next_stratum`, `replay::an_unreadable_source_is_not_unreadable` |
 | R2: the head by A6's print order, not the least offset | `dark2::query_arity` (P8: `# 4:6` prints first, `1:1` is the head) |
 
@@ -443,3 +449,75 @@ When the light is open, R2 judges nothing. When the source is dark and the perfo
 - **Q34. The safety head's atom.** `dark(nat 2, sym "engine", sym "safety", sym "s", sym "?y")`, with the `?` (§3.1: "the subject as in §3.2", which prints `?y`)? No vector has one.
 
 **Gates at `c72ecad`:** `just check` clean; echo's 113 tests pass; `checks.coverage` 96.22% of lines (the ratchet is 94; echo 99.29%, 1971 of 1985; `source.rs` 288 of 288, `dark2.rs` 451 of 452, `interval.rs` 62 of 62); `checks.echo-independent` (R2 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Seven mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
+
+### 10.6 R3, as built: P, F and the interval
+
+`72d1b88` 🔴 → `953b133` 🟢. The `implements` line moves to `spec 3d00a4ecea49d9908c7c03d6973e6484f03075da` (version 4) and `vectors 5bead5f96f6497e5e2d7a1bba62a4f33973ff18c` (`docs/spec/echo-vectors` at the red commit, which added Taut's 68). R3 retires the word `program`: what R2 and R3 agree with, or can't tell without a run, answers `unknown unreplayed model`. Nothing rings.
+
+**P and F** (`echo::program`; certificate §3.1 header, §3.1.1 A, B, G):
+- **The canonical line** is the whole record re-printed from its parse: the keyword, one space, the body with single spaces, `, ` between arguments, literals and key positions, `not ` before a negative literal, zero-ary atoms bare, ` -> `, variables with their `?`. However a line was spaced, its canonical line is one.
+- **P** is `fragment(τ @pact/program root, ℓ "program", sorted)` over one atom `<keyword>(sym "<canonical line>")` at `@pact/program` per distinct `rule`, `functional` or `query` record that read.
+- **F** is `fragment(τ @pact/fact root, ℓ "facts", sorted)` over the distinct fact atoms that read, typed constants keeping their types (S4: `typed-corpus-unheard`'s F is its certificate's claim).
+- **Which lines** (Note §6.7 H5): every line that read, left out by H1 or not (an unsafe rule, a repeated id, a declaration hole all stay in P); lines that don't read are in neither (95a, 97a). Repeats collapse: the set is of distinct records (§3.1 "one atom per distinct record"; fixpoint §5.0.1 item 2).
+
+**Which header the source calls for** (H5; §3.1.1 F):
+
+| the source (R2's light) | `program` / `facts` |
+|---|---|
+| no hole; lit; or total dark after an **engine** fault only | P / F |
+| total dark (`unknown`) with a line that doesn't read or a **reader** fault (`#`, `repeat`, `arity L:1`) | `none` / `none` |
+| a reader hole beside light R2 can't tell | R3 can't tell: `unknown` turns on the run (R4), or on the positive core for W beside a hole that adds (a certain paradox, H3 v3.3; Taut's 95, 97). Check 1 waits |
+
+**Check 1** (certificate §4.1): each header field against echo's own, `program` then `facts`:
+
+```text
+interval source source <claimed> <recomputed> about none at none 0 by 1
+```
+
+`none` prints on whichever side has no address (§3.2: "a `none` where the checker computes an address fails check 1"; and an address claimed for a reader-Dark source is a claim of a P that isn't there).
+
+**The interval, across slices** (Note §6.2): R2's `verdict` lines and R3's `source` lines are one list, sorted by stratum in its enumeration's order (`source`, `structure`, `verdict`, then `grammar`, `reader`, `engine`, then `piece`; not by name: `grammar` before `engine`), then by the printed line's bytes. `dissonant <n>` counts every line of every stratum replayed so far (Q27).
+
+**What R3 can't tell, and says so:**
+- a reader hole beside open light: `unknown unreplayed model`;
+- check 2 (a model printed for a Dark source): its interval's bytes are open (Q26), so where check 1 agrees the answer is `unknown unreplayed source`, the stratum check 2 belongs to. Where check 1 differs, the `source` lines print and the answer is `dissonant` (Q27).
+
+**What the tests hold** (`echo/tests/r3.rs`, 20 tests; 133 in echo's binary):
+- **P** from Taut's 16 `NNa-program` vectors: each source noted in the vector is read by echo, every canonical line echo re-prints equals the vector's line set, each line's atom has the vector's address, and P has its digest;
+- **F** from Taut's 16 `NNb-facts` vectors over the same sources (23b and 35b: the empty facts);
+- **the header** from Taut's 17 `NNg-header` vectors: `program` and `facts` are what echo expects (22: engine Dark, P and F; 24: reader Dark, `none`), and the header atom with echo's P and F has the vector's digest. 95 and 97 are the two R3 can't decide (above); their vectors are the paradox's P and F, and echo's P and F equal them;
+- **every certificate's claims**: the 38 fixtures, Taut's 20–24, 55, 71, 77, 80, 81, 90, 91 and 68, 51 in all, every one decided. All claim echo's P and F except five: `ct-a4` (another F) and four that claim `none` (below);
+- the canonical line, spacing and typed constants; P and F as sets of the lines that read, queries and declarations in P only; the expected header by light; check 1's sides;
+- `ct-a4` byte for byte; a reader-Dark header claiming P; an engine-Dark header claiming `none`; check 1 waiting; check 2 open;
+- 45's `structure depth` line and atom, 46's other `τ`, 68's `stray` line and atom, byte for byte; the order by stratum enumeration; R2's and R3's lines composed in one list (ct-a4 plus a record hole: `dissonant 2`, `source` first);
+- vector 68's triple: P and F agree, `unknown unreplayed model`, and its `heard` line is the vector's `line2` byte for byte.
+
+**mirror's checker fixtures under R3** (the tune's answer from its `expect`, a **lower bound**: "each kind must appear among the printed intervals", the tune's test docstring):
+
+| fixture | the tune | echo R3 |
+|---|---|---|
+| `ct-a4-spurious-fact` | dissonant source | `dissonant 1`: `interval source source cdcde6e9… a9eea834… about none at none 0 by 1` (claimed F with `edge(a, z)`; echo's F is 20b's) |
+| `ct-a5-readable-dark` | dissonant dark | `dissonant 3`: two `source` lines (`none` claimed; echo's P and F are 20a's and 20b's), then R2's `dark` line |
+| `ct-a12-budget-stop` | dissonant budget verdict | `dissonant 2`: `source none <P>`, `source none <F>` (`budget`, `verdict`: R7, R6) |
+| `e1-false-budget-clear` | dissonant budget | `dissonant 2`: the same two `source` lines (`budget`: R7) |
+| `e1-false-budget-opaque` | dissonant budget verdict | `dissonant 2`: the same (R7, R6) |
+| `a1-record-dark-disagrees`, `a1-record-dark-in-clear`, `ct-a6-unsafe-with-model`, `dark2-not-canonical`, `p8-one-line` | dissonant hole / dark | R2's lines, unchanged (§10.4); check 1 agrees |
+| the other 10 cheats (`ct-a1`, `a2`, `a3`, `a8`, `a9`, `a10`, `a11`, `e4-dark-order`, `score-missing-note`; `typed-corpus-unheard`, which the tune can't read) | dissonant (R4–R9's kinds) / unreadable | `unknown unreplayed model` |
+| the 18 that ring | rings | `unknown unreplayed model`: R2 and R3 agree, the rest is unreplayed |
+
+**Counted:**
+- **Refused for its own reason:** `ct-a4` is now `dissonant source`, the tune's exact kind. With R2's six, **7 of the 38 fixtures** are refused for the reason the tune names. For 5 of them echo's kinds are exactly the tune's listed kinds (`ct-a4`, both `a1-record-dark-*`, `dark2-not-canonical`, `p8-one-line`); `ct-a5` prints the tune's `dark` and also `source` (Q35); `ct-a6` prints the tune's `hole` and still lacks R6's `verdict` and `shadowed`.
+- **Beyond the tune's listed kinds:** echo prints `source` on 4 fixtures whose cheat is elsewhere (`ct-a5`, `ct-a12`, `e1-false-budget-clear`, `e1-false-budget-opaque`). Each is hand-written with `program none` / `facts none` for a source that calls for P and F. §3.2 makes that a check 1 failure; the `expect` lists don't say whether the tune prints it (Q35). No fixture the tune rings is dissonant in echo.
+- **Byte for byte, where mirror's data pins the bytes:** ct-a4's `source` line is not pinned by any vector (the fixture records no interval lines); its two addresses are pinned by the fixture (claimed) and 20b (recomputed), and the line's format by §6.2 and the `verdict`-stratum lines 76/76a match. The interval lines R3 checks byte for byte against vectors are 45's text and atom, 68's `stray` text and atom, 76 and 76a (R2's), and 68's `heard` line: **5 lines and 3 atoms**, all exact. P, F and the header match **49 of 49** vector digests (16 + 16 + 17).
+
+**What R3 does not do, on purpose:** judge `result` (the model is R4's, the certificate's address R8's); decide the header where it turns on the run; judge check 2's own interval (Q26); 46a's rename (`distance` at `@song/distance`) is a digest P2 already reproduces from its preimage, and no R3 interval uses it.
+
+### 10.7 Questions R3 adds for Mara
+
+- **Q35. A `none` header claimed where the source calls for P and F.** §3.2: "a `none` where the checker computes an address fails check 1". Four hand-written fixtures (`ct-a5-readable-dark`, `ct-a12-budget-stop`, `e1-false-budget-clear`, `e1-false-budget-opaque`) claim `program none` and `facts none` for sources that read and aren't `unknown`, and their `expect` lists only the kinds of their cheat. echo prints the two `source` lines §3.2 calls for. Does the tune print them too (the `expect` is a lower bound, so the fixtures can't say)? If it doesn't, S7's overlap will show four located commas, and either the tune or the fixtures move. If `none` is meant as "not claimed", §3.2 needs that sentence.
+- **Q36. `program` and `facts` for a budget stop.** S1 says what a budget-stopped certificate's `result` is (the stopped set); nothing says `program` and `facts` differ from an unbudgeted run's. echo expects P and F. Right?
+- **Q37. The header of a W source beside a hole that adds.** H5: an `unknown` performance keeps the pre-hole header (`none` after a reader fault); H3 v3.3: such a source is `unknown` (the C3 / K3 case) unless a certain paradox exists in the positive core. So the header turns on a run, and echo's R3 waits (Taut's 95 and 97 are the paradox case, P and F). Confirm that an `unknown shadow under W` source's certificate has `program none` and `facts none` after a reader fault, as every other `unknown` one does.
+- **Q38. Repeated records in P and F.** §3.1: "one atom per distinct record"; fixpoint §5.0.1 item 2: the reader collapses repeats when it forms the set. echo collapses both a repeated rule line (which is also a `repeat` hole) and a repeated fact. Identical in bytes, or identical in canonical line (`rule  r p  requires q` and `rule r p requires q`)? echo: canonical line.
+- **Q39. A canonical line's constants.** Rules and queries read only plain `sym` names (Q24), so their canonical lines print names bare. If Q24 opens rules and queries to typed constants, does the canonical line print them in their canonical text (`p(nat 7)`), as echo's printer already does, or must a plain `sym` then print typed too (`sym "a"`), which would move every program address?
+
+**Gates at `953b133`:** `just check` clean; echo's 133 tests pass; `checks.coverage` 96.25% of lines (the ratchet is 94; echo 99.35%, 2139 of 2153; `program.rs` 133 of 133, `replay.rs` 146 of 146, `interval.rs` 74 of 74); `checks.doctest`; `checks.echo-independent` (R3 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Six mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
