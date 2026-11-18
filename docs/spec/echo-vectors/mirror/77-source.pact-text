@@ -1,0 +1,3 @@
+fact a
+fact B
+rule rb b requires a

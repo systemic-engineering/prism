@@ -12,12 +12,15 @@ docs/spec/echo.md §2).
 | `20`–`24-certificate.cert`, `20`–`24-source.pact-text`, `48-source.pact-text` | `tests/checker/vectors/`, `reed/ship` `3cedf18a` | Taut's certificates and sources that the `taut-*` and `a1-record-dark-engine` fixtures borrow |
 | `27-stdout-positive.stdout`, `50-heard-score-none.tune` | the same | vector 50: the tune's `heard` line over corpus 01's source and 27's stdout split at its `certificate` line (M1) |
 | `01-determinism.pact-text` | `tests/pact/01-determinism.pact-text`, `reed/ship` `3cedf18a` | corpus 01's source, vector 50's `source` input |
+| `37-record-dark-2.record`, `48-dark2-order-basis.song`, `55-certificate.cert`, `55-record-dark2-strata.record`, `56-record-dark2-reader.record`; `71`, `77`, `80`, `81`, `90`, `91`: `-source.pact-text`, `-certificate.cert` and their `.record` | `tests/checker/vectors/`, `reed/ship` `3cedf18a` (blobs as `git ls-tree` names them, e.g. `55-record-dark2-strata.record` `d9a4bc81`) | Taut's Dark-2 and hole triples under Note §6.7 (H1, H4, H5): a source, its performance, and the record's whole bytes (each `.record`'s `hex` field, the said text empty). Certificate replay R2 |
 
 How echo uses them:
 - `echo/tests/vectors.rs`: the 46 atom vectors read as `fact` lines, print back, and the 7 that carry `content` encode to it; `mirror.facts` reads whole.
 - `echo/tests/address.rs` (P2): all 215 digests from their preimages; the 63 `atom` lines, the 32 `fact … <hex>` lines and 50 composites (fragments, lenses, the ε frame, models, result and facts sets) from their text, by echo's own encoder.
 - `echo/tests/integrity.rs` (P4): `mirror.facts` passes V0, and `# grammar` recomputes from its facts.
 - `echo/tests/replay.rs` and `echo/tests/bin.rs` (certificate replay, R1): every fixture reads and none rings; vector 50's `heard` line byte for byte; the model's address recomputes from the layers of Taut's and the correct fixtures' certificates.
+
+- `echo/tests/source.rs`, `echo/tests/dark2.rs` and `echo/tests/r2.rs` (certificate replay, R2): the fixtures' and Taut's sources read and located; the holes in A6's order against 55's record; the head against 48a, 22f, 24f and 71c; `basis` against 48b; the hole atoms against 73–75, 77, 81, 90, 91; Taut's triples agree; 76 and 76a's interval lines and atoms, byte for byte.
 
 To refresh: copy the same paths from a newer mirror commit, update this
 README, and expect the counts in the tests to move only where mirror's

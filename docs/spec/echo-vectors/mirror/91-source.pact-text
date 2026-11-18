@@ -1,0 +1,4 @@
+fact f(k, v)
+fact g(k)
+rule h h(?x) requires g(?x)
+functional f(1, 1) -> 2

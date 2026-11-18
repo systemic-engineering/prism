@@ -1,0 +1,11 @@
+certificate  1
+result       9095bec0a36ba29275c2e62331829a8f566e44f80ef32e48a817c497612d2350
+program      8db1edefb68dd1ada9b047fc4ab7e1221ae04b2cdae146075e7299f0d3a5bd57
+facts        41e704fc2491b14581ee6de6c7f0636161b36255ade624bd5214c04a42976356
+engine       none
+dark-order   none
+
+layer        0 a
+layer        1 b
+derive       b by rb from a
+hole         # 2:6

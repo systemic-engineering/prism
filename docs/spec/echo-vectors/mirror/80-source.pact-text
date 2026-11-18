@@ -1,0 +1,4 @@
+fact p(a)
+fact q(b)
+functional p(2) -> 1
+functional p(3) -> 1

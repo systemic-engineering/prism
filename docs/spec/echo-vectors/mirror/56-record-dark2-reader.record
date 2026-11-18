@@ -1,0 +1,20 @@
+vector     56-record-dark2-reader
+kind       record (Note v3.0 §6.7 H4)
+note       24's source: one hole, `repeat 2:1`; both rules left out, so unknown;
+note       nothing unread, so no basis. The same bytes as 37's prefix
+source     24-source.pact-text
+cert       24-certificate.cert
+invocation mirror pact eval tests/checker/vectors/24-source.pact-text
+cwd        the repository root
+exact      verdict     unknown
+exact      file        "tests/checker/vectors/24-source.pact-text"
+exact      shaped_by   none
+exact
+prefix     hole        repeat 2:1 #<said>
+pinned     `exact` lines byte for byte (an empty one is the blank line); a `prefix` (hole) line
+pinned     byte for byte up to and including its `#`
+said       `<said>` after `#`: the instrument's @nl utterance, any bytes but LF, never compared
+was        A6′: `dark        reader 2:1 #`; verdict `dark` (v3.0)
+length     119
+hex        766572646963742020202020756e6b6e6f776e0a66696c6520202020202020202274657374732f636865636b65722f766563746f72732f32342d736f757263652e706163742d74657874220a7368617065645f62792020206e6f6e650a0a686f6c65202020202020202072657065617420323a3120230a
+blake3     c648b688e1e3e0298630cc9a2e87c1ff897cf257b05fb25daab8d6cd6834dee3

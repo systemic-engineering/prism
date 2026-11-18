@@ -1,0 +1,12 @@
+certificate  1
+result       d919519dc5a65b2176b1e4959c0a90140341ef2215f2e7978d1e78a93627eded
+program      7a900bbbeaf1a10f8aacda15f61d746f887fa1ee9f26af5d9c5ae38c27b6ae6a
+facts        fccdd0f1c7815e4f980e22a2dba282fd0b9487d12e88645d9c785585e364cde7
+engine       none
+dark-order   none
+
+layer        0 f(k, v)
+layer        0 g(k)
+layer        1 h(k)
+derive       h(k) by h from g(k)
+hole         declaration f functional f(1, 1) -> 2

@@ -1,0 +1,14 @@
+certificate  1
+result       0a6abb887833d4d4b6b54fa2a9efe0ae8255bf90e20f531a6ed9ce1e22bd5dda
+program      f3cc48bfea6836963cb095a00bc9b4f5fc33aa0ee77652aa6c84e03a53de4de7
+facts        7e28c6e291358f7d89791f17933dfc1904ffa34ab1b9551583ac58ca5268aa8b
+engine       none
+dark-order   none
+
+layer        0 e(a, b)
+layer        0 n(a)
+layer        1 m(a)
+layer        1 p(a, b)
+derive       m(a) by r from n(a)
+derive       p(a, b) by s from e(a, b)
+hole         # 3:6

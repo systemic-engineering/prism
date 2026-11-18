@@ -1,0 +1,24 @@
+vector     80-record-declarations-light
+kind       record (Note v3.0 §6.7 H4)
+note       80's source: 71's two declaration holes beside `fact q(b)`. p has arity 1, so the
+note       holes remove nothing (v3.2.1 G1 guard): p(a) and q(b) are light, uncertain, `true >= 0`, no shadow line
+source     80-source.pact-text
+cert       80-certificate.cert
+invocation mirror pact eval tests/checker/vectors/80-source.pact-text
+cwd        the repository root
+exact      verdict     uncertain
+exact      file        "tests/checker/vectors/80-source.pact-text"
+exact      shaped_by   none
+exact      true        >= 0
+exact      undefined   0
+exact      findings    0
+exact
+prefix     hole        declaration p functional p(2) -> 1 #<said>
+prefix     hole        declaration p functional p(3) -> 1 #<said>
+pinned     `exact` lines byte for byte (an empty one is the blank line); a `prefix` (hole) line
+pinned     byte for byte up to and including its `#`
+said       `<said>` after `#`: the instrument's @nl utterance, any bytes but LF, never compared
+atoms      73, 74 (the performance's hole atoms), 75 the holes child, 80h the certificate
+length     239
+hex        766572646963742020202020756e6365727461696e0a66696c6520202020202020202274657374732f636865636b65722f766563746f72732f38302d736f757263652e706163742d74657874220a7368617065645f62792020206e6f6e650a7472756520202020202020203e3d20300a756e646566696e6564202020300a66696e64696e677320202020300a0a686f6c6520202020202020206465636c61726174696f6e20702066756e6374696f6e616c2070283229202d3e203120230a686f6c6520202020202020206465636c61726174696f6e20702066756e6374696f6e616c2070283329202d3e203120230a
+blake3     0f1dd2e3d4f5a57e50e60ff86f0bc5a78420e6b369923fad802dcc82ad8d084a

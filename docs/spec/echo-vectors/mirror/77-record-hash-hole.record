@@ -1,0 +1,25 @@
+vector     77-record-hash-hole
+kind       record (Note v3.0 §6.7 H4)
+note       77's source: one `#` hole beside 0-ary light; uncertain, `true >= 1`, `shadow *`, basis {2}
+source     77-source.pact-text
+cert       77-certificate.cert
+invocation mirror pact eval tests/checker/vectors/77-source.pact-text
+cwd        the repository root
+exact      verdict     uncertain
+exact      file        "tests/checker/vectors/77-source.pact-text"
+exact      shaped_by   none
+exact      true        >= 1
+exact      undefined   0
+exact      findings    0
+exact
+exact      true        b
+prefix     hole        # 2:6 #<said>
+exact      shadow      *
+exact      basis       unread 2
+pinned     `exact` lines byte for byte (an empty one is the blank line); a `prefix` (hole) line
+pinned     byte for byte up to and including its `#`
+said       `<said>` after `#`: the instrument's @nl utterance, any bytes but LF, never compared
+split      the value `# 2:6 #<said>` splits at its first ` #` (V5): the hole text `# 2:6`
+length     210
+hex        766572646963742020202020756e6365727461696e0a66696c6520202020202020202274657374732f636865636b65722f766563746f72732f37372d736f757263652e706163742d74657874220a7368617065645f62792020206e6f6e650a7472756520202020202020203e3d20310a756e646566696e6564202020300a66696e64696e677320202020300a0a747275652020202020202020620a686f6c6520202020202020202320323a3620230a736861646f772020202020202a0a626173697320202020202020756e7265616420320a
+blake3     d90d40d4c1c54a569cfdc9f055390ee85b9c5cc7ed52b4cd9fb266f9f86ab71a

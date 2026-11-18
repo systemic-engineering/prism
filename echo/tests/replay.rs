@@ -259,8 +259,8 @@ fn implements_line_names_a_spec_commit_and_a_vectors_tree() {
     assert_eq!(words[4], replay::VECTORS);
 }
 
-/// Three lines in R1 (no intervals yet), in §6.3's order, whatever the
-/// verdict.
+/// §6.3's order, whatever the verdict: the verdict, `heard`, `implements`,
+/// then one `interval` line per dissonance (none unless `dissonant`).
 #[test]
 fn the_verdict_then_heard_then_implements() {
     for budget in [BUDGET, 1] {
@@ -269,6 +269,12 @@ fn the_verdict_then_heard_then_implements() {
         assert!(l[1].starts_with("heard source "));
         assert!(l[2].starts_with("implements spec "));
     }
+    let l = lines(&run(&fixture("a1-record-dark-disagrees"), BUDGET));
+    assert_eq!(l.len(), 5, "{l:?}");
+    assert_eq!(l[0], "dissonant 2");
+    assert!(l[1].starts_with("heard source "));
+    assert!(l[2].starts_with("implements spec "));
+    assert!(l[3..].iter().all(|i| i.starts_with("interval ")));
 }
 
 // ------------------------------------------------------------ the floor
@@ -278,21 +284,21 @@ fn the_verdict_then_heard_then_implements() {
 #[test]
 fn what_echo_cannot_replay_is_unknown_never_rings() {
     let a = run(&fixture("pos-v01"), BUDGET);
-    assert_eq!(a.verdict, Verdict::Unreplayed("source"));
-    assert_eq!(lines(&a)[0], "unknown unreplayed source");
+    assert_eq!(a.verdict, Verdict::Unreplayed("program"));
+    assert_eq!(lines(&a)[0], "unknown unreplayed program");
     assert_eq!(a.exit(), 2);
 }
 
 /// Every one of mirror's 38 checker fixtures, cheats (`ct-*`) and correct
-/// ones alike: none rings in R1, and each reads (typed-corpus-unheard's
-/// typed constants included: S4).
+/// ones alike: none rings, and each reads (typed-corpus-unheard's typed
+/// constants included: S4). R2's answers are `r2::the_fixture_table`.
 #[test]
 fn no_fixture_rings() {
     for name in FIXTURES {
         let a = run(&fixture(name), BUDGET);
         assert_ne!(a.verdict, Verdict::Rings, "{name}");
-        assert_eq!(lines(&a)[0], "unknown unreplayed source", "{name}");
-        assert_eq!(a.exit(), 2, "{name}");
+        assert_ne!(a.exit(), 0, "{name}");
+        assert!(!lines(&a)[0].starts_with("unknown unreadable"), "{name}");
     }
 }
 
@@ -482,7 +488,12 @@ fn every_certificate_line_form() {
     ];
     for line in reads {
         let a = unreadable(&with_line(&f.certificate, 9, line), &f.record);
-        assert_eq!(lines(&a)[0], "unknown unreplayed source", "{line}");
+        assert!(
+            !lines(&a)[0].starts_with("unknown unreadable"),
+            "{line}: {}",
+            lines(&a)[0]
+        );
+        assert_ne!(a.verdict, Verdict::Rings, "{line}");
     }
     let refused = [
         ("context      under 0 = [p & ]", 29),
@@ -547,7 +558,8 @@ fn record_hole_text_is_opaque() {
         &f.certificate,
         &with_line(&f.record, 8, "hole        arity q #\u{201c}B\u{201d} \t \r"),
     );
-    assert_eq!(lines(&a)[0], "unknown unreplayed source");
+    // It reads, and pos-v01's source has no `arity q` hole (R2).
+    assert_eq!(lines(&a)[0], "dissonant 1");
     let a = unreadable(
         &f.certificate,
         &with_line(&f.record, 8, "hole        arity \u{e9} #q"),
@@ -602,7 +614,9 @@ fn an_unreadable_source_is_not_unreadable() {
         },
         BUDGET,
     );
-    assert_eq!(lines(&a)[0], "unknown unreplayed source");
+    // A Dark source with a model printed for it: check 2, whose interval
+    // bytes are open (Q26), so not yet replayed.
+    assert_eq!(lines(&a)[0], "unknown unreplayed program");
 }
 
 // --------------------------------------------------------------- budget
@@ -618,7 +632,7 @@ fn the_budget_is_pinned() {
 #[test]
 fn the_budget_counts_ground_rule_instances() {
     let f = fixture("pos-v01");
-    assert_eq!(lines(&run(&f, 9))[0], "unknown unreplayed source");
+    assert_eq!(lines(&run(&f, 9))[0], "unknown unreplayed program");
     for budget in [8, 1, 0] {
         let a = run(&f, budget);
         assert_eq!(a.verdict, Verdict::Uncertain { budget });
@@ -654,7 +668,8 @@ fn a_budget_of_one_runs_out_on_real_inputs() {
             );
             ran_out += 1;
         } else {
-            assert_eq!(lines(&a)[0], "unknown unreplayed source", "{name}");
+            assert!(!lines(&a)[0].starts_with("uncertain"), "{name}");
+            assert_ne!(a.verdict, Verdict::Rings, "{name}");
         }
     }
     // 16 fixtures' own certificates, 3 that borrow one (a1-record-dark-in-clear,

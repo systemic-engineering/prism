@@ -1,0 +1,27 @@
+vector     81-record-unary-light
+kind       record (Note v3.0 §6.7 H4)
+note       81's source: a `#` hole (3:6) removes the predicates used with arity >= 2 (v3.1 H1):
+note       e and p are dark, the unary light n(a), m(a) stays; `true >= 1`, `true m(a)`, `shadow *`, basis {3}
+source     81-source.pact-text
+cert       81-certificate.cert
+invocation mirror pact eval tests/checker/vectors/81-source.pact-text
+cwd        the repository root
+exact      verdict     uncertain
+exact      file        "tests/checker/vectors/81-source.pact-text"
+exact      shaped_by   none
+exact      true        >= 1
+exact      undefined   0
+exact      findings    0
+exact
+exact      true        m(a)
+prefix     hole        # 3:6 #<said>
+exact      shadow      *
+exact      basis       unread 3
+pinned     `exact` lines byte for byte (an empty one is the blank line); a `prefix` (hole) line
+pinned     byte for byte up to and including its `#`
+said       `<said>` after `#`: the instrument's @nl utterance, any bytes but LF, never compared
+absent     `true        p(a, b)`: p is in R- (D(#) = {e, p}); claimed, it is shadowed (84)
+was        v3.0: D(#) empty, so p(a, b) was light and printed
+length     213
+hex        766572646963742020202020756e6365727461696e0a66696c6520202020202020202274657374732f636865636b65722f766563746f72732f38312d736f757263652e706163742d74657874220a7368617065645f62792020206e6f6e650a7472756520202020202020203e3d20310a756e646566696e6564202020300a66696e64696e677320202020300a0a7472756520202020202020206d2861290a686f6c6520202020202020202320333a3620230a736861646f772020202020202a0a626173697320202020202020756e7265616420330a
+blake3     261d65a8499be544a52ca092a6c6833fa6ec615dda494a56625d14bc3583015f

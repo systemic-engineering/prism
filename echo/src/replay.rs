@@ -23,8 +23,11 @@ use core::fmt::Write;
 
 use crate::address::{self, Address, Tau};
 use crate::certificate::{self, Performance};
+use crate::dark2;
 use crate::facts::Position;
+use crate::interval::Interval;
 use crate::record;
+use crate::source;
 
 /// The prism commit whose `docs/spec/echo.md` echo implements: §10, the
 /// decomposition and R1's exact surface. Full and lowercase (Note §4.2,
@@ -48,9 +51,9 @@ pub const STRATA: [&str; 8] = [
     "source", "program", "model", "contexts", "verdict", "budget", "address", "score",
 ];
 
-/// What echo replays, of [`STRATA`], so far: nothing. Each slice from R2
-/// on removes its word from the front.
-const UNREPLAYED: [&str; 8] = STRATA;
+/// How many of [`STRATA`] echo replays so far: R2 retired `source`. Each
+/// slice removes its word from the front.
+const REPLAYED: usize = 0;
 
 /// echo's four inputs, in the order every list of them is printed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,8 +89,11 @@ pub struct Inputs<'a> {
 /// The first line of echo's answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Verdict {
-    /// `rings`: every stratum replayed and agreed. Not reachable in R1.
+    /// `rings`: every stratum replayed and agreed. Not reachable before R8.
     Rings,
+    /// `dissonant <n>`: the intervals, sorted (Note §6.2), one line each.
+    /// From R2 on, `<n>` counts the strata replayed so far.
+    Dissonant(Vec<Interval>),
     /// `uncertain budget <n> ground rule instances`: echo's own budget ran
     /// out; a run with more could continue.
     Uncertain { budget: u64 },
@@ -121,7 +127,7 @@ impl Answer {
     pub fn exit(&self) -> u8 {
         match self.verdict {
             Verdict::Rings => 0,
-            Verdict::Uncertain { .. } => 1,
+            Verdict::Dissonant(_) | Verdict::Uncertain { .. } => 1,
             Verdict::Io(_) | Verdict::Unreadable { .. } | Verdict::Unreplayed(_) => 2,
         }
     }
@@ -130,6 +136,7 @@ impl Answer {
     pub fn print(&self) -> String {
         let mut out = match &self.verdict {
             Verdict::Rings => String::from("rings"),
+            Verdict::Dissonant(intervals) => format!("dissonant {}", intervals.len()),
             Verdict::Uncertain { budget } => {
                 format!("uncertain budget {budget} ground rule instances")
             }
@@ -163,6 +170,12 @@ impl Answer {
             }
         }
         let _ = write!(out, "\nimplements spec {SPEC} vectors {VECTORS} rig none\n");
+        if let Verdict::Dissonant(intervals) = &self.verdict {
+            for i in intervals {
+                out.push_str(&i.text());
+                out.push('\n');
+            }
+        }
         out
     }
 }
@@ -227,9 +240,6 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
         }
         return Verdict::Io(io);
     };
-    // The source is never `unreadable`: a source that doesn't read is a
-    // Dark-2 source, judged from R2 on (Note §5; Seam row 8).
-    let _ = source;
     let performance = match certificate::read(certificate) {
         Ok(p) => p,
         Err(r) => {
@@ -239,17 +249,27 @@ fn judge(inputs: &Inputs<'_>, budget: u64) -> Verdict {
             }
         }
     };
-    if let Err(r) = record::read(record) {
-        return Verdict::Unreadable {
-            input: Input::Record,
-            at: r.at,
-        };
-    }
+    let record = match record::read(record) {
+        Ok(r) => r,
+        Err(r) => {
+            return Verdict::Unreadable {
+                input: Input::Record,
+                at: r.at,
+            }
+        }
+    };
     let mut meter = Meter { left: budget };
     if consider(&performance, &mut meter).is_err() {
         return Verdict::Uncertain { budget };
     }
-    conclude(&UNREPLAYED)
+    // R2: the source and its Dark-2 report. The source is never
+    // `unreadable`: a line that doesn't read is a hole (Note §5; Seam row
+    // 8). Where R2 can't tell, or agrees, the next stratum answers.
+    let report = dark2::report(&source::read(source));
+    match dark2::judge(&report, &performance, &record) {
+        Some(intervals) if !intervals.is_empty() => Verdict::Dissonant(intervals),
+        _ => conclude(&STRATA[REPLAYED..]),
+    }
 }
 
 /// R1's replay: every ground rule instance the certificate prints (its

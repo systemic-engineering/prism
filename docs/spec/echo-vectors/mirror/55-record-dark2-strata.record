@@ -1,0 +1,28 @@
+vector     55-record-dark2-strata
+kind       record (Note v3.0 §6.7 H4)
+note       48's source: five holes (two `#`, a repeat, an arity, a safety); the eval
+note       program is empty, so no light at all: unknown; basis {2, 7}
+source     48-source.pact-text
+cert       55-certificate.cert
+invocation mirror pact eval tests/checker/vectors/48-source.pact-text
+cwd        the repository root
+exact      verdict     unknown
+exact      file        "tests/checker/vectors/48-source.pact-text"
+exact      shaped_by   none
+exact
+prefix     hole        # 2:6 #<said>
+prefix     hole        # 7:11 #<said>
+prefix     hole        repeat 6:1 #<said>
+prefix     hole        arity q #<said>
+prefix     hole        safety s ?y #<said>
+exact      basis       unread 2, 7
+pinned     `exact` lines byte for byte (an empty one is the blank line); a `prefix` (hole) line
+pinned     byte for byte up to and including its `#`
+said       `<said>` after `#`: the instrument's @nl utterance, any bytes but LF, never compared
+order      hole lines in A6's order (H1, v3.0.1): `#` by offset, then reader (`repeat`), then engine
+order      (arity, safety); `basis` last (§6.4 Q3). Readers compare a multiset of hole texts (H4)
+was        A6′: `dark        grammar 2:6 #`, …, `dark        engine safety s ?y #` (a record
+was        `dark` line is unreadable from v3.0 on); verdict `dark` (v3.0)
+length     232
+hex        766572646963742020202020756e6b6e6f776e0a66696c6520202020202020202274657374732f636865636b65722f766563746f72732f34382d736f757263652e706163742d74657874220a7368617065645f62792020206e6f6e650a0a686f6c6520202020202020202320323a3620230a686f6c6520202020202020202320373a313120230a686f6c65202020202020202072657065617420363a3120230a686f6c6520202020202020206172697479207120230a686f6c6520202020202020207361666574792073203f7920230a626173697320202020202020756e7265616420322c20370a
+blake3     7916c884afb818bad0a0009ccd6e9d0f905b174d11e57d8f36be2c25fcb366d7

@@ -1,0 +1,3 @@
+fact p(a)
+functional p(2) -> 1
+functional p(3) -> 1

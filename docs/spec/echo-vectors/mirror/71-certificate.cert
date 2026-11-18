@@ -1,0 +1,10 @@
+certificate  1
+result       db68f7b570cb25fe271318ae944ac2d5c55e29c7a49f3d52bc56ffc56ea44ad6
+program      89aeb7bff610858577c65a413cd3ecdb17f245567e62cfc599146e71244665ee
+facts        092a7016845574b1f947d4063fe5b9ae844328ce13562389c4a86931a2f6f1b1
+engine       none
+dark-order   none
+
+layer        0 p(a)
+hole         declaration p functional p(2) -> 1
+hole         declaration p functional p(3) -> 1

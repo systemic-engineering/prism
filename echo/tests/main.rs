@@ -9,9 +9,12 @@
 mod address;
 mod bin;
 mod cut;
+mod dark2;
 mod facts;
 mod integrity;
+mod r2;
 mod refusals;
 mod replay;
+mod source;
 mod typed;
 mod vectors;

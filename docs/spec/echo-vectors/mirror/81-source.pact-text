@@ -1,0 +1,5 @@
+fact e(a, b)
+fact n(a)
+fact X
+rule r m(?x) requires n(?x)
+rule s p(?x, ?y) requires e(?x, ?y)

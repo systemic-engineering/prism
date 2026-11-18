@@ -63,6 +63,24 @@ impl Tau {
         }
     }
 
+    /// `@mirror/certificate` with the root flag: every atom and fragment
+    /// the certificate itself introduces (certificate §3.1.1 A).
+    pub fn mirror_certificate() -> Tau {
+        Tau {
+            name: "@mirror/certificate".into(),
+            grammar: None,
+        }
+    }
+
+    /// `@song/interval` with the root flag: the interval and `basis` atoms
+    /// (Note §6.2 Bytes, §6.4).
+    pub fn song_interval() -> Tau {
+        Tau {
+            name: "@song/interval".into(),
+            grammar: None,
+        }
+    }
+
     fn new(name: &str, grammar: Option<Address>) -> Option<Tau> {
         (!name.as_bytes().contains(&0)).then(|| Tau {
             name: name.into(),

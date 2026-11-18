@@ -1,0 +1,17 @@
+vector     48-dark2-order-basis
+kind       ordering (B3: dark-order, basis)
+source     48-source.pact-text, seven lines, no comments
+print      1 grammar 2:6 (`fact Q`: the least offset the grammar can't continue from)
+print      2 grammar 7:11 (`fact p(a, B)`)
+print      3 reader 6:1 (repeated rule id `a`, the later record, column 1)
+print      4 engine arity q
+print      5 engine safety s ?y
+rule       print order of the record's dark lines: strata (grammar, reader, engine), then dark-order within
+set        check 10 compares the record's dark lines as a set: any order of these five rings
+head       2:6: the merged order's head (2:6, 6:1, 7:11, engine); the performance's one atom, 48a
+basis      {2, 7}: the lines that did not read. 6 read (its failure is a reader check)
+record     basis       unread 2, 7
+record     basis       unread 2-4, 7, 9-10 (for unread {2, 3, 4, 7, 9, 10})
+score      basis(nat 2, nat 7) at @song/interval root: 48b
+none       no basis line and no basis atom when nothing is unread
+line_text  the record's `dark` line text under strata is still not pinned (P5)

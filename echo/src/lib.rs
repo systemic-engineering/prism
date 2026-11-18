@@ -18,10 +18,13 @@ extern crate alloc;
 pub mod address;
 pub mod certificate;
 pub mod cut;
+pub mod dark2;
 pub mod facts;
 pub mod integrity;
+pub mod interval;
 pub mod record;
 pub mod replay;
+pub mod source;
 pub mod value;
 
 pub use address::{Address, Tau};
