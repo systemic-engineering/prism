@@ -53,6 +53,16 @@ impl Tau {
         }
     }
 
+    /// `@pact/fact` with the root flag: the store's altitude, of every
+    /// model and fact atom and every context fragment (certificate §3.1.1
+    /// A).
+    pub fn pact_fact() -> Tau {
+        Tau {
+            name: "@pact/fact".into(),
+            grammar: None,
+        }
+    }
+
     fn new(name: &str, grammar: Option<Address>) -> Option<Tau> {
         (!name.as_bytes().contains(&0)).then(|| Tau {
             name: name.into(),

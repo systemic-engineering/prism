@@ -78,13 +78,21 @@ fn nothing_but_the_arguments() {
     let here = prism(&echo_args(&paths));
     let empty = std::env::temp_dir().join(format!("echo-bin-{}", std::process::id()));
     std::fs::create_dir_all(&empty).expect("temp dir");
-    let there = Command::new(env!("CARGO_BIN_EXE_prism"))
+    let mut there = Command::new(env!("CARGO_BIN_EXE_prism"));
+    there
         .args(echo_args(&paths))
         .env_clear()
-        .current_dir(&empty)
-        .output()
-        .expect("runs");
-    std::fs::remove_dir(&empty).expect("empty");
+        .current_dir(&empty);
+    // Under coverage the binary is instrumented: its profiling runtime (not
+    // echo's code) writes where LLVM_PROFILE_FILE says, or into the cwd.
+    // Keep that one variable so the empty directory stays empty.
+    if let Some(profile) = std::env::var_os("LLVM_PROFILE_FILE") {
+        there.env("LLVM_PROFILE_FILE", profile);
+    }
+    let there = there.output().expect("runs");
+    let left: Vec<_> = std::fs::read_dir(&empty).expect("temp dir").collect();
+    std::fs::remove_dir_all(&empty).expect("temp dir");
+    assert!(left.is_empty(), "the binary wrote into its cwd: {left:?}");
     assert_eq!(here.stdout, there.stdout);
     assert_eq!(here.status.code(), there.status.code());
 }

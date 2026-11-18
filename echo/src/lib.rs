@@ -20,6 +20,7 @@ pub mod certificate;
 pub mod cut;
 pub mod facts;
 pub mod integrity;
+pub mod record;
 pub mod replay;
 pub mod value;
 

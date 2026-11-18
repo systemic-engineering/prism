@@ -57,6 +57,9 @@ pub enum Unreadable {
     LeadingZero,
     /// A `nat` above 2⁶⁴ − 1 (its encoding is `u64(n)`).
     NatOverflow,
+    /// A line that may stand once (a certificate header key, the record's
+    /// `verdict`) stands again.
+    Repeated,
     /// A `\` in a `sym` string not followed by `"` or `\`.
     Escape,
     /// A `sym` string that isn't UTF-8.
@@ -76,6 +79,7 @@ impl fmt::Display for Unreadable {
             Unreadable::OddHex => f.write_str("an odd number of hex digits"),
             Unreadable::LeadingZero => f.write_str("a leading zero"),
             Unreadable::NatOverflow => f.write_str("a nat above 2^64 - 1"),
+            Unreadable::Repeated => f.write_str("a line that stands once, again"),
             Unreadable::Escape => f.write_str("an unknown escape"),
             Unreadable::Utf8 => f.write_str("invalid UTF-8"),
         }
@@ -166,7 +170,7 @@ pub(crate) fn read_from(input: &[u8], first_line: usize) -> Result<Facts, Refusa
 
 /// The lines of `input`, without their LFs; the last LF may be missing
 /// (pact-eval §1.2), and an empty input has no lines.
-fn lines(input: &[u8]) -> impl Iterator<Item = &[u8]> {
+pub(crate) fn lines(input: &[u8]) -> impl Iterator<Item = &[u8]> {
     let body = input.strip_suffix(b"\n").unwrap_or(input);
     let none = input.is_empty();
     body.split(|&b| b == b'\n').filter(move |_| !none)
@@ -191,8 +195,32 @@ fn ascii(bytes: &[u8]) -> String {
     bytes.iter().map(|&b| b as char).collect()
 }
 
-fn printable(b: u8) -> bool {
+pub(crate) fn printable(b: u8) -> bool {
     (0x20..=0x7e).contains(&b)
+}
+
+/// One atom of line `line`, read from byte offset `pos` of its `bytes` with
+/// this module's grammar (typed constants included); the atom and the offset
+/// after it. The certificate's lines print their atoms in this form
+/// (certificate §3.2; docs/spec/echo.md §10.1).
+pub(crate) fn atom_at(bytes: &[u8], pos: usize, line: usize) -> Result<(Atom, usize), Refusal> {
+    let mut r = LineReader { bytes, pos, line };
+    let atom = r.atom()?;
+    Ok((atom, r.pos))
+}
+
+/// A `nat`'s decimal at `pos`: no leading zero, at most 2⁶⁴ − 1.
+pub(crate) fn nat_at(bytes: &[u8], pos: usize, line: usize) -> Result<(u64, usize), Refusal> {
+    let mut r = LineReader { bytes, pos, line };
+    let n = r.decimal()?;
+    Ok((n, r.pos))
+}
+
+/// 64 lowercase hex digits at `pos`, as 32 bytes.
+pub(crate) fn addr_at(bytes: &[u8], pos: usize, line: usize) -> Result<([u8; 32], usize), Refusal> {
+    let mut r = LineReader { bytes, pos, line };
+    let a = r.hex32()?;
+    Ok((a, r.pos))
 }
 
 fn name_byte(b: u8) -> bool {
@@ -403,6 +431,10 @@ impl<'a> LineReader<'a> {
 
     /// `<decimal>`: no sign, no leading zero, at most 2⁶⁴ − 1.
     fn nat(&mut self) -> Result<Value, Refusal> {
+        self.decimal().map(Value::Nat)
+    }
+
+    fn decimal(&mut self) -> Result<u64, Refusal> {
         let start = self.pos;
         let digits = self.run(u8::is_ascii_digit);
         if digits.is_empty() {
@@ -421,7 +453,7 @@ impl<'a> LineReader<'a> {
                 None => return self.refuse(start, Unreadable::NatOverflow),
             }
         }
-        Ok(Value::Nat(n))
+        Ok(n)
     }
 
     /// A run of hex digits from the cursor, refusing an uppercase one.
@@ -436,6 +468,10 @@ impl<'a> LineReader<'a> {
 
     /// `<64 lowercase hex>`.
     fn addr(&mut self) -> Result<Value, Refusal> {
+        self.hex32().map(Value::Addr)
+    }
+
+    fn hex32(&mut self) -> Result<[u8; 32], Refusal> {
         let start = self.pos;
         let digits = self.hex_run()?;
         let mut a = [0u8; 32];
@@ -443,7 +479,7 @@ impl<'a> LineReader<'a> {
             return self.refuse(start, Unreadable::AddrLength);
         }
         a.copy_from_slice(&unhex(digits));
-        Ok(Value::Addr(a))
+        Ok(a)
     }
 
     /// `"<lowercase hex>"`, an even number of digits.
