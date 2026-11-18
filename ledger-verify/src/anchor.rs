@@ -14,7 +14,10 @@
 //!
 //! and the key is the one `openssl pkey -pubout` writes ([`AnchorKey::from_pem`]).
 
+use alloc::string::String;
+
 use crate::checkpoint::Checkpoint;
+use crate::note::decode_base64;
 
 /// The FIPS 205 context string: domain separation for the anchor key.
 pub const CONTEXT: &[u8] = b"prism ledger anchor v1";
@@ -55,8 +58,17 @@ impl AnchorKey {
 
     /// The key as `openssl pkey -pubout` writes it: a PEM `PUBLIC KEY`
     /// (SubjectPublicKeyInfo) for SLH-DSA-SHA2-128s.
-    pub fn from_pem(_pem: &str) -> Result<AnchorKey, AnchorError> {
-        Err(AnchorError::Key)
+    pub fn from_pem(pem: &str) -> Result<AnchorKey, AnchorError> {
+        let body = pem
+            .strip_prefix("-----BEGIN PUBLIC KEY-----\n")
+            .and_then(|rest| rest.strip_suffix("-----END PUBLIC KEY-----\n"))
+            .ok_or(AnchorError::Key)?;
+        let base64: String = body.split('\n').collect();
+        let der = decode_base64(&base64).map_err(|_| AnchorError::Key)?;
+        let key = der
+            .strip_prefix(SPKI_PREFIX.as_slice())
+            .ok_or(AnchorError::Key)?;
+        AnchorKey::from_bytes(key)
     }
 
     /// Verify an anchor signature over `checkpoint`.
