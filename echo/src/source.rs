@@ -111,8 +111,28 @@ pub struct Source {
 
 /// Read a pact source. It always reads: what doesn't read is a hole.
 pub fn read(input: &[u8]) -> Source {
-    let _ = input;
-    Source::default()
+    let mut out = Source::default();
+    let mut offset = 0;
+    for (i, bytes) in facts::lines(input).enumerate() {
+        let line = i + 1;
+        match parse(bytes) {
+            Ok(Some(record)) => out.lines.push(Line {
+                record,
+                line,
+                offset,
+            }),
+            Ok(None) => {}
+            Err(at) => out.unread.push(Unread {
+                at: Position {
+                    line,
+                    column: at + 1,
+                },
+                offset: offset + at,
+            }),
+        }
+        offset += bytes.len() + 1;
+    }
+    out
 }
 
 /// A failure is the 0-based offset in the line where it can't continue.

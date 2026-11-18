@@ -1,11 +1,12 @@
-//! Certificate replay (prism-022 S1, S2), slice R1: the surface
-//! (docs/spec/echo.md §10.1).
+//! Certificate replay (prism-022 S1, S2): slice R1, the surface
+//! (docs/spec/echo.md §10.1), and slice R2, the source and the Dark-2
+//! report (§10.4; `crate::source`, `crate::dark2`).
 //!
 //! The output is Note v3.3.2 §6.3's, as mirror's v3.2 contract delta
 //! (`docs/pin-batch/2026-10-30-tune-exit-contract-v3.2.md`) gives it: the
-//! verdict line, then `heard` (§4.2, B8), then `implements`, every line
-//! ending in LF. The exits are Alex's: 0 rings, 1 dissonant or uncertain,
-//! 2 unknown.
+//! verdict line, then `heard` (§4.2, B8), then `implements`, then one
+//! `interval` line per dissonance (§6.2), every line ending in LF. The
+//! exits are Alex's: 0 rings, 1 dissonant or uncertain, 2 unknown.
 //!
 //! **The floor:** `rings` comes only out of [`conclude`] with nothing left
 //! unreplayed. Every stratum echo can't replay yet is `unknown unreplayed
@@ -29,15 +30,15 @@ use crate::interval::Interval;
 use crate::record;
 use crate::source;
 
-/// The prism commit whose `docs/spec/echo.md` echo implements: §10, the
-/// decomposition and R1's exact surface. Full and lowercase (Note §4.2,
-/// Q2: prism's repository is SHA-1). Always an earlier commit than the one
-/// that sets it (the self-reference rule).
-pub const SPEC: &str = "7a6dd355564cffaf6c47bb4f650390a9725352f4";
+/// The prism commit whose `docs/spec/echo.md` echo implements: `1e7eb3a`,
+/// version 3, §10's decomposition with R1 as built. Full and lowercase
+/// (Note §4.2, Q2: prism's repository is SHA-1). Always an earlier commit
+/// than the one that sets it (the self-reference rule).
+pub const SPEC: &str = "1e7eb3a402060c253bdb70305dac8c46554e92b1";
 
 /// The git tree of `docs/spec/echo-vectors` echo was verified against: the
-/// tree at `73df7f0`, the R1 red commit that added mirror's fixtures.
-pub const VECTORS: &str = "ce646bf56a9f00a9309522d3178e4de4ca482060";
+/// tree at `d7a3fb5`, the R2 red commit that added Taut's Dark-2 triples.
+pub const VECTORS: &str = "8c1c52ae9fd7fb4720e79044ef58ef4464535e59";
 
 /// The work budget, in ground rule instances considered (certificate §3.2
 /// UNKNOWN: "a work count … fixed as a constant in the checker's own
@@ -53,7 +54,7 @@ pub const STRATA: [&str; 8] = [
 
 /// How many of [`STRATA`] echo replays so far: R2 retired `source`. Each
 /// slice removes its word from the front.
-const REPLAYED: usize = 0;
+const REPLAYED: usize = 1;
 
 /// echo's four inputs, in the order every list of them is printed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

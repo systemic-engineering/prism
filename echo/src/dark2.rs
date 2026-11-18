@@ -199,20 +199,213 @@ fn position(p: &str) -> Option<usize> {
 
 /// The Dark-2 report of `source`.
 pub fn report(source: &Source) -> Report {
-    let _ = source;
+    let mut rules = Vec::new();
+    let mut facts = Vec::new();
+    let mut queries = Vec::new();
+    let mut declarations = Vec::new();
+    for l in &source.lines {
+        match &l.record {
+            Record::Rule { id, head, body } => rules.push((id, head, body, l)),
+            Record::Fact(a) => facts.push(a),
+            Record::Query(a) => queries.push((a, l)),
+            Record::Functional { pred, key, value } => declarations.push((pred, key, value)),
+        }
+    }
+    let arity = arities(rules.iter().map(|(_, h, b, _)| (*h, b.as_slice())), &facts);
+    let conflict: BTreeSet<&String> = arity
+        .iter()
+        .filter(|(_, a)| a.len() > 1)
+        .map(|(p, _)| p)
+        .collect();
+
+    // The reader's checks, each with its byte offset.
+    let mut reader: Vec<(usize, Hole)> = Vec::new();
+    let mut seen: BTreeMap<&String, usize> = BTreeMap::new();
+    for (id, _, _, l) in &rules {
+        let n = seen.entry(*id).or_default();
+        *n += 1;
+        if *n > 1 {
+            reader.push((l.offset, Hole::Repeat(l.line)));
+        }
+    }
+    let repeated: BTreeSet<&String> = seen
+        .iter()
+        .filter(|(_, n)| **n > 1)
+        .map(|(id, _)| *id)
+        .collect();
+    let mut bad_queries = BTreeSet::new();
+    for (q, l) in &queries {
+        let fits = arity
+            .get(&q.pred)
+            .is_some_and(|a| a.contains(&q.args.len()));
+        if !fits {
+            reader.push((l.offset, Hole::QueryArity(l.line)));
+            bad_queries.insert(l.line);
+        }
+    }
+    reader.sort_by_key(|(o, _)| *o);
+
+    // The engine's: arity, safety, declarations.
+    let mut engine: Vec<Hole> = conflict.iter().map(|p| Hole::Arity((*p).clone())).collect();
+    let mut safety = Vec::new();
+    let mut unsafe_rules = BTreeSet::new();
+    for (id, head, body, _) in rules.iter().filter(|(id, ..)| !repeated.contains(id)) {
+        let positive: BTreeSet<&String> = body
+            .iter()
+            .filter(|l| !l.negative)
+            .flat_map(|l| vars(&l.atom))
+            .collect();
+        let named: BTreeSet<&String> = vars(head)
+            .chain(
+                body.iter()
+                    .filter(|l| l.negative)
+                    .flat_map(|l| vars(&l.atom)),
+            )
+            .collect();
+        for v in named.difference(&positive) {
+            safety.push(((*id).clone(), (*v).clone()));
+            unsafe_rules.insert(*id);
+        }
+    }
+    safety.sort();
+    engine.extend(
+        safety
+            .into_iter()
+            .map(|(rule, var)| Hole::Safety { rule, var }),
+    );
+    let mut ill: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut declared = BTreeSet::new();
+    for (pred, key, value) in &declarations {
+        let line = canonical(pred, key, value);
+        if conflict.contains(pred) {
+            continue;
+        }
+        let n = arity.get(*pred).and_then(|a| a.first().copied());
+        let positions: Vec<Option<usize>> = key.iter().map(|k| position(k)).collect();
+        let inside = |p: Option<usize>| n.is_some_and(|n| p.is_some_and(|p| p <= n));
+        let keys: BTreeSet<Option<usize>> = positions.iter().copied().collect();
+        let well_formed = n.is_some()
+            && positions.iter().all(|p| inside(*p))
+            && inside(position(value))
+            && keys.len() == positions.len();
+        if !well_formed {
+            ill.insert(((*pred).clone(), line));
+        } else if !keys.contains(&position(value)) {
+            declared.insert((*pred).clone());
+        }
+    }
+    let ill_preds: BTreeSet<String> = ill.iter().map(|(p, _)| p.clone()).collect();
+    engine.extend(
+        ill.into_iter()
+            .map(|(pred, line)| Hole::Declaration { pred, line }),
+    );
+
+    // A6's order, and the head of the merged order.
+    let mut holes: Vec<Hole> = source.unread.iter().map(|u| Hole::Unread(u.at)).collect();
+    holes.extend(reader.iter().map(|(_, h)| h.clone()));
+    let head = if holes.is_empty() {
+        (!engine.is_empty()).then_some(0)
+    } else {
+        let offsets = source
+            .unread
+            .iter()
+            .map(|u| u.offset)
+            .chain(reader.iter().map(|(o, _)| *o));
+        offsets.enumerate().min_by_key(|(_, o)| *o).map(|(i, _)| i)
+    };
+    holes.extend(engine);
+
+    // What is left to run: the eval program (H1's "left out").
+    let mentions = |p: &Pattern, body: &[Literal]| {
+        core::iter::once(p)
+            .chain(body.iter().map(|l| &l.atom))
+            .any(|a| conflict.contains(&a.pred))
+    };
+    let eval_rules: Vec<&Vec<Literal>> = rules
+        .iter()
+        .filter(|(id, h, b, _)| {
+            !repeated.contains(id) && !unsafe_rules.contains(id) && !mentions(h, b)
+        })
+        .map(|(_, _, b, _)| *b)
+        .collect();
+    let eval_facts: Vec<&&Atom> = facts
+        .iter()
+        .filter(|f| !conflict.contains(&f.pred))
+        .collect();
+    let eval_queries = queries
+        .iter()
+        .filter(|(q, l)| !bad_queries.contains(&l.line) && !conflict.contains(&q.pred))
+        .count();
+    let unread = !source.unread.is_empty();
+
+    let light = if holes.is_empty() {
+        Light::NoHole
+    } else if eval_facts.is_empty()
+        && eval_rules
+            .iter()
+            .all(|b| b.iter().any(|l| !l.negative) && b.iter().all(|l| !l.negative))
+        && (eval_queries == 0 || unread)
+    {
+        Light::Dark
+    } else if holes.iter().any(Hole::adds)
+        && rules
+            .iter()
+            .any(|(_, _, b, _)| b.iter().any(|l| l.negative))
+    {
+        Light::Open
+    } else {
+        // Every predicate a hole or a declaration could remove (H1's `D`,
+        // the general rule, a paradox's group): D(#) is every predicate
+        // used with arity >= 2 in a line that read; a declaration hole's,
+        // its predicate at arity >= 2 (G1); and every declared predicate.
+        let wide = |p: &String| {
+            arity.get(p).is_some_and(|a| a.iter().any(|&n| n >= 2))
+                || queries
+                    .iter()
+                    .any(|(q, _)| &q.pred == p && q.args.len() >= 2)
+        };
+        let removable = |p: &String| {
+            (unread && wide(p)) || (ill_preds.contains(p) && wide(p)) || declared.contains(p)
+        };
+        if eval_facts.iter().any(|f| !removable(&f.pred)) {
+            Light::Lit
+        } else {
+            Light::Open
+        }
+    };
+    let basis = source.unread.iter().map(|u| u.at.line).collect();
     Report {
-        holes: Vec::new(),
-        head: None,
-        basis: Vec::new(),
-        light: Light::Open,
+        holes,
+        head,
+        basis,
+        light,
     }
 }
 
 /// `unread <runs>` (§6.4): maximal runs joined by `, `, a run of two or
 /// more as `a-b`; `None` when nothing was unread.
 pub fn basis_text(lines: &[usize]) -> Option<String> {
-    let _ = lines;
-    None
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for &l in lines {
+        match runs.last_mut() {
+            Some((_, end)) if *end + 1 == l => *end = l,
+            _ => runs.push((l, l)),
+        }
+    }
+    let first = runs.first()?;
+    let run = |(a, b): &(usize, usize)| {
+        if a == b {
+            format!("{a}")
+        } else {
+            format!("{a}-{b}")
+        }
+    };
+    let mut out = format!("unread {}", run(first));
+    for r in &runs[1..] {
+        out.push_str(", ");
+        out.push_str(&run(r));
+    }
+    Some(out)
 }
 
 /// The score's `basis(nat l₁, …)` atom (§6.4), at `@song/interval`.
@@ -313,6 +506,88 @@ pub fn judge(
     performance: &Performance,
     record: &RecordLines,
 ) -> Option<Vec<Interval>> {
-    let _ = (report, performance, record);
-    None
+    let carries_model = performance.header.result.is_some()
+        || !performance.layers.is_empty()
+        || !performance.derives.is_empty()
+        || !performance.contexts.is_empty();
+    match report.light {
+        Light::Open => return None,
+        // Check 2: a model printed for a Dark source. Its interval's bytes
+        // are open (docs/spec/echo.md Q26).
+        Light::Dark if carries_model => return None,
+        _ => {}
+    }
+    let expected: Vec<String> = report.holes.iter().map(Hole::text).collect();
+    let mut out = Vec::new();
+
+    // The record's `hole` lines, by hole text (the value before its first
+    // ` #`; the said text is never compared).
+    let claimed: Vec<String> = record
+        .lines
+        .iter()
+        .filter(|l| l.key == "hole")
+        .map(|l| {
+            let end = l
+                .value
+                .windows(2)
+                .position(|w| w == b" #")
+                .unwrap_or(l.value.len());
+            l.value[..end]
+                .iter()
+                .map(|&b| b as char)
+                .collect::<String>()
+        })
+        .filter(|t| in_table(t))
+        .collect();
+    holes(&mut out, &claimed, &expected, "record", |t| {
+        Side::Addr(address::hash(t.as_bytes()))
+    });
+
+    // The performance's: `hole` lines in an uncertain or paradox one only,
+    // and one `dark 2` atom, the head, in an unknown one (H5).
+    let dark = report.light == Light::Dark;
+    let claimed: Vec<String> = performance
+        .holes
+        .iter()
+        .map(|(t, _)| t.clone())
+        .filter(|t| in_table(t))
+        .collect();
+    let derived = if dark { Vec::new() } else { expected };
+    holes(&mut out, &claimed, &derived, "performance", |t| {
+        Side::Addr(address::atom(&Tau::mirror_certificate(), &hole_atom(t)))
+    });
+    let claimed: Vec<Atom> = performance
+        .dark
+        .iter()
+        .filter_map(|(d, _)| claimed_dark(d))
+        .collect();
+    let derived: Vec<Atom> = if dark {
+        report.head().into_iter().collect()
+    } else {
+        Vec::new()
+    };
+    let (only_c, only_d) = difference(&claimed, &derived);
+    let addr = |a: &Atom| Side::Addr(address::atom(&Tau::mirror_certificate(), a));
+    if let ([c], [d]) = (only_c.as_slice(), only_d.as_slice()) {
+        out.push(Interval::verdict("dark", addr(c), addr(d), "performance"));
+    } else {
+        for c in &only_c {
+            out.push(Interval::verdict(
+                "dark",
+                addr(c),
+                Side::None,
+                "performance",
+            ));
+        }
+        for d in &only_d {
+            out.push(Interval::verdict(
+                "dark",
+                Side::None,
+                addr(d),
+                "performance",
+            ));
+        }
+    }
+    interval::sort(&mut out);
+    Some(out)
 }
