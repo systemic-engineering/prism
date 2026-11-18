@@ -2,11 +2,9 @@
 
 use std::sync::OnceLock;
 
-use ledger_verify::anchor::{
-    AnchorError, AnchorKey, CONTEXT, PUBLIC_KEY, SIGNATURE, SPKI_PREFIX,
-};
-use ledger_verify::checkpoint::Checkpoint;
 use base64ct::Encoding as _;
+use ledger_verify::anchor::{AnchorError, AnchorKey, CONTEXT, PUBLIC_KEY, SIGNATURE, SPKI_PREFIX};
+use ledger_verify::checkpoint::Checkpoint;
 use slh_dsa::{Sha2_128s, SigningKey};
 
 use crate::common::{flip, tree, ORIGIN};
@@ -213,10 +211,17 @@ fn a_malformed_pem_key_rejects() {
         ("long", pem(&long)),
         ("unused bits", pem(&unused)),
         ("private", pem(&der).replace("PUBLIC", "PRIVATE")),
-        ("no footer", pem(&der).replace("-----END PUBLIC KEY-----\n", "")),
+        (
+            "no footer",
+            pem(&der).replace("-----END PUBLIC KEY-----\n", ""),
+        ),
         ("not base64", pem(&der).replacen("MDA", "M!A", 1)),
         ("empty", String::new()),
     ] {
-        assert_eq!(AnchorKey::from_pem(&bad).err(), Some(AnchorError::Key), "{what}");
+        assert_eq!(
+            AnchorKey::from_pem(&bad).err(),
+            Some(AnchorError::Key),
+            "{what}"
+        );
     }
 }

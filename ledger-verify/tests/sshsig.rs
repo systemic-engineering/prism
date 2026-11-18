@@ -10,8 +10,8 @@
 
 use base64ct::{Base64, Encoding as _};
 use ledger_verify::sshsig::{
-    verify, SealKey, SshsigError, COMPOSITE_LABEL, COMPOSITE_PREFIX, KEY_TYPE,
-    MLDSA44_PUBLIC_KEY, MLDSA44_SIGNATURE, PUBLIC_KEY, SIGNATURE,
+    verify, SealKey, SshsigError, COMPOSITE_LABEL, COMPOSITE_PREFIX, KEY_TYPE, MLDSA44_PUBLIC_KEY,
+    MLDSA44_SIGNATURE, PUBLIC_KEY, SIGNATURE,
 };
 use sha2::{Digest, Sha512};
 
@@ -25,8 +25,7 @@ const SIG: &str = include_str!("../../docs/spec/seal-vectors/seal-msg.spectral-s
 const SIG_OTHER_NS: &str =
     include_str!("../../docs/spec/seal-vectors/seal-msg.other-namespace.sig");
 const SIG_SHA256: &str = include_str!("../../docs/spec/seal-vectors/seal-msg.sha256.sig");
-const SIG_CLASSIC: &str =
-    include_str!("../../docs/spec/seal-vectors/seal-msg.classic-ed25519.sig");
+const SIG_CLASSIC: &str = include_str!("../../docs/spec/seal-vectors/seal-msg.classic-ed25519.sig");
 
 const NS: &str = "spectral-seal";
 
@@ -40,7 +39,11 @@ const BEGIN: &str = "-----BEGIN SSH SIGNATURE-----\n";
 const END: &str = "-----END SSH SIGNATURE-----\n";
 
 fn dearmor(armored: &str) -> Vec<u8> {
-    let body = armored.strip_prefix(BEGIN).unwrap().strip_suffix(END).unwrap();
+    let body = armored
+        .strip_prefix(BEGIN)
+        .unwrap()
+        .strip_suffix(END)
+        .unwrap();
     Base64::decode_vec(&body.replace('\n', "")).unwrap()
 }
 
@@ -181,17 +184,12 @@ fn the_composite_encoding_is_what_ssh_keygen_wrote() {
         &ml_dsa::EncodedVerifyingKey::<ml_dsa::MlDsa44>::try_from(&pk[..MLDSA44_PUBLIC_KEY])
             .unwrap(),
     );
-    let ml_sig =
-        ml_dsa::Signature::<ml_dsa::MlDsa44>::try_from(&sig[..MLDSA44_SIGNATURE]).unwrap();
+    let ml_sig = ml_dsa::Signature::<ml_dsa::MlDsa44>::try_from(&sig[..MLDSA44_SIGNATURE]).unwrap();
     assert!(ml.verify_with_context(&m, COMPOSITE_LABEL, &ml_sig));
     assert!(!ml.verify_with_context(&m, &[], &ml_sig));
-    let ed = ed25519_dalek::VerifyingKey::from_bytes(
-        pk[MLDSA44_PUBLIC_KEY..].try_into().unwrap(),
-    )
-    .unwrap();
-    let ed_sig = ed25519_dalek::Signature::from_bytes(
-        sig[MLDSA44_SIGNATURE..].try_into().unwrap(),
-    );
+    let ed = ed25519_dalek::VerifyingKey::from_bytes(pk[MLDSA44_PUBLIC_KEY..].try_into().unwrap())
+        .unwrap();
+    let ed_sig = ed25519_dalek::Signature::from_bytes(sig[MLDSA44_SIGNATURE..].try_into().unwrap());
     assert!(ed.verify_strict(&m, &ed_sig).is_ok());
 }
 
@@ -218,7 +216,10 @@ fn another_namespace_rejects() {
         verify(SIG_OTHER_NS, NS, MSG, &seal()),
         Err(SshsigError::Namespace)
     );
-    assert_eq!(verify(SIG_OTHER_NS, "other-namespace", MSG, &seal()), Ok(()));
+    assert_eq!(
+        verify(SIG_OTHER_NS, "other-namespace", MSG, &seal()),
+        Ok(())
+    );
     assert_eq!(verify(SIG, "", MSG, &seal()), Err(SshsigError::Namespace));
     // The namespace is signed: relabelling the blob does not move it.
     let mut b = Blob::parse(&dearmor(SIG_OTHER_NS));
@@ -346,13 +347,19 @@ fn the_seal_key_parses_as_ssh_keygen_writes_it() {
     );
     // A truncated or extended blob, bad base64, nothing.
     let raw = Base64::decode_vec(fields[1]).unwrap();
-    let short = format!("{KEY_TYPE} {}", Base64::encode_string(&raw[..raw.len() - 1]));
+    let short = format!(
+        "{KEY_TYPE} {}",
+        Base64::encode_string(&raw[..raw.len() - 1])
+    );
     let mut longer = raw.clone();
     longer.push(0);
     let long = format!("{KEY_TYPE} {}", Base64::encode_string(&longer));
     let mut wrong_len = raw.clone();
     wrong_len[4 + KEY_TYPE.len() + 3] -= 1; // the key string claims 1343
-    let wrong_len = format!("{KEY_TYPE} {}", Base64::encode_string(&wrong_len[..raw.len() - 1]));
+    let wrong_len = format!(
+        "{KEY_TYPE} {}",
+        Base64::encode_string(&wrong_len[..raw.len() - 1])
+    );
     for bad in [
         short,
         long,
@@ -411,10 +418,16 @@ fn a_malformed_blob_rejects() {
     // Trailing bytes after the blob, a bad preamble, a truncated blob.
     let mut bytes = blob().encode();
     bytes.push(0);
-    assert_eq!(verify(&armor(&bytes), NS, MSG, &seal()), Err(SshsigError::Format));
+    assert_eq!(
+        verify(&armor(&bytes), NS, MSG, &seal()),
+        Err(SshsigError::Format)
+    );
     let mut bytes = blob().encode();
     bytes[0] = b's';
-    assert_eq!(verify(&armor(&bytes), NS, MSG, &seal()), Err(SshsigError::Format));
+    assert_eq!(
+        verify(&armor(&bytes), NS, MSG, &seal()),
+        Err(SshsigError::Format)
+    );
     let bytes = blob().encode();
     for cut in [3, 8, 20, bytes.len() - 1] {
         assert_eq!(
