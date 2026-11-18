@@ -1,11 +1,11 @@
 {
   "packages": [
-    { "id": "path+file:///w/listen#0.1.0", "name": "listen" },
+    { "id": "path+file:///w/echo#0.1.0", "name": "echo" },
     { "id": "path+file:///w/prismqueer#0.1.0", "name": "prismqueer" }
   ],
   "resolve": {
     "nodes": [
-      { "id": "path+file:///w/listen#0.1.0", "deps": [
+      { "id": "path+file:///w/echo#0.1.0", "deps": [
         { "name": "prismqueer", "pkg": "path+file:///w/prismqueer#0.1.0" }
       ] },
       { "id": "path+file:///w/prismqueer#0.1.0", "deps": [] }

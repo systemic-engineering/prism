@@ -47,7 +47,7 @@
         ./imperfect
         ./projections
         ./ledger-verify
-        ./listen
+        ./echo
       ];
       sourceExts = [
         "rs"
@@ -88,14 +88,14 @@
       # vectors the tests load from docs/spec (gate_vectors, spec_vectors),
       # and the stock tools' raw output (docs/spec/seal-vectors: openssl and
       # ssh-keygen keys, messages and signatures, byte for byte), and mirror's
-      # data that listen reads (docs/spec/listen-vectors).
+      # data that echo reads (docs/spec/echo-vectors).
       testFileset = fs.unions (
         [ packageFileset ]
         ++ map (d: fs.intersection (fs.maybeMissing (d + "/tests")) (fs.fileFilter (f: f.hasExt "rs") d)) crates
         ++ [
           (fs.fileFilter (f: f.hasExt "json") ./docs/spec)
           ./docs/spec/seal-vectors
-          ./docs/spec/listen-vectors
+          ./docs/spec/echo-vectors
         ]
       );
 
@@ -338,10 +338,10 @@
               installPhaseCommand = "touch $out";
             };
 
-            # listen, the second reader (prism-022), builds for the same two
+            # echo, the second reader (prism-022), builds for the same two
             # targets: no std, so no clock, no file and no process can reach it.
-            listen-portable = craneLibPortable.mkCargoDerivation {
-              pname = "listen-portable";
+            echo-portable = craneLibPortable.mkCargoDerivation {
+              pname = "echo-portable";
               inherit version;
               src = packageSrc;
               strictDeps = true;
@@ -349,20 +349,20 @@
               cargoVendorDir = craneLibPortable.vendorCargoDeps { cargoLock = ./Cargo.lock; };
               doInstallCargoArtifacts = false;
               buildPhaseCargoCommand = lib.concatMapStringsSep "\n" (
-                t: "cargo build --locked --release -p listen --target ${t}"
+                t: "cargo build --locked --release -p echo --target ${t}"
               ) portableTargets;
               installPhaseCommand = "touch $out";
             };
 
-            # prism-022 S5: listen's Cargo graph (every kind, every depth)
+            # prism-022 S5: echo's Cargo graph (every kind, every depth)
             # holds no prismqueer, no mirror crate and nothing LAPACK, BLAS or
             # Fortran. The guard runs on the real graph, and must reject the
             # three forbidden fixtures (a direct prismqueer, a transitive
             # openblas-src behind a dev cycle, an innocently named crate with
             # `links = "lapack"`) and accept the clean one
-            # (prismqueer in the workspace, but not under listen).
-            listen-independent = craneLib.mkCargoDerivation {
-              pname = "listen-independent";
+            # (prismqueer in the workspace, but not under echo).
+            echo-independent = craneLib.mkCargoDerivation {
+              pname = "echo-independent";
               inherit version;
               src = packageSrc;
               strictDeps = true;
@@ -371,12 +371,12 @@
               nativeBuildInputs = [ pkgs.jq ];
               doInstallCargoArtifacts = false;
               buildPhaseCargoCommand = ''
-                guard=${./nix/listen-independent.sh}
+                guard=${./nix/echo-independent.sh}
                 cargo metadata --format-version 1 --locked --offline > metadata.json
                 bash $guard metadata.json
-                bash $guard ${./nix/fixtures/listen-clean.json}
-                for f in ${./nix/fixtures/listen-direct.json} ${./nix/fixtures/listen-transitive.json} ${./nix/fixtures/listen-links.json}; do
-                  if bash $guard $f 2>/dev/null; then echo "listen-independent accepted $f" >&2; exit 1; fi
+                bash $guard ${./nix/fixtures/echo-clean.json}
+                for f in ${./nix/fixtures/echo-direct.json} ${./nix/fixtures/echo-transitive.json} ${./nix/fixtures/echo-links.json}; do
+                  if bash $guard $f 2>/dev/null; then echo "echo-independent accepted $f" >&2; exit 1; fi
                 done
               '';
               installPhaseCommand = "touch $out";
@@ -412,7 +412,7 @@
                     ./prismqueer/tests
                     ./imperfect/tests
                     ./ledger-verify/tests
-                    ./listen/tests
+                    ./echo/tests
                   ]
                 );
                 leaked = fs.toList (fs.intersection packageFileset probes);

@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use listen::{read, Atom, Value};
+use echo::{read, Atom, Value};
 
 /// 64 hex digits led by a letter: also a valid pact name.
 const HEX: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";

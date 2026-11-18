@@ -1,7 +1,7 @@
 //! P1, the facts reader: the reflection's format, `mirror.facts`' subset of
 //! pact text.
 //!
-//! The grammar is assembled from mirror's spec text (docs/spec/listen.md §4
+//! The grammar is assembled from mirror's spec text (docs/spec/echo.md §4
 //! gives it whole, with the open questions):
 //! - reflection seam A1.4: `# <key> <value>` header lines, `fact` lines with
 //!   `addr`/`nat`/`bytes`/`sym` arguments, `#` comments, nothing else; an
@@ -136,7 +136,7 @@ pub fn read_reflection(s: &[u8]) -> Result<Option<Facts>, Refusal> {
 fn read_from(input: &[u8], first_line: usize) -> Result<Facts, Refusal> {
     let mut out = Facts::default();
     // Headers are the `# <key> <value>` lines of the leading block of `#`
-    // lines; any other `#` line is a comment (docs/spec/listen.md §7 Q3).
+    // lines; any other `#` line is a comment (docs/spec/echo.md §7 Q3).
     let mut leading = true;
     for (i, bytes) in lines(input).enumerate() {
         let line = first_line + i;

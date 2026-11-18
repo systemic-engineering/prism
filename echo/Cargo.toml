@@ -1,9 +1,9 @@
 [package]
-name = "listen"
+name = "echo"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "prism's second reader of mirror's reflections (prism-022): the cut at `---` and the typed facts reader, from mirror's spec text. no_std, no mirror crate, no LAPACK."
+description = "prism's second reader of mirror's reflections (prism-022): it never authors, it gives the engine's record back. The cut at `---` and the typed facts reader, from mirror's spec text. no_std, no mirror crate, no LAPACK."
 repository = "https://github.com/systemic-engineering/prism"
 publish = false
 
@@ -14,7 +14,7 @@ autotests = false
 name = "main"
 path = "tests/main.rs"
 
-# No dependencies. checks.listen-independent holds the graph to that: no
+# No dependencies. checks.echo-independent holds the graph to that: no
 # prismqueer, no mirror crate, nothing LAPACK, BLAS or Fortran, at any depth
-# and of any kind (docs/spec/listen.md §2).
+# and of any kind (docs/spec/echo.md §2).
 [dependencies]

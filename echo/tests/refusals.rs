@@ -2,7 +2,7 @@
 //! column (reflection seam A1.4: "a refusal with its location, never a
 //! silent drop"). Columns count bytes (fixpoint §16.2.1).
 
-use listen::{read, read_reflection, Position, Refusal, Unreadable};
+use echo::{read, read_reflection, Position, Refusal, Unreadable};
 use Unreadable::*;
 
 const HEX: &str = "0976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa";
@@ -87,7 +87,7 @@ fn malformed_records() {
 
 /// §16.10 item 1: `int` and `ratio` are reserved, refused until pinned. A
 /// type word without its value, and `not` / `requires`, are not names
-/// (pact-eval §1.2; the type words: docs/spec/listen.md §7 Q5).
+/// (pact-eval §1.2; the type words: docs/spec/echo.md §7 Q5).
 #[test]
 fn keywords_and_reserved_types() {
     check(&[

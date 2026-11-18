@@ -1,16 +1,16 @@
 {
   "packages": [
-    { "id": "path+file:///w/listen#0.1.0", "name": "listen" },
+    { "id": "path+file:///w/echo#0.1.0", "name": "echo" },
     { "id": "registry+https://github.com/rust-lang/crates.io-index#helper@1.0.0", "name": "helper" },
     { "id": "registry+https://github.com/rust-lang/crates.io-index#openblas-src@0.10.0", "name": "openblas-src" }
   ],
   "resolve": {
     "nodes": [
-      { "id": "path+file:///w/listen#0.1.0", "deps": [
+      { "id": "path+file:///w/echo#0.1.0", "deps": [
         { "name": "helper", "pkg": "registry+https://github.com/rust-lang/crates.io-index#helper@1.0.0" }
       ] },
       { "id": "registry+https://github.com/rust-lang/crates.io-index#helper@1.0.0", "deps": [
-        { "name": "listen", "pkg": "path+file:///w/listen#0.1.0" },
+        { "name": "echo", "pkg": "path+file:///w/echo#0.1.0" },
         { "name": "openblas_src", "pkg": "registry+https://github.com/rust-lang/crates.io-index#openblas-src@0.10.0" }
       ] },
       { "id": "registry+https://github.com/rust-lang/crates.io-index#openblas-src@0.10.0", "deps": [] }

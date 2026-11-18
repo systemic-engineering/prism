@@ -1,6 +1,6 @@
 //! mirror's data, read by prism's reader.
 //!
-//! docs/spec/listen-vectors/mirror holds, byte for byte from mirror
+//! docs/spec/echo-vectors/mirror holds, byte for byte from mirror
 //! `reed/ship` (its README names the commit): the 46 `kind atom*` vectors of
 //! `tests/checker/vectors` (Taut's §5.0 vectors, written from the spec text)
 //! and `mirror.facts`, the pinned F_G (charter row `9092fca1…`).
@@ -8,10 +8,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use listen::{read, Value};
+use echo::{read, Value};
 
 fn dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/spec/listen-vectors/mirror")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/spec/echo-vectors/mirror")
 }
 
 fn hex(bytes: &[u8]) -> String {

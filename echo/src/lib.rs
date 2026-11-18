@@ -1,8 +1,13 @@
 //! prism's second reader of mirror's reflections (prism-022, S4/S5).
 //!
+//! Echo can only give back the last words she was given, and she never
+//! speaks first. The checker never authors: it replays the engine's own
+//! record from the text and gives it back exactly, so where the two differ,
+//! the difference is named and located.
+//!
 //! Read from mirror's spec text and vectors only, never from mirror's
-//! engine source (docs/spec/listen.md §2). The spec is
-//! `docs/spec/listen.md`.
+//! engine source (docs/spec/echo.md §2). The spec is
+//! `docs/spec/echo.md`.
 //!
 //! No I/O, no clock, no sampling, no network: `#![no_std]` with `alloc`.
 #![no_std]
