@@ -8,8 +8,8 @@
 //! `hole` lines, and its `dark 2` atom against the head of the source's
 //! report (`hole … about performance`, `dark … about performance`). Where
 //! R2 can't tell, and where nothing differs, R3 judges P and F (check 1;
-//! `crate::r3`), and then the answer is the next stratum's: `unknown
-//! unreplayed model`. Nothing rings.
+//! `crate::r3`) and R4 the run (`crate::r4`), and then the answer is the
+//! next stratum's: `unknown unreplayed contexts`. Nothing rings.
 //!
 //! The fixtures' `expect` (tune's `test_checker.py` docstring): `expect
 //! dissonant <kind>…`, each kind among the printed intervals.
@@ -115,7 +115,7 @@ fn hole_atom(words: &[&str]) -> String {
     })
 }
 
-const NEXT: &str = "unknown unreplayed model";
+const NEXT: &str = "unknown unreplayed contexts";
 
 /// R2's lines (stratum `verdict`) on all 38 fixtures. The interval lines
 /// are exact: the hole texts' digests are b3sum 1.8.7's, run by hand; the
@@ -546,31 +546,29 @@ fn dark_atoms_pair_only_one_for_one() {
 }
 
 /// Where R2 can't tell, it doesn't: W with a hole that adds (R5's
-/// `unknown shadow under W`); light it can't decide without a run (R4).
-/// Both `unknown unreplayed model`, whatever the record says: their
-/// header waits for the light too (`r3::check_1_waits_for_the_light_it_needs`).
-/// A Dark source printed with a model (check 2, Q26) is
-/// `r3::a_dark_source_with_a_model`.
+/// `unknown shadow under W`); light it can't decide without a run. R2
+/// judges neither record. The W one's header R4 decides from its positive
+/// core (no certain paradox: `unknown`, so `none`, and v01's claimed P and
+/// F are two `source` lines); the other's header waits for the light
+/// (`r3::check_1_waits_for_the_light_it_needs`). A Dark source printed
+/// with a model (check 2, Q26) is `r3::a_dark_source_with_a_model`.
 #[test]
 fn what_r2_cannot_tell_is_left_to_the_next_stratum() {
     let (v01, _) = fixture("pos-v01");
     let bogus = b"verdict     clear\nfile        \"x\"\nshaped_by   none\nhole        # 9:9 #\n";
-    for source in [
-        &b"fact p(a)\nrule r q(?x) requires p(?x), not s(?x)\nfact X\n"[..],
-        &b"fact e(a, b)\nfact X\n"[..],
-    ] {
-        let t = Triple {
-            source: source.to_vec(),
-            certificate: v01.certificate.clone(),
-            record: bogus.to_vec(),
-        };
-        assert_eq!(
-            lines(&run(&t))[0],
-            NEXT,
-            "{}",
-            String::from_utf8_lossy(source)
-        );
-    }
+    let t = |source: &[u8]| Triple {
+        source: source.to_vec(),
+        certificate: v01.certificate.clone(),
+        record: bogus.to_vec(),
+    };
+    let a = run(&t(
+        b"fact p(a)\nrule r q(?x) requires p(?x), not s(?x)\nfact X\n",
+    ));
+    assert_eq!(lines(&a)[0], "dissonant 2");
+    assert!(intervals(&a)
+        .iter()
+        .all(|i| i.starts_with("interval source source ")));
+    assert_eq!(lines(&run(&t(b"fact e(a, b)\nfact X\n")))[0], NEXT);
 }
 
 /// Lines are sorted by stratum, then by the printed line's bytes (Note

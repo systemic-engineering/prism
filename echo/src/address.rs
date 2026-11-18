@@ -90,6 +90,14 @@ impl Tau {
         }
     }
 
+    /// `@song/note` with the root flag: the Note (Note §2.2; Taut's 38).
+    pub fn song_note() -> Tau {
+        Tau {
+            name: "@song/note".into(),
+            grammar: None,
+        }
+    }
+
     fn new(name: &str, grammar: Option<Address>) -> Option<Tau> {
         (!name.as_bytes().contains(&0)).then(|| Tau {
             name: name.into(),

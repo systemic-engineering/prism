@@ -22,6 +22,7 @@ pub mod dark2;
 pub mod facts;
 pub mod integrity;
 pub mod interval;
+pub mod model;
 pub mod program;
 pub mod record;
 pub mod replay;

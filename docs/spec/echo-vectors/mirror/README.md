@@ -14,6 +14,7 @@ docs/spec/echo.md §2).
 | `01-determinism.pact-text` | `tests/pact/01-determinism.pact-text`, `reed/ship` `3cedf18a` | corpus 01's source, vector 50's `source` input |
 | `37-record-dark-2.record`, `48-dark2-order-basis.song`, `55-certificate.cert`, `55-record-dark2-strata.record`, `56-record-dark2-reader.record`; `71`, `77`, `80`, `81`, `90`, `91`: `-source.pact-text`, `-certificate.cert` and their `.record` | `tests/checker/vectors/`, `reed/ship` `3cedf18a` (blobs as `git ls-tree` names them, e.g. `55-record-dark2-strata.record` `d9a4bc81`) | Taut's Dark-2 and hole triples under Note §6.7 (H1, H4, H5): a source, its performance, and the record's whole bytes (each `.record`'s `hex` field, the said text empty). Certificate replay R2 |
 | `68-certificate-stray.cert`, `68-a5-dissonant.song` | `tests/checker/vectors/`, `reed/ship` `3cedf18a` (blobs `fa7bb792`, `aeb4c516`) | Taut's one full A5 tune output for a dissonant case: corpus 01's source, 27's record half, 27's certificate plus a spurious `layer 1 path(a, a)`; the `stray` line and its atom. Certificate replay R3 (the interval's text and atom; P and F agree, the stray is R4's) |
+| `38-note-positive.song`, `41-negs-empty.song`, `44a-note-step.song` | `tests/checker/vectors/`, `reed/ship` `3cedf18a` | Taut's Note vectors (Note §2.1, §2.2): a positive derivation's Note of 20's and 31's sources, and a positive rule's empty `negs`. Certificate replay R4 (`missing` / `extra` name a derivation by its Note) |
 
 How echo uses them:
 - `echo/tests/vectors.rs`: the 46 atom vectors read as `fact` lines, print back, and the 7 that carry `content` encode to it; `mirror.facts` reads whole.
@@ -24,6 +25,8 @@ How echo uses them:
 - `echo/tests/source.rs`, `echo/tests/dark2.rs` and `echo/tests/r2.rs` (certificate replay, R2): the fixtures' and Taut's sources read and located; the holes in A6's order against 55's record; the head against 48a, 22f, 24f and 71c; `basis` against 48b; the hole atoms against 73–75, 77, 81, 90, 91; Taut's triples agree; 76 and 76a's interval lines and atoms, byte for byte.
 
 - `echo/tests/r3.rs` (certificate replay, R3): P and F against the 16 `NNa-program` and 16 `NNb-facts` vectors (their noted sources re-read and re-printed by echo), the 17 `NNg-header` vectors, every fixture's and Taut's certificate claims; `ct-a4`'s `source` interval; 45, 46 and 68's interval text and atom.
+
+- `echo/tests/r4.rs` (certificate replay, R4): echo's own run of the positive sources against Taut's `NNc` (model), `NNd` (layers) and `NNe` (derivations) for 20, 21, 22, 31, 35, 82, 83, 86, 87 and 89; the Notes against 38, 41 and 44a; the cheats `ct-a2`, `ct-a8`, `ct-a9`, `ct-a10`; 68's whole output, byte for byte; 95 and 97's header from the positive core.
 
 To refresh: copy the same paths from a newer mirror commit, update this
 README, and expect the counts in the tests to move only where mirror's

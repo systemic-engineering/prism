@@ -284,8 +284,8 @@ fn the_verdict_then_heard_then_implements() {
 #[test]
 fn what_echo_cannot_replay_is_unknown_never_rings() {
     let a = run(&fixture("pos-v01"), BUDGET);
-    assert_eq!(a.verdict, Verdict::Unreplayed("model"));
-    assert_eq!(lines(&a)[0], "unknown unreplayed model");
+    assert_eq!(a.verdict, Verdict::Unreplayed("contexts"));
+    assert_eq!(lines(&a)[0], "unknown unreplayed contexts");
     assert_eq!(a.exit(), 2);
 }
 
@@ -627,14 +627,15 @@ fn the_budget_is_pinned() {
     assert_eq!(BUDGET, 10_000_000);
 }
 
-/// pos-v01 prints 9 `derive` lines: R1 considers each as one ground rule
-/// instance. A budget of 9 is enough; 8 runs out; 1 runs out. Counted, so
-/// the boundary is exact and every run gives the same bytes.
+/// From R4 the budget is charged where echo's own run forms a ground rule
+/// instance (R1 charged one per printed `derive` line): pos-v01's naive
+/// run forms 38. A budget of 38 is enough; 37, 9, 1 and 0 run out.
+/// Counted, so the boundary is exact and every run gives the same bytes.
 #[test]
 fn the_budget_counts_ground_rule_instances() {
     let f = fixture("pos-v01");
-    assert_eq!(lines(&run(&f, 9))[0], "unknown unreplayed model");
-    for budget in [8, 1, 0] {
+    assert_eq!(lines(&run(&f, 38))[0], "unknown unreplayed contexts");
+    for budget in [37, 9, 1, 0] {
         let a = run(&f, budget);
         assert_eq!(a.verdict, Verdict::Uncertain { budget });
         assert_eq!(
@@ -643,25 +644,26 @@ fn the_budget_counts_ground_rule_instances() {
         );
         assert_eq!(a.exit(), 1);
     }
-    let first = run(&f, 8).print();
+    let first = run(&f, 37).print();
     for _ in 0..50 {
-        assert_eq!(run(&f, 8).print(), first);
+        assert_eq!(run(&f, 37).print(), first);
     }
 }
 
-/// A budget of 1 on every real input that prints more than one derivation.
+/// A budget of 1 runs out on exactly the real inputs whose source's run
+/// forms more than one ground rule instance, whatever their certificates
+/// print.
 #[test]
 fn a_budget_of_one_runs_out_on_real_inputs() {
     let mut ran_out = 0;
     for name in FIXTURES {
         let f = fixture(name);
-        let derives = f
-            .certificate
-            .split(|&b| b == b'\n')
-            .filter(|l| l.starts_with(b"derive "))
-            .count();
+        let s = echo::source::read(&f.source);
+        let report = echo::dark2::report(&s);
+        let mut meter = echo::model::Meter::new(BUDGET);
+        echo::model::replay(&s, &report, &mut meter).expect("budget");
         let a = run(&f, 1);
-        if derives > 1 {
+        if meter.spent() > 1 {
             assert_eq!(
                 lines(&a)[0],
                 "uncertain budget 1 ground rule instances",
@@ -673,8 +675,10 @@ fn a_budget_of_one_runs_out_on_real_inputs() {
             assert_ne!(a.verdict, Verdict::Rings, "{name}");
         }
     }
-    // 16 fixtures' own certificates, 3 that borrow one (a1-record-dark-in-clear,
-    // e1-false-budget-clear, score-missing-note) and Taut's 20, 21, 23.
+    // The 22 positive sources whose run forms two or more instances
+    // (`r4::the_budget_on_every_fixture`); W sources, Dark ones, ct-a6
+    // (its rule unsafe, left out) and ct-a9 (no premise ever holds) form
+    // fewer.
     assert_eq!(ran_out, 22);
 }
 

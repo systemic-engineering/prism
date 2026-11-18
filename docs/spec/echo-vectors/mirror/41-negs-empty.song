@@ -1,0 +1,10 @@
+vector     41-negs-empty
+kind       fragment (negs)
+note       a positive rule's negs: the empty set's address
+tau        @pact/fact root
+label      "negs"
+k          0
+expect     equal
+length     41
+preimage   667261676d656e740040706163742f66616374000000000000000000046e6567730000000000000000
+blake3     2580cbb757e54ae3b12528edd430b0a9d4ad64ef79987f8e6ecc663597d5e9e8

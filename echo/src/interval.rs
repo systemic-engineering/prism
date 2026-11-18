@@ -105,6 +105,28 @@ impl Interval {
         }
     }
 
+    /// A `structure`-stratum interval of the positive run (Note §6.2:
+    /// `stray`, `unlayered`, `depth`, `missing`, `extra`): about `none`, at
+    /// `tick <tick>`.
+    pub fn structure(
+        kind: &'static str,
+        left: Side,
+        right: Side,
+        tick: u64,
+        distance: u64,
+    ) -> Self {
+        Interval {
+            stratum: "structure",
+            kind,
+            left,
+            right,
+            about: "none",
+            run: "tick",
+            tick,
+            distance,
+        }
+    }
+
     /// The printed line, without its LF.
     pub fn text(&self) -> String {
         let mut out = format!("interval {} {} ", self.stratum, self.kind);

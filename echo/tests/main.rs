@@ -14,6 +14,7 @@ mod facts;
 mod integrity;
 mod r2;
 mod r3;
+mod r4;
 mod refusals;
 mod replay;
 mod source;

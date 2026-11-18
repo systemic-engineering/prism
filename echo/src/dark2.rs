@@ -115,7 +115,7 @@ impl Hole {
     }
 
     /// H1's `A` is non-empty: the hole can add atoms.
-    fn adds(&self) -> bool {
+    pub fn adds(&self) -> bool {
         !matches!(self, Hole::QueryArity(_) | Hole::Declaration { .. })
     }
 }
@@ -154,6 +154,10 @@ pub struct Report {
     /// The unread lines, ascending.
     pub basis: Vec<usize>,
     pub light: Light,
+    /// The eval program (H1): the indices, into the source's `lines`, of
+    /// the lines that read and that H1's table doesn't leave out, in
+    /// source order.
+    pub eval: Vec<usize>,
 }
 
 impl Report {
@@ -203,12 +207,12 @@ pub fn report(source: &Source) -> Report {
     let mut facts = Vec::new();
     let mut queries = Vec::new();
     let mut declarations = Vec::new();
-    for l in &source.lines {
+    for (i, l) in source.lines.iter().enumerate() {
         match &l.record {
             Record::Rule { id, head, body } => rules.push((id, head, body, l)),
             Record::Fact(a) => facts.push(a),
             Record::Query(a) => queries.push((a, l)),
-            Record::Functional { pred, key, value } => declarations.push((pred, key, value)),
+            Record::Functional { pred, key, value } => declarations.push((pred, key, value, i)),
         }
     }
     let arity = arities(rules.iter().map(|(_, h, b, _)| (*h, b.as_slice())), &facts);
@@ -275,7 +279,8 @@ pub fn report(source: &Source) -> Report {
     );
     let mut ill: BTreeSet<(String, String)> = BTreeSet::new();
     let mut declared = BTreeSet::new();
-    for (pred, key, value) in &declarations {
+    let mut eval_declarations = BTreeSet::new();
+    for (pred, key, value, i) in &declarations {
         let line = canonical(pred, key, value);
         if conflict.contains(pred) {
             continue;
@@ -290,7 +295,10 @@ pub fn report(source: &Source) -> Report {
             && keys.len() == positions.len();
         if !well_formed {
             ill.insert(((*pred).clone(), line));
-        } else if !keys.contains(&position(value)) {
+            continue;
+        }
+        eval_declarations.insert(*i);
+        if !keys.contains(&position(value)) {
             declared.insert((*pred).clone());
         }
     }
@@ -374,11 +382,26 @@ pub fn report(source: &Source) -> Report {
         }
     };
     let basis = source.unread.iter().map(|u| u.at.line).collect();
+    let eval = source
+        .lines
+        .iter()
+        .enumerate()
+        .filter(|(i, l)| match &l.record {
+            Record::Rule { id, head, body } => {
+                !repeated.contains(id) && !unsafe_rules.contains(id) && !mentions(head, body)
+            }
+            Record::Fact(f) => !conflict.contains(&f.pred),
+            Record::Query(q) => !bad_queries.contains(&l.line) && !conflict.contains(&q.pred),
+            Record::Functional { .. } => eval_declarations.contains(i),
+        })
+        .map(|(i, _)| i)
+        .collect();
     Report {
         holes,
         head,
         basis,
         light,
+        eval,
     }
 }
 

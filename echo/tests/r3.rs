@@ -151,7 +151,9 @@ fn replace(bytes: &[u8], prefix: &str, with: &str) -> Vec<u8> {
         .into_bytes()
 }
 
-const NEXT: &str = "unknown unreplayed model";
+/// What R2, R3 and R4 agree with answers the next stratum (R4 retired
+/// `model`).
+const NEXT: &str = "unknown unreplayed contexts";
 
 fn source_line(left: &str, right: &str) -> String {
     format!("interval source source {left} {right} about none at none 0 by 1")
@@ -577,20 +579,25 @@ fn check_1_judges_each_address() {
 }
 
 /// `ct-a4-spurious-fact`, refused for its own reason: `dissonant source`.
-/// The certificate claims F with `edge(a, z)`; echo's F is 20b's.
+/// The certificate claims F with `edge(a, z)`; echo's F is 20b's. From R4
+/// on, its layers' `edge(a, z)` and `path(a, z)` are `stray` too (Note
+/// §6.2's row: "CT-A4: one cause, named once").
 #[test]
 fn ct_a4_is_refused_for_its_spurious_fact() {
     let (t, expect) = fixture("ct-a4-spurious-fact");
     assert_eq!(expect, "dissonant source");
     let a = run(&t);
-    assert_eq!(lines(&a)[0], "dissonant 1");
+    assert_eq!(lines(&a)[0], "dissonant 3");
     assert_eq!(
-        intervals(&a),
-        [source_line(
+        intervals(&a)[0],
+        source_line(
             "cdcde6e982f1790afd8d19bc0644cedb5c8898e663b7289ba12bf35e16f437aa",
             &field("20b-facts.vector", "blake3"),
-        )]
+        )
     );
+    assert!(intervals(&a)[1..]
+        .iter()
+        .all(|i| i.starts_with("interval structure stray ")));
     assert_eq!(a.exit(), 1);
 }
 
@@ -623,27 +630,30 @@ fn dark_headers_are_judged() {
 }
 
 /// A source with a reader fault and light R2 can't tell: whether its
-/// header is `none` is the run's (R4), so check 1 waits, whatever the
-/// claim.
+/// header is `none` turns on the run. R4 decides it where the run alone
+/// can: W beside a hole that adds, whose positive core has no certain
+/// paradox, is `unknown`, so `none` (the claimed P and F are two `source`
+/// lines). A positive source with no certain paradox still turns on the
+/// light (R6), so check 1 waits, whatever the claim.
 #[test]
 fn check_1_waits_for_the_light_it_needs() {
     let (v01, _) = fixture("pos-v01");
-    for source in [
-        &b"fact e(a, b)\nfact X\n"[..],
-        &b"fact p(a)\nrule r q(?x) requires p(?x), not s(?x)\nfact X\n"[..],
-    ] {
-        let t = Triple {
-            source: source.to_vec(),
-            certificate: v01.certificate.clone(),
-            record: v01.record.clone(),
-        };
-        assert_eq!(
-            lines(&run(&t))[0],
-            NEXT,
-            "{}",
-            String::from_utf8_lossy(source)
-        );
-    }
+    let t = |source: &[u8]| Triple {
+        source: source.to_vec(),
+        certificate: v01.certificate.clone(),
+        record: v01.record.clone(),
+    };
+    assert_eq!(lines(&run(&t(b"fact e(a, b)\nfact X\n")))[0], NEXT);
+    let a = run(&t(
+        b"fact p(a)\nrule r q(?x) requires p(?x), not s(?x)\nfact X\n",
+    ));
+    let header = certificate::read(&v01.certificate).expect("reads").header;
+    let mut want = vec![
+        source_line(&hex(&header.program.expect("P")), "none"),
+        source_line(&hex(&header.facts.expect("F")), "none"),
+    ];
+    want.sort();
+    assert_eq!(intervals(&a), want);
 }
 
 /// A Dark source printed with a model: check 1 judges its header; check
@@ -682,8 +692,9 @@ fn a_dark_source_with_a_model() {
 /// R3's answer on all 38 fixtures. The `source` lines are exact (the
 /// addresses are echo's P and F, checked against Taut's 32 program and
 /// facts vectors; `3e705fdd…`/`a9eea834…` are 20a/20b); R2's `verdict`
-/// lines are `r2::the_fixture_table`'s; `dissonant <n>` counts both. Every
-/// other fixture answers `unknown unreplayed model`, and none rings.
+/// lines are `r2::the_fixture_table`'s; R4's `structure` lines are
+/// `r4::the_fixture_table`'s, left out here. Every other fixture has no
+/// line of R2's or R3's, and none rings.
 #[test]
 fn the_fixture_table() {
     let p20 = field("20a-program.vector", "blake3");
@@ -721,13 +732,12 @@ fn the_fixture_table() {
     for name in &names {
         let a = run(&fixture(name).0);
         assert_ne!(a.verdict, Verdict::Rings, "{name}");
+        let l: Vec<String> = intervals(&a)
+            .into_iter()
+            .filter(|i| !i.starts_with("interval structure "))
+            .collect();
         if let Some((_, source, r2)) = refused.iter().find(|(n, _, _)| n == name) {
-            let l = intervals(&a);
-            assert_eq!(
-                lines(&a)[0],
-                format!("dissonant {}", source.len() + r2),
-                "{name}"
-            );
+            assert_eq!(l.len(), source.len() + r2, "{name}");
             assert_eq!(&l[..source.len()], &source[..], "{name}");
             assert!(
                 l[source.len()..]
@@ -737,23 +747,32 @@ fn the_fixture_table() {
             );
             assert_eq!(a.exit(), 1, "{name}");
         } else {
-            assert_eq!(lines(&a)[0], NEXT, "{name}");
-            assert_eq!(lines(&a).len(), 3, "{name}");
-            assert_eq!(a.exit(), 2, "{name}");
+            assert!(l.is_empty(), "{name}: {l:?}");
         }
     }
 }
 
-/// The kinds echo prints, R2's (`hole`, `dark`) and R3's (`source`):
-/// wherever the tune's `expect` names one, echo prints it; no fixture the
-/// tune rings is dissonant in echo. An `expect` is a lower bound ("each
-/// kind must appear among the printed intervals", the tune's test
-/// docstring), so a kind beyond it is no disagreement; echo's are listed
-/// exactly: `source` on the four fixtures that claim `none` for P and F
-/// (Q35).
+/// The kinds echo prints, R2's (`hole`, `dark`), R3's (`source`) and R4's
+/// (`stray`, `unlayered`, `depth`, `missing`, `extra`): wherever the
+/// tune's `expect` names one, echo prints it; no fixture the tune rings is
+/// dissonant in echo. An `expect` is a lower bound ("each kind must appear
+/// among the printed intervals", the tune's test docstring), so a kind
+/// beyond it is no disagreement; echo's are listed exactly: `source` on
+/// the four fixtures that claim `none` for P and F (Q35); `stray` on ct-a4
+/// (its spurious atoms' layers) and `missing` on ct-a10 (Q44).
 #[test]
 fn the_kinds_agree_with_the_tune() {
-    const OWNED: [&str; 4] = ["hole", "dark", "dark-source", "source"];
+    const OWNED: [&str; 9] = [
+        "hole",
+        "dark",
+        "dark-source",
+        "source",
+        "stray",
+        "unlayered",
+        "depth",
+        "missing",
+        "extra",
+    ];
     let mut matched = Vec::new();
     let mut beyond = Vec::new();
     for name in fixtures() {
@@ -763,7 +782,13 @@ fn the_kinds_agree_with_the_tune() {
             .iter()
             .map(|l| l.split(' ').nth(2).expect("kind").to_string())
             .collect();
+        // A fixture with a score is about the score (R9): score-missing-note's
+        // `missing` is a Note the score lacks, not a derivation.
+        let scored = text(&format!("fixtures/{name}/expect"))
+            .lines()
+            .any(|l| l.starts_with("score "));
         match expect.strip_prefix("dissonant ") {
+            Some(_) if scored => assert!(echo.is_empty(), "{name}: {echo:?}"),
             Some(kinds) => {
                 let tune: BTreeSet<String> = kinds.split(' ').map(str::to_string).collect();
                 for k in echo.difference(&tune) {
@@ -787,9 +812,13 @@ fn the_kinds_agree_with_the_tune() {
         [
             "a1-record-dark-disagrees",
             "a1-record-dark-in-clear",
+            "ct-a10-truncated-claims-fixed",
+            "ct-a2-missing-derivation",
             "ct-a4-spurious-fact",
             "ct-a5-readable-dark",
             "ct-a6-unsafe-with-model",
+            "ct-a8-layer-off-by-one",
+            "ct-a9-circular-pair",
             "dark2-not-canonical",
             "p8-one-line",
         ]
@@ -797,7 +826,9 @@ fn the_kinds_agree_with_the_tune() {
     assert_eq!(
         beyond,
         [
+            "ct-a10-truncated-claims-fixed missing",
             "ct-a12-budget-stop source",
+            "ct-a4-spurious-fact stray",
             "ct-a5-readable-dark source",
             "e1-false-budget-clear source",
             "e1-false-budget-opaque source",
@@ -822,11 +853,12 @@ fn taut_certificates_agree_in_r3() {
     }
 }
 
-/// Vector 68 (A5, dissonant; the stray is R4's): corpus 01's source, 68's
-/// certificate, 27's record half. Under R3 echo agrees with P and F and
-/// waits for the model; its `heard` line is the vector's, byte for byte.
+/// Vector 68 (A5, dissonant): corpus 01's source, 68's certificate, 27's
+/// record half. echo agrees with P and F; the stray is R4's, one line
+/// (`r4::vector_68_byte_for_byte`); its `heard` line is the vector's, byte
+/// for byte.
 #[test]
-fn vector_68_waits_for_the_model() {
+fn vector_68_agrees_with_p_and_f() {
     let stdout = read("27-stdout-positive.stdout");
     let at = stdout
         .split_inclusive(|&b| b == b'\n')
@@ -839,7 +871,8 @@ fn vector_68_waits_for_the_model() {
         record: stdout[..at].to_vec(),
     };
     let a = run(&t);
-    assert_eq!(lines(&a)[0], NEXT);
+    assert_eq!(lines(&a)[0], "dissonant 1");
+    assert!(intervals(&a)[0].starts_with("interval structure stray "));
     assert_eq!(lines(&a)[1], field("68-a5-dissonant.song", "line2"));
 }
 
@@ -942,9 +975,9 @@ fn intervals_sort_by_stratum_then_bytes() {
     );
 }
 
-/// Across slices: ct-a4's source interval and a `hole` interval R2 finds
-/// in the same record print in one list, `source` first, and `dissonant
-/// <n>` counts both.
+/// Across slices: ct-a4's source interval, its two R4 strays and a `hole`
+/// interval R2 finds in the same record print in one list, `source`, then
+/// `structure`, then `verdict`, and `dissonant <n>` counts all four.
 #[test]
 fn strata_compose_in_one_list() {
     let (t, _) = fixture("ct-a4-spurious-fact");
@@ -952,10 +985,12 @@ fn strata_compose_in_one_list() {
     record.extend_from_slice(b"hole        # 9:9 #\n");
     let t = Triple { record, ..t };
     let a = run(&t);
-    assert_eq!(lines(&a)[0], "dissonant 2");
+    assert_eq!(lines(&a)[0], "dissonant 4");
     let l = intervals(&a);
     assert!(l[0].starts_with("interval source source "), "{l:?}");
-    assert!(l[1].starts_with("interval verdict hole "), "{l:?}");
+    assert!(l[1].starts_with("interval structure stray "), "{l:?}");
+    assert!(l[2].starts_with("interval structure stray "), "{l:?}");
+    assert!(l[3].starts_with("interval verdict hole "), "{l:?}");
     let Verdict::Dissonant(found) = &a.verdict else {
         panic!("dissonant")
     };
