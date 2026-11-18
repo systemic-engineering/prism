@@ -41,8 +41,11 @@ contains
     ! Query optimal workspace size
     lwork = -1
     call dsyev('V', 'U', n, eigenvectors, n, eigenvalues, work_query, lwork, info)
-    lwork = int(work_query(1))
-    allocate(work(lwork))
+    if (info /= 0) return
+    call workspace_size(work_query(1), lwork, stat)
+    if (stat /= 0) return
+    allocate(work(lwork), stat=stat)
+    if (stat /= 0) return
 
     ! Compute eigensystem
     call dsyev('V', 'U', n, eigenvectors, n, eigenvalues, work, lwork, info)
@@ -68,14 +71,18 @@ contains
     stat = 0
 
     ! Copy matrix (dsyev overwrites in-place)
-    allocate(a(n, n))
+    allocate(a(n, n), stat=stat)
+    if (stat /= 0) return
     a = matrix
 
     ! Query optimal workspace size
     lwork = -1
     call dsyev('N', 'U', n, a, n, eigenvalues, work_query, lwork, info)
-    lwork = int(work_query(1))
-    allocate(work(lwork))
+    if (info /= 0) return
+    call workspace_size(work_query(1), lwork, stat)
+    if (stat /= 0) return
+    allocate(work(lwork), stat=stat)
+    if (stat /= 0) return
 
     ! Compute eigenvalues only
     call dsyev('N', 'U', n, a, n, eigenvalues, work, lwork, info)
@@ -106,14 +113,18 @@ contains
     stat = 0
 
     ! Copy matrix before calling (dgesvd overwrites)
-    allocate(a(m, n))
+    allocate(a(m, n), stat=stat)
+    if (stat /= 0) return
     a = matrix
 
     ! Query optimal workspace size
     lwork = -1
     call dgesvd('A', 'A', m, n, a, m, singular_values, u, m, vt, n, work_query, lwork, info)
-    lwork = int(work_query(1))
-    allocate(work(lwork))
+    if (info /= 0) return
+    call workspace_size(work_query(1), lwork, stat)
+    if (stat /= 0) return
+    allocate(work(lwork), stat=stat)
+    if (stat /= 0) return
 
     ! Restore copy (workspace query may have modified a)
     a = matrix
@@ -145,14 +156,18 @@ contains
     stat = 0
 
     ! Copy matrix (dgesvd overwrites in-place)
-    allocate(a(m, n))
+    allocate(a(m, n), stat=stat)
+    if (stat /= 0) return
     a = matrix
 
     ! Query optimal workspace size
     lwork = -1
     call dgesvd('N', 'N', m, n, a, m, singular_values, dummy_u, 1, dummy_vt, 1, work_query, lwork, info)
-    lwork = int(work_query(1))
-    allocate(work(lwork))
+    if (info /= 0) return
+    call workspace_size(work_query(1), lwork, stat)
+    if (stat /= 0) return
+    allocate(work(lwork), stat=stat)
+    if (stat /= 0) return
 
     ! Restore copy
     a = matrix
@@ -186,14 +201,21 @@ contains
     integer(c_int), intent(out) :: info
     integer(c_int), intent(out) :: stat
 
-    real(c_double) :: theta(n), dtheta(n)
+    real(c_double), allocatable :: theta(:), dtheta(:)
     real(c_double) :: cos_sum, sin_sum, k_over_n
     integer :: i, j, s
 
     info = 0
     stat = 0
     if (n < 1) then
-      info = 1
+      ! N is argument 1, refused the way LAPACK refuses one: INFO = -1.
+      info = -1
+      order_r = 0.0d0
+      return
+    end if
+
+    allocate(theta(n), dtheta(n), stat=stat)
+    if (stat /= 0) then
       order_r = 0.0d0
       return
     end if
@@ -223,6 +245,22 @@ contains
     phases_out = theta
   end subroutine spectral_phase_lock
 
+  ! LAPACK's workspace answer (WORK(1) after LWORK = -1) as a default
+  ! integer, or stat = -1 when it won't fit one (or isn't a number).
+  subroutine workspace_size(query, lwork, stat)
+    real(c_double), intent(in) :: query
+    integer, intent(out) :: lwork
+    integer(c_int), intent(out) :: stat
+
+    if (.not. (query <= real(huge(lwork), c_double))) then
+      lwork = 0
+      stat = -1
+    else
+      lwork = max(1, int(query))
+      stat = 0
+    end if
+  end subroutine workspace_size
+
   ! The STAT= mechanism, probed: allocate `count` doubles and report the
   ! allocation's status. The tests' only way to make an ALLOCATE fail on
   ! purpose (the wrappers' sizes come from LAPACK's workspace query).
@@ -233,9 +271,8 @@ contains
 
     real(c_double), allocatable :: probe(:)
 
-    allocate(probe(count))
-    stat = 0
-    deallocate(probe)
+    allocate(probe(count), stat=stat)
+    if (stat == 0) deallocate(probe)
   end subroutine spectral_allocate_probe
 
 end module optics_spectral

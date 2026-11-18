@@ -109,7 +109,12 @@ fn phase_lock_refuses_what_its_c_int_would_wrap() {
         ffi::phase_lock(&[], &[], 1.0, 1, 0.1),
         Err(pre(Routine::PhaseLock, 1))
     );
-    assert!(ffi::phase_lock(&[0.0], &[1.0], 1.0, i32::MAX as usize, 0.0).is_ok());
+    // The first step count a C int can't hold, refused before a single step.
+    assert_eq!(
+        ffi::phase_lock(&[0.0], &[1.0], 1.0, PAST_INT, 0.1),
+        Err(pre(Routine::PhaseLock, 5))
+    );
+    assert!(ffi::phase_lock(&[0.0], &[1.0], 1.0, 3, 0.1).is_ok());
 }
 
 #[test]

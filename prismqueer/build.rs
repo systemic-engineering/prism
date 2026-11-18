@@ -510,6 +510,17 @@ fn main() {
         println!("cargo:rustc-link-lib=lapack");
         println!("cargo:rustc-link-lib=blas");
 
+        // prism's xerbla_ (src/ffi.rs) replaces LAPACK's where the dynamic
+        // linker lets it: on Linux liblapack.so calls xerbla_ through its PLT,
+        // and the executable's definition wins once it is in .dynsym. Export
+        // it explicitly for prismqueer's own binaries rather than trust the
+        // linker's "defined in a linked DSO" rule. Darwin's dylib calls its
+        // own copy directly; nothing at link time changes that
+        // (docs/spec/lapack-failures.md).
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+            println!("cargo:rustc-link-arg=-Wl,--export-dynamic-symbol=xerbla_");
+        }
+
         // Fortran runtime: gfortran path (nix devshell). Discover the
         // libgfortran directory via `gfortran -print-file-name=...`.
         let ext = if cfg!(target_os = "macos") {

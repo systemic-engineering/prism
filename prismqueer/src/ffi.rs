@@ -28,9 +28,10 @@
 //! This module is compiled only when `--features lapack` is active; the
 //! Fortran objects are linked by `build.rs` under the same feature gate.
 
-use std::cell::Cell;
 use std::fmt;
 use std::os::raw::{c_char, c_int};
+use std::sync::{Mutex, PoisonError};
+use std::thread::ThreadId;
 
 // ---------------------------------------------------------------------------
 // Raw extern declarations
@@ -234,10 +235,20 @@ struct Report {
     position: i32,
 }
 
-thread_local! {
-    /// The last report on this thread since [`xerbla_clear`]. LAPACK calls
-    /// `xerbla` on the calling thread, from its argument checks.
-    static REPORT: Cell<Option<Report>> = const { Cell::new(None) };
+/// The last report per thread since [`xerbla_clear`]. LAPACK calls `xerbla`
+/// on the calling thread, from its argument checks, so a report belongs to
+/// the call on that thread. (A mutex over thread ids, not `thread_local!`:
+/// that macro expands std's source into this crate, and coverage would
+/// measure it as an absolute path, nix/lcov-paths.sh.)
+static REPORTS: Mutex<Vec<(ThreadId, Report)>> = Mutex::new(Vec::new());
+
+/// This thread's slot in [`REPORTS`]: remove and return its report. Never
+/// panics (a poisoned lock is still read), so it's safe under `xerbla_`.
+fn xerbla_remove() -> Option<Report> {
+    let me = std::thread::current().id();
+    let mut reports = REPORTS.lock().unwrap_or_else(PoisonError::into_inner);
+    let at = reports.iter().position(|(id, _)| *id == me)?;
+    Some(reports.swap_remove(at).1)
 }
 
 /// prism's `xerbla_`: LAPACK's error handler, replaced. Reference LAPACK's
@@ -247,6 +258,7 @@ thread_local! {
 /// Takes effect only where LAPACK reaches `xerbla_` through the dynamic
 /// linker (Linux). On darwin nix's dylib calls its own copy directly, and
 /// this is never called.
+#[no_mangle]
 extern "C" fn xerbla_(name: *const c_char, info: *const c_int, len: usize) {
     let mut buf = [b' '; 6];
     if !name.is_null() {
@@ -262,26 +274,37 @@ extern "C" fn xerbla_(name: *const c_char, info: *const c_int, len: usize) {
         // SAFETY: LAPACK passes INFO by reference: a valid, aligned c_int.
         unsafe { *info }
     };
-    // try_with: never panic across the C boundary (a panic here aborts).
-    let _ = REPORT.try_with(|r| r.set(Some(Report { name: buf, position })));
+    // No unwrap: a panic here would unwind across the C boundary and abort.
+    xerbla_remove();
+    REPORTS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .push((
+            std::thread::current().id(),
+            Report {
+                name: buf,
+                position,
+            },
+        ));
 }
 
 /// Forget any earlier report on this thread.
 fn xerbla_clear() {
-    let _ = REPORT.try_with(|r| r.set(None));
+    // Nothing in Rust calls the handler, and a linker pulls an object in only
+    // for its references: this one keeps prism's `xerbla_` in every binary
+    // that calls LAPACK through here.
+    std::hint::black_box(xerbla_ as extern "C" fn(*const c_char, *const c_int, usize));
+    xerbla_remove();
 }
 
 /// The report since [`xerbla_clear`], if LAPACK made one.
 fn xerbla_take() -> Option<Report> {
-    REPORT.try_with(Cell::take).ok().flatten()
+    xerbla_remove()
 }
 
 /// A call's `INFO`, `STAT` and `xerbla` report, as a value.
 fn check(routine: Routine, info: c_int, stat: c_int, report: Option<Report>) -> Result<(), Fault> {
-    if info != 0 {
-        return Err(Fault::Unconverged { routine, info });
-    }
-    if stat != 0 && report.is_some() {
+    if stat != 0 {
         return Err(Fault::Allocation { routine, stat });
     }
     if let Some(r) = report {
@@ -315,25 +338,47 @@ fn call(routine: Routine, raw: impl FnOnce(&mut c_int, &mut c_int)) -> Result<()
 // ---------------------------------------------------------------------------
 
 /// A dimension as the C `int` LAPACK takes, or the argument it would be.
-fn dim(_routine: Routine, _position: i32, n: usize) -> Result<c_int, Fault> {
-    Ok(n as c_int)
+fn dim(routine: Routine, position: i32, n: usize) -> Result<c_int, Fault> {
+    c_int::try_from(n).map_err(|_| Fault::Argument {
+        routine,
+        position,
+        caught: Caught::PreCheck,
+    })
 }
 
 /// `slice` holds `rows × cols` values, or the fault that says it doesn't.
 /// A product past `usize` is the first dimension refused.
 fn shape(
-    _routine: Routine,
-    _position: i32,
-    _slice: &[f64],
-    _rows: usize,
-    _cols: usize,
+    routine: Routine,
+    position: i32,
+    slice: &[f64],
+    rows: usize,
+    cols: usize,
 ) -> Result<(), Fault> {
-    Ok(())
+    let expected = rows.checked_mul(cols).ok_or(Fault::Argument {
+        routine,
+        position,
+        caught: Caught::PreCheck,
+    })?;
+    if slice.len() == expected {
+        Ok(())
+    } else {
+        Err(Fault::Shape {
+            routine,
+            expected,
+            found: slice.len(),
+        })
+    }
 }
 
 /// An `n×n` matrix and `n`-vectors for one of prism's own routines (`n` is
 /// their first argument).
-fn square(routine: Routine, n: usize, matrices: &[&[f64]], vectors: &[&[f64]]) -> Result<c_int, Fault> {
+fn square(
+    routine: Routine,
+    n: usize,
+    matrices: &[&[f64]],
+    vectors: &[&[f64]],
+) -> Result<c_int, Fault> {
     let c = dim(routine, 1, n)?;
     for m in matrices {
         shape(routine, 1, m, n, n)?;
@@ -581,7 +626,11 @@ pub fn singular_values(m: usize, n: usize, matrix: &[f64]) -> Result<Vec<f64>, F
 /// The singular values of an `m×n` matrix given column-major, by dgesvd: no
 /// conversion on the way in. Descending. Only `room` calls this; it owns
 /// the layout.
-pub(crate) fn singular_values_columns(m: usize, n: usize, mat_cm: &[f64]) -> Result<Vec<f64>, Fault> {
+pub(crate) fn singular_values_columns(
+    m: usize,
+    n: usize,
+    mat_cm: &[f64],
+) -> Result<Vec<f64>, Fault> {
     let (cm, cn) = dgesvd_args(m, n, mat_cm)?;
     let k = m.min(n);
     if k == 0 {
@@ -662,6 +711,13 @@ pub fn phase_lock(
 ) -> Result<(Vec<f64>, f64), Fault> {
     let n = phases.len();
     let c = dim(Routine::PhaseLock, 1, n)?;
+    if n == 0 {
+        return Err(Fault::Argument {
+            routine: Routine::PhaseLock,
+            position: 1,
+            caught: Caught::PreCheck,
+        });
+    }
     shape(Routine::PhaseLock, 1, omegas, n, 1)?;
     let steps = dim(Routine::PhaseLock, 5, steps)?;
     let mut phases_out = vec![0.0_f64; n];
@@ -776,7 +832,15 @@ mod tests {
         let (mut info, mut stat): (c_int, c_int) = (0, 0);
         xerbla_clear();
         // SAFETY: n = -1 makes every array zero-sized; the pointers are live.
-        unsafe { spectral_eigenvalues(-1, matrix.as_ptr(), evals.as_mut_ptr(), &mut info, &mut stat) };
+        unsafe {
+            spectral_eigenvalues(
+                -1,
+                matrix.as_ptr(),
+                evals.as_mut_ptr(),
+                &mut info,
+                &mut stat,
+            )
+        };
         let report = xerbla_take();
 
         assert_eq!((info, stat), (-3, 0), "dsyev refuses N, its 3rd argument");
@@ -814,7 +878,16 @@ mod tests {
         let (mut sv, mut u, mut vt) = ([0.0_f64; 1], [0.0_f64; 1], [0.0_f64; 1]);
         let (mut info, mut stat): (c_int, c_int) = (0, 0);
         // SAFETY: m = -1 makes every array zero-sized; the pointers are live.
-        unsafe { spectral_singular_values(-1, 1, matrix.as_ptr(), sv.as_mut_ptr(), &mut info, &mut stat) };
+        unsafe {
+            spectral_singular_values(
+                -1,
+                1,
+                matrix.as_ptr(),
+                sv.as_mut_ptr(),
+                &mut info,
+                &mut stat,
+            )
+        };
         assert_eq!((info, stat), (-3, 0));
         let (mut info, mut stat): (c_int, c_int) = (0, 0);
         // SAFETY: as above.
@@ -835,7 +908,14 @@ mod tests {
         let (mut evecs, mut stat) = ([0.0_f64; 1], 0);
         // SAFETY: as above.
         unsafe {
-            spectral_eigensystem(-1, matrix.as_ptr(), sv.as_mut_ptr(), evecs.as_mut_ptr(), &mut info, &mut stat)
+            spectral_eigensystem(
+                -1,
+                matrix.as_ptr(),
+                sv.as_mut_ptr(),
+                evecs.as_mut_ptr(),
+                &mut info,
+                &mut stat,
+            )
         };
         assert_eq!((info, stat), (-3, 0));
     }
@@ -847,7 +927,18 @@ mod tests {
         let (mut info, mut stat): (c_int, c_int) = (0, 0);
         // SAFETY: n = 0: nothing is read or written but the scalars.
         unsafe {
-            spectral_phase_lock(0, out.as_ptr(), out.as_ptr(), 1.0, 1, 0.1, out.as_mut_ptr(), &mut r, &mut info, &mut stat)
+            spectral_phase_lock(
+                0,
+                out.as_ptr(),
+                out.as_ptr(),
+                1.0,
+                1,
+                0.1,
+                out.as_mut_ptr(),
+                &mut r,
+                &mut info,
+                &mut stat,
+            )
         };
         assert_eq!(
             check(Routine::PhaseLock, info, stat, None),
