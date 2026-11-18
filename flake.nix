@@ -47,6 +47,7 @@
         ./imperfect
         ./projections
         ./ledger-verify
+        ./listen
       ];
       sourceExts = [
         "rs"
@@ -335,6 +336,49 @@
               installPhaseCommand = "touch $out";
             };
 
+            # listen, the second reader (prism-022), builds for the same two
+            # targets: no std, so no clock, no file and no process can reach it.
+            listen-portable = craneLibPortable.mkCargoDerivation {
+              pname = "listen-portable";
+              inherit version;
+              src = packageSrc;
+              strictDeps = true;
+              cargoArtifacts = null;
+              cargoVendorDir = craneLibPortable.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+              doInstallCargoArtifacts = false;
+              buildPhaseCargoCommand = lib.concatMapStringsSep "\n" (
+                t: "cargo build --locked --release -p listen --target ${t}"
+              ) portableTargets;
+              installPhaseCommand = "touch $out";
+            };
+
+            # prism-022 S5: listen's Cargo graph (every kind, every depth)
+            # holds no prismqueer, no mirror crate and nothing LAPACK, BLAS or
+            # Fortran. The guard runs on the real graph, and must reject the
+            # two forbidden fixtures (a direct prismqueer, a transitive
+            # openblas-src behind a dev cycle) and accept the clean one
+            # (prismqueer in the workspace, but not under listen).
+            listen-independent = craneLib.mkCargoDerivation {
+              pname = "listen-independent";
+              inherit version;
+              src = packageSrc;
+              strictDeps = true;
+              cargoArtifacts = null;
+              cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+              nativeBuildInputs = [ pkgs.jq ];
+              doInstallCargoArtifacts = false;
+              buildPhaseCargoCommand = ''
+                guard=${./nix/listen-independent.sh}
+                cargo metadata --format-version 1 --locked --offline > metadata.json
+                bash $guard metadata.json
+                bash $guard ${./nix/fixtures/listen-clean.json}
+                for f in ${./nix/fixtures/listen-direct.json} ${./nix/fixtures/listen-transitive.json}; do
+                  if bash $guard $f 2>/dev/null; then echo "listen-independent accepted $f" >&2; exit 1; fi
+                done
+              '';
+              installPhaseCommand = "touch $out";
+            };
+
             # One ratchet: the CI workflow repeats coverageFloor as its own
             # `coverage_threshold`. The two must be the same number, or CI
             # fails a push the local gate passed (it did: '99' against 94).
@@ -365,6 +409,7 @@
                     ./prismqueer/tests
                     ./imperfect/tests
                     ./ledger-verify/tests
+                    ./listen/tests
                   ]
                 );
                 leaked = fs.toList (fs.intersection packageFileset probes);

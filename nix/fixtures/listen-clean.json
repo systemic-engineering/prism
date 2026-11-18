@@ -1,0 +1,17 @@
+{
+  "packages": [
+    { "id": "path+file:///w/listen#0.1.0", "name": "listen" },
+    { "id": "path+file:///w/prismqueer#0.1.0", "name": "prismqueer" },
+    { "id": "registry+https://github.com/rust-lang/crates.io-index#lapack-src@0.10.0", "name": "lapack-src" }
+  ],
+  "resolve": {
+    "nodes": [
+      { "id": "path+file:///w/listen#0.1.0", "deps": [] },
+      { "id": "path+file:///w/prismqueer#0.1.0", "deps": [
+        { "name": "lapack_src", "pkg": "registry+https://github.com/rust-lang/crates.io-index#lapack-src@0.10.0" }
+      ] },
+      { "id": "registry+https://github.com/rust-lang/crates.io-index#lapack-src@0.10.0", "deps": [] }
+    ],
+    "root": null
+  }
+}
