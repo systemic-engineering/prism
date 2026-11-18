@@ -1,0 +1,1 @@
+adjudicator statement 1: the witness quorum for example.com/prism-ledger at size 8 holds.

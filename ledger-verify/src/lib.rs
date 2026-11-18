@@ -8,6 +8,8 @@
 //! - [`anchor`]: the SLH-DSA-SHA2-128s anchor over a checkpoint.
 //! - [`quorum`]: Lemma B's witness quorum, counting distinct witnesses
 //!   whose Ed25519 *and* ML-DSA-44 cosignatures both verify.
+//! - [`sshsig`]: OpenSSH SSHSIG with the `ssh-mldsa44-ed25519` composite
+//!   key (Alex's seal): ML-DSA-44 *and* Ed25519 must both verify.
 //!
 //! It never holds a private key: every check takes public keys and
 //! signatures. No I/O, no clock, no RNG: `#![no_std]` with `alloc`, so the
@@ -24,6 +26,7 @@ pub mod commitment;
 pub mod merkle;
 pub mod note;
 pub mod quorum;
+pub mod sshsig;
 
 /// A SHA-256 output: a leaf hash, a node hash or a tree root.
 pub type Hash = [u8; 32];

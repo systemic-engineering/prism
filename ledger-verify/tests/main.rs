@@ -13,3 +13,4 @@ mod commitment;
 mod merkle;
 mod note;
 mod quorum;
+mod sshsig;
