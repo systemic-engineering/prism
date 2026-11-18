@@ -1,6 +1,6 @@
 # echo: prism's second reader of mirror
 
-*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 5: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface), R2 (the source and the Dark-2 report, §10.4) and R3 (P, F and the interval, §10.6). Crate `echo`: a no_std library and the std binary `prism echo …`.*
+*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 6: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface), R2 (the source and the Dark-2 report, §10.4), R3 (P, F and the interval, §10.6) and R4 (the positive run, §10.8). Crate `echo`: a no_std library and the std binary `prism echo …`.*
 
 Echo can only give back the last words she was given, and she never speaks first. The checker never authors: it replays the engine's own record from the text and gives it back exactly, so where the two differ, the difference is named and located.
 
@@ -17,8 +17,10 @@ Echo can only give back the last words she was given, and she never speaks first
 
 | **S1/S2, certificate replay, R1** | `echo::replay`, `echo::certificate`, `echo::record`; the binary `prism` (`echo/src/bin/prism.rs`) | Note v3.3.2 §4.2, §6.3, §6.4 (a); mirror's v3.2 contract delta; certificate §3.2, §3.1.1 A and J, §4.3 (§10 here) |
 | **S1/S2, certificate replay, R2** | `echo::source` (the pact reader), `echo::dark2` (the Dark-2 report and check 10), `echo::interval` | Seam's pact-eval audit §1.2; certificate §2.4, §3.1, §3.1.1 J, J′, M4; Note v3.3.2 §6.2, §6.4, §6.5 G7, G8, §6.7 H1–H5, H7 (§10.4 here) |
+| **S1/S2, certificate replay, R3** | `echo::program` (P, F, check 1) | certificate §3.1, §3.1.1 A, B, F, G, §3.2; Note v3.3.2 §6.2, §6.7 H5 (§10.6 here) |
+| **S1/S2, certificate replay, R4** | `echo::model` (the positive run, checks 3, 4, 5, 8; the positive core) | certificate §1, §2.1, §3.1, §3.2, §4.1, §4.2; Note v3.3.2 §2.1, §2.2, §6.2 (the `structure` rows), §6.5 G5, §6.7 H1, H3 v3.3 (§10.8 here) |
 
-Not yet: P5 (V2, the second reading), and certificate replay's R3–R10 (§10).
+Not yet: P5 (V2, the second reading), and certificate replay's R5–R10 (§10).
 
 ## 2. Independence
 
@@ -206,6 +208,11 @@ Each of these was applied, killed by the suite, and reverted:
 | R3: check 1 decided where it turns on light R2 can't tell | 4 tests: `r3::check_1_waits_for_the_light_it_needs`, `r3::the_expected_header_follows_the_light`, `r3::the_header_vectors` (95, 97), `r2::what_r2_cannot_tell_is_left_to_the_next_stratum` |
 | R2: check 2 ignored (a Dark source printed with a model judged) | `r2::what_r2_cannot_tell_is_left_to_the_next_stratum`, `replay::an_unreadable_source_is_not_unreadable` |
 | R2: the head by A6's print order, not the least offset | `dark2::query_arity` (P8: `# 4:6` prints first, `1:1` is the head) |
+| R4: depth off by one (a new atom at `round + 1`) | 22 tests, among them Taut's `NNd`/`NNe` and the models (`r4::the_model_layer_and_derivation_vectors`, `r4::echo_s_model_is_the_certificates_result`), the diamond, `r4::the_structure_cheats`, `r4::vector_68_byte_for_byte`, the budget's boundary, and R2's and R3's fixture tables |
+| R4: a stray derivation accepted (a claimed derivation of a model atom passes whether or not it is first-tick) | `r4::an_extra_derivation_is_refused` |
+| R4: a stray atom accepted (a layer line outside the model passes) | 8 tests: `r4::the_structure_cheats` (ct-a9), `r4::vector_68_byte_for_byte`, `r4::the_fixture_table`, `r4::the_kinds_agree_with_the_tune`, 4 `r3::` (ct-a4, the strata in one list, 68) |
+| R4: the budget charged per `derive` line (R1's charge) instead of per instance formed | 4 tests: `r4::the_budget_is_charged_per_instance`, `r4::the_budget_on_every_fixture`, `replay::the_budget_counts_ground_rule_instances`, `replay::a_budget_of_one_runs_out_on_real_inputs` |
+| R4: check 8 skipped (no `missing`, no `extra`) | 5 tests: `r4::the_structure_cheats` (ct-a2, ct-a10), `r4::an_extra_derivation_is_refused`, `r4::the_fixture_table`, `r4::the_kinds_agree_with_the_tune`, `r3::the_kinds_agree_with_the_tune` |
 
 ## 9. Open questions for Mara
 
@@ -521,3 +528,96 @@ interval source source <claimed> <recomputed> about none at none 0 by 1
 - **Q39. A canonical line's constants.** Rules and queries read only plain `sym` names (Q24), so their canonical lines print names bare. If Q24 opens rules and queries to typed constants, does the canonical line print them in their canonical text (`p(nat 7)`), as echo's printer already does, or must a plain `sym` then print typed too (`sym "a"`), which would move every program address?
 
 **Gates at `953b133`:** `just check` clean; echo's 133 tests pass; `checks.coverage` 96.25% of lines (the ratchet is 94; echo 99.35%, 2139 of 2153; `program.rs` 133 of 133, `replay.rs` 146 of 146, `interval.rs` 74 of 74); `checks.doctest`; `checks.echo-independent` (R3 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Six mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
+
+### 10.8 R4, as built: the positive run
+
+`575d55b` 🔴 → `a2bddbb` 🟢. The `implements` line moves to `spec fa96f40b3436a71490173fb99a513c03cb7199a7` (version 5) and `vectors 49698ad6c68df77eefedd4e19336e2675c0e9ae0` (`docs/spec/echo-vectors` at the red commit, which added Taut's Notes 38, 41 and 44a). R4 retires the word `model`: what R2–R4 agree with, or what needs R5 or later, answers `unknown unreplayed contexts`. Nothing rings.
+
+**The evaluation** (`echo::model`), from the definitions, never from the certificate:
+- **The program it runs** is H1's eval program: the lines that read, minus what H1's table leaves out (`echo::dark2::Report::eval`, the indices of what's left). A positive source (no `not` in a rule that read; §3.2 "a `not` anywhere means W", Q31) runs its whole eval program. A W source runs only its **positive core** (H3 v3.3: "the least model, from the eval program's facts, of its rules with no `not` literal"), and only where the header turns on it (below). Everything else of W is R5's.
+- **The least model, by naive evaluation** (certificate §1: "a tick is also the naive stage `min{n : a ∈ T_Pⁿ(F)}`"). Stage 0 is the eval program's facts. Round `n` forms every ground instance of every rule whose positive premises are all in stage `n − 1` (premises matched in body order, each against the stage's atoms of its predicate and arity, typed constants compared by type and bytes, S4), and stage `n` adds their heads. The run ends at the first round that adds nothing: that round is check 5's "one naive round over M adds nothing".
+- **Depths** (§1's pinned conventions): an atom's depth is the round that first adds it; facts are 0. That is `1 + max` over its first-tick derivations' premises, the longest-path depth.
+- **The first-tick derivations** (§2.1, "all first-tick ones"): the instances formed in the round that first adds their head, exactly those whose positive premises are all at depths below the head's. A head that is a fact has none (Note §6.5 G5: M3's query excludes it).
+- **Determinism:** every map and set is a `BTreeMap` / `BTreeSet`; a test refuses `HashMap`, `HashSet`, `hashbrown` and `RandomState` anywhere in `echo/src`, and every fixture's answer is the same bytes twice.
+
+**The budget, its real charge point** (certificate §3.2 UNKNOWN: "ground rule instances considered"; §4.3). Every ground instance echo forms is one unit, in every round, the closure round included; partial matches of a body are not instances and are not charged. Naive evaluation re-forms every instance each round, so vector 01 costs 4 + 8 + 13 + 13 = **38**. R1's provisional charge (one per printed `derive` line) is gone: the charge is the source's, whatever the certificate prints. The run happens before anything is judged, so a run that runs out is `uncertain budget <n> ground rule instances` (exit 1) whatever else differs (§10.1's precedence). Instances charged per fixture (each boundary tested: `n` finishes, `n − 1` runs out):
+
+| instances | fixtures |
+|---|---|
+| 38 | `pos-v01`, `taut-20`, `ct-a4`, `ct-a5`, `ct-a8`, `ct-a10`, `ct-a11`, `e4-dark-order`, `a1-record-dark-in-clear` (vector 01's source) |
+| 14 | `a8-budget-query-unknown`, `ct-a12-budget-stop` |
+| 10 | `pos-diamond`, `ct-a2` |
+| 9 | `e1-false-budget-clear`, `e1-false-budget-opaque` |
+| 4 | `pos-v05`, `taut-21`, `ct-a3`, `score-missing-note` |
+| 2 | `pos-v05-control`, `p8-swapped`, `p8-one-line` |
+| 0 | `ct-a9` (no premise ever holds), `ct-a6` (its rule unsafe, left out), the Dark ones (`a1-record-dark-disagrees`, `-engine`, `-reader`, `dark2-not-canonical`, `pos-dark2-*`, `taut-22`, `taut-24`), and the W sources, which run nothing in R4 (`ct-a1`, `pos-v03`, `pos-v04`, `taut-23`, `taut-48`, `typed-corpus-unheard`) |
+
+**Which header the run decides** (R3 left it open where a reader hole sits beside light R2 can't tell):
+- a **certain paradox** in the run (H3 v3.3: some key group of an eval-program declaration, well-formed and not trivial, has two values in the stable set; for a positive program the run, for W beside a hole that adds the positive core) is `paradox` whatever the light, so P and F (H5);
+- **W beside a hole that adds**, with no certain paradox in the core, is `unknown` (`unknown shadow under W`'s record), so the pre-hole header: `none` and `none` after the reader's fault (Q37);
+- a positive source with no certain paradox still turns on the light (R6), and check 1 waits.
+
+Taut's **95 and 97** are now decided: both cores hold a certain paradox (95: `p(k, a)`, `p(k, b)` under `functional p(1) -> 2`; 97: `p(k, one)`, `p(k, two)`), so P and F, their `NNg` headers. Without 95's declaration the core has none, and the header is `none`.
+
+**What R4 judges** (checks 3, 4, 5 and 8, certificate §4.1; Note §6.2's `structure` rows; stratum `structure`, about `none`, run `tick`). Over a positive source whose performance should print its run (light no hole or lit; open only with a certain paradox) and that prints a positive one (no `under`/`over`/`context` line: check 6 is R5's; no budget `erasure`: R7's; no `dark 2` line, which §3.2 judges by checks 10 and 1, Q43):
+
+| kind | when | left / right | beat | distance |
+|---|---|---|---|---|
+| `stray` | a `layer` line's atom is not in the model (checks 3, 4, 8) | the atom / `none` | its claimed tick | 1 |
+| `depth` | a `layer` line's atom is in the model at another depth (check 4) | the atom / `none` | its claimed tick | `\|claimed − depth\|` |
+| `unlayered` | a model atom no `layer` line names (checks 4, 5) | `none` / the atom | its depth | 1 |
+| `extra` | a `derive` line whose head is in the model and whose Note is not one of echo's first-tick derivations' (or is one already matched: a list, never collapsed) (check 8) | the Note / `none` | the head's depth (Q44) | 1 |
+| `missing` | a first-tick derivation no `derive` line names (check 8) | `none` / the Note | the head's depth | 1 |
+
+Atoms are addressed at `@pact/fact` root. A derivation is named by its **Note** (Note §2.1, §2.2): `note(addr head, addr rule, addr negs, addr p₁, …)` at `@song/note` root, the rule its record atom `rule(sym "<canonical line>")` at `@pact/program`, `negs` the empty set's address for a positive rule (`fragment(@pact/fact, "negs", [])`, Taut's 41); echo's Notes equal Taut's 38 and 44a. A claimed `derive` line's rule is found by its id among the source's rules that read. A `derive` line whose head is outside the model is named once, by its layer's `stray` (§6.2: "one cause, named once"; `missing` / `extra` for heads in the model only).
+
+**What R4 can't print bytes for, and says so** (`unknown unreplayed contexts`, never accepted; where other lines print, the answer is `dissonant`, Q27): a `derive` line whose head is neither in the model nor layered (Q40); one naming a rule id the source doesn't have, or has twice (Q41); a `layer` line repeated exactly at the right depth (Q42).
+
+**What the tests hold** (`echo/tests/r4.rs`, 18 tests; 151 in echo's binary, R1–R3's tests moved to R4's answers where R4 now decides):
+- **Taut's runs:** for the ten positive sources among his vectors (20, 21, 22, 31, 35, 82, 83, 86, 87, 89), echo's layers and derivations fragments equal his `NNd` and `NNe` digests, and its model his `NNc` (22 is an engine Dark, `result none`, with empty layers and derivations): **29 of 29 digests**;
+- **models:** echo's model address equals the certificate's `result` on every correct positive fixture with one (`p8-swapped`, `pos-diamond`, `pos-v01`, `pos-v05`, `pos-v05-control`, `taut-20`, `taut-21`; `a8-budget-query-unknown` as its stopped set, depth ≤ 3, Note §6.5 S1) and on Taut's eight positive certificates (20, 21, 71, 77, 80, 81, 90, 91);
+- **the Notes:** 38, 41 and 44a, from echo's own derivations;
+- **the definitions:** the diamond's depths and its two first-tick derivations of `d`; a non-first-tick instance not carried; no derivation for a head that is a fact; typed constants run with their types (`nat 7` and `sym "7"` are two heads);
+- **the cheats, line by line:** below; an `extra` for a valid but not first-tick instance, for a non-instance, and for a first-tick one printed twice; `depth` by its distance (5 − 1 = 4); an unlayered fact at tick 0;
+- **vector 68 byte for byte:** lines 1–2 (`exact_hex`), line 4 (`tail_hex`), and the `stray` interval's atom (`24f850e1…`): echo's whole A5 output;
+- **the budget:** 38 on vector 01 (37 runs out; ct-a8 too, before its dissonance), every fixture's boundary exact, a budget of 1 running out on exactly the 22 positive sources whose run forms two or more instances;
+- **determinism:** two runs, identical bytes, on every fixture; no hash-ordered collection in the library;
+- **95 and 97:** the positive core decides their header.
+
+**mirror's checker fixtures under R4** (the tune's answer from its `expect`, a lower bound):
+
+| fixture | the tune | echo R4 |
+|---|---|---|
+| `ct-a2-missing-derivation` | dissonant missing | `dissonant 1`: `interval structure missing none 2dad57eb… about none at tick 2 by 1` (the Note of `d` by `cd` from `c`) |
+| `ct-a8-layer-off-by-one` | dissonant depth | `dissonant 1`: `interval structure depth 85e7f5f4… none about none at tick 4 by 1` (`path(a, d)`, depth 3) |
+| `ct-a9-circular-pair` | dissonant stray | `dissonant 2`: `stray` for `p` (`3eef543f…`) and `q` (`44b4c4b3…`), both at tick 1 |
+| `ct-a10-truncated-claims-fixed` | dissonant unlayered | `dissonant 2`: `missing none be508772… at tick 3` (`path(a, d)` by path-step from `path(a, c)` & `edge(c, d)`), `unlayered none 85e7f5f4… at tick 3` (Q44) |
+| `ct-a4-spurious-fact` | dissonant source | `dissonant 3`: R3's `source` line, then `stray` for `edge(a, z)` at 0 and `path(a, z)` at 1 (Q45) |
+| `ct-a5-readable-dark` | dissonant dark | `dissonant 3`, unchanged: a `dark 2` claim isn't judged by checks 3–8 (Q43) |
+| `ct-a12`, `e1-false-budget-clear`, `e1-false-budget-opaque` | dissonant budget (verdict) | unchanged (`source` ×2): their `erasure` is R7's |
+| `a1-record-dark-disagrees`, `a1-record-dark-in-clear`, `ct-a6-unsafe-with-model`, `dark2-not-canonical`, `p8-one-line` | dissonant hole / dark | R2's lines, unchanged; R4 agrees where it judges (`a1-record-dark-in-clear` runs vector 01: no `structure` line) |
+| `ct-a1`, `ct-a3`, `ct-a11`, `e4-dark-order`, `score-missing-note` | dissonant (R5–R9's kinds) | `unknown unreplayed contexts`: R4 agrees (ct-a3's, ct-a11's, e4's and pos-v05's runs are layered and derived exactly) or can't judge (ct-a1 is W) |
+| the 18 that ring | rings | `unknown unreplayed contexts`: R2–R4 agree, the rest is unreplayed (pos-v03, pos-v04, taut-23, taut-48 are W: R5's) |
+| `typed-corpus-unheard` | unreadable | `unknown unreplayed contexts`: it reads (S4); its source is W |
+
+**Counted:**
+- **Refused for its own reason:** with R4's four (`ct-a2`, `ct-a8`, `ct-a9`, `ct-a10`), **11 of the 38 fixtures** are refused for the reason the tune names. For 7 of them echo's kinds are exactly the tune's listed kinds (`ct-a2`, `ct-a8`, `ct-a9`, both `a1-record-dark-*`, `dark2-not-canonical`, `p8-one-line`). Three print the tune's kind and one more: `ct-a4` (`source`, and `stray`: Q45), `ct-a10` (`unlayered`, and `missing`: Q44), `ct-a5` (`dark`, and `source`: Q35). `ct-a6` prints the tune's `hole` and still lacks R6's `verdict` and `shadowed`.
+- **Beyond the tune's listed kinds:** `source` on four fixtures (Q35), `stray` on ct-a4 (Q45), `missing` on ct-a10 (Q44). No fixture the tune rings is dissonant in echo.
+- **Byte for byte, where mirror's data pins it:** vector 68's whole output (three lines and the interval atom); 29 run digests (`NNc`, `NNd`, `NNe`); 3 Note digests; the model address on 16 certificates. The four cheats' interval lines aren't pinned by any vector (the fixtures record kinds only); their format is 45's and 68's, and their atoms are Taut's encoder's.
+
+**Corrections to §10's table:** `pos-v03` is a W source (`rule send … not reader_tracking(?a)`), so it is R5's data, not R4's. `pos-v05` is positive (`functional owner(1) -> 2` over a positive rule), so R4 judges its run.
+
+**What R4 does not do, on purpose:** judge `result` against the model (check 9's `address`, R8; the model address is tested, not printed); judge a budget-stopped run (R7: E1's true or false claim decides what should be layered); decide a positive source's light where no paradox is certain (R6); anything under W but the positive core (R5).
+
+### 10.9 Questions R4 adds for Mara
+
+- **Q40. A derivation of an atom outside the model and unlayered.** §6.2's `stray` is "a claimed atom not in the recomputed model", beat "its claimed tick". A `derive` line whose head no `layer` line names has no claimed tick. Is it a `stray` (at which beat?), an `extra` (the row says heads in the model only), or unreadable? echo prints nothing and answers `unknown unreplayed contexts`.
+- **Q41. A `derive` line's rule id the source doesn't have, or has twice.** Its Note's `rule` is the record atom's address (Note §2.1), and there is no record, or two. Which bytes does `extra`'s left side take? echo: unreplayed.
+- **Q42. A `layer` line repeated exactly.** §3.2: "a repeated line in a set is a `fail`". At the right depth, no §6.2 kind names it (`depth` would be distance 0, never printed). Which kind, or is it the reader's (`unknown unreadable certificate:<L>:1`)? echo: unreplayed.
+- **Q43. Checks 3–8 on a `dark 2` claim.** §3.2: "A certificate claiming Dark at 2 is judged by check 10 … and by check 1". echo reads that as the list, so a `dark 2` performance for a source with light (ct-a5) is not also judged by the structure checks, which would print every model atom `unlayered` and every derivation `missing` (23 lines on ct-a5). Right?
+- **Q44. One cause, two lines: `unlayered` and `missing`.** ct-a10 omits `path(a, d)` and its derivation. echo prints both `unlayered` (the atom) and `missing` (its Note), because `missing` is for heads in the model and `path(a, d)` is. Does the tune name it once? And `missing` / `extra`'s beat, "the head's tick": the head's depth (echo) or its claimed tick, when the two differ?
+- **Q45. ct-a4's strays.** Its spurious `edge(a, z)` and `path(a, z)` are layered. echo prints `source` (F) and two `stray` lines; the `expect` lists `source` only. §6.2's `stray` row says "(CT-A4: one cause, named once)": does that mean the tune prints the strays (named once each, not again as `extra`), or that the cause is named once, by `source`, and the strays are silent?
+- **Q46. The budget's unit, exactly.** echo charges each ground instance formed (every positive premise matched in the stage), every round, the closure round included, and nothing for a partial match. That is naive evaluation's count (vector 01: 38; semi-naive would charge fewer). Is the tune's "ground rule instances considered" the same function? It matters only at the edge (Q21), but there two checkers print different lines.
+- **Q47. Which declarations make a paradox certain.** echo checks the eval program's well-formed, non-trivial declarations over the stable set's key groups, and decides the header with it only where R3 couldn't (a reader hole beside open light). Confirm that an ill-formed declaration (a hole) and a trivial one (value among its keys) never make one certain.
+
+**Gates at `a2bddbb`:** `just check` clean; echo's 151 tests pass; `checks.coverage` 96.28% of lines (the ratchet is 94; echo 99.17%, 2503 of 2524; `model.rs` 329 of 336, `replay.rs` 138 of 138, `dark2.rs` 466 of 467, `interval.rs` 92 of 92); `checks.doctest`; `checks.echo-independent` (R4 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Five mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
