@@ -44,6 +44,15 @@ impl Tau {
         Tau::new(name, Some(grammar))
     }
 
+    /// `@parse/item` with the root flag: the altitude of every grammar
+    /// fact and of F_G's set address (fixpoint §15.2, §16.10 item 1).
+    pub fn parse_item() -> Tau {
+        Tau {
+            name: "@parse/item".into(),
+            grammar: None,
+        }
+    }
+
     fn new(name: &str, grammar: Option<Address>) -> Option<Tau> {
         (!name.as_bytes().contains(&0)).then(|| Tau {
             name: name.into(),

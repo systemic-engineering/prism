@@ -477,6 +477,7 @@ fn tau_bytes_and_nul() {
     assert_eq!(under.bytes()[4..], g);
     assert_eq!((under.name(), under.grammar()), ("@x", Some(&g)));
     assert_eq!(Tau::root("@mirror").expect("tau").grammar(), None);
+    assert_eq!(Tau::parse_item(), Tau::root("@parse/item").expect("tau"));
     assert_eq!(Tau::root("@a\0b"), None);
     assert_eq!(Tau::under("@a\0b", g), None);
 }

@@ -28,8 +28,10 @@
 
 use core::fmt;
 
-use crate::address::Address;
-use crate::facts::{Position, Refusal};
+use alloc::vec::Vec;
+
+use crate::address::{self, Address, Tau};
+use crate::facts::{read_from, Facts, Position, Refusal};
 
 /// The header keys of an F_G file, in order, with their hex lengths
 /// (fixpoint §16.10 item 1).
@@ -79,25 +81,132 @@ pub enum Breach {
     },
 }
 
+fn hex(f: &mut fmt::Formatter<'_>, a: &Address) -> fmt::Result {
+    a.iter().try_for_each(|b| write!(f, "{b:02x}"))
+}
+
 impl fmt::Display for Breach {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _ = f;
-        Ok(())
+        match self {
+            Breach::Unreflected => f.write_str("unreflected: no seam"),
+            Breach::Unreadable(r) => write!(f, "unreadable: {r}"),
+            Breach::Header { at, fault } => {
+                write!(f, "{at} header: ")?;
+                match fault {
+                    HeaderFault::Missing(k) => write!(f, "`{k}` is missing"),
+                    HeaderFault::Expected(k) => write!(f, "`{k}` belongs here"),
+                    HeaderFault::Unexpected => f.write_str("a header after `grammar`"),
+                    HeaderFault::Hex => f.write_str("not lowercase hex of the key's length"),
+                }
+            }
+            Breach::Order { at, repeated: true } => write!(f, "{at} a fact repeated"),
+            Breach::Order { at, .. } => write!(f, "{at} a fact out of ascending address order"),
+            Breach::Address {
+                at,
+                claimed,
+                computed,
+            } => {
+                write!(f, "{at} address: claimed ")?;
+                hex(f, claimed)?;
+                f.write_str(", recomputed ")?;
+                hex(f, computed)
+            }
+        }
     }
 }
 
 /// V0 over a facts file read on its own (lines from 1).
 pub fn check_facts(r: &[u8]) -> Result<Integrity, Breach> {
-    let _ = r;
-    Ok(Integrity {
-        grammar: [0; 32],
-        facts: 0,
-        above: None,
-    })
+    integrity(r, 1, None)
 }
 
 /// V0 over a whole file: cut it (P3), check its reflection in the whole
 /// file's coordinates, and give `H(a)` back.
 pub fn check_reflection(s: &[u8]) -> Result<Integrity, Breach> {
-    check_facts(s)
+    let cut = crate::cut::cut(s);
+    let r = cut.reflection.ok_or(Breach::Unreflected)?;
+    integrity(r.bytes, r.seam_line + 1, Some(address::hash(cut.above)))
+}
+
+fn integrity(r: &[u8], first_line: usize, above: Option<Address>) -> Result<Integrity, Breach> {
+    let read = read_from(r, first_line).map_err(Breach::Unreadable)?;
+    let claimed = header(&read, first_line)?;
+    let item = Tau::parse_item();
+    let mut members: Vec<Address> = Vec::with_capacity(read.facts.len());
+    for fact in &read.facts {
+        let a = address::atom(&item, &fact.atom);
+        if let Some(&prev) = members.last() {
+            if a <= prev {
+                return Err(Breach::Order {
+                    at: Position {
+                        line: fact.line,
+                        column: 1,
+                    },
+                    repeated: a == prev,
+                });
+            }
+        }
+        members.push(a);
+    }
+    // strictly ascending already, so set_addr is the fragment as listed
+    let computed = address::fragment(&item, "grammar", &members);
+    if computed != claimed.0 {
+        return Err(Breach::Address {
+            at: claimed.1,
+            claimed: claimed.0,
+            computed,
+        });
+    }
+    Ok(Integrity {
+        grammar: computed,
+        facts: members.len(),
+        above,
+    })
+}
+
+/// The three header lines, well-formed; gives `# grammar`'s value and where
+/// it stands.
+fn header(read: &Facts, first_line: usize) -> Result<(Address, Position), Breach> {
+    let h = &read.headers;
+    let fault = |line, column, fault| Breach::Header {
+        at: Position { line, column },
+        fault,
+    };
+    let mut grammar = ([0; 32], Position { line: 0, column: 0 });
+    for (i, (key, len)) in HEADERS.iter().enumerate() {
+        let Some(got) = h.get(i) else {
+            let line = h.last().map_or(first_line, |x| x.line + 1);
+            return Err(fault(line, 1, HeaderFault::Missing(key)));
+        };
+        if got.key != *key {
+            return Err(fault(got.line, 3, HeaderFault::Expected(key)));
+        }
+        let column = key.len() + 4;
+        let v = got.value.as_bytes();
+        let lower_hex = |b: &u8| b.is_ascii_digit() || (b'a'..=b'f').contains(b);
+        if v.len() != *len || !v.iter().all(lower_hex) {
+            return Err(fault(got.line, column, HeaderFault::Hex));
+        }
+        if *key == "grammar" {
+            for (j, out) in grammar.0.iter_mut().enumerate() {
+                *out = (nibble(v[2 * j]) << 4) | nibble(v[2 * j + 1]);
+            }
+            grammar.1 = Position {
+                line: got.line,
+                column,
+            };
+        }
+    }
+    if let Some(extra) = h.get(HEADERS.len()) {
+        return Err(fault(extra.line, 3, HeaderFault::Unexpected));
+    }
+    Ok(grammar)
+}
+
+/// A lowercase hex digit's value (only called on one).
+fn nibble(b: u8) -> u8 {
+    match b {
+        b'0'..=b'9' => b - b'0',
+        _ => b - b'a' + 10,
+    }
 }
