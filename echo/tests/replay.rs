@@ -284,8 +284,8 @@ fn the_verdict_then_heard_then_implements() {
 #[test]
 fn what_echo_cannot_replay_is_unknown_never_rings() {
     let a = run(&fixture("pos-v01"), BUDGET);
-    assert_eq!(a.verdict, Verdict::Unreplayed("program"));
-    assert_eq!(lines(&a)[0], "unknown unreplayed program");
+    assert_eq!(a.verdict, Verdict::Unreplayed("model"));
+    assert_eq!(lines(&a)[0], "unknown unreplayed model");
     assert_eq!(a.exit(), 2);
 }
 
@@ -614,9 +614,10 @@ fn an_unreadable_source_is_not_unreadable() {
         },
         BUDGET,
     );
-    // A Dark source with a model printed for it: check 2, whose interval
-    // bytes are open (Q26), so not yet replayed.
-    assert_eq!(lines(&a)[0], "unknown unreplayed program");
+    // A reader-Dark source whose certificate claims P and F: check 1's
+    // two `source` intervals (R3). Check 2 is still open (Q26).
+    assert_eq!(lines(&a)[0], "dissonant 2");
+    assert_eq!(a.exit(), 1);
 }
 
 // --------------------------------------------------------------- budget
@@ -632,7 +633,7 @@ fn the_budget_is_pinned() {
 #[test]
 fn the_budget_counts_ground_rule_instances() {
     let f = fixture("pos-v01");
-    assert_eq!(lines(&run(&f, 9))[0], "unknown unreplayed program");
+    assert_eq!(lines(&run(&f, 9))[0], "unknown unreplayed model");
     for budget in [8, 1, 0] {
         let a = run(&f, budget);
         assert_eq!(a.verdict, Verdict::Uncertain { budget });

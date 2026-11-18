@@ -65,7 +65,7 @@ fn the_binary_prints_the_library_answer() {
         BUDGET,
     );
     assert_eq!(stdout(&o), want.print());
-    assert!(stdout(&o).starts_with("unknown unreplayed program\nheard source e997e229"));
+    assert!(stdout(&o).starts_with("unknown unreplayed model\nheard source e997e229"));
     assert_eq!(o.status.code(), Some(2));
     assert!(o.stderr.is_empty());
 }

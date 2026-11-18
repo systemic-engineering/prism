@@ -7,8 +7,9 @@
 //! against the source's holes (`hole … about record`); the performance's
 //! `hole` lines, and its `dark 2` atom against the head of the source's
 //! report (`hole … about performance`, `dark … about performance`). Where
-//! R2 can't tell, and where nothing differs, the answer is the next
-//! stratum's: `unknown unreplayed program`. Nothing rings.
+//! R2 can't tell, and where nothing differs, R3 judges P and F (check 1;
+//! `crate::r3`), and then the answer is the next stratum's: `unknown
+//! unreplayed model`. Nothing rings.
 //!
 //! The fixtures' `expect` (tune's `test_checker.py` docstring): `expect
 //! dissonant <kind>…`, each kind among the printed intervals.
@@ -114,7 +115,7 @@ fn hole_atom(words: &[&str]) -> String {
     })
 }
 
-const NEXT: &str = "unknown unreplayed program";
+const NEXT: &str = "unknown unreplayed model";
 
 /// R2's answer on all 38 fixtures. The interval lines are exact: the hole
 /// texts' digests are b3sum 1.8.7's, run by hand; the atoms' addresses are
@@ -158,6 +159,15 @@ fn the_fixture_table() {
                 "3491ee284e5db6aaa2e4382187830569d2b34acc458f545b5502f556e890eb5e",
                 "none",
                 "record",
+            )],
+        ),
+        // R3's (check 1): `r3::ct_a4_is_refused_for_its_spurious_fact`.
+        (
+            "ct-a4-spurious-fact",
+            vec![format!(
+                "interval source source {} {} about none at none 0 by 1",
+                "cdcde6e982f1790afd8d19bc0644cedb5c8898e663b7289ba12bf35e16f437aa",
+                "a9eea8347186d088f5c9e48104f3ace60acef6b6d2b9212829b21211d094a104"
             )],
         ),
         ("ct-a5-readable-dark", vec![dark(&dark_at(3, 5), "none")]),
@@ -532,9 +542,11 @@ fn dark_atoms_pair_only_one_for_one() {
 }
 
 /// Where R2 can't tell, it doesn't: W with a hole that adds (R5's
-/// `unknown shadow under W`); light it can't decide without a run (R4); a
-/// Dark source printed with a model (check 2, Q26). All `unknown
-/// unreplayed program`, whatever the record says.
+/// `unknown shadow under W`); light it can't decide without a run (R4).
+/// Both `unknown unreplayed model`, whatever the record says: their
+/// header waits for the light too (`r3::check_1_waits_for_the_light_it_needs`).
+/// A Dark source printed with a model (check 2, Q26) is
+/// `r3::a_dark_source_with_a_model`.
 #[test]
 fn what_r2_cannot_tell_is_left_to_the_next_stratum() {
     let (v01, _) = fixture("pos-v01");
@@ -542,7 +554,6 @@ fn what_r2_cannot_tell_is_left_to_the_next_stratum() {
     for source in [
         &b"fact p(a)\nrule r q(?x) requires p(?x), not s(?x)\nfact X\n"[..],
         &b"fact e(a, b)\nfact X\n"[..],
-        &b"fact Edge(a\t"[..],
     ] {
         let t = Triple {
             source: source.to_vec(),

@@ -89,6 +89,22 @@ impl Interval {
         }
     }
 
+    /// Check 1's interval (Note §6.2): stratum and kind `source`, the
+    /// claimed address left and the recomputed one right, about `none`, no
+    /// run (`at none 0`), distance 1 (a hash has no metric).
+    pub fn source(left: Side, right: Side) -> Self {
+        Interval {
+            stratum: "source",
+            kind: "source",
+            left,
+            right,
+            about: "none",
+            run: "none",
+            tick: 0,
+            distance: 1,
+        }
+    }
+
     /// The printed line, without its LF.
     pub fn text(&self) -> String {
         let mut out = format!("interval {} {} ", self.stratum, self.kind);

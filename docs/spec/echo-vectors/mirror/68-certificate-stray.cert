@@ -1,0 +1,30 @@
+certificate  1
+result       c26727afd3de20d1ad4a0db758ce73a59882ff6a3dc149b3b12d2c50228fb0ee
+program      3e705fddf91700b8adb16f2bf0eee3d78313c7428e308ef0d59367fd0f251edb
+facts        a9eea8347186d088f5c9e48104f3ace60acef6b6d2b9212829b21211d094a104
+engine       none
+dark-order   none
+
+layer        0 edge(a, b)
+layer        0 edge(b, c)
+layer        0 edge(c, b)
+layer        0 edge(c, d)
+layer        1 path(a, a)
+layer        1 path(a, b)
+layer        1 path(b, c)
+layer        1 path(c, b)
+layer        1 path(c, d)
+layer        2 path(a, c)
+layer        2 path(b, b)
+layer        2 path(b, d)
+layer        2 path(c, c)
+layer        3 path(a, d)
+derive       path(a, b) by path-base from edge(a, b)
+derive       path(a, c) by path-step from path(a, b) & edge(b, c)
+derive       path(a, d) by path-step from path(a, c) & edge(c, d)
+derive       path(b, b) by path-step from path(b, c) & edge(c, b)
+derive       path(b, c) by path-base from edge(b, c)
+derive       path(b, d) by path-step from path(b, c) & edge(c, d)
+derive       path(c, b) by path-base from edge(c, b)
+derive       path(c, c) by path-step from path(c, b) & edge(b, c)
+derive       path(c, d) by path-base from edge(c, d)

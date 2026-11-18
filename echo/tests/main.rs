@@ -13,6 +13,7 @@ mod dark2;
 mod facts;
 mod integrity;
 mod r2;
+mod r3;
 mod refusals;
 mod replay;
 mod source;
