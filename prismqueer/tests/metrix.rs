@@ -11,7 +11,7 @@
 //! Isometry defects Tᵀ·G_B·T − G_A are `Form`s; relative spectra of two
 //! `Metrix` on one frame are exact algebraic multisets.
 
-#![cfg(feature = "lapack")]
+#![cfg(all(feature = "lapack", feature = "bundle"))]
 
 use std::collections::BTreeSet;
 use std::marker::PhantomData;

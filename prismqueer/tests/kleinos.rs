@@ -16,7 +16,7 @@
 //! B→A read as I gives no comma; dropping the span gives zero loops; two
 //! spans whose 16-hex labels collide but whose full ids differ are two edges.
 
-#![cfg(feature = "lapack")]
+#![cfg(all(feature = "lapack", feature = "bundle"))]
 
 use std::collections::{BTreeMap, BTreeSet};
 

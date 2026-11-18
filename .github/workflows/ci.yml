@@ -10,6 +10,7 @@ jobs:
     uses: systemic-engineering/ci/.github/workflows/rust-nix-check.yml@main
     with:
       coverage_threshold: '94'
+      features: 'lapack,fate'
 
   format:
     name: format

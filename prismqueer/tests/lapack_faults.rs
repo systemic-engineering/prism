@@ -5,6 +5,8 @@
 //! `Shape`. Neither reaches Fortran, where the first would come back as
 //! `INFO < 0` and the second would be read or written out of bounds.
 
+#![cfg(feature = "lapack")]
+
 use prismqueer::ffi::{self, Caught, Fault, Routine};
 use terni::Imperfect;
 

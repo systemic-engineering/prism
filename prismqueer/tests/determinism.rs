@@ -2,6 +2,8 @@
 //! (docs/spec/checks.md, to-fix 1 and 2). Same seed, same result, in this
 //! process and in the next one; different seeds, different results.
 
+#![cfg(feature = "bundle")]
+
 use prismqueer::flux::pillar::Sample;
 
 fn draws(seed: &[u8]) -> Vec<i64> {
