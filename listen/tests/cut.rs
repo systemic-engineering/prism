@@ -23,7 +23,10 @@ fn a_file_with_no_seam_is_unreflected() {
 
 #[test]
 fn the_seam_at_offset_zero_leaves_an_empty_observation() {
-    assert_eq!(parts(b"---\nfact p\n"), (&b""[..], Some((&b"fact p\n"[..], 1))));
+    assert_eq!(
+        parts(b"---\nfact p\n"),
+        (&b""[..], Some((&b"fact p\n"[..], 1)))
+    );
 }
 
 #[test]
@@ -77,7 +80,10 @@ fn near_misses_are_not_the_seam() {
 /// file have a seam? docs/spec/listen.md §7 Q1.)
 #[test]
 fn crlf_is_not_the_seam() {
-    assert_eq!(parts(b"a\r\n---\r\nb\r\n"), unreflected(b"a\r\n---\r\nb\r\n"));
+    assert_eq!(
+        parts(b"a\r\n---\r\nb\r\n"),
+        unreflected(b"a\r\n---\r\nb\r\n")
+    );
 }
 
 /// `---` at the end of the file with no LF is not `2d 2d 2d 0a`. (Open

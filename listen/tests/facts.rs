@@ -16,7 +16,12 @@ fn atom(pred: &str, args: Vec<Value>) -> Atom {
 }
 
 fn atoms(src: &[u8]) -> Vec<Atom> {
-    read(src).expect("reads").facts.into_iter().map(|f| f.atom).collect()
+    read(src)
+        .expect("reads")
+        .facts
+        .into_iter()
+        .map(|f| f.atom)
+        .collect()
 }
 
 /// mirror.facts' header shape (fixpoint §16.10 item 1): `# key value` lines
@@ -31,7 +36,11 @@ fn header_lines_at_the_top_are_headers() {
     };
     assert_eq!(
         f.headers,
-        vec![h("format-grammar", "145e", 1), h("root", "97c6", 2), h("grammar", "9092", 3)]
+        vec![
+            h("format-grammar", "145e", 1),
+            h("root", "97c6", 2),
+            h("grammar", "9092", 3)
+        ]
     );
     assert_eq!(f.facts.len(), 1);
     assert_eq!(f.facts[0].line, 4);
@@ -42,7 +51,8 @@ fn header_lines_at_the_top_are_headers() {
 /// a line shaped `# <key> <value>` is one.
 #[test]
 fn other_hash_lines_are_comments() {
-    let f = read(b"# a header\n# lonely\n#\n#x y\n#  two spaces\nfact p\n# root 97c6\n").expect("reads");
+    let f = read(b"# a header\n# lonely\n#\n#x y\n#  two spaces\nfact p\n# root 97c6\n")
+        .expect("reads");
     assert_eq!(
         f.headers,
         vec![Header {
@@ -59,7 +69,10 @@ fn other_hash_lines_are_comments() {
 /// pact-eval §1.2: `blank = { " " }`, and the last LF may be missing.
 #[test]
 fn blank_lines_and_a_missing_final_lf() {
-    assert_eq!(atoms(b"\n   \nfact p\n\nfact q"), vec![atom("p", vec![]), atom("q", vec![])]);
+    assert_eq!(
+        atoms(b"\n   \nfact p\n\nfact q"),
+        vec![atom("p", vec![]), atom("q", vec![])]
+    );
     assert_eq!(atoms(b""), vec![]);
     assert_eq!(atoms(b"\n"), vec![]);
 }
@@ -149,5 +162,11 @@ fn a_reflection_is_read_below_the_seam() {
     assert_eq!(f.facts[0].line, 4);
     assert_eq!(f.facts[0].atom, atom("p", vec![sym("a")]));
     assert_eq!(read_reflection(b"fact p\n"), Ok(None));
-    assert_eq!(read_reflection(b"x\n---\n").expect("reads").expect("reflected").facts, vec![]);
+    assert_eq!(
+        read_reflection(b"x\n---\n")
+            .expect("reads")
+            .expect("reflected")
+            .facts,
+        vec![]
+    );
 }

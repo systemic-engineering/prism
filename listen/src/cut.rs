@@ -31,8 +31,28 @@ pub struct Reflection<'a> {
 
 /// Cut `s` at its first seam.
 pub fn cut(s: &[u8]) -> Cut<'_> {
-    Cut {
-        above: s,
-        reflection: None,
+    let (mut start, mut line) = (0, 1);
+    loop {
+        if s[start..].starts_with(SEAM) {
+            return Cut {
+                above: &s[..start],
+                reflection: Some(Reflection {
+                    bytes: &s[start + SEAM.len()..],
+                    seam_line: line,
+                }),
+            };
+        }
+        match s[start..].iter().position(|&b| b == b'\n') {
+            Some(lf) => {
+                start += lf + 1;
+                line += 1;
+            }
+            None => {
+                return Cut {
+                    above: s,
+                    reflection: None,
+                }
+            }
+        }
     }
 }

@@ -127,8 +127,18 @@ fn malformed_bytes() {
         (b"fact p(bytes \"abc\")\n", 1, 18, OddHex),
         (b"fact p(bytes \"a\")\n", 1, 16, OddHex),
         (b"fact p(bytes \"0A\")\n", 1, 16, Uppercase),
-        (b"fact p(bytes \"0g\")\n", 1, 16, Expected("a lowercase hex digit or `\"`")),
-        (b"fact p(bytes \"00\n", 1, 17, Expected("a lowercase hex digit or `\"`")),
+        (
+            b"fact p(bytes \"0g\")\n",
+            1,
+            16,
+            Expected("a lowercase hex digit or `\"`"),
+        ),
+        (
+            b"fact p(bytes \"00\n",
+            1,
+            17,
+            Expected("a lowercase hex digit or `\"`"),
+        ),
         (b"fact p(bytes 00)\n", 1, 14, Expected("`\"`")),
     ]);
 }

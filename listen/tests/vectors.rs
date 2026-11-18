@@ -70,8 +70,14 @@ fn mirror_facts_reads_whole() {
         keys,
         vec![
             ("format-grammar", "145e0f7c84579d400c894f74ef2d2e64d230185a"),
-            ("root", "97c6e069da2f7a1656fbe0fa57fcba7d7fe8da5150201bf04a81ef7fb985d528"),
-            ("grammar", "9092fca18d8bc728f7f3467329c4a01d4073de2194fb7bce939ca739938857ee"),
+            (
+                "root",
+                "97c6e069da2f7a1656fbe0fa57fcba7d7fe8da5150201bf04a81ef7fb985d528"
+            ),
+            (
+                "grammar",
+                "9092fca18d8bc728f7f3467329c4a01d4073de2194fb7bce939ca739938857ee"
+            ),
         ]
     );
     assert_eq!(f.facts.len(), 539);
@@ -93,7 +99,11 @@ fn mirror_facts_reads_whole() {
         f.facts[0].atom.to_string(),
         "child(addr d0cbd0eb9646486f87456df3d3bbe24987c0798de9f497ee4ec8b6bb0d4f61f9, nat 6, addr 553fdbdce708153cc9fb3176839191e985aee6cdf021efa9b00e7399d279c845)"
     );
-    let printed: String = f.facts.iter().map(|x| format!("fact {}\n", x.atom)).collect();
+    let printed: String = f
+        .facts
+        .iter()
+        .map(|x| format!("fact {}\n", x.atom))
+        .collect();
     let again = read(printed.as_bytes()).expect("canonical print reads");
     assert!(f
         .facts
