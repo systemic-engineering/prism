@@ -1,6 +1,6 @@
 # Ledger: what `ledger-verify` checks, under which assumptions
 
-*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`). `ledger-verify/tests/` holds the crate to all three.*
+*prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`), and `seal-vectors/` (the stock tools' raw output, 2026-11-18: OpenSSL 4.1.0's SLH-DSA anchor and OpenSSH 10.6p1's `ssh-mldsa44-ed25519` SSHSIGs, throwaway keys, §3 and §6). `ledger-verify/tests/` holds the crate to all four.*
 
 ## The crate
 
@@ -12,7 +12,7 @@
 
 | Crate | Version | Used for | Standard |
 |---|---|---|---|
-| `sha2` | 0.11.1 | every hash | FIPS 180-4 |
+| `sha2` | 0.11.1 | every hash (SHA-256; SHA-512 for SSHSIG) | FIPS 180-4 |
 | `base64ct` | 1.8.3 | base64, canonical only | RFC 4648 §4, §3.5 |
 | `ed25519-dalek` | 3.0.0 | `verify_strict` only | RFC 8032 |
 | `ml-dsa` | 0.1.2 | ML-DSA-44 `Verify` (Algorithm 3) | FIPS 204 (final); the crate runs Wycheproof's vectors |
@@ -93,11 +93,32 @@ ML-DSA-44 is FIPS 204 `ML-DSA.Verify` with an empty context. C2SP names the log 
 
 An offline key signs a checkpoint at genesis and periodically after that (bullet-up-008, lean 3). If lattices fall, history up to the last anchor still rests on hashes alone. It is checked separately from the AND rule.
 
-**The format is provisional,** because C2SP assigns SLH-DSA no signature type: FIPS 205 pure SLH-DSA-SHA2-128s over the checkpoint's note text, with the context string `"prism ledger anchor v1"`, for domain separation from anything else the key signs.
-- Public key: 32 bytes. Signature: 7856 bytes.
+**The format** (C2SP assigns SLH-DSA no signature type): FIPS 205 pure SLH-DSA-SHA2-128s over the checkpoint's note text, with the context string `"prism ledger anchor v1"`, for domain separation from anything else the key signs.
+- Public key: 32 bytes, published as the PEM `PUBLIC KEY` that `openssl pkey -pubout` writes (`AnchorKey::from_pem`): DER SubjectPublicKeyInfo, the 18-byte prefix `30 30 30 0b 06 09 60 86 48 01 65 03 04 03 14 03 21 00` (OID 2.16.840.1.101.3.4.3.20, id-slh-dsa-sha2-128s, no parameters; BIT STRING, 0 unused bits), then the key. Any other OID, length or armor is refused.
+- Signature: 7856 bytes, raw, as `openssl pkeyutl` writes it.
 - How an anchor is carried (a note line under 0xff, or a file beside the checkpoint) isn't decided.
 
-**Alex's seal key is a deployment gate** (prism-019, 2026-11-17). Nothing deploys signing with it until a post-quantum seal tool is chosen. This crate only verifies.
+**The stock tool makes exactly this format** (checked 2026-11-18, OpenSSL 4.1.0 of 23 Oct 2026, Homebrew `openssl@4`; the `openssl` first on PATH on this Mac is Nix's 3.6.1, so the ceremony names the 4.x binary explicitly). The ceremony's commands, offline, on Alex's machine:
+
+```sh
+openssl genpkey -algorithm SLH-DSA-SHA2-128s -out anchor.key.pem
+openssl pkey -in anchor.key.pem -pubout -out anchor.pub.pem
+# checkpoint.txt: the checkpoint's note text (origin, size, base64 root,
+# each line ending in \n), and nothing else.
+openssl pkeyutl -sign -rawin -inkey anchor.key.pem -in checkpoint.txt \
+  -pkeyopt 'context-string:prism ledger anchor v1' -out anchor.sig
+# and to check it with the same tool:
+openssl pkeyutl -verify -rawin -pubin -inkey anchor.pub.pem -in checkpoint.txt \
+  -sigfile anchor.sig -pkeyopt 'context-string:prism ledger anchor v1'
+```
+
+- **The context option works on SLH-DSA in 4.1.0.** `-pkeyopt context-string:<text>` sets the FIPS 205 context (`OSSL_SIGNATURE_PARAM_CONTEXT_STRING`, at most 255 bytes, default empty; `EVP_SIGNATURE-SLH-DSA(7)`). A signature made with it verifies only with it, and one made without it doesn't verify with it (both checked with the CLI and in the tests). So the context stays, and the flag is part of the format: **forgetting it makes a valid FIPS 205 signature that is not an anchor,** and `ledger-verify` rejects it (`an_openssl_anchor_without_the_context_rejects`).
+- **`-rawin` is pure SLH-DSA, not a prehash.** With the default `message-encoding` of 1, OpenSSL signs `M′ = 0x00 ‖ |ctx| ‖ ctx ‖ M` over the file's bytes as given (`EVP_SIGNATURE-SLH-DSA(7)`: "OpenSSL does not support Pre Hash SLH-DSA"). The tests confirm it: a pure FIPS 205 verifier (RustCrypto `slh-dsa`, `try_verify_with_context`) accepts the CLI's signature. `-digest` is not used.
+- The signature is randomized (OpenSSL's default `deterministic` is 0), so two signatures over one checkpoint differ; both verify.
+
+**Vectors** (`seal-vectors/`): `anchor-body.txt` (the tests' checkpoint, RFC 6962's eight leaves at size 8), `anchor.pub.pem`, `anchor.sig` (with the context), `anchor-empty-context.sig` (the same command without `-pkeyopt`). The private key was deleted after signing.
+
+**Alex's seal key is a deployment gate** (prism-019, 2026-11-17). The tooling is no longer the blocker (spectral-003's Response, 2026-11-17): this anchor and the SSHSIG seal (§6) are made with stock tools, and `ledger-verify` verifies what they produce. Nothing signs with Alex's keys until Alex has generated and cross-signed them. This crate only verifies.
 
 ## 4. The witness quorum (Lemma B), under the AND rule
 
@@ -178,6 +199,45 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 
 **Vectors:** `commitment-vectors.json`, 4 commitments (m = "", "abc", 64 bytes, 1012 bytes) with fixed coins, written by `commitment-vectors.py` from the paper's text with `hashlib` only (it computes A r row by row from the definition and checks its own Receive). The Rust verifier accepts them; a changed m, every flipped bit (bar the unread corners, which open to the same m), and a truncated commitment or opening reject.
 
+## 6. Alex's seal: SSHSIG with `ssh-mldsa44-ed25519`
+
+Alex's seal and the adjudicator's statements are SSHSIGs made by `ssh-keygen -Y sign` with an `ssh-mldsa44-ed25519` key (OpenSSH 10.6; spectral-003's Response). `sshsig::verify(armored, namespace, message, allowed)` verifies exactly what that tool produces, and nothing weaker.
+
+**The ceremony's commands** (Alex's machine, Alex's user; the key's storage and cross-signatures are spectral-003's step 2–3):
+
+```sh
+ssh-keygen -t mldsa44-ed25519 -f ~/.ssh/seal_mldsa44_ed25519   # with a passphrase
+ssh-keygen -Y sign -n spectral-seal -f ~/.ssh/seal_mldsa44_ed25519 statement.txt
+#   -> statement.txt.sig (armored); default hash sha512
+ssh-keygen -Y verify -f allowed_signers -I <identity> -n spectral-seal \
+  -s statement.txt.sig < statement.txt
+```
+
+**The format, with its sources:**
+
+- **SSHSIG** (OpenSSH `PROTOCOL.sshsig` and `sshsig.c`, V_10_6_P1): the armor is `-----BEGIN SSH SIGNATURE-----`, base64, `-----END SSH SIGNATURE-----`. The blob is `byte[6] "SSHSIG"`, `uint32 1`, `string publickey`, `string namespace`, `string reserved`, `string hash_algorithm`, `string signature`. The signed data is `byte[6] "SSHSIG" ‖ string namespace ‖ string reserved ‖ string hash_algorithm ‖ string H(message)`, and `sshsig.c` builds it with the reserved string **empty** on both sides, so a non-empty reserved field in the blob is ignored, as `PROTOCOL.sshsig` says (`a_reserved_value_is_ignored_as_openssh_does`).
+- **The composite** (OpenSSH 10.6p1 `ssh-mldsa-eddsa.c`, which cites draft-miller-sshm-mldsa44-ed25519-composite-sigs-00 and implements draft-ietf-lamps-pq-composite-sigs-18):
+  - public key: `string "ssh-mldsa44-ed25519"`, `string (mldsaPK[1312] ‖ ed25519PK[32])`;
+  - signature: `string "ssh-mldsa44-ed25519"`, `string (mldsaSig[2420] ‖ ed25519Sig[64])`;
+  - both halves sign `M′ = "CompositeAlgorithmSignatures2025" ‖ "COMPSIG-MLDSA44-Ed25519-SHA512" ‖ 0x00 ‖ SHA-512(signed data)`. The 0x00 is the length of the composite's own context, which OpenSSH always passes empty;
+  - ML-DSA-44 is FIPS 204 pure, with the label `"COMPSIG-MLDSA44-Ed25519-SHA512"` as its context (hedged: OpenSSH draws fresh randomness per signature); Ed25519 is RFC 8032 over the same `M′`.
+  - OpenSSH verifies ML-DSA, then Ed25519, and fails if either fails: AND.
+  - A test (`the_composite_encoding_is_what_ssh_keygen_wrote`) pins this against the tool's own output: it builds `M′` from the source's text and verifies each half of the real vector directly with `ml-dsa` and `ed25519-dalek`. ML-DSA-44 doesn't verify with an empty context.
+
+**What `verify` checks, in order:** the armor; the magic and version 1; no trailing bytes in the blob, the key or the signature field; the key is `ssh-mldsa44-ed25519` (anything else, a classic `ssh-ed25519` included, is `KeyType`); the key is byte-equal to the allowed key (`Key`); the namespace equals the expected one and isn't empty (`Namespace`); the hash algorithm is `sha512` or `sha256` (`HashAlgorithm`); the signature is `ssh-mldsa44-ed25519` with 2484 bytes; then **both** halves. `Signature { ed25519, mldsa44 }` says which verified. Ed25519 is checked with `verify_strict`, as in §2: an honest `ssh-keygen` signature always passes it, but it is stricter than OpenSSH's ref10, which accepts some non-canonical forms. `SealKey::from_openssh` reads a `.pub` line or an `allowed_signers` key field (`<type> <base64> [comment]`); the text type must match the blob's.
+
+**Vectors** (`seal-vectors/`, OpenSSH 10.6p1, throwaway keys, each `.sig` checked with `ssh-keygen -Y verify` before check-in, private keys deleted):
+
+| File | Made by |
+|---|---|
+| `seal.pub`, `other.pub` | `ssh-keygen -t mldsa44-ed25519 -N ''` |
+| `classic.pub` | `ssh-keygen -t ed25519 -N ''` |
+| `seal-msg.txt` | the message |
+| `seal-msg.spectral-seal.sig` | `ssh-keygen -Y sign -n spectral-seal -f seal` |
+| `seal-msg.sha256.sig` | the same, with `-O hashalg=sha256` |
+| `seal-msg.other-namespace.sig` | `ssh-keygen -Y sign -n other-namespace -f seal` |
+| `seal-msg.classic-ed25519.sig` | `ssh-keygen -Y sign -n spectral-seal -f classic` |
+
 ## Assumptions, all of them
 
 | Check | Rests on | Post-quantum |
@@ -185,6 +245,7 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 | Merkle inclusion and consistency, Lemma A | SHA-256 collision resistance | Category 2 (NIST IR 8547 Table 1) |
 | Checkpoint, AND rule | Ed25519 (discrete log) **and** ML-DSA-44 (Module-LWE/SIS) | holds while ML-DSA-44 holds: a forger must break both |
 | Anchor | SLH-DSA-SHA2-128s: SHA-256 only | Category 1, hash-only |
+| Seal (SSHSIG `ssh-mldsa44-ed25519`), AND rule | ML-DSA-44 **and** Ed25519 over M′, which commits to the message through SHA-512 (sha512) or SHA-256 then SHA-512 (sha256) | holds while ML-DSA-44 holds: a forger must break both |
 | Quorum, Lemma B, AND rule | Ed25519 **and** ML-DSA-44 cosignatures, both per witness (a forger must break both); at most f dishonest witnesses; honest witnesses checking consistency (C2SP tlog-witness) | as the stronger of the two: holds while either holds, falls only when both fall |
 | Commitment hiding (Theorem 1) | nothing: < 2^−256, information-theoretic | unconditional |
 | Commitment binding | SHA-256 collision resistance | Category 2 |
@@ -192,14 +253,15 @@ The log holds commitments, never content (prism-019 ask 3). Decided by Alex, 202
 
 ## Tests and mutations
 
-`ledger-verify/tests/` (one binary). Keys are throwaway keypairs from fixed seeds, made in the tests.
+`ledger-verify/tests/` (one binary). Keys are throwaway keypairs from fixed seeds, made in the tests, except the stock tools' vectors in `seal-vectors/`, made by OpenSSL and OpenSSH with keys deleted after.
 
 | Area | Tests |
 |---|---|
 | Merkle | 21: published roots 0..8; every vector proof; named runs at sizes 1, 2, 3, 7, 8; the wrong index, a truncated path, an extra node, the wrong root, leaf or sizes reject; the inner-node-as-leaf attack; consistency edges; the size-binding property; both probe sets |
 | Note | 8: the C2SP example, key IDs, vkey refusals, canonical base64, key names, the parse rules |
 | Checkpoint | 13: the body, its refusals, `CosignedSubtree`; both valid accepts (either order); Ed25519 alone, ML-DSA-44 alone, either one forged, other keys, another checkpoint all reject; duplicate lines, wrong key types and a malformed note are refused |
-| Anchor | 5: the sizes, a valid anchor, another checkpoint, flipped bits and a short signature, another key |
+| Anchor | 12: the sizes, a valid anchor, another checkpoint, flipped bits and a short signature, another key; the OpenSSL vector is over the test checkpoint, verifies, rejects without the context, with a flipped bit, over another checkpoint or under another key; our SPKI encoding equals openssl's byte for byte; malformed PEM keys (another OID, short, long, unused bits, PRIVATE, no footer, bad base64, empty) reject |
+| SSHSIG | 14: the composite encoding against the real vector, half by half; the ssh-keygen seal (sha512) and the sha256 seal verify; another namespace (either way, empty, relabelled), another message, another allowed key (or the blob's key swapped) reject; only the Ed25519 half corrupted, only the ML-DSA-44 half corrupted, or another signature's Ed25519 half swapped in reject; a classic `ssh-ed25519` key and SSHSIG are `KeyType`; the `.pub` parse and its refusals; version 0/2, sha384/SHA512/empty hash, a wrong signature type, short or trailing bytes, a bad preamble, truncations reject; a non-empty reserved is ignored; the armor is required |
 | Quorum | 19: Q(7,2) = 5 and Mara's table; the 0x04 body against the C2SP example and an independent encoder; a 0x04 cosignature verifies, and rejects retimed, flipped, short or as a plain note signature; 0x01 and 0x04 keys kept apart; a witness with only its ML-DSA-44 or only its Ed25519 cosignature counts 0; 4 reject, 5 with both accept; 5 where one has only one scheme, or one forged Ed25519 or ML-DSA-44, reject; 5 with a duplicate, an unknown witness or an imposter reject; another checkpoint; both cosignatures read from a note; witness declarations; unusable sets |
 | Commitment | 14: the sizes; the tests' committer against the row-by-row definition; the Python vectors open, and reject mutated; opens with its (m, r); the wrong m, the wrong r, truncated or extended inputs, another scheme byte reject; every flipped bit rejects with its reason, bar the unread corners; the check equals the paper's equation; the binding extractor; the hiding smoke check (per-bit frequencies over 200 + 200 commitments within 0.3; not a proof) |
 
@@ -209,6 +271,7 @@ Each mutation was applied, run and reverted:
 |---|---|
 | OR instead of AND (`ed25519 \|\| mldsa44`) | `ed25519_alone_never_verifies`, `mldsa44_alone_never_verifies`, `a_forged_ed25519_beside_a_valid_mldsa44_rejects`, `a_forged_mldsa44_beside_a_valid_ed25519_rejects` |
 | Counting lines, not distinct witnesses | `five_with_one_duplicate_rejects` |
+| SSHSIG: OR instead of AND (`ed25519 \|\| mldsa44`) | `corrupting_the_ed25519_half_only_rejects`, `corrupting_the_mldsa44_half_only_rejects`, `swapping_in_the_ed25519_half_of_another_signature_rejects` |
 | Quorum: OR instead of AND per witness (`ed25519 \|\| mldsa44`) | `a_witness_with_only_its_ed25519_cosignature_counts_zero`, `a_witness_with_only_its_mldsa44_cosignature_counts_zero`, `five_where_one_has_only_its_ed25519_rejects`, `five_where_one_has_only_its_mldsa44_rejects`, `five_with_one_forged_ed25519_rejects`, `five_with_one_forged_mldsa44_rejects` |
 | No 0x00 leaf prefix | `leaf_and_node_hashes_carry_their_prefixes`, `mth_matches_the_published_roots_for_sizes_0_to_8`, `an_inner_node_cannot_pose_as_a_leaf` |
 | No 0x01 node prefix | 10 Merkle tests, among them every vector proof and both probe sets |
