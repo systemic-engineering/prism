@@ -13,6 +13,8 @@ const DASH: &str = "\u{2014} ";
 
 /// Signature type 0x01: Ed25519 over the note text.
 pub const ED25519: u8 = 0x01;
+/// Signature type 0x04: a timestamped Ed25519 checkpoint cosignature.
+pub const ED25519_COSIGNATURE: u8 = 0x04;
 /// Signature type 0x06: a timestamped ML-DSA-44 checkpoint cosignature.
 pub const MLDSA44_COSIGNATURE: u8 = 0x06;
 

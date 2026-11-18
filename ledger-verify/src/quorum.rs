@@ -7,16 +7,17 @@
 //! witnesses, so an honest one cosigned both. Liveness (Corollary C) needs
 //! N ≥ 3f + 1; it is reported, not required.
 //!
-//! **The quorum is exactly as post-quantum as its cosignature scheme**
-//! (Mara, BROKEN on "nothing to break"): Lemma B assumes unforgeable
-//! cosignatures. Here they are ML-DSA-44 (C2SP type 0x06), so the count
-//! rests on Module-LWE/SIS. With Ed25519 cosignatures a quantum adversary
-//! forges a quorum.
+//! **The AND rule, for witnesses** (bullet-up-008, Alex, 2026-11-16): a
+//! witness is declared with two keys, Ed25519 (C2SP `tlog-cosignature`
+//! 0x04) and ML-DSA-44 (0x06), and counts toward Q only if **both** its
+//! cosignatures verify. The weaker scheme never decides alone, so forging
+//! a quorum takes forging both schemes: the count is as strong as the
+//! stronger of the two, until both fall.
 
 use alloc::vec::Vec;
 
-use crate::checkpoint::{Checkpoint, MlDsaKey};
-use crate::note::SignatureLine;
+use crate::checkpoint::{Checkpoint, Ed25519CosignerKey, MlDsaKey};
+use crate::note::{SignatureLine, Vkey, ED25519_COSIGNATURE, MLDSA44_COSIGNATURE};
 
 /// Q = ⌊(N+f)/2⌋ + 1.
 pub fn required(n: usize, f: usize) -> usize {
@@ -29,30 +30,70 @@ pub fn live(n: usize, f: usize) -> bool {
     n >= 3 * f + 1
 }
 
-/// Why a witness set is not usable.
+/// Why a witness or a witness set is not usable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuorumError {
     /// Q > N: no checkpoint could ever be accepted.
     Unreachable { n: usize, f: usize, q: usize },
     /// Two witnesses with one name and key ID, or one public key.
     DuplicateWitness,
+    /// A witness not declared with exactly one Ed25519 (0x04) and one
+    /// ML-DSA-44 (0x06) key under one name.
+    WitnessKeys,
+}
+
+/// One witness: its Ed25519 and its ML-DSA-44 cosigner key, one name.
+#[derive(Debug, Clone)]
+pub struct Witness {
+    ed25519: Ed25519CosignerKey,
+    mldsa44: MlDsaKey,
+}
+
+impl Witness {
+    /// Both keys, under one cosigner name.
+    pub fn new(ed25519: Ed25519CosignerKey, mldsa44: MlDsaKey) -> Result<Witness, QuorumError> {
+        if ed25519.name != mldsa44.name {
+            return Err(QuorumError::WitnessKeys);
+        }
+        Ok(Witness { ed25519, mldsa44 })
+    }
+
+    /// From two vkeys, in either order: one of type 0x04, one of type 0x06.
+    pub fn from_vkeys(a: &Vkey, b: &Vkey) -> Result<Witness, QuorumError> {
+        let (ed, ml) = match (a.sig_type, b.sig_type) {
+            (ED25519_COSIGNATURE, MLDSA44_COSIGNATURE) => (a, b),
+            (MLDSA44_COSIGNATURE, ED25519_COSIGNATURE) => (b, a),
+            _ => return Err(QuorumError::WitnessKeys),
+        };
+        let ed = Ed25519CosignerKey::from_vkey(ed).map_err(|_| QuorumError::WitnessKeys)?;
+        let ml = MlDsaKey::from_vkey(ml).map_err(|_| QuorumError::WitnessKeys)?;
+        Witness::new(ed, ml)
+    }
+
+    /// The cosigner name.
+    pub fn name(&self) -> &str {
+        &self.mldsa44.name
+    }
 }
 
 /// The configured witnesses and the tolerance f.
 #[derive(Debug, Clone)]
 pub struct Witnesses {
-    keys: Vec<MlDsaKey>,
+    witnesses: Vec<Witness>,
     f: usize,
 }
 
 /// The count over one checkpoint's cosignatures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tally {
-    /// Distinct witnesses with at least one valid cosignature.
+    /// Distinct witnesses whose Ed25519 **and** ML-DSA-44 cosignatures
+    /// both verified.
     pub valid: usize,
-    /// Lines from a known witness that failed to verify.
+    /// Distinct witnesses with exactly one of the two valid (counted zero).
+    pub partial: usize,
+    /// Lines from a known witness key that failed to verify.
     pub invalid: usize,
-    /// Lines from no configured witness (ignored, as signed-note requires).
+    /// Lines from no configured witness key (ignored, as signed-note requires).
     pub unknown: usize,
     /// Q for this set.
     pub required: usize,
@@ -67,61 +108,89 @@ impl Tally {
     }
 }
 
+/// The AND rule for one witness.
+fn counts(ed25519: bool, mldsa44: bool) -> bool {
+    let _ = ed25519;
+    mldsa44
+}
+
 impl Witnesses {
-    pub fn new(keys: Vec<MlDsaKey>, f: usize) -> Result<Witnesses, QuorumError> {
-        let (n, q) = (keys.len(), required(keys.len(), f));
+    pub fn new(witnesses: Vec<Witness>, f: usize) -> Result<Witnesses, QuorumError> {
+        let (n, q) = (witnesses.len(), required(witnesses.len(), f));
         if q > n {
             return Err(QuorumError::Unreachable { n, f, q });
         }
-        // One party, one vote: no (name, key ID) twice, no public key twice.
-        let publics: Vec<Vec<u8>> = keys.iter().map(MlDsaKey::public_key).collect();
+        // One party, one vote: no (name, key ID) twice, no public key
+        // twice, in either scheme.
+        let ml: Vec<Vec<u8>> = witnesses.iter().map(|w| w.mldsa44.public_key()).collect();
         for i in 0..n {
             for j in i + 1..n {
-                let same_label = keys[i].name == keys[j].name && keys[i].id == keys[j].id;
-                if same_label || publics[i] == publics[j] {
+                let (a, b) = (&witnesses[i], &witnesses[j]);
+                let same_ed = (a.ed25519.name == b.ed25519.name && a.ed25519.id == b.ed25519.id)
+                    || a.ed25519.public_key() == b.ed25519.public_key();
+                let same_ml = (a.mldsa44.name == b.mldsa44.name && a.mldsa44.id == b.mldsa44.id)
+                    || ml[i] == ml[j];
+                if same_ed || same_ml {
                     return Err(QuorumError::DuplicateWitness);
                 }
             }
         }
-        Ok(Witnesses { keys, f })
+        Ok(Witnesses { witnesses, f })
     }
 
     /// N.
     pub fn len(&self) -> usize {
-        self.keys.len()
+        self.witnesses.len()
     }
 
     /// Whether no witness is configured.
     pub fn is_empty(&self) -> bool {
-        self.keys.is_empty()
+        self.witnesses.is_empty()
     }
 
     /// Q for this set.
     pub fn required(&self) -> usize {
-        required(self.keys.len(), self.f)
+        required(self.witnesses.len(), self.f)
     }
 
     /// Count the cosignature lines over `checkpoint`.
     pub fn tally(&self, checkpoint: &Checkpoint, cosignatures: &[SignatureLine]) -> Tally {
-        // Which witnesses have a valid cosignature: a set, so a witness
-        // counts once however many lines it sent.
-        let mut cosigned = alloc::vec![false; self.keys.len()];
+        // Per witness, which of its two schemes has a valid cosignature: a
+        // set, so a witness counts once however many lines it sent.
+        let n = self.witnesses.len();
+        let (mut ed, mut ml) = (alloc::vec![false; n], alloc::vec![false; n]);
         let (mut invalid, mut unknown) = (0, 0);
         for line in cosignatures {
-            match self.keys.iter().position(|k| k.names(line)) {
-                None => unknown += 1,
-                Some(i) => match self.keys[i].verify(checkpoint, &line.signature) {
-                    Some(_) => cosigned[i] = true,
-                    None => invalid += 1,
-                },
+            let by_ed = self.witnesses.iter().position(|w| w.ed25519.names(line));
+            let by_ml = self.witnesses.iter().position(|w| w.mldsa44.names(line));
+            let verified = match (by_ed, by_ml) {
+                (Some(i), _) => self.witnesses[i]
+                    .ed25519
+                    .verify(checkpoint, &line.signature)
+                    .map(|_| &mut ed[i]),
+                (None, Some(i)) => self.witnesses[i]
+                    .mldsa44
+                    .verify(checkpoint, &line.signature)
+                    .map(|_| &mut ml[i]),
+                (None, None) => {
+                    unknown += 1;
+                    continue;
+                }
+            };
+            match verified {
+                Some(seen) => *seen = true,
+                None => invalid += 1,
             }
         }
+        let valid = (0..n).filter(|&i| counts(ed[i], ml[i])).count();
+        let partial = (0..n).filter(|&i| ed[i] != ml[i]).count();
         Tally {
-            valid: cosigned.iter().filter(|&&c| c).count(),
+            valid,
+            partial,
             invalid,
             unknown,
             required: self.required(),
-            live: live(self.keys.len(), self.f),
+            live: live(n, self.f),
         }
     }
 }

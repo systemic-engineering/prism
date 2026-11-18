@@ -22,7 +22,7 @@ use alloc::format;
 
 use crate::note::{
     decode_base64, encode_base64, valid_key_name, SignatureLine, SignedNote, Vkey, ED25519,
-    MLDSA44_COSIGNATURE,
+    ED25519_COSIGNATURE, MLDSA44_COSIGNATURE,
 };
 use crate::Hash;
 
@@ -110,6 +110,14 @@ impl Checkpoint {
         m.extend_from_slice(&self.root);
         m
     }
+
+    /// The message a C2SP `tlog-cosignature` Ed25519 (0x04) checkpoint
+    /// cosignature signs: `cosignature/v1\n`, `time <timestamp>\n` (ASCII
+    /// decimal), then the checkpoint's note text. No extension lines:
+    /// checkpoints with extensions are refused on parse.
+    pub fn cosignature_v1(&self, timestamp: u64) -> String {
+        format!("cosignature/v1\ntime {timestamp}\n{}", self.body())
+    }
 }
 
 /// `opaque x<1..2^8-1>`: a one-byte length, then the bytes. Callers hold
@@ -136,13 +144,18 @@ pub struct Ed25519Key {
 }
 
 impl Ed25519Key {
+    /// A log key: a vkey of type 0x01.
     pub fn from_vkey(vkey: &Vkey) -> Result<Ed25519Key, CheckpointError> {
+        Ed25519Key::of_type(vkey, ED25519)
+    }
+
+    fn of_type(vkey: &Vkey, sig_type: u8) -> Result<Ed25519Key, CheckpointError> {
         let bytes: &[u8; 32] = vkey
             .public_key
             .as_slice()
             .try_into()
             .map_err(|_| CheckpointError::Key)?;
-        if vkey.sig_type != ED25519 {
+        if vkey.sig_type != sig_type {
             return Err(CheckpointError::Key);
         }
         let key =
@@ -166,6 +179,54 @@ impl Ed25519Key {
         };
         let signature = ed25519_dalek::Signature::from_bytes(bytes);
         self.key.verify_strict(message, &signature).is_ok()
+    }
+
+    /// The encoded public key, for comparing keys.
+    pub fn public_key(&self) -> [u8; 32] {
+        self.key.to_bytes()
+    }
+}
+
+/// An Ed25519 cosigner key (type 0x04): a witness's classical half.
+#[derive(Debug, Clone)]
+pub struct Ed25519CosignerKey {
+    pub name: String,
+    pub id: u32,
+    key: Ed25519Key,
+}
+
+impl Ed25519CosignerKey {
+    pub fn from_vkey(vkey: &Vkey) -> Result<Ed25519CosignerKey, CheckpointError> {
+        let key = Ed25519Key::of_type(vkey, ED25519_COSIGNATURE)?;
+        Ok(Ed25519CosignerKey {
+            name: key.name.clone(),
+            id: key.id,
+            key,
+        })
+    }
+
+    /// Does this line carry this key's name and ID?
+    pub fn names(&self, line: &SignatureLine) -> bool {
+        line.name == self.name && line.id == self.id
+    }
+
+    /// The encoded public key, for comparing keys.
+    pub fn public_key(&self) -> [u8; 32] {
+        self.key.public_key()
+    }
+
+    /// Verify a checkpoint cosignature (`timestamp ‖ Ed25519 signature`
+    /// over [`Checkpoint::cosignature_v1`]); its timestamp if it verifies.
+    pub fn verify(&self, checkpoint: &Checkpoint, cosignature: &[u8]) -> Option<u64> {
+        if cosignature.len() != 8 + 64 {
+            return None;
+        }
+        let (time, signature) = cosignature.split_at(8);
+        let timestamp = u64::from_be_bytes(time.try_into().ok()?);
+        let message = checkpoint.cosignature_v1(timestamp);
+        self.key
+            .verify(message.as_bytes(), signature)
+            .then_some(timestamp)
     }
 }
 

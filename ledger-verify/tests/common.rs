@@ -92,6 +92,23 @@ pub fn cosigned_subtree(
     m
 }
 
+/// C2SP tlog-cosignature's Ed25519 (0x04) signed message, written from the
+/// spec text: lines `cosignature/v1`, `time <ASCII decimal>`, origin, size
+/// (ASCII decimal), base64(root), each ending in a newline; no extensions.
+pub fn cosignature_v1(timestamp: u64, origin: &str, size: u64, root: &Hash) -> String {
+    let mut m = String::from("cosignature/v1\n");
+    m.push_str("time ");
+    m.push_str(&timestamp.to_string());
+    m.push('\n');
+    m.push_str(origin);
+    m.push('\n');
+    m.push_str(&size.to_string());
+    m.push('\n');
+    m.push_str(&b64(root));
+    m.push('\n');
+    m
+}
+
 /// A throwaway Ed25519 key from a fixed seed.
 pub struct Ed {
     pub name: String,
@@ -120,6 +137,43 @@ impl Ed {
     /// The note signature line over `text`.
     pub fn line(&self, text: &str) -> String {
         line(&self.name, self.id(), &self.sign(text.as_bytes()))
+    }
+    /// The key ID as a 0x04 cosigner.
+    pub fn cosigner_id(&self) -> u32 {
+        key_id(&self.name, 0x04, &self.public())
+    }
+    /// The vkey as a 0x04 cosigner.
+    pub fn cosigner_vkey(&self) -> String {
+        vkey(&self.name, 0x04, &self.public())
+    }
+    /// timestamp || Ed25519 over `cosignature_v1`.
+    pub fn cosignature(&self, origin: &str, size: u64, root: &Hash, timestamp: u64) -> Vec<u8> {
+        let m = cosignature_v1(timestamp, origin, size, root);
+        let mut out = timestamp.to_be_bytes().to_vec();
+        out.extend_from_slice(&self.sign(m.as_bytes()));
+        out
+    }
+    pub fn cosignature_line(&self, origin: &str, size: u64, root: &Hash, timestamp: u64) -> String {
+        line(
+            &self.name,
+            self.cosigner_id(),
+            &self.cosignature(origin, size, root, timestamp),
+        )
+    }
+}
+
+/// A witness: an Ed25519 (0x04) and an ML-DSA-44 (0x06) cosigner, one name.
+pub struct Witness {
+    pub ed: Ed,
+    pub ml: Ml,
+}
+
+impl Witness {
+    pub fn new(name: &str, ed_seed: u8, ml_seed: u8) -> Witness {
+        Witness {
+            ed: Ed::new(name, ed_seed),
+            ml: Ml::new(name, ml_seed),
+        }
     }
 }
 
@@ -181,12 +235,12 @@ pub fn log_keys() -> &'static (Ed, Ml) {
     KEYS.get_or_init(|| (Ed::new(ORIGIN, 1), Ml::new(ORIGIN, 2)))
 }
 
-/// Seven witnesses, seeds 10..17.
-pub fn witnesses() -> &'static Vec<Ml> {
-    static W: OnceLock<Vec<Ml>> = OnceLock::new();
+/// Seven witnesses: Ed25519 seeds 30..37, ML-DSA-44 seeds 10..17.
+pub fn witnesses() -> &'static Vec<Witness> {
+    static W: OnceLock<Vec<Witness>> = OnceLock::new();
     W.get_or_init(|| {
         (0..7)
-            .map(|i| Ml::new(&format!("witness{i}.example.com"), 10 + i))
+            .map(|i| Witness::new(&format!("witness{i}.example.com"), 30 + i, 10 + i))
             .collect()
     })
 }
