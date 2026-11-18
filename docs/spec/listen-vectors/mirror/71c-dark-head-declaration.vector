@@ -1,0 +1,12 @@
+vector     71c-dark-head-declaration
+kind       atom
+note       H5/B1: an unknown performance whose head is a declaration hole names the predicate only.
+note       Live in 79 (a lone declaration, H7 V6)
+tau        @mirror/certificate root
+atom       dark(nat 2, sym "engine", sym "declaration", sym "p")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       dark         2 engine declaration p
+expect     equal
+length     120
+preimage   73706c696e74657200406d6972726f722f63657274696669636174650000000000000000005200000000000000046461726b00000000000000040100000000000000080000000000000002000000000000000006656e67696e6500000000000000000b6465636c61726174696f6e00000000000000000170
+blake3     c3f9d26c7f7809707e0a2a7a41e0cc2a8975b0d4ac3218756c100d71fcaa8016

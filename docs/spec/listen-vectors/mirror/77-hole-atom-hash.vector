@@ -1,0 +1,11 @@
+vector     77-hole-atom-hash
+kind       atom
+note       H5: a line that doesn't read, as the performance's hole atom: two syms, `#` and `2:6`
+tau        @mirror/certificate root
+atom       hole(sym "#", sym "2:6")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       hole         # 2:6
+expect     equal
+length     80
+preimage   73706c696e74657200406d6972726f722f63657274696669636174650000000000000000002a0000000000000004686f6c65000000000000000200000000000000000123000000000000000003323a36
+blake3     7179387abf0c0020c55f0af7c6ec1a7e7b1e51025c58c31647e7f694b7e09641

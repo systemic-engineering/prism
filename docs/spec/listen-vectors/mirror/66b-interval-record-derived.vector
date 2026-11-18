@@ -1,0 +1,12 @@
+vector     66b-interval-record-derived
+kind       atom
+note       the `record` kind (§6.5 R2): derived-only line 'true 9': left none, right BLAKE3 of it
+note       corpus 01's record with its `true` count off by one prints two intervals
+tau        @song/interval root
+atom       interval(sym "verdict", sym "record", sym "none", addr cabe184c4a32f32e131b786c36dd37fbd6ec8929498a286fcd0f6992b80c58ef, sym "none", sym "none", nat 0, nat 1)
+tau_hex    40736f6e672f696e74657276616c0000
+text       interval verdict record none cabe184c4a32f32e131b786c36dd37fbd6ec8929498a286fcd0f6992b80c58ef about none at none 0 by 1
+expect     equal
+length     202
+preimage   73706c696e7465720040736f6e672f696e74657276616c000000000000000000a90000000000000008696e74657276616c0000000000000008000000000000000007766572646963740000000000000000067265636f72640000000000000000046e6f6e65020000000000000020cabe184c4a32f32e131b786c36dd37fbd6ec8929498a286fcd0f6992b80c58ef0000000000000000046e6f6e650000000000000000046e6f6e6501000000000000000800000000000000000100000000000000080000000000000001
+blake3     8e1781f9b225c0238532defc9e9cb42a9d4c0aa31acce22dc50d4f75f2b6bf5c

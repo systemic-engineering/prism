@@ -1,0 +1,11 @@
+vector     13-tau-root-flag-same-name
+kind       atom (contrast)
+note       same name and content with the root flag: a different address. Illegal for a
+note       format altitude in use; here only to show the flag is in the preimage
+tau        @data/json root
+atom       p(sym "a")
+tau_hex    40646174612f6a736f6e0000
+expect     not-equal 12-tau-grammar-addr
+length     56
+preimage   73706c696e7465720040646174612f6a736f6e0000000000000000001b000000000000000170000000000000000100000000000000000161
+blake3     880aa263828d004c4ac3caf2b987f359f48e0fe70360ca290e71d09473000771

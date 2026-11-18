@@ -1,0 +1,11 @@
+vector     77b-score-hole-hash
+kind       atom
+note       H6: the score's hole atom for `# 2:6`
+tau        @song/interval root
+atom       hole(sym "#", sym "2:6")
+tau_hex    40736f6e672f696e74657276616c0000
+score      hole         # 2:6
+expect     equal
+length     75
+preimage   73706c696e7465720040736f6e672f696e74657276616c0000000000000000002a0000000000000004686f6c65000000000000000200000000000000000123000000000000000003323a36
+blake3     d14c5ff2439dd8bb417154933af9196d1339c0dbfd9b2d51624db03e720b5718

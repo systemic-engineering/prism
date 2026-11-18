@@ -1,0 +1,12 @@
+vector     91-hole-atom-rule-5
+kind       atom
+note       v3.2.5 rule 5: the declaration hole for `functional f(1, 1) -> 2` (G8 text; split at the first two spaces)
+tau        @mirror/certificate root
+atom       hole(sym "declaration", sym "f", sym "functional f(1, 1) -> 2")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       hole         declaration f functional f(1, 1) -> 2
+score      hole         declaration f functional f(1, 1) -> 2
+expect     equal
+length     120
+preimage   73706c696e74657200406d6972726f722f6365727469666963617465000000000000000000520000000000000004686f6c65000000000000000300000000000000000b6465636c61726174696f6e0000000000000000016600000000000000001766756e6374696f6e616c206628312c203129202d3e2032
+blake3     15e9a43baf22234340e1eb0f22599c40dc160fe6dab31c24a55b2e7b01de6da2

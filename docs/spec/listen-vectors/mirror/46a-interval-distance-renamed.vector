@@ -1,0 +1,12 @@
+vector     46a-interval-distance-renamed
+kind       atom (contrast)
+note       B2 alternative as v2.2 defines a rename: τ @song/distance, predicate `distance`,
+note       printed key `distance`, all together. CT-A3 + `layer 2 owner(doc, alex)` on 21's source (owner(doc, alex) has depth 1)
+tau        @song/distance root
+atom       distance(sym "structure", sym "depth", addr 9e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a8, sym "none", sym "none", sym "tick", nat 2, nat 1)
+tau_hex    40736f6e672f64697374616e63650000
+text       distance structure depth 9e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a8 none about none at tick 2 by 1
+expect     not-equal 45-interval-song-interval
+length     203
+preimage   73706c696e7465720040736f6e672f64697374616e6365000000000000000000aa000000000000000864697374616e6365000000000000000800000000000000000973747275637475726500000000000000000564657074680200000000000000209e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a80000000000000000046e6f6e650000000000000000046e6f6e650000000000000000047469636b01000000000000000800000000000000020100000000000000080000000000000001
+blake3     2b82b037e7719dd8381517a2f9bce59682ebf7c0345e4d40283bb68460aec56d

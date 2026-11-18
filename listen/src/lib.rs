@@ -9,3 +9,11 @@
 #![forbid(unsafe_code)]
 
 extern crate alloc;
+
+pub mod cut;
+pub mod facts;
+pub mod value;
+
+pub use cut::{cut, Cut, Reflection};
+pub use facts::{read, read_reflection, Fact, Facts, Header, Position, Refusal, Unreadable};
+pub use value::{Atom, Value};

@@ -1,0 +1,12 @@
+vector     54-interval-verdict-words
+kind       atom
+note       B7 + Note v3.1 §6.7 H3: CT-A3 on 21's source (corpus 05): claimed `clear`, derived
+note       `paradox`; verdict words print bare. Was `clear dark` (v2), `clear declined` (v3.0)
+tau        @song/interval root
+atom       interval(sym "verdict", sym "verdict", sym "clear", sym "paradox", sym "none", sym "none", nat 0, nat 1)
+tau_hex    40736f6e672f696e74657276616c0000
+text       interval verdict verdict clear paradox about none at none 0 by 1
+expect     equal
+length     179
+preimage   73706c696e7465720040736f6e672f696e74657276616c000000000000000000920000000000000008696e74657276616c00000000000000080000000000000000077665726469637400000000000000000776657264696374000000000000000005636c65617200000000000000000770617261646f780000000000000000046e6f6e650000000000000000046e6f6e6501000000000000000800000000000000000100000000000000080000000000000001
+blake3     99a87385214bc95abd700ad9cb445d7cb6778a4e9f64009b571b8ead19b559d5

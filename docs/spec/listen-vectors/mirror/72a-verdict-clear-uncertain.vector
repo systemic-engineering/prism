@@ -1,0 +1,11 @@
+vector     72a-verdict-clear-uncertain
+kind       atom
+note       H3 verdict words (v3.1): 70's record claiming `clear` (a budget stop is uncertain); the `verdict` line alone differs (R3), so one interval
+tau        @song/interval root
+atom       interval(sym "verdict", sym "verdict", sym "clear", sym "uncertain", sym "none", sym "none", nat 0, nat 1)
+tau_hex    40736f6e672f696e74657276616c0000
+text       interval verdict verdict clear uncertain about none at none 0 by 1
+expect     equal
+length     181
+preimage   73706c696e7465720040736f6e672f696e74657276616c000000000000000000940000000000000008696e74657276616c00000000000000080000000000000000077665726469637400000000000000000776657264696374000000000000000005636c656172000000000000000009756e6365727461696e0000000000000000046e6f6e650000000000000000046e6f6e6501000000000000000800000000000000000100000000000000080000000000000001
+blake3     471bcc8c3bd67100232771add4681859166508a8ec161c59c0f8a7df06c702e1

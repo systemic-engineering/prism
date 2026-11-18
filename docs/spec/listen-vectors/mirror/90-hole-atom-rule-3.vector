@@ -1,0 +1,12 @@
+vector     90-hole-atom-rule-3
+kind       atom
+note       v3.2.5 rule 3: the declaration hole for `functional f(1) -> 3` (G8 text; split at the first two spaces)
+tau        @mirror/certificate root
+atom       hole(sym "declaration", sym "f", sym "functional f(1) -> 3")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       hole         declaration f functional f(1) -> 3
+score      hole         declaration f functional f(1) -> 3
+expect     equal
+length     117
+preimage   73706c696e74657200406d6972726f722f63657274696669636174650000000000000000004f0000000000000004686f6c65000000000000000300000000000000000b6465636c61726174696f6e0000000000000000016600000000000000001466756e6374696f6e616c2066283129202d3e2033
+blake3     b200f306088f1e286fefffd724cf89dea10e87feb7c159562ae674fbe826088f

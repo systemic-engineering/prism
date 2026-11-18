@@ -1,0 +1,11 @@
+vector     72c-verdict-uncertain-unknown
+kind       atom
+note       H3 verdict words (v3.1): 56's record claiming `uncertain` (24 has no light); the `verdict` line alone differs (R3), so one interval
+tau        @song/interval root
+atom       interval(sym "verdict", sym "verdict", sym "uncertain", sym "unknown", sym "none", sym "none", nat 0, nat 1)
+tau_hex    40736f6e672f696e74657276616c0000
+text       interval verdict verdict uncertain unknown about none at none 0 by 1
+expect     equal
+length     183
+preimage   73706c696e7465720040736f6e672f696e74657276616c000000000000000000960000000000000008696e74657276616c00000000000000080000000000000000077665726469637400000000000000000776657264696374000000000000000009756e6365727461696e000000000000000007756e6b6e6f776e0000000000000000046e6f6e650000000000000000046e6f6e6501000000000000000800000000000000000100000000000000080000000000000001
+blake3     b35b78d771cba13563c7772cd61ce25a971a37fd0a3118f5821ff41b88bdaebc

@@ -1,0 +1,11 @@
+vector     48b-basis-atom
+kind       atom
+note       48's source: unread lines {2, 7}, strictly ascending (§6.4, O8)
+tau        @song/interval root
+atom       basis(nat 2, nat 7)
+tau_hex    40736f6e672f696e74657276616c0000
+record     basis       unread 2, 7
+expect     equal
+length     88
+preimage   73706c696e7465720040736f6e672f696e74657276616c0000000000000000003700000000000000056261736973000000000000000201000000000000000800000000000000020100000000000000080000000000000007
+blake3     e2769806c7db4c8c6d03648baca8c3755ed24f29387098a7efdafcefe7c9a792

@@ -1,0 +1,11 @@
+vector     69-budget-erasure-atom
+kind       atom
+note       §6.5 R4: a Count{3, Ticks} budget claim on a positive run (ruler = vector 49)
+tau        @mirror/certificate root
+atom       erasure(addr f159129a5c9e45f401159f61eaa7a9260c79b16a04aaf52ab6f64fdce578c4cb, sym "tick", sym "delta-non-empty")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       erasure      tick budget count 3 ticks
+expect     equal
+length     139
+preimage   73706c696e74657200406d6972726f722f6365727469666963617465000000000000000000650000000000000007657261737572650000000000000003020000000000000020f159129a5c9e45f401159f61eaa7a9260c79b16a04aaf52ab6f64fdce578c4cb0000000000000000047469636b00000000000000000f64656c74612d6e6f6e2d656d707479
+blake3     5270ebeba5f7d4e087b9798c43eb09a8c10ab5bd41fdd1061d7fee8c232971bb

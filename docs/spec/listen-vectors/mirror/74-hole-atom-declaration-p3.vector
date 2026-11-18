@@ -1,0 +1,11 @@
+vector     74-hole-atom-declaration-p3
+kind       atom
+note       H5: the performance's hole atom for `declaration p functional p(3) -> 1` (no said text); live in 80
+tau        @mirror/certificate root
+atom       hole(sym "declaration", sym "p", sym "functional p(3) -> 1")
+tau_hex    406d6972726f722f63657274696669636174650000
+line       hole         declaration p functional p(3) -> 1
+expect     equal
+length     117
+preimage   73706c696e74657200406d6972726f722f63657274696669636174650000000000000000004f0000000000000004686f6c65000000000000000300000000000000000b6465636c61726174696f6e0000000000000000017000000000000000001466756e6374696f6e616c2070283329202d3e2031
+blake3     d042cf15ddfaf3b1ab25992184bf0753d6dc64b3032bbeb3ac7df56249dccf00

@@ -1,0 +1,12 @@
+vector     76-interval-hole-record
+kind       atom
+note       H7: 80's record without its `hole declaration p functional p(3) -> 1` line: expected, not claimed.
+note       right = BLAKE3 of the hole text `declaration p functional p(3) -> 1` (H1's canonical text; no `hole ` key)
+tau        @song/interval root
+atom       interval(sym "verdict", sym "hole", sym "none", addr 3ff84bfc58475cd193bd51c5c82586c9934c8d48b94f2b2bb321fcd3429efe20, sym "record", sym "none", nat 0, nat 1)
+tau_hex    40736f6e672f696e74657276616c0000
+text       interval verdict hole none 3ff84bfc58475cd193bd51c5c82586c9934c8d48b94f2b2bb321fcd3429efe20 about record at none 0 by 1
+expect     equal
+length     202
+preimage   73706c696e7465720040736f6e672f696e74657276616c000000000000000000a90000000000000008696e74657276616c000000000000000800000000000000000776657264696374000000000000000004686f6c650000000000000000046e6f6e650200000000000000203ff84bfc58475cd193bd51c5c82586c9934c8d48b94f2b2bb321fcd3429efe200000000000000000067265636f72640000000000000000046e6f6e6501000000000000000800000000000000000100000000000000080000000000000001
+blake3     4e803b992561c57b32523f458937224fe29f5dad2e12fb83d458c332e68cf6f8

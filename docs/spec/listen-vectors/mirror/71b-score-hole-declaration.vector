@@ -1,0 +1,12 @@
+vector     71b-score-hole-declaration
+kind       atom
+note       H6 + G8: the score's hole atom for `declaration p functional p(3) -> 1`; the canonical line is one sym.
+note       Was dark(sym "engine", sym "declaration", sym "p", sym <line>) under A6/G8
+tau        @song/interval root
+atom       hole(sym "declaration", sym "p", sym "functional p(3) -> 1")
+tau_hex    40736f6e672f696e74657276616c0000
+score      hole         declaration p functional p(3) -> 1
+expect     equal
+length     112
+preimage   73706c696e7465720040736f6e672f696e74657276616c0000000000000000004f0000000000000004686f6c65000000000000000300000000000000000b6465636c61726174696f6e0000000000000000017000000000000000001466756e6374696f6e616c2070283329202d3e2031
+blake3     a056b6aff371b4c2db753cc714ad4c63fa92626ad0cbd0824907b9cb1d47ddec
