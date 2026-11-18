@@ -1,5 +1,7 @@
 # Ledger: what `chorus` checks, under which assumptions
 
+Named by Alex (2026-11-18), from the frame of *manipulation.md* that also named `echo`. A chorus is many independent voices attesting they saw the same thing; a history can't be rewritten in front of that many. Its role is to comment on the frame, which is what a double bind forbids. Its refrain comes back the same (consistency). Echo replays a reading; chorus cosigns a history.
+
 *prism, 2026-11-17 (prism-019, the verifier crate; decisions in prism-019's Log of 2026-11-16/17 and bullet-up-008). The crate verifies; it never holds, makes or sees a private key. Test vectors: `ledger-vectors.json` (generated from RFC 9162's text by `ledger-vectors.py`) and `ledger-probes.json` (transparency-dev/merkle's published probes, bundled unchanged), and `commitment-vectors.json` (generated from Halevi–Micali's text by `commitment-vectors.py`), and `seal-vectors/` (the stock tools' raw output, 2026-11-18: OpenSSL 4.1.0's SLH-DSA anchor and OpenSSH 10.6p1's `ssh-mldsa44-ed25519` SSHSIGs, throwaway keys, §3 and §6). `chorus/tests/` holds the crate to all four.*
 
 ## The crate
