@@ -1,6 +1,6 @@
 # echo: prism's second reader of mirror
 
-*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 3: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slice R1 (the surface, §10). Crate `echo`: a no_std library and the std binary `prism echo …`.*
+*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 4: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface) and R2 (the source and the Dark-2 report, §10.4). Crate `echo`: a no_std library and the std binary `prism echo …`.*
 
 Echo can only give back the last words she was given, and she never speaks first. The checker never authors: it replays the engine's own record from the text and gives it back exactly, so where the two differ, the difference is named and located.
 
@@ -16,8 +16,9 @@ Echo can only give back the last words she was given, and she never speaks first
 | **P4, V0 integrity** | `echo::integrity::{check_facts, check_reflection}` | seam note amendment 1, A1.3 and A1.7 P4; fixpoint §16.10 item 1 |
 
 | **S1/S2, certificate replay, R1** | `echo::replay`, `echo::certificate`, `echo::record`; the binary `prism` (`echo/src/bin/prism.rs`) | Note v3.3.2 §4.2, §6.3, §6.4 (a); mirror's v3.2 contract delta; certificate §3.2, §3.1.1 A and J, §4.3 (§10 here) |
+| **S1/S2, certificate replay, R2** | `echo::source` (the pact reader), `echo::dark2` (the Dark-2 report and check 10), `echo::interval` | Seam's pact-eval audit §1.2; certificate §2.4, §3.1, §3.1.1 J, J′, M4; Note v3.3.2 §6.2, §6.4, §6.5 G7, G8, §6.7 H1–H5, H7 (§10.4 here) |
 
-Not yet: P5 (V2, the second reading), and certificate replay's R2–R10 (§10).
+Not yet: P5 (V2, the second reading), and certificate replay's R3–R10 (§10).
 
 ## 2. Independence
 
@@ -192,6 +193,13 @@ Each of these was applied, killed by the suite, and reverted:
 | R1: replay defaults to `rings` when nothing failed (`Verdict::Rings` for `conclude(&UNREPLAYED)`) | 8 tests: `replay::what_echo_cannot_replay_is_unknown_never_rings`, `replay::no_fixture_rings`, four more `replay::` tests that expect `unknown unreplayed source`, the budget's boundary, and `bin::the_binary_prints_the_library_answer` |
 | R1: the record dropped from `heard` (its slot `none`) | `replay::heard_names_each_input_by_blake3_of_its_raw_bytes`, `replay::vector_50_heard_line_byte_for_byte` |
 | R1: the binary takes its budget from the clock (`SystemTime` nanoseconds mod 10) | `bin::the_binary_source_reads_only_its_arguments`, `bin::the_binary_prints_the_library_answer` |
+| R2: a Dark-2 source reads (`source::read` drops every line that doesn't read) | 19 tests: 5 `source::`, 7 `dark2::` (48's holes, head and basis among them), 7 `r2::` (the fixture table, the tune's kinds, Taut's triples among them) |
+| R2: a source cheat passes as unknown (intervals found, `unknown unreplayed program` printed) | 9 tests: 7 `r2::` (the fixture table, the tune's kinds, 76/76a), `replay::record_hole_text_is_opaque`, `replay::the_verdict_then_heard_then_implements` |
+| R2: the Dark-2 report skipped (the record's `hole` lines never compared) | 7 tests: 5 `r2::` (the fixture table, the tune's kinds, the multiset, 76/76a, the sort), 2 `replay::` |
+| R2: decide where R2 can't tell (`Light::Open` judged) | `r2::what_r2_cannot_tell_is_left_to_the_next_stratum` |
+| R2: the `dark` kind never pairs | `r2::dark_atoms_pair_only_one_for_one`, `r2::the_fixture_table` (dark2-not-canonical) |
+| R2: check 2 ignored (a Dark source printed with a model judged) | `r2::what_r2_cannot_tell_is_left_to_the_next_stratum`, `replay::an_unreadable_source_is_not_unreadable` |
+| R2: the head by A6's print order, not the least offset | `dark2::query_arity` (P8: `# 4:6` prints first, `1:1` is the head) |
 
 ## 9. Open questions for Mara
 
@@ -270,13 +278,13 @@ implements spec <commit> vectors <tree> rig none
 | line | exit | when |
 |---|---|---|
 | `rings` | 0 | every stratum replayed and agreed. **Not reachable in R1** |
-| `dissonant <n>` | 1 | from R3 on |
+| `dissonant <n>` | 1 | from R2 on (§10.4): one `interval` line each, after `implements` |
 | `uncertain budget <n> ground rule instances` | 1 | echo's own work budget, `<n>`, ran out |
 | `unknown io <input> …` | 2 | every input that couldn't be read, in the order `source certificate record score` |
 | `unknown unreadable <input>:<L>:<C>` | 2 | the first input, in that order, that doesn't read, at its first unread byte (Q22) |
 | `unknown unreplayed <stratum>` | 2 | the first stratum, in §10's order, that echo can't replay yet (Q20) |
 
-  Precedence: `io`, then `unreadable`, then the budget, then `unreplayed`. The source never makes the answer `unreadable`: a source that doesn't read is a Dark-2 source, and a correct Dark-2 performance rings (Note §5, Seam row 8).
+  Precedence: `io`, then `unreadable`, then the budget, then `dissonant` (from R2 on), then `unreplayed`. The source never makes the answer `unreadable`: a source that doesn't read is a Dark-2 source, and a correct Dark-2 performance rings (Note §5, Seam row 8).
 
 **What R1 reads.**
 - **The certificate**, by §3.2: `#` comments at column 1 and blank lines anywhere; every other line is a key, one or more spaces, and a value. The keys are the header's six (`certificate 1`, then `result`, `program`, `facts`, `engine`, `dark-order`, each `<64 hex>` or `none`, once each), `layer`, `derive`, `context`, `dark`, `violating`, `erasure` (R5's form, Note §6.5) and `hole` (Note §6.7 H5). Atoms are read with echo's typed facts reader (§4), so `bytes "…"`, `addr …` and `nat …` constants read: that is S4, beyond the tune (`typed-corpus-unheard`). An unknown key, a malformed value or a missing header key is unreadable at its `L:C`.
@@ -353,3 +361,85 @@ Nothing rings; every cheat is "not pass". No cheat is refused *for its reason* y
 **What R1 does not do, on purpose:** it reads the record's line form, not its values (R6); it doesn't read the score (R9); it doesn't compare the recomputed model address with the `result` claim in its verdict, because the interval for that is check 9's, against a model from the source (R4, R8).
 
 **Gates at `b030c7f`:** `just check` clean; `checks.coverage` 96.07% of lines (the ratchet is 94; echo 98.88%, 1148 of 1161); `checks.doctest`; `checks.echo-independent` (the binary adds no dependency); `checks.echo-portable`, which now builds `--lib`.
+
+### 10.4 R2, as built: the source and the Dark-2 report
+
+`d7a3fb5` 🔴 → `c72ecad` 🟢. The `implements` line moves to `spec 1e7eb3a402060c253bdb70305dac8c46554e92b1` (version 3) and `vectors 8c1c52ae9fd7fb4720e79044ef58ef4464535e59` (`docs/spec/echo-vectors` at the red commit, which added Taut's Dark-2 triples). R2 retires the word `source`: what R2 agrees with, or can't tell, answers `unknown unreplayed program`, the next stratum. Nothing rings.
+
+**The reader** (`echo::source`) is Seam's pact-eval §1.2 grammar, frozen: `rule`, `fact`, `query`, `functional`, `#` comments at column 1, blank lines of spaces, printable ASCII and LF only. It always reads: a line that doesn't read is a hole, kept with its `L:C` and its byte offset, and the lines that read are read (Note §6.4, composed). The location is **the least byte offset where the grammar can't continue** (certificate §3.1.1 J):
+- a byte outside 0x20–0x7E fails where it stands, never ahead of an earlier error on its line (`fact edge(a, B)⇥` is 14, not 16);
+- a key must be whole (`fac p` fails at 4, `q p` at 2: `q` could still be `query`), an indented line at its first non-space;
+- a name that is a keyword (`not`, `requires`) fails at the byte after it, where it could still have grown into another name (Q25);
+- `p()`, a number where a `sym` belongs, a trailing comment, an empty `requires`, `?x` in a query (Q28), position `0`: each where it stops.
+
+**Beyond the tune (S4):** a `fact` argument may be a typed constant (`sym "…"`, `nat`, `addr`, `bytes "…"`), as `pact eval` reads since trace-layer C6. A type word with no space after it is a name (`p(nat)` is `sym "nat"`, as the tune reads it). Typed constants in `rule` and `query` lines don't read, and `sym` strings are printable ASCII (Q24). `typed-corpus-unheard`'s source reads whole: 3 rules and 6 typed facts.
+
+**The report** (`echo::dark2`), from the lines that read, Note §6.7 H1's holes with their canonical texts:
+
+| hole | when | counted over |
+|---|---|---|
+| `# L:C` | a line that doesn't read | |
+| `repeat L:1` | a repeated rule id, at each later line (J′); every rule with that id is left out | the rules |
+| `arity L:1` | a query whose arity is none of its predicate's (M4 (a), the checker's reading) | facts and rules |
+| `arity p` | a predicate used with two arities (G7: a repeated rule's atoms count); every fact, rule, query and declaration on `p` is left out | facts and rules, heads and bodies (Q29) |
+| `safety r ?v` | a variable of the head or of a negative literal in no positive literal, one hole per variable | the rules repeats leave (H1 v3.0.1) |
+| `declaration p <canonical line>` | no arity, a position outside `1 … n`, a repeated key (H7 v3.2.5); not when `p` has two arities (`arity p` speaks); a trivial one (value among the keys) is no hole (v3.2.7); identical lines are one declaration (Q33) | |
+
+- **Order** (A6, H1 v3.0.1): `#` by offset, then the reader's by offset, then arity (by predicate), safety (by rule, then variable), declarations (by predicate, then line bytes; G8).
+- **The head** under `@mirror/dark-order` (certificate §2.4; Note §6.4): the `#` and reader holes merged by least byte offset, then the engine's in the order above. Its `dark 2` atom is `at L:C` (a reader check at column 1) or `engine <check> <subject>`; a declaration names its predicate only (71c), and a safety names `?v` with its `?` (Q34).
+- **`basis`**: the unread lines, `unread <runs>` (runs of two or more as `a-b`) and `basis(nat …)` at `@song/interval`. Computed and tested (48b); the record's `basis` line is compared by the `record` kind, which is R6's (Q32).
+
+**Light, as far as R2 can tell without a run** (H3). The verdict `unknown`, and with it a performance of one `dark 2` atom and no `hole` line (H5), needs "no light at all", which in general is the run's (R4, R5). R2 decides it only where the lines say it outright:
+- **no hole**: nothing to tell; the performance carries no `dark 2` atom and no `hole` line, the record no table hole;
+- **dark**: nothing left to run could give light. The eval program (the lines that read, minus H1's "left out") has no fact, every rule has a positive premise and no `not`, and no query could be a light falsehood (none is left, or a `#` hole makes `R⁺ = *`);
+- **lit**: a fact is left whose predicate nothing can remove: not used with arity ≥ 2 beside a `#` hole (`D(#)`; queries counted, which only widens it), not a declaration hole's at arity ≥ 2 (G1), not declared by a well-formed, non-trivial declaration (the general rule, a paradox's group). Then the verdict is `uncertain` or `paradox`, and either way the performance carries every hole and no `dark 2` atom;
+- **open**: anything else. Also every source with a `not` in a line that read beside a hole that adds (`#`, `repeat`, `arity p`, `safety`): that is `unknown shadow under W`, R5's. Taut's 48 has its `not` only in a rule left out, nothing left to run, and rings as `unknown`, so **dark** is decided first (Q31).
+
+**What R2 judges** (check 10, composed: Note §6.4; under the hole: H4, H5, H7). The kinds are §6.2's and H7's, stratum `verdict`, beat `none 0`, distance 1:
+- the record's `hole` lines, as a **multiset of hole texts** (the value before its first ` #`; the said text is never compared), against the report: one `hole` interval per text claimed or expected but not both, `about record`, each side BLAKE3 of the text (76). Lines of another type (`budget`, `capacity`, `io`) are R7's;
+- the performance's `hole` lines the same way, `about performance`, each side the hole atom `hole(sym …)` split at the first two spaces (76a): expected when lit, none when dark (Taut V2);
+- the performance's `dark 2` atoms against `{head}` when dark, `{}` otherwise: a `dark` interval `about performance`, paired only when exactly one is claimed-only and one derived-only (§6.5 R2), else one line per surplus atom. A `dark 255` atom is R6's.
+
+When the light is open, R2 judges nothing. When the source is dark and the performance prints a model (a `result`, layers, derives or contexts), that is check 2's `dark-source`, whose left side isn't pinned (Q26), so R2 judges nothing there either. Intervals print sorted by stratum, then by line bytes (§6.2). **`dissonant <n>` counts the strata replayed so far**: R3–R9 may add lines to the same input (Q27).
+
+**What the tests hold** (`echo/tests/source.rs`, `dark2.rs`, `r2.rs`; 29 new tests, 113 in echo's binary):
+- every grammar rule broken, located; lines and offsets counting comments and blanks; typed facts kept with their types, and refused where they stop;
+- 48's holes equal 55's record's hole texts, in order; the head is 48a's atom; basis is 48b's; 22f and 24f's dark child; 71c's declaration head; the hole atoms of 73, 74 (and their holes child 75), 77, 81, 90 and 91;
+- Taut's triples agree in R2: 55 and 56 (total dark), 71, 77, 80, 81, 90 and 91 (uncertain), each answering `unknown unreplayed program`;
+- **76 and 76a byte for byte:** 80's record, then 80's performance, without `declaration p functional p(3) -> 1` print exactly the vector's interval line, and its atom has the vector's address;
+- the multiset (a repeated hole is an extra line; the said text never decides), the pairing of `dark`, what R2 can't tell, the sort.
+
+**mirror's checker fixtures under R2** (the tune's answer from its `expect`, whose `dissonant <kind>…` means each kind is among the printed intervals; the fixtures record no interval lines):
+
+| fixture | the tune | echo R2 |
+|---|---|---|
+| `a1-record-dark-disagrees` | dissonant hole | `dissonant 2`: `hole 61cdf14c… none about record` (`# 3:6`), `hole none f9b90e3f… about record` (`# 3:14`) |
+| `a1-record-dark-in-clear` | dissonant hole | `dissonant 1`: `hole 3491ee28… none about record` (`# 1:1`) |
+| `ct-a5-readable-dark` | dissonant dark | `dissonant 1`: `dark <dark 2 at 3:5> none about performance` |
+| `ct-a6-unsafe-with-model` | dissonant hole verdict shadowed | `dissonant 2`: `hole none 356f962f… about record`, `hole none <hole(safety, bad, ?x)> about performance`. `verdict` and `shadowed` are R6's |
+| `dark2-not-canonical` | dissonant dark | `dissonant 1`: `dark <dark 2 at 5:5> <dark 2 at 3:14> about performance` |
+| `p8-one-line` | dissonant hole | `dissonant 1`: `hole none f210bb24… about record` (`# 4:6`) |
+| `ct-a4-spurious-fact` | dissonant source | `unknown unreplayed program`: the `source` kind is check 1's, the program and facts addresses, R3's (the interval line format too) |
+| the other 12 cheats (`ct-a1`, `a2`, `a3`, `a8`, `a9`, `a10`, `a11`, `a12`, `e1-false-budget-*`, `e4-dark-order`, `score-missing-note`) | dissonant (R4–R9's kinds) | `unknown unreplayed program` |
+| the 18 that ring (`a1-record-dark-engine`, `a1-record-dark-reader`, `a8-budget-query-unknown`, `p8-swapped`, `pos-dark2-engine`, `pos-dark2-reader`, `pos-diamond`, `pos-v01`, `pos-v03`, `pos-v04`, `pos-v05`, `pos-v05-control`, `taut-20` … `taut-24`, `taut-48`) | rings | `unknown unreplayed program`: R2 agrees, and the rest is unreplayed |
+| `typed-corpus-unheard` | unreadable | `unknown unreplayed program`: it reads (S4) and has no hole |
+
+**Counted:** the 6 fixtures whose cheat lives in R2's strata are refused for their own reason; for 5 of them echo's kinds equal the tune's expected kinds exactly, and for `ct-a6` echo prints the `hole` kind the tune expects, with `verdict` and `shadowed` to come from R6. No fixture the tune rings is dissonant in echo, and echo prints no kind the tune doesn't expect. The only interval lines pinned byte for byte by mirror's data are Taut's 76 and 76a, and echo prints both exactly. Parity of whole interval lists with the tune is R10's.
+
+**What R2 does not do, on purpose:** judge the record's `basis`, verdict word, counts or light lines (R6's `record`, `verdict`, `shadowed`); compare the header's `program` and `facts` (R3, check 1, including the engine-Dark header of §3.1.1 F); decide light that needs a run (R4, R5). R1's record reader still reads a record `dark` line, which H4 makes unreadable from v3.0; that moves with R6, which reads the record's values.
+
+### 10.5 Questions R2 adds for Mara
+
+- **Q24. Typed constants in pact sources.** Since C6 `pact eval` reads typed **facts**. echo reads `sym`/`nat`/`addr`/`bytes` constants in `fact` lines only, never in `rule` terms or `query` lines, and keeps a `sym` string to printable ASCII (pact-eval §1.2's byte set). Is that the bin's surface, or do rules and queries take typed constants too, and may a `sym` string hold UTF-8 (§5.0.1 item 6)?
+- **Q25. "Can't continue" at a keyword or an overflow.** echo locates `fact not` at the byte after `not` (the name could have grown into `nota`), `rule r not requires q` at the space after `not`, and `nat 18446744073709551616` at the digit that overflows. Is that the pinned reading of J's "least byte offset at which the grammar cannot continue"?
+- **Q26. Check 2's `dark-source` bytes.** §6.2: "the performance / the source's least Dark". Which typed constant is the performance's side (its `result`, its address, `none`)? Does it print beside `dark none <head> about performance` or instead of it? Until pinned, a Dark source printed with a model is `unknown unreplayed program`.
+- **Q27. A dissonance before every stratum is replayed.** echo prints `dissonant <n>` with the intervals of the strata it has replayed (R2: `hole`, `dark`). R3–R9 may add lines for the same input, so `<n>` is a lower bound until R10, never a claim that nothing else differs. Acceptable for the overlap (S7), or should a partial dissonance say so?
+- **Q28. A non-ground query.** Certificate §3.1 lists "a non-ground query" among the reader's checks, at column 1; pact-eval §1.2 makes a query's body a `ground-atom`, so `?x` fails the grammar where it stands, a `#` hole; and H1 has no hole type for it. echo follows the grammar (`query p(?x)` is `# L:9`). Which?
+- **Q29. Which lines carry arity.** echo counts facts and rules (heads and bodies, `not` included) for `arity p` and for a declaration's `n`, and never queries, since M4 (a) makes a query's mismatch the reader's `arity L:1`. For `D(#)`'s "used with arity ≥ 2 in a line that read", do queries count? (echo counts them there; that only widens what R2 treats as removable, so it can only make R2 answer `open`.)
+- **Q30. A declaration on a predicate only a query uses.** "Used by no line that read" (H7 rule 1): echo reads queries as giving no arity, so it's ill-formed. Right?
+- **Q31. The mode, for `unknown shadow under W`.** Certificate §3.2: "a `not` anywhere means W". Taut's 48 has a `not` only in a rule left out by safety, nothing left to run, and the tune rings it as total dark. echo decides total darkness first. Is the mode the source's, or the eval program's? (It matters for a lit source whose only `not` is in a line left out.)
+- **Q32. Comparing `basis`.** §6.5 R2: "compared as a value, and its addr is the score's `basis(nat …)` atom address". With one slot, is a wrong `basis` one `record` interval pairing the two atoms, or set difference's two? echo computes `basis` and leaves the comparison to R6.
+- **Q33. Repeated lines.** Two identical `functional` lines: one declaration (a set, as the program fragment's "one atom per distinct record"), or two `declaration` holes? Two identical `rule` lines: a `repeat`? echo: one declaration; a repeat.
+- **Q34. The safety head's atom.** `dark(nat 2, sym "engine", sym "safety", sym "s", sym "?y")`, with the `?` (§3.1: "the subject as in §3.2", which prints `?y`)? No vector has one.
+
+**Gates at `c72ecad`:** `just check` clean; echo's 113 tests pass; `checks.coverage` 96.22% of lines (the ratchet is 94; echo 99.29%, 1971 of 1985; `source.rs` 288 of 288, `dark2.rs` 451 of 452, `interval.rs` 62 of 62); `checks.echo-independent` (R2 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Seven mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
