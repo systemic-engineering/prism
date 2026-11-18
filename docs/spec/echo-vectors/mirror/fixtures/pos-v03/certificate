@@ -1,0 +1,18 @@
+# Vector 03 under W, hand-built. Nothing is derived; under_1 = under_0 = F.
+certificate  1
+result       f09ba1c301b1c731b75ece004f74c589b05dee0ad2a7a6dcb32f375073411078
+program      c666e7200564f9ca9f612d6adb2a95d90b915654527c3b9ae158b0e7e90bec76
+facts        0def1985e3242f738c33484fdad32e2e6ce03be8351da194717e83ebf2d5fd0c
+engine       none
+dark-order   none
+
+layer        under 0 application(a1)
+layer        under 0 pdf_stands_alone(a1)
+layer        under 0 dates_only(a1)
+layer        over 0 application(a1)
+layer        over 0 pdf_stands_alone(a1)
+layer        over 0 dates_only(a1)
+
+context      under 0 = [application(a1) & dates_only(a1) & pdf_stands_alone(a1)]
+context      over 0 = [application(a1) & dates_only(a1) & pdf_stands_alone(a1)]
+context      under 1 = [application(a1) & dates_only(a1) & pdf_stands_alone(a1)]

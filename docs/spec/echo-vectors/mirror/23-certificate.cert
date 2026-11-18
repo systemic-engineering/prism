@@ -1,0 +1,27 @@
+# W: negation cycle (pact 04's shape): r true; p, q, t undefined; opaque
+# certificate address ecd800d3f792231dcf4b93d734283e4cdae12c254165ed537d3c805fedf10959
+# rule p p requires not q
+# rule q q requires not p
+# rule r r requires not s
+# rule t t requires p
+certificate  1
+result       f9600ec8aeff3cac867bb6b7d9cc5e763e35f5e3c32a89d6011d8f3d7ec374b3
+program      411ebfabe54fd0d1585d0e6e8c246abb1905c3fd32e4f782caebf87a70ed2f48
+facts        b811692f0079dc1b370f3e7656d0c8bde2fb51a219a2f29da74c21222d8671c1
+engine       none
+dark-order   none
+
+layer        under 1 r
+layer        over 1 p
+layer        over 1 q
+layer        over 1 r
+layer        over 2 t
+derive       under r by r
+derive       over p by p
+derive       over q by q
+derive       over t by t from p
+context      under 0 = []
+context      over 0 = [p & q & r & t]
+context      under 1 = [r]
+context      over 1 = [p & q & r & t]
+context      under 2 = [r]

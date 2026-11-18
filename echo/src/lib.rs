@@ -16,9 +16,11 @@
 extern crate alloc;
 
 pub mod address;
+pub mod certificate;
 pub mod cut;
 pub mod facts;
 pub mod integrity;
+pub mod replay;
 pub mod value;
 
 pub use address::{Address, Tau};

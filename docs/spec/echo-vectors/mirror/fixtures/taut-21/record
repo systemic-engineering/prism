@@ -1,0 +1,9 @@
+verdict     paradox
+file        "21-source.pact-text"
+shaped_by   functional owner(1) -> 2
+true        >= 0
+undefined   0
+findings    1
+
+finding     functional owner key(doc) alex reed
+shadow      owner

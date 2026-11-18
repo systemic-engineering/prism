@@ -1,0 +1,11 @@
+# Seam's trace merge audit C2 (seam/trace-audit 1971b5a1,
+# docs/audits/2026-11-18-seam-trace-layer-merge-audit.md section 4.2):
+# since reed/trace-layer C6, `mirror pact eval` reads typed facts; the tune
+# does not. This is the bin's own triple (trace.pact + the corpus's six
+# spans as `bytes` commit ids, record and certificate from `mirror pact
+# eval --explain source.pact`, clear, exit 0), and the tune's current
+# answer on it: unknown unreadable (certificate:8, expected ',' or ')').
+# Alex shipped typed facts ahead of the tune (STATE #97). A pin of the
+# gap, not a target: when the tune learns typed constants, this goes red
+# and is rewritten as `expect rings`.
+expect unreadable

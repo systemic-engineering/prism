@@ -1,0 +1,3 @@
+expect dissonant budget
+source ../e1-false-budget-opaque/source.pact
+certificate ../e1-false-budget-opaque/certificate

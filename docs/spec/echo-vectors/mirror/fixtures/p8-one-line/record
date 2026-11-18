@@ -1,0 +1,11 @@
+verdict     uncertain
+file        "source.pact"
+shaped_by   none
+true        >= 1
+undefined   0
+findings    0
+
+true        p(a)
+hole        arity 1:1 #query p has arity 2
+shadow      *
+basis       unread 4

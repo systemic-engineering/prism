@@ -1,0 +1,9 @@
+verdict     clear
+file        "source.pact"
+shaped_by   none
+true        2
+undefined   0
+findings    0
+
+true        owner(doc, alex)
+true        owner(doc, reed)

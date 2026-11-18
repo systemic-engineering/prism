@@ -1,0 +1,8 @@
+certificate  1
+result       none
+program      35cdc64fae084c1a8df4d7ccbd215f6f764ba93849bec1c7cbaf2e55c867629c
+facts        eacef9556a8e6dd457ebfcdb63be34f2fc0cfbb8f6e27739bf2310b2b5aff1f3
+engine       none
+dark-order   none
+
+dark         2 engine arity q

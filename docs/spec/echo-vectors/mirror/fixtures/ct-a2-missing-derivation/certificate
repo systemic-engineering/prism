@@ -1,0 +1,16 @@
+# d's first-tick derivation via c is omitted. Hand-written.
+certificate  1
+result       1da5b8e7ad8df4cce4917e1934e3d546d1f51e3f2cbb7311c2801e13deea8f37
+program      d142ece31c5964e1d043f941da8ae243b2311d30af1043547d15a5534f41e072
+facts        41e704fc2491b14581ee6de6c7f0636161b36255ade624bd5214c04a42976356
+engine       none
+dark-order   none
+
+layer        0 a
+layer        1 b
+layer        1 c
+layer        2 d
+
+derive       b by ab from a
+derive       c by ac from a
+derive       d by bd from b

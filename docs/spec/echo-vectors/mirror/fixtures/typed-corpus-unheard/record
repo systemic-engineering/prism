@@ -1,0 +1,19 @@
+verdict     clear
+file        "source.pact"
+shaped_by   none
+true        12
+undefined   0
+findings    0
+
+true        candidate(bytes "0e97587c4125a87a85a70589ff3e15860acb1b6e", bytes "457086e9b40a06aff9158e2ef9f751eb00309ebb", bytes "552e3785a76a48197bc0844c82cff397a4bdf906")
+true        candidate(bytes "457086e9b40a06aff9158e2ef9f751eb00309ebb", bytes "a15849844b0e694aaf7b1a43da4aa59cda25bfb7", bytes "0e97587c4125a87a85a70589ff3e15860acb1b6e")
+true        candidate(bytes "6ff3f452cebd0aa039423d595b4c3af785081a02", bytes "af20d9cad27c0ed15c96a14e312242a468861b7d", bytes "878304ec46b54c37e29f08b05e15fcc754e2e0f0")
+true        received(bytes "0e97587c4125a87a85a70589ff3e15860acb1b6e")
+true        received(bytes "457086e9b40a06aff9158e2ef9f751eb00309ebb")
+true        received(bytes "6ff3f452cebd0aa039423d595b4c3af785081a02")
+true        received(bytes "a15849844b0e694aaf7b1a43da4aa59cda25bfb7")
+true        received(bytes "ab55253bd5de935b84e24e3cc4a6911f11d8732e")
+true        received(bytes "af20d9cad27c0ed15c96a14e312242a468861b7d")
+true        root(bytes "0a261ff8316b0156a71050625d4f9f10277f7364", bytes "ab55253bd5de935b84e24e3cc4a6911f11d8732e")
+true        root(bytes "552e3785a76a48197bc0844c82cff397a4bdf906", bytes "0e97587c4125a87a85a70589ff3e15860acb1b6e")
+true        root(bytes "878304ec46b54c37e29f08b05e15fcc754e2e0f0", bytes "6ff3f452cebd0aa039423d595b4c3af785081a02")

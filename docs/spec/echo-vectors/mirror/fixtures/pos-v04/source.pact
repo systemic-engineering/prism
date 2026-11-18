@@ -1,0 +1,5 @@
+# Vector 04 (tests/pact/04-negation-cycle.pact-text), copied by hand.
+rule p p requires not q
+rule q q requires not p
+rule r r requires not s
+rule t t requires p

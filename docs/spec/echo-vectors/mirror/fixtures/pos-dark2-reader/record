@@ -1,0 +1,7 @@
+verdict     unknown
+file        "source.pact"
+shaped_by   none
+hole        # 3:14 #a sym is a lowercase name
+hole        # 5:5 #byte 0x09 is outside ASCII 0x20-0x7E
+hole        repeat 4:1 #repeated rule id p
+basis       unread 3, 5

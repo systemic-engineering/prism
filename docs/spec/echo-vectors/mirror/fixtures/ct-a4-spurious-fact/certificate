@@ -1,0 +1,35 @@
+# A spurious fact edge(a, z): internally consistent (its facts address, its
+# layer 0, path(a, z) derived from it), wrong against the source. Hand-written.
+certificate  1
+result       a316fdb1f1405a0ff5b626c5e4ca0d49ef3e17ebef48fb1c520e42297cb1d37f
+program      3e705fddf91700b8adb16f2bf0eee3d78313c7428e308ef0d59367fd0f251edb
+facts        cdcde6e982f1790afd8d19bc0644cedb5c8898e663b7289ba12bf35e16f437aa
+engine       none
+dark-order   none
+
+layer        0 edge(a, b)
+layer        0 edge(a, z)
+layer        0 edge(b, c)
+layer        0 edge(c, b)
+layer        0 edge(c, d)
+layer        1 path(a, b)
+layer        1 path(a, z)
+layer        1 path(b, c)
+layer        1 path(c, b)
+layer        1 path(c, d)
+layer        2 path(a, c)
+layer        2 path(b, b)
+layer        2 path(b, d)
+layer        2 path(c, c)
+layer        3 path(a, d)
+
+derive       path(a, b) by path-base from edge(a, b)
+derive       path(a, z) by path-base from edge(a, z)
+derive       path(b, c) by path-base from edge(b, c)
+derive       path(c, b) by path-base from edge(c, b)
+derive       path(c, d) by path-base from edge(c, d)
+derive       path(a, c) by path-step from path(a, b) & edge(b, c)
+derive       path(b, b) by path-step from path(b, c) & edge(c, b)
+derive       path(b, d) by path-step from path(b, c) & edge(c, d)
+derive       path(c, c) by path-step from path(c, b) & edge(b, c)
+derive       path(a, d) by path-step from path(a, c) & edge(c, d)

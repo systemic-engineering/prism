@@ -1,0 +1,14 @@
+# A circular derivation pair, both in layer 1. Hand-written.
+certificate  1
+result       fd056fac5808526fe6b31a12a59a1216dfb9b508e7573bcbd6222ba3e1951f3d
+program      b4c1bd6447cab35c79d055ac87c2511a6792873d66bc5603f54af9f41867aa21
+facts        83376edbb8d8b7d3b95a621613ff84add7c91b672dd5c53ce8137e9b51054e7a
+engine       none
+dark-order   none
+
+layer        0 s
+layer        1 p
+layer        1 q
+
+derive       p by pq from q
+derive       q by qp from p

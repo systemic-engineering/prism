@@ -1,0 +1,12 @@
+# Dark at 2: reader error (repeated rule id)
+# certificate address f034185be7677967f771719d7691ba80c610c3ce00dbbe2311bce023b33c6b40
+# rule a p requires q
+# rule a p requires r
+certificate  1
+result       none
+program      none
+facts        none
+engine       none
+dark-order   none
+
+dark         2 at 2:1

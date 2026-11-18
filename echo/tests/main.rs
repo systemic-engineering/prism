@@ -7,9 +7,11 @@
 //! it.
 
 mod address;
+mod bin;
 mod cut;
 mod facts;
 mod integrity;
 mod refusals;
+mod replay;
 mod typed;
 mod vectors;

@@ -1,0 +1,9 @@
+# A model printed for a program that should be Dark at 2. Hand-written.
+certificate  1
+result       75bf9a4cf9c1dd8b13d1e0fe8ad7c7e3d5f1c3cf4bfc2a1f00ac5cbcf1b4d0a2
+program      db48ccdf8ef28b022f6f461859a93858b189dac5ba44bc5354dbc37b376a95e7
+facts        7ecb9c2027db31a78d378f17790eab4838a197f88ec58b63fc331995cf5b8fcc
+engine       none
+dark-order   none
+
+layer        0 q(a)

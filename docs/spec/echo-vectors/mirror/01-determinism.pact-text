@@ -1,0 +1,8 @@
+# Vector 01: determinism. Transcribed by hand from tests/pact/01-determinism.json
+# at 5babfbad (blob 44243526c42ffcaa7f97d3359d26a7af400ae0cf); oracle: oracles.md.
+rule path-base path(?x, ?y) requires edge(?x, ?y)
+rule path-step path(?x, ?z) requires path(?x, ?y), edge(?y, ?z)
+fact edge(a, b)
+fact edge(b, c)
+fact edge(c, b)
+fact edge(c, d)

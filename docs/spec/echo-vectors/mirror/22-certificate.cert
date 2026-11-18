@@ -1,0 +1,12 @@
+# Dark at 2: engine arity q
+# certificate address 3c7263002811fb12897e850ba06c774c41664e4f526f18bc7c34e8574bc7a868
+# rule r p(?x) requires q(?x, ?x)
+# fact q(a)
+certificate  1
+result       none
+program      4591e66e06dc8b8ea790be335354a9d79de484b77fd1f5f742674b83cc14f95b
+facts        7ecb9c2027db31a78d378f17790eab4838a197f88ec58b63fc331995cf5b8fcc
+engine       none
+dark-order   none
+
+dark         2 engine arity q

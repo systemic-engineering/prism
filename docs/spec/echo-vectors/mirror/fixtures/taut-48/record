@@ -1,0 +1,9 @@
+verdict     unknown
+file        "tests/checker/vectors/48-source.pact-text"
+shaped_by   none
+hole        # 2:6 #a sym is a lowercase name
+hole        # 7:11 #a sym is a lowercase name
+hole        repeat 6:1 #rule id a is repeated
+hole        arity q #q is used with 1 and 2 arguments
+hole        safety s ?y #?y occurs only under not
+basis       unread 2, 7

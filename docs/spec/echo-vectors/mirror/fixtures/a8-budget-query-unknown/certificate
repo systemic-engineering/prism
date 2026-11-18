@@ -1,0 +1,17 @@
+# A8 (R7): an honest budget stop at 3 under a query on e (tick 4). e is unknown, not false:
+# the record lists no `false e` line.
+certificate  1
+result       1da5b8e7ad8df4cce4917e1934e3d546d1f51e3f2cbb7311c2801e13deea8f37
+program      ef39c6a557e7bba92ca1d9ba83f1176082aa2d18d9b53495f10fb9aecfd51a18
+facts        41e704fc2491b14581ee6de6c7f0636161b36255ade624bd5214c04a42976356
+engine       none
+dark-order   none
+
+layer        0 a
+layer        1 b
+layer        2 c
+layer        3 d
+derive       b by r1 from a
+derive       c by r2 from b
+derive       d by r3 from c
+erasure      tick budget count 3 ticks

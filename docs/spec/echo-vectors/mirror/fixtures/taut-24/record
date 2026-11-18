@@ -1,0 +1,4 @@
+verdict     unknown
+file        "24-source.pact-text"
+shaped_by   none
+hole        repeat 2:1 #repeated rule id a

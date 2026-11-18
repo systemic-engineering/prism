@@ -1,0 +1,7 @@
+rule r p(?x) requires q(?x)
+fact Q
+rule s r(?y) requires not t(?y)
+fact q(a, b)
+rule a u requires w
+rule a u requires v
+fact p(a, B)

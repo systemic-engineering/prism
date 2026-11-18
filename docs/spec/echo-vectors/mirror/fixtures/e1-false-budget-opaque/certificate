@@ -1,0 +1,17 @@
+# Seam E1: a complete performance (ticks 0..3, nothing deeper) that claims a budget stop at 3.
+# Nothing was cut, so the claim is false: the run is a fixed point and its record is clear.
+certificate  1
+result       27ebcf1e7a5a90ab5e2ab42e93db7fc9d76df01d4e4f6cd0f37e1d22a9ca7a4f
+program      none
+facts        none
+engine       none
+dark-order   none
+
+layer        0 a
+layer        1 b
+layer        2 c
+layer        3 d
+derive       b by r1 from a
+derive       c by r2 from b
+derive       d by r3 from c
+erasure      tick budget count 3 ticks

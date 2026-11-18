@@ -1,0 +1,5 @@
+# Seam A-1, checker audit section 8: an engine Dark at 2; the record's `hole` text is admitted and not compared (no pinned engine form).
+verdict     unknown
+file        "22-source.pact-text"
+shaped_by   none
+hole        arity q #arity: q expected 2 found 1

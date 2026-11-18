@@ -1,0 +1,8 @@
+verdict     clear
+file        "source.pact"
+shaped_by   none
+true        1
+undefined   0
+findings    0
+
+true        b

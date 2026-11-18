@@ -1,0 +1,17 @@
+verdict     clear
+file        "source.pact"
+shaped_by   none
+true        10
+undefined   0
+findings    0
+
+true        path(a, b)
+true        path(a, c)
+true        path(a, d)
+true        path(a, z)
+true        path(b, b)
+true        path(b, c)
+true        path(b, d)
+true        path(c, b)
+true        path(c, c)
+true        path(c, d)

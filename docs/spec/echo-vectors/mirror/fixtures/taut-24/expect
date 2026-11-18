@@ -1,0 +1,3 @@
+expect rings
+source ../../vectors/24-source.pact-text
+certificate ../../vectors/24-certificate.cert

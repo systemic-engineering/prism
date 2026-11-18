@@ -1,0 +1,14 @@
+# CT-A12 (Seam): a budget stop under Count{3, Ticks} (e lies at tick 4, beyond it), truncated at tick 1,
+# with a clear record.
+# The honest performance has ticks 0..3 and an opaque record shaped by the Count.
+certificate  1
+result       none
+program      none
+facts        none
+engine       none
+dark-order   none
+
+layer        0 a
+layer        1 b
+derive       b by r1 from a
+erasure      tick budget count 3 ticks

@@ -1,0 +1,19 @@
+# CT5: vector 05 as Dark at 255, hand-built.
+certificate  1
+result       7ffc8663ce550ee319582546f4af6595a8f843dc29f1d245b4a0287ff918861b
+program      6b35f4c27dc18f7f6b581e9367936d4f34fc4b40b992eb5a6c982e09a0c9610b
+facts        7b21e9054274db1b6a3d73b22e044e1248465a17ec5805d4fa0086c01eba1ab4
+engine       none
+dark-order   none
+
+layer        0 claim(doc, alex)
+layer        0 claim(doc, reed)
+layer        1 owner(doc, alex)
+layer        1 owner(doc, reed)
+
+derive       owner(doc, alex) by owner from claim(doc, alex)
+derive       owner(doc, reed) by owner from claim(doc, reed)
+
+dark         255 functional owner(1) -> 2
+violating    owner(doc, alex) by functional owner(1) -> 2
+violating    owner(doc, reed) by functional owner(1) -> 2

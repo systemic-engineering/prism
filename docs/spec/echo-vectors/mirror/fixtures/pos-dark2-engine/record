@@ -1,0 +1,5 @@
+verdict     unknown
+file        "source.pact"
+shaped_by   none
+hole        arity q #q expected 1 found 2
+hole        safety s ?x #?x is unsafe

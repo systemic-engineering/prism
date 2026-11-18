@@ -1,0 +1,14 @@
+# Seam's P8 under the hole (Note 6.7): a reader dissonance (query arity, 1:1) beside a grammar one (4:6).
+# The lines that read still have light: q(a), p(a). No dark atom; two hole lines.
+certificate  1
+result       b16063187665cada219bf2d8a17b0de35a1fd9ede90c4a3e1f8322c4319522f4
+program      a94af8ece04b524c2cd20c0c4552f4781149874fd1f388bea57af7c1ee7b84e2
+facts        7ecb9c2027db31a78d378f17790eab4838a197f88ec58b63fc331995cf5b8fcc
+engine       none
+dark-order   none
+
+layer        0 q(a)
+layer        1 p(a)
+derive       p(a) by r from q(a)
+hole         # 4:6
+hole         arity 1:1

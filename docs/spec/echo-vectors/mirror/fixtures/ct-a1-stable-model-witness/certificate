@@ -1,0 +1,23 @@
+# A stable model {q, r} with a period-2 witness. Every derivation is a valid
+# instance against the certificate's own final contexts, and those contexts
+# are closed; but over_0 is not g(under_0). Hand-written.
+certificate  1
+result       3ba37f0f195f8175707d9c1264b3a78fee6477dee81b59b95f45e96554fe6011
+program      411ebfabe54fd0d1585d0e6e8c246abb1905c3fd32e4f782caebf87a70ed2f48
+facts        b811692f0079dc1b370f3e7656d0c8bde2fb51a219a2f29da74c21222d8671c1
+engine       none
+dark-order   none
+
+layer        under 1 q
+layer        under 1 r
+layer        over 1 q
+layer        over 1 r
+
+derive       under q by q
+derive       under r by r
+
+context      under 0 = []
+context      over 0 = [q & r]
+context      under 1 = [q & r]
+context      over 1 = [q & r]
+context      under 2 = [q & r]

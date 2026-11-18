@@ -1,0 +1,5 @@
+expect dissonant missing
+source ../pos-v05/source.pact
+certificate ../pos-v05/certificate
+record ../pos-v05/record
+score score

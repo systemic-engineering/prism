@@ -1,0 +1,11 @@
+verdict     uncertain
+file        "source.pact"
+shaped_by   none
+true        >= 1
+undefined   3
+findings    0
+
+true        r
+undefined   p
+undefined   q
+undefined   t

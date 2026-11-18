@@ -1,0 +1,9 @@
+# Taut 48 / 48a: the performance keeps one dark atom, the merged order's head, 2:6.
+certificate  1
+result       none
+program      none
+facts        none
+engine       none
+dark-order   none
+
+dark         2 at 2:6

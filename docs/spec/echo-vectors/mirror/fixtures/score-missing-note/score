@@ -1,0 +1,10 @@
+# Vector 05's score with owner(doc, reed)'s Note dropped: the score is a record of what was heard,
+# and completeness is checked (every Note of the source present).
+score        1
+program      6b35f4c27dc18f7f6b581e9367936d4f34fc4b40b992eb5a6c982e09a0c9610b
+facts        7b21e9054274db1b6a3d73b22e044e1248465a17ec5805d4fa0086c01eba1ab4
+instrument   none
+heard_by     none
+
+note         9e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a8 5f12d02c63ba59767256d70c8833540411829d3b21711ffac4a784a87331a3df 2580cbb757e54ae3b12528edd430b0a9d4ad64ef79987f8e6ecc663597d5e9e8 bc757001beb55f356910098264ccaac6b3ed74d262c38114f2a83f4b124375bb
+interval     piece clash 038a9f6956e1130f6237e2f54e011fc4201c9d6ac0caa7208c1e60d61405f33b 9e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a8 about f37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162 at tick 1 by 1

@@ -1,0 +1,11 @@
+certificate  1
+result       0376ff7be0b2c62cf70b9717127ffd40322fccfce8e5e12930a17727f14601e2
+program      6b35f4c27dc18f7f6b581e9367936d4f34fc4b40b992eb5a6c982e09a0c9610b
+facts        edfb0324fc7dbf5c7bc31f3eadc8c1dbccbeca3f48cab63cad27af2c18a342b8
+engine       none
+dark-order   none
+
+layer        0 claim(doc, alex)
+layer        1 owner(doc, alex)
+
+derive       owner(doc, alex) by owner from claim(doc, alex)

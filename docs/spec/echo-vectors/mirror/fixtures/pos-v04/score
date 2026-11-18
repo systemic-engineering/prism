@@ -1,0 +1,17 @@
+# Hand-built score for vector 04 (W): one gaze per run, Notes with negs, flux on the over-beat.
+# Under-run Notes: r by r (negs {s}); p and q are blocked by over_K. Over-run Notes: the undefined heads only.
+score        1
+program      411ebfabe54fd0d1585d0e6e8c246abb1905c3fd32e4f782caebf87a70ed2f48
+facts        b811692f0079dc1b370f3e7656d0c8bde2fb51a219a2f29da74c21222d8671c1
+instrument   none
+gaze         under b819ac75a00b57d511298641f0b701a336c7599671bc07f1da486d50d92d5ec0
+gaze         over f9600ec8aeff3cac867bb6b7d9cc5e763e35f5e3c32a89d6011d8f3d7ec374b3
+heard_by     none
+
+note         9bfdfcc7c3c4db82a700f3458b8de414fbdf002db4319e65ae33896a35f6b257 889fab7ef9a2340b6dec26d43936b8ff1a4af6e95ca2d6ffcc0e1d027f287ebe 065bea19394deb42639636c6b71b581801d0d0897b89df2e0c6a6a748bfd317c
+note         3eef543f588202f0af3d853c2d3a1b627135692f3885bdaafeaccb3cc143fcb6 f5d5d9a74256852b8345bc4d349c6496214630e0707a3601152d58e53a695faf d617e179809daa6a4bb17ccd72c260f00f2e824560580bb2610cb3aa1d00963e
+note         44b4c4b35b473f67cfdc119677cfd070486647fb21bdace243e95a17ceb3113a dcdc285dcfba66a8b6f9dc162d998376c095e7ba198ea3e086beb964b9dcc27a 5fade342379d1dbae25de2f4df9eacf604522a03149c2c8c4e1c24abe300265e
+note         d4481f0254b4bd84c95cc50e4c490c9f02e01c5eb25876277da16fbdeae03205 cd668c5a2afbee7fd736e89fb8caf96f9af4ed03b6d72c9e6a267c03634f8c55 2580cbb757e54ae3b12528edd430b0a9d4ad64ef79987f8e6ecc663597d5e9e8 3eef543f588202f0af3d853c2d3a1b627135692f3885bdaafeaccb3cc143fcb6
+interval     piece flux 3eef543f588202f0af3d853c2d3a1b627135692f3885bdaafeaccb3cc143fcb6 none about none at over 1 by 2
+interval     piece flux 44b4c4b35b473f67cfdc119677cfd070486647fb21bdace243e95a17ceb3113a none about none at over 1 by 2
+interval     piece flux d4481f0254b4bd84c95cc50e4c490c9f02e01c5eb25876277da16fbdeae03205 none about none at over 2 by 2

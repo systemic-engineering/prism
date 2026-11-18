@@ -1,0 +1,12 @@
+verdict     uncertain
+file        "source.pact"
+shaped_by   none
+true        >= 1
+undefined   0
+findings    0
+
+true        p(a)
+hole        # 4:6 #a sym is a lowercase name
+hole        arity 1:1 #query p has arity 2; the program says 1
+shadow      *
+basis       unread 4

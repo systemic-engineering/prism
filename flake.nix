@@ -349,7 +349,7 @@
               cargoVendorDir = craneLibPortable.vendorCargoDeps { cargoLock = ./Cargo.lock; };
               doInstallCargoArtifacts = false;
               buildPhaseCargoCommand = lib.concatMapStringsSep "\n" (
-                t: "cargo build --locked --release -p echo --target ${t}"
+                t: "cargo build --locked --release -p echo --lib --target ${t}"
               ) portableTargets;
               installPhaseCommand = "touch $out";
             };

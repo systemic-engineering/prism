@@ -1,0 +1,2 @@
+rule r p(?x) requires q(?x, ?x)
+fact q(a)

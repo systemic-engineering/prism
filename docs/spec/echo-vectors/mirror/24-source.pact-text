@@ -1,0 +1,2 @@
+rule a p requires q
+rule a p requires r
