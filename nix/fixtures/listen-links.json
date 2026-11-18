@@ -1,0 +1,15 @@
+{
+  "packages": [
+    { "id": "path+file:///w/listen#0.1.0", "name": "listen" },
+    { "id": "registry+https://github.com/rust-lang/crates.io-index#linalg-sys@0.1.0", "name": "linalg-sys", "links": "lapack" }
+  ],
+  "resolve": {
+    "nodes": [
+      { "id": "path+file:///w/listen#0.1.0", "deps": [
+        { "name": "linalg_sys", "pkg": "registry+https://github.com/rust-lang/crates.io-index#linalg-sys@0.1.0" }
+      ] },
+      { "id": "registry+https://github.com/rust-lang/crates.io-index#linalg-sys@0.1.0", "deps": [] }
+    ],
+    "root": null
+  }
+}

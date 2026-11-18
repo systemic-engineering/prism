@@ -355,8 +355,9 @@
             # prism-022 S5: listen's Cargo graph (every kind, every depth)
             # holds no prismqueer, no mirror crate and nothing LAPACK, BLAS or
             # Fortran. The guard runs on the real graph, and must reject the
-            # two forbidden fixtures (a direct prismqueer, a transitive
-            # openblas-src behind a dev cycle) and accept the clean one
+            # three forbidden fixtures (a direct prismqueer, a transitive
+            # openblas-src behind a dev cycle, an innocently named crate with
+            # `links = "lapack"`) and accept the clean one
             # (prismqueer in the workspace, but not under listen).
             listen-independent = craneLib.mkCargoDerivation {
               pname = "listen-independent";
@@ -372,7 +373,7 @@
                 cargo metadata --format-version 1 --locked --offline > metadata.json
                 bash $guard metadata.json
                 bash $guard ${./nix/fixtures/listen-clean.json}
-                for f in ${./nix/fixtures/listen-direct.json} ${./nix/fixtures/listen-transitive.json}; do
+                for f in ${./nix/fixtures/listen-direct.json} ${./nix/fixtures/listen-transitive.json} ${./nix/fixtures/listen-links.json}; do
                   if bash $guard $f 2>/dev/null; then echo "listen-independent accepted $f" >&2; exit 1; fi
                 done
               '';

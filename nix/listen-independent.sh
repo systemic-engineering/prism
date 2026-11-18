@@ -7,7 +7,9 @@
 #   - prismqueer;
 #   - any mirror crate (`mirror`, `mirror-*`, `mirror_*`);
 #   - anything LAPACK, BLAS or Fortran (by name: *lapack*, *blas*,
-#     *fortran*, netlib-src, intel-mkl*, accelerate-src).
+#     *fortran*, netlib-src, intel-mkl*, accelerate-src), and any package
+#     whose `links` key names one (*lapack*, *blas*, *fortran*): a native
+#     library is linked under the `links` name, whatever the crate is called.
 #
 # Input: `cargo metadata --format-version 1` JSON. The graph is resolve.nodes:
 # every dependency kind (normal, build, dev) and every target counts.
@@ -17,14 +19,26 @@ set -euo pipefail
 
 meta=${1:?usage: listen-independent.sh <metadata.json>}
 forbidden='^(prismqueer|mirror|mirror[-_].*|.*lapack.*|.*blas.*|.*fortran.*|netlib-src|intel-mkl.*|accelerate-src)$'
+native='lapack|blas|fortran'
 
-found=$(jq -r --arg re "$forbidden" '
+# The closure is a fixpoint over a frontier, not jq's recurse: a dev-dependency
+# can close a cycle back to listen, and recurse would not terminate.
+found=$(jq -r --arg re "$forbidden" --arg native "$native" '
   (.packages | map({key: .id, value: .name}) | from_entries) as $name
+  | (.packages | map({key: .id, value: (.links // "")}) | from_entries) as $links
   | (.resolve.nodes | map({key: .id, value: [.deps[].pkg]}) | from_entries) as $deps
   | [.packages[] | select(.name == "listen") | .id] as $roots
   | if ($roots | length) != 1 then "!no-listen"
-    else ($deps[$roots[0]] // [])
-      | map($name[.]) | unique | .[] | select(test($re))
+    else {seen: $roots, frontier: $roots}
+      | until(.frontier | length == 0;
+          ([.frontier[] | ($deps[.] // [])[]] | unique) as $next
+          | ($next - .seen) as $new
+          | {seen: (.seen + $new), frontier: $new})
+      | .seen - $roots
+      | map(if ($name[.] | test($re)) then $name[.]
+            elif ($links[.] | test($native)) then "\($name[.]) (links \($links[.]))"
+            else empty end)
+      | unique | .[]
     end
 ' "$meta")
 
