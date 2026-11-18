@@ -593,7 +593,11 @@ impl Fate {
         let projection = self.kernel_spec.projection_matrix(FEATURE_DIM);
         let state_slice: &[f64] = state;
 
-        match crate::ffi::preview(FEATURE_DIM, &projection, state_slice) {
+        // Both are FEATURE_DIM-shaped by construction (the array type and
+        // projection_matrix(n)'s n·n), so preview's shape check can't refuse.
+        match crate::ffi::preview(FEATURE_DIM, &projection, state_slice)
+            .expect("FEATURE_DIM-shaped by construction")
+        {
             Some(result) => {
                 // Compute loss: sum of absolute values of zeroed dimensions
                 let mut loss = 0.0f64;

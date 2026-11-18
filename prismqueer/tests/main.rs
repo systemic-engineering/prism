@@ -33,6 +33,7 @@ mod identity_vectors;
 mod instrument;
 mod integration;
 mod kleinos;
+mod lapack_faults;
 mod lambda_integration;
 mod loss_laws;
 mod metrix;

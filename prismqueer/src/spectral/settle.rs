@@ -112,8 +112,8 @@ impl Loss for Tail {
 /// Why the flow could not be measured.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Wall {
-    /// LAPACK did not converge (`info` code).
-    Eigensystem(i32),
+    /// LAPACK could not measure the eigensystem.
+    Eigensystem(crate::ffi::Fault),
     /// A value, the time, or the resolution was not finite, or out of range.
     NonFinite,
     /// The section has no value at this vertex.
@@ -201,7 +201,7 @@ impl Eigen {
             .measure()
             .decompose()
             .map_err(|e| match e {
-                RoomError::Unmeasured(info) => Wall::Eigensystem(info),
+                RoomError::Unmeasured(fault) => Wall::Eigensystem(fault),
                 other => unreachable!("decompose fails only unmeasured: {other:?}"),
             })?;
         let harmonic = kernel(modes.spectrum(), components(graph, &index), n)?;

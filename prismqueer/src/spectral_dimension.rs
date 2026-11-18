@@ -147,12 +147,12 @@ pub fn laplacian_from_edges(n: usize, edges: &[(usize, usize)]) -> Vec<f64> {
 /// `d_s(σ)` at the given diffusion time.
 ///
 /// Convenience over [`laplacian_from_edges`] + [`ffi::eigensystem`] +
-/// [`spectral_dimension`]. Returns `Err(info)` if LAPACK fails to converge.
+/// [`spectral_dimension`]. Returns the [`ffi::Fault`] if LAPACK can't measure.
 pub fn graph_spectral_dimension(
     n: usize,
     edges: &[(usize, usize)],
     sigma: Sigma,
-) -> Result<SpectralDimension, i32> {
+) -> Result<SpectralDimension, ffi::Fault> {
     let lap = laplacian_from_edges(n, edges);
     let (evals, _evecs) = ffi::eigensystem(n, &lap)?;
     Ok(spectral_dimension(&evals, sigma))

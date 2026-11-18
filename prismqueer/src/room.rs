@@ -336,8 +336,8 @@ pub enum RoomError {
         /// Its column.
         col: usize,
     },
-    /// LAPACK couldn't measure (dsyev's `info`).
-    Unmeasured(i32),
+    /// LAPACK couldn't measure: what it, or prism's check before it, said.
+    Unmeasured(crate::ffi::Fault),
     /// A face runs along an edge the graph doesn't have.
     Outside(Edge),
     /// Two moduli in one operation: ℤ/n and ℤ/m are different rings, and
@@ -1256,7 +1256,7 @@ impl<A: Kind, B: Kind> Map<A, B, f64> {
 
     /// The singular values, descending, by LAPACK's dgesdd. The matrix goes
     /// over as stored (column-major). `Err` is dgesdd's `info`.
-    pub(crate) fn singular_values(&self) -> Result<Vec<f64>, i32> {
+    pub(crate) fn singular_values(&self) -> Result<Vec<f64>, crate::ffi::Fault> {
         crate::ffi::singular_values_columns(self.to.dim, self.from.dim, &self.entries)
     }
 }

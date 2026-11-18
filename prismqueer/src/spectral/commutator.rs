@@ -99,9 +99,10 @@ fn exact_commutator(
 /// A map of C⁰ to itself, exactly.
 type Laplacian = Map<Vertices, Vertices, Z>;
 
-/// LAPACK could not compute the singular values (`info` code).
+/// LAPACK could not compute the singular values: what it, or prism's check
+/// before it, said.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Unmeasured(pub i32);
+pub struct Unmeasured(pub crate::ffi::Fault);
 
 /// Classify a singular-value measurement against the operators' scale
 /// (product of their Frobenius norms) through the declared band
@@ -109,12 +110,12 @@ pub struct Unmeasured(pub i32);
 /// non-zero from `1e-6`, both times `max(scale, 1)`. In between, the
 /// instrument doesn't know yet.
 fn read(
-    measured: Result<Vec<f64>, i32>,
+    measured: Result<Vec<f64>, crate::ffi::Fault>,
     scale: f64,
 ) -> Imperfect<Dissonance, Unmeasured, Vec<f64>> {
     let svs = match measured {
         Ok(svs) => svs,
-        Err(info) => return Imperfect::Failure(Unmeasured(info), Vec::new()),
+        Err(fault) => return Imperfect::Failure(Unmeasured(fault), Vec::new()),
     };
     let band = crate::band::zeros::commutator();
     let mut spectrum = Vec::new();
@@ -152,9 +153,13 @@ mod tests {
 
     #[test]
     fn lapack_failure_is_unmeasured_not_commuting() {
-        match read(Err(7), 1.0) {
-            terni::Imperfect::Failure(Unmeasured(7), _) => {}
-            other => panic!("expected Failure(Unmeasured(7)), got {other:?}"),
+        let fault = crate::ffi::Fault::Unconverged {
+            routine: crate::ffi::Routine::Dgesvd,
+            info: 7,
+        };
+        match read(Err(fault), 1.0) {
+            terni::Imperfect::Failure(Unmeasured(f), _) if f == fault => {}
+            other => panic!("expected Failure(Unmeasured({fault:?})), got {other:?}"),
         }
     }
 

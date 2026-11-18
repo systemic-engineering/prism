@@ -143,7 +143,7 @@ pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, Convergenc
         Ok(evals) => evals,
         Err(e) => {
             let why = match e {
-                RoomError::Unmeasured(info) => format!("LAPACK dsyev failed with info={info}"),
+                RoomError::Unmeasured(fault) => format!("LAPACK: {fault}"),
                 other => format!("{other:?}"),
             };
             return Imperfect::Failure(

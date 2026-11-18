@@ -311,7 +311,7 @@ impl Instrument {
             .expect("D = δ + δ* is self-adjoint")
             .decompose()
             .map_err(|e| match e {
-                RoomError::Unmeasured(info) => Unmeasured(info),
+                RoomError::Unmeasured(fault) => Unmeasured(fault),
                 other => unreachable!("decompose only fails to measure: {other:?}"),
             })?;
         let n = dirac.to().dim();

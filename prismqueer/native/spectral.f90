@@ -13,23 +13,27 @@ module optics_spectral
 
   private
   public :: spectral_eigensystem, spectral_eigenvalues, spectral_svd, spectral_singular_values, spectral_phase_lock
+  public :: spectral_allocate_probe
 
 contains
 
   ! Full eigensystem: eigenvalues + eigenvectors via dsyev('V', 'U', ...).
   ! Eigenvalues returned in ascending order.
   ! Eigenvectors stored as columns of the output matrix (column-major).
-  subroutine spectral_eigensystem(n, matrix, eigenvalues, eigenvectors, info) &
+  subroutine spectral_eigensystem(n, matrix, eigenvalues, eigenvectors, info, stat) &
       bind(c, name="spectral_eigensystem")
     integer(c_int), value, intent(in) :: n
     real(c_double), intent(in) :: matrix(n, n)
     real(c_double), intent(out) :: eigenvalues(n)
     real(c_double), intent(out) :: eigenvectors(n, n)
     integer(c_int), intent(out) :: info
+    integer(c_int), intent(out) :: stat
 
     real(c_double) :: work_query(1)
     real(c_double), allocatable :: work(:)
     integer :: lwork
+
+    stat = 0
 
     ! Copy matrix to eigenvectors (dsyev overwrites in-place)
     eigenvectors = matrix
@@ -48,17 +52,20 @@ contains
 
   ! Eigenvalues only via dsyev('N', 'U', ...).
   ! Faster — no eigenvector computation.
-  subroutine spectral_eigenvalues(n, matrix, eigenvalues, info) &
+  subroutine spectral_eigenvalues(n, matrix, eigenvalues, info, stat) &
       bind(c, name="spectral_eigenvalues")
     integer(c_int), value, intent(in) :: n
     real(c_double), intent(in) :: matrix(n, n)
     real(c_double), intent(out) :: eigenvalues(n)
     integer(c_int), intent(out) :: info
+    integer(c_int), intent(out) :: stat
 
     real(c_double), allocatable :: a(:,:)
     real(c_double) :: work_query(1)
     real(c_double), allocatable :: work(:)
     integer :: lwork
+
+    stat = 0
 
     ! Copy matrix (dsyev overwrites in-place)
     allocate(a(n, n))
@@ -80,7 +87,7 @@ contains
   ! Full SVD: singular values + left/right singular vectors via dgesvd('A','A',...).
   ! Singular values returned in descending order.
   ! U is m×m, VT is n×n (V transposed), stored column-major.
-  subroutine spectral_svd(m, n, matrix, singular_values, u, vt, info) &
+  subroutine spectral_svd(m, n, matrix, singular_values, u, vt, info, stat) &
       bind(c, name="spectral_svd")
     integer(c_int), value, intent(in) :: m, n
     real(c_double), intent(in) :: matrix(m, n)
@@ -88,6 +95,7 @@ contains
     real(c_double), intent(out) :: u(m, m)
     real(c_double), intent(out) :: vt(n, n)
     integer(c_int), intent(out) :: info
+    integer(c_int), intent(out) :: stat
 
     real(c_double), allocatable :: a(:,:)
     real(c_double) :: work_query(1)
@@ -95,6 +103,7 @@ contains
     integer :: lwork, k
 
     k = min(m, n)
+    stat = 0
 
     ! Copy matrix before calling (dgesvd overwrites)
     allocate(a(m, n))
@@ -118,12 +127,13 @@ contains
 
   ! Singular values only via dgesvd('N','N',...).
   ! Faster — no U/V computation.
-  subroutine spectral_singular_values(m, n, matrix, singular_values, info) &
+  subroutine spectral_singular_values(m, n, matrix, singular_values, info, stat) &
       bind(c, name="spectral_singular_values")
     integer(c_int), value, intent(in) :: m, n
     real(c_double), intent(in) :: matrix(m, n)
     real(c_double), intent(out) :: singular_values(min(m, n))
     integer(c_int), intent(out) :: info
+    integer(c_int), intent(out) :: stat
 
     real(c_double), allocatable :: a(:,:)
     real(c_double) :: dummy_u(1, 1), dummy_vt(1, 1)
@@ -132,6 +142,7 @@ contains
     integer :: lwork, k
 
     k = min(m, n)
+    stat = 0
 
     ! Copy matrix (dgesvd overwrites in-place)
     allocate(a(m, n))
@@ -162,7 +173,7 @@ contains
   ! Reed 2026-07-20 per Alex "Not DEFERRED. DONE!" FLANG-floor directive.
   ! Numerical work lives in Fortran (below the knife); Rust delegates the
   ! entire Kuramoto integration through this bind(c) surface.
-  subroutine spectral_phase_lock(n, phases_in, omegas, k, steps, dt, phases_out, order_r, info) &
+  subroutine spectral_phase_lock(n, phases_in, omegas, k, steps, dt, phases_out, order_r, info, stat) &
       bind(c, name="spectral_phase_lock")
     integer(c_int), value, intent(in) :: n
     real(c_double), intent(in) :: phases_in(n)
@@ -173,12 +184,14 @@ contains
     real(c_double), intent(out) :: phases_out(n)
     real(c_double), intent(out) :: order_r
     integer(c_int), intent(out) :: info
+    integer(c_int), intent(out) :: stat
 
     real(c_double) :: theta(n), dtheta(n)
     real(c_double) :: cos_sum, sin_sum, k_over_n
     integer :: i, j, s
 
     info = 0
+    stat = 0
     if (n < 1) then
       info = 1
       order_r = 0.0d0
@@ -209,5 +222,20 @@ contains
 
     phases_out = theta
   end subroutine spectral_phase_lock
+
+  ! The STAT= mechanism, probed: allocate `count` doubles and report the
+  ! allocation's status. The tests' only way to make an ALLOCATE fail on
+  ! purpose (the wrappers' sizes come from LAPACK's workspace query).
+  subroutine spectral_allocate_probe(count, stat) &
+      bind(c, name="spectral_allocate_probe")
+    integer(c_int64_t), value, intent(in) :: count
+    integer(c_int), intent(out) :: stat
+
+    real(c_double), allocatable :: probe(:)
+
+    allocate(probe(count))
+    stat = 0
+    deallocate(probe)
+  end subroutine spectral_allocate_probe
 
 end module optics_spectral

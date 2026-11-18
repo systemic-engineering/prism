@@ -620,12 +620,12 @@ pub fn infer_via_rotation(
         let tick = t as usize;
         // Advance Kuramoto phase-lock by one dt step.
         let (new_phases, order_r) = phase_lock(&phases, &omegas, config.coupling_k, 1, config.dt)
-            .map_err(|info| {
+            .map_err(|fault| {
             Transparency::single(
                 Property::FiedlerRise,
                 PropertyVerdict::Fail(Diagnostic::new(format!(
-                    "infer_via_rotation: phase_lock FFI failure at tick {} (info={})",
-                    tick, info
+                    "infer_via_rotation: phase_lock FFI failure at tick {} ({})",
+                    tick, fault
                 ))),
             )
         })?;
