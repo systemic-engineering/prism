@@ -1,0 +1,15 @@
+vector     71d-certificate-declaration
+kind       certificate
+note       71's uncertain performance (v3.2.1 G1: the declaration holes remove nothing, so p(a) is light)
+tau        @mirror/certificate root
+label      "certificate"
+k          7
+result     db68f7b570cb25fe271318ae944ac2d5c55e29c7a49f3d52bc56ffc56ea44ad6 ({p(a)}: the run's true set, H5)
+program    89aeb7bff610858577c65a413cd3ecdb17f245567e62cfc599146e71244665ee
+facts      092a7016845574b1f947d4063fe5b9ae844328ce13562389c4a86931a2f6f1b1
+holes      75
+dark       empty (an uncertain performance has none, H5)
+expect     equal
+length     281
+preimage   667261676d656e7400406d6972726f722f63657274696669636174650000000000000000000b636572746966696361746500000000000000078d30f94987bb12eae5ef1a777a26af2f8abdf01a89dbdc386659e88290fef1ceb625a2b21e1c6a3fa1e832ede0eeef2e1e60cbaf6d3c980ded27ddf68b42a9a0202789eeca17f65eb38b270ad37c132fd42887797c85688813f11111f0d39a9580bd9551d222171e9501ce43d47d596ead276cc7a1cdf4d442441a2960f05882f783f56bb78a0d44e312fd3fc0db94a6eb9fb13307d48632f400e5bf7509eb02a1f0eb90675a21142a4ff58866e703927c30b6810d61d153222b17d53c6c38e07fffd33cf058525c55e997e8f28f4ac41343aec5be4330c0c32a78a861075b43
+blake3     d6a0d43cf46e3331f5cd8c6996ceb5fddd483cf70e937c0b560b4075dfae708f

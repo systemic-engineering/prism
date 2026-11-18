@@ -1,0 +1,15 @@
+vector     07-fragment-k3
+kind       fragment
+tau        @mirror root
+label      "shard"
+k          3
+children   01 02 03 (ordered, as given)
+tau_hex    406d6972726f720000
+git_at     406d6972726f72000000000000000000057368617264
+git_width  3
+git_first  000
+git_last   002
+expect     equal
+length     135
+preimage   667261676d656e7400406d6972726f7200000000000000000005736861726400000000000000030976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa7f65e0f7f42e177232cbf1de75804f6dd2dfc6de1feb43afadebfc1dee3119c88e982274589ba47f8dc5de45409c1379197a47eae289279481d47dabf6d8f2be
+blake3     59aa9df321b99f9253f89d5bddc2954605025acd6c5bd8a8c759b0318c06d2e9

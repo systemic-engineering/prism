@@ -1,0 +1,10 @@
+vector     23f-contexts
+kind       certificate: contexts
+note       each child is a fact-set fragment at @pact/fact, label "model"
+tau        @mirror/certificate root
+label      "contexts"
+sequence   under0=[], over0=[p & q & r & t], under1=[r], over1=[p & q & r & t], under2=[r]
+expect     equal
+length     214
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000008636f6e74657874730000000000000005e6b5cbac239682e3456bbdfd0bc22704f5214ce04456927254a991860915ea59b819ac75a00b57d511298641f0b701a336c7599671bc07f1da486d50d92d5ec0f9600ec8aeff3cac867bb6b7d9cc5e763e35f5e3c32a89d6011d8f3d7ec374b3b819ac75a00b57d511298641f0b701a336c7599671bc07f1da486d50d92d5ec0f9600ec8aeff3cac867bb6b7d9cc5e763e35f5e3c32a89d6011d8f3d7ec374b3
+blake3     95ed6f09a35de1faba0244824f5860d411ba699eb0e55cffa66cb0ece1cd7c63

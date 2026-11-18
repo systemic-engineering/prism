@@ -1,0 +1,8 @@
+vector     35b-facts
+kind       certificate: facts
+tau        @pact/fact root
+label      "facts"
+expect     equal
+length     42
+preimage   667261676d656e740040706163742f666163740000000000000000000566616374730000000000000000
+blake3     b811692f0079dc1b370f3e7656d0c8bde2fb51a219a2f29da74c21222d8671c1

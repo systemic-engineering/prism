@@ -1,0 +1,14 @@
+vector     88a-program
+kind       certificate: program
+note       source: fact e(k, one) | fact e(k, two) | rule rp p(?x, ?y) requires e(?x, ?y) | functional p(1) -> 2 | fact s(k, a) | rule q1 q(?x, ?y) requires s(?x, ?y) | rule q2 q(?x, b) requires s(?x, ?z), not p(?x, one) | functional q(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule rp p(?x, ?y) requires e(?x, ?y)" 73ee6d6dd80da21b8ac6d058ec07a493672974c9ed2cc1df4a09800e32a4f84a
+line       "rule q1 q(?x, ?y) requires s(?x, ?y)" 2c3251e07606534100624a2341f7602c5cdfeb8351ea4c639ff9d54155c945ea
+line       "rule q2 q(?x, b) requires s(?x, ?z), not p(?x, one)" 22a4d84ba2b214742e519fc5e1fb14df5106385eb0b8fb3d851402aabbd2fab0
+line       "functional p(1) -> 2" c3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113
+line       "functional q(1) -> 2" 141d0aef977aa792b8c7c051d35d00b15955a592a66472018b9309fa512fb499
+expect     equal
+length     207
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d0000000000000005141d0aef977aa792b8c7c051d35d00b15955a592a66472018b9309fa512fb49922a4d84ba2b214742e519fc5e1fb14df5106385eb0b8fb3d851402aabbd2fab02c3251e07606534100624a2341f7602c5cdfeb8351ea4c639ff9d54155c945ea73ee6d6dd80da21b8ac6d058ec07a493672974c9ed2cc1df4a09800e32a4f84ac3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113
+blake3     37697a35a6567e4d09c630dd7bf6e7162f4833621824b27738e99d614fddaca1

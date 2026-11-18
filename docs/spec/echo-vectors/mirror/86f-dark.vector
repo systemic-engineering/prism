@@ -1,0 +1,9 @@
+vector     86f-dark
+kind       certificate: dark
+tau        @mirror/certificate root
+label      "dark"
+dark       nat 255 sym "functional f(1) -> 2" addr 92b73ed288232ed17ab3f03f11c1e1803d5b4a1d5ced195fff3bbe22e234b39b addr ae864eff91bdc97cd4c188a9bf545e05efab992e81cf10882a37259593262029
+expect     equal
+length     82
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000046461726b00000000000000016cfc53b99fd40cad89ad2f5f17fea34354802efb30d8dbf72bcebdbfac7fbccb
+blake3     96f07a87bcfc4b1a9f347438a927d5cda3f03d19bf09a3d2373f3adc904fadd6

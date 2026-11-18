@@ -1,0 +1,17 @@
+vector     11-lens-k2
+kind       lens
+note       pins the lens bytes rule only. Not a well-formed source lens: fixpoint §5.0.1
+note       item 4 wants targets (N, ε) with ε at @mirror/erasure, and ε's own bytes
+note       (its ℓ and entry shape) are not pinned yet
+tau        @mirror root
+label      "source"
+k          2
+targets    07 01 (ordered)
+tau_hex    406d6972726f720000
+git_at     406d6972726f7200000000000000000006736f75726365
+git_first  ^000
+git_last   ^001
+expect     equal
+length     100
+preimage   6c656e7300406d6972726f7200000000000000000006736f75726365000000000000000259aa9df321b99f9253f89d5bddc2954605025acd6c5bd8a8c759b0318c06d2e90976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa
+blake3     f8f2f814a9aac1d4dfe11296db56228110fe0dace605d9c1e30b9d414a18c6c1

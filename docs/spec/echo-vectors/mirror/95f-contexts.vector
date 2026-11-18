@@ -1,0 +1,10 @@
+vector     95f-contexts
+kind       certificate: contexts
+note       each child is a fact-set fragment at @pact/fact, label "model"
+tau        @mirror/certificate root
+label      "contexts"
+sequence   under0=[p(k, a) & p(k, b) & s(k)], over0=[o(k, a) & o(k, b) & p(k, a) & p(k, b) & s(k)], under1=[o(k, a) & o(k, b) & p(k, a) & p(k, b) & s(k)], over1=[o(k, a) & o(k, b) & p(k, a) & p(k, b) & s(k)], under2=[o(k, a) & o(k, b) & p(k, a) & p(k, b) & s(k)]
+expect     equal
+length     214
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000008636f6e74657874730000000000000005105bb63f7ff026293a1bf4b5d210024175e490ed1b05b81092f83c40b8baf58b1a3f6d179e78f8edfeb4274dd77a43d2ccdf4821f27cc6ffd27155d671c2a1361a3f6d179e78f8edfeb4274dd77a43d2ccdf4821f27cc6ffd27155d671c2a1361a3f6d179e78f8edfeb4274dd77a43d2ccdf4821f27cc6ffd27155d671c2a1361a3f6d179e78f8edfeb4274dd77a43d2ccdf4821f27cc6ffd27155d671c2a136
+blake3     f78b90d68f4c4d7f08fe533d337244a53813fba3141275797a66dd28bc1b6e75

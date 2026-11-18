@@ -15,10 +15,12 @@
 
 extern crate alloc;
 
+pub mod address;
 pub mod cut;
 pub mod facts;
 pub mod value;
 
+pub use address::{Address, Tau};
 pub use cut::{cut, Cut, Reflection};
 pub use facts::{read, read_reflection, Fact, Facts, Header, Position, Refusal, Unreadable};
 pub use value::{Atom, Value};

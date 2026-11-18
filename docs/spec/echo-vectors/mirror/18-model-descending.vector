@@ -1,0 +1,11 @@
+vector     18-model-descending
+kind       model (negative)
+note       the wrong sort direction
+tau        @datalog/fact root
+label      "model"
+members    01 02 03 (a set)
+order      8e982274 7f65e0f7 0976ca11
+expect     not-equal 16-model-sorted
+length     141
+preimage   667261676d656e740040646174616c6f672f66616374000000000000000000056d6f64656c00000000000000038e982274589ba47f8dc5de45409c1379197a47eae289279481d47dabf6d8f2be7f65e0f7f42e177232cbf1de75804f6dd2dfc6de1feb43afadebfc1dee3119c80976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa
+blake3     53cb2ef754a8838c0ce6fa02fe2129b534d39554237e5440811703d179333689

@@ -1,0 +1,12 @@
+vector     87a-program
+kind       certificate: program
+note       source: rule own owner(?d, ?p) requires claim(?d, ?p) | rule see seen(?p) requires owner(?d, ?p) | fact claim(doc, alex) | fact claim(doc, reed) | fact claim(car, alex) | functional owner(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule own owner(?d, ?p) requires claim(?d, ?p)" 72c15c4f842666d8e7fe96b19f7472fe349cbd6e4bfcb90d06604e7072a2d790
+line       "rule see seen(?p) requires owner(?d, ?p)" fa88b645e642a0d6d3026fc36201ea4919dcb6a241dfbb495d32c9f9c6142562
+line       "functional owner(1) -> 2" f37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162
+expect     equal
+length     143
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d000000000000000372c15c4f842666d8e7fe96b19f7472fe349cbd6e4bfcb90d06604e7072a2d790f37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162fa88b645e642a0d6d3026fc36201ea4919dcb6a241dfbb495d32c9f9c6142562
+blake3     95c43511c00314b4c70dade8d8ad1fd6cf84be6abf1aa8626442049f3fc74d3d

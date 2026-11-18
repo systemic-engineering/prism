@@ -1,0 +1,10 @@
+vector     24f-dark
+kind       certificate: dark
+note       source: rule a p requires q | rule a p requires r
+tau        @mirror/certificate root
+label      "dark"
+dark       nat 2 sym "at" nat 2 nat 1
+expect     equal
+length     82
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000046461726b00000000000000011a94f5e878d670f7b29b7dc3e758fcaeb165d91a886784c4cabc5d671962a1c3
+blake3     db5f3800b19a1b7988db8cd6539aef87bc7244d84683240edd4b068fc031d547

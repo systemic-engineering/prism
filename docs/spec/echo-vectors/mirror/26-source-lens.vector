@@ -1,0 +1,13 @@
+vector     26-source-lens
+kind       lens
+note       targets in the order (addr(N), addr(ε)), fixpoint §5.0.1 item 4
+tau        @mirror root
+label      "source"
+k          2
+targets    N = 07 (stand-in), ε = 25
+git_first  ^000
+git_last   ^001
+expect     equal
+length     100
+preimage   6c656e7300406d6972726f7200000000000000000006736f75726365000000000000000259aa9df321b99f9253f89d5bddc2954605025acd6c5bd8a8c759b0318c06d2e9d3d41dc6c4f1f698edd683d986187e60b8f545003c6f83c73e5eb893fc3ea57e
+blake3     9e3c0b28e749627b2cea15f04471a41ffa832fbcd4769aa9ae0dad981d6d0871

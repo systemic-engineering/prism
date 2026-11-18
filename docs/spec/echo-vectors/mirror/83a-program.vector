@@ -1,0 +1,12 @@
+vector     83a-program
+kind       certificate: program
+note       source: rule base reach(?x, ?y) requires edge(?x, ?y) | rule hop far(?y) requires reach(?x, ?y) | fact edge(a, b) | fact edge(a, c) | fact edge(d, e) | functional reach(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule base reach(?x, ?y) requires edge(?x, ?y)" fc95e3adf0495aa1fb313ce3782b75c3e3cf819f55603c9c57e2da38e1e3cd37
+line       "rule hop far(?y) requires reach(?x, ?y)" bca35277ae26f601b519f2bd2023e32bd113d5f83b61bf9665f4087c3bb50774
+line       "functional reach(1) -> 2" 90151095d29c00565d420f3b74921f9e9add1537737ab07eade6afeec17131f7
+expect     equal
+length     143
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d000000000000000390151095d29c00565d420f3b74921f9e9add1537737ab07eade6afeec17131f7bca35277ae26f601b519f2bd2023e32bd113d5f83b61bf9665f4087c3bb50774fc95e3adf0495aa1fb313ce3782b75c3e3cf819f55603c9c57e2da38e1e3cd37
+blake3     e107de5910f2a9a9d3934004e233926f5108f07124a942c94f8fed02c740ce95

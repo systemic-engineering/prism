@@ -1,0 +1,10 @@
+vector     94i-dark
+kind       certificate: dark
+note       violating atoms: the whole key group over `true` (§3.1.1 D), by address
+tau        @mirror/certificate root
+label      "dark"
+dark       nat 255 sym "functional o(1) -> 2" addr 9779d2a11ad9501dee1a688173e4fb6edb4ed655aca92affea180d6a8cbc8962 addr ad4b9393ea8bf1d35a327b46937736792c0c0918bb0fd57e0ac7a37ee7efd7ce
+expect     equal
+length     82
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000046461726b0000000000000001ccbb9f7944fc93dcd56d546bec3adaa4b3c74fbf63b9855a493b2e663fa3985d
+blake3     a605eef1274828cd2507b6dee68d3f060bd61f4b1874e5ca40aef0064cb0ee0b

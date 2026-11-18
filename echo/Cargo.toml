@@ -14,7 +14,13 @@ autotests = false
 name = "main"
 path = "tests/main.rs"
 
-# No dependencies. checks.echo-independent holds the graph to that: no
-# prismqueer, no mirror crate, nothing LAPACK, BLAS or Fortran, at any depth
-# and of any kind (docs/spec/echo.md §2).
+# One dependency: blake3, for the address law H (fixpoint §5.0: "BLAKE3,
+# default (unkeyed) mode, 32-byte output"). Pinned exactly, at the version
+# prism's lockfile already holds (prismqueer's `=1.8.7`) and the b3sum that
+# checked mirror's vectors (1.8.7). no_std (no `std` feature) and `pure`:
+# the portable Rust implementation only, no C or assembly from build.rs.
+# checks.echo-independent holds the rest of the graph: no prismqueer, no
+# mirror crate, nothing LAPACK, BLAS or Fortran, at any depth and of any
+# kind (docs/spec/echo.md §2).
 [dependencies]
+blake3 = { version = "=1.8.7", default-features = false, features = ["pure"] }

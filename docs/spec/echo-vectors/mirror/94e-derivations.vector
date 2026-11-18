@@ -1,0 +1,10 @@
+vector     94e-derivations
+kind       certificate: derivations
+tau        @mirror/certificate root
+label      "derivations"
+under      o(k, a) by r1; o(k, b) by r2
+over       
+expect     equal
+length     121
+preimage   667261676d656e7400406d6972726f722f63657274696669636174650000000000000000000b64657269766174696f6e7300000000000000023e392bfa7d2dd6538ef453b01d9940f3cea0916c1cbad9389c770b7b7c9f90b7a841509c340586996a6892385eabdca35758a00fd13d2314bd2d52a38eaffd5c
+blake3     23ac146bf08948328fc68528943c751d73a162a1acf16b20007b1de123066c00

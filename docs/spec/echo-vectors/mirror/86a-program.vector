@@ -1,0 +1,12 @@
+vector     86a-program
+kind       certificate: program
+note       source: rule good q(?x) requires e(?x) | rule bad q(?x) requires f(?x, ?y) | fact e(k) | fact f(k, v) | fact f(k, w) | functional f(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule good q(?x) requires e(?x)" d1e4e17ee2ee19a35ced0f94ba92c2c97bb3190d1cfe6fa5f2c93ad3e1775b7b
+line       "rule bad q(?x) requires f(?x, ?y)" cfb71e707f47412fd55ec91a52f745f7c07324010ebb363e9e72f3351db514a8
+line       "functional f(1) -> 2" 1dc34f799cb808c005354d0a7c59c0a736fa7c3427169ad59176c4d6f2566a36
+expect     equal
+length     143
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000031dc34f799cb808c005354d0a7c59c0a736fa7c3427169ad59176c4d6f2566a36cfb71e707f47412fd55ec91a52f745f7c07324010ebb363e9e72f3351db514a8d1e4e17ee2ee19a35ced0f94ba92c2c97bb3190d1cfe6fa5f2c93ad3e1775b7b
+blake3     afb07814cc83e57b92ba14d9deac86574e8edcb1a34cba08293795d7af75e183

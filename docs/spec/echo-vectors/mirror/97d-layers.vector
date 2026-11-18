@@ -1,0 +1,10 @@
+vector     97d-layers
+kind       certificate: layers
+tau        @mirror/certificate root
+label      "layers"
+under      e(k, one) & e(k, two) & e(m, three) & s(k) & s(m) | p(k, four) & p(k, one) & p(k, two) & p(m, four) & p(m, three)
+over       e(k, one) & e(k, two) & e(m, three) & s(k) & s(m) | p(k, four) & p(k, one) & p(k, two) & p(m, four) & p(m, three)
+expect     equal
+length     180
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000066c61796572730000000000000004098ab15f313796ee86aec1146acea7ed875d21b5259ade7e0a8de459062022ff9f4b1d7f387176ef9ae50d18503aa5de8f76cd27de085ddc723bb826c16404a06fc79f2462d37f4d7c15dea0c2033058c42d8819b6beee44866fffd46888307ec0df8eb4869b9b43cf0faaa7e5efb7ab35003ee09d3c1a7c18e7c40b93236e4c
+blake3     d216171483961fb2f66709f1dd8e8c60d4d20ac0b5b9534a607f333b2076c3d6

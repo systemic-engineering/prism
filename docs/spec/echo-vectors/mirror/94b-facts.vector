@@ -1,0 +1,9 @@
+vector     94b-facts
+kind       certificate: facts
+tau        @pact/fact root
+label      "facts"
+facts      s(k)
+expect     equal
+length     74
+preimage   667261676d656e740040706163742f666163740000000000000000000566616374730000000000000001cfaa70e041736b29f16c06514b29b7fd88bea988f3be7e7ca18ba543f1017f9c
+blake3     73f64a5babaa71cf0d318c986457c7c7c1bf7a3dce76912b17cf98b4b6dd0e97

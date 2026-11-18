@@ -1,0 +1,16 @@
+vector     08-fragment-k3-reversed
+kind       fragment
+note       must differ from 07: fragment children are ordered (§5)
+tau        @mirror root
+label      "shard"
+k          3
+children   03 02 01 (ordered, as given)
+tau_hex    406d6972726f720000
+git_at     406d6972726f72000000000000000000057368617264
+git_width  3
+git_first  000
+git_last   002
+expect     equal
+length     135
+preimage   667261676d656e7400406d6972726f7200000000000000000005736861726400000000000000038e982274589ba47f8dc5de45409c1379197a47eae289279481d47dabf6d8f2be7f65e0f7f42e177232cbf1de75804f6dd2dfc6de1feb43afadebfc1dee3119c80976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa
+blake3     40bb5a780c545b40a975a22486cd09f86210f817618735db0af7d8d696dbc776

@@ -1,0 +1,11 @@
+vector     81a-holes-child-hash-3
+kind       fragment
+note       H5: 81's holes child
+tau        @mirror/certificate root
+label      "holes"
+k          1
+children   81
+expect     equal
+length     83
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000005686f6c657300000000000000010b8d2ca1ffa162e0d88ccb2bd95557a8386f466dd704d2de890492b432eb715d
+blake3     bc5d84289845c244134b72ed617f3c81162af708414291d23b2d81683092551a

@@ -1,0 +1,10 @@
+vector     89a-program
+kind       certificate: program
+note       source: fact f(k, one) | fact f(k, two) | functional f(1) -> 1
+tau        @pact/program root
+label      "program"
+line       "functional f(1) -> 1" 6bb0a6c37eaa357f615915170e4e3eba195ce54b38e6c9d473df7dfb65efaccf
+expect     equal
+length     79
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000016bb0a6c37eaa357f615915170e4e3eba195ce54b38e6c9d473df7dfb65efaccf
+blake3     9e1db0cd9b68a553abc606f2afc3787f5b68b94f3b629e1f0ce9049d8983bdc8

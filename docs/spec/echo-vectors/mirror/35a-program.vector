@@ -1,0 +1,10 @@
+vector     35a-program
+kind       certificate: program
+note       source: rule r p requires q
+tau        @pact/program root
+label      "program"
+line       "rule r p requires q" a449bbf403db03a7a9758116709a586e12e65f1345bd36e3adb301867a0fb1d5
+expect     equal
+length     79
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d0000000000000001a449bbf403db03a7a9758116709a586e12e65f1345bd36e3adb301867a0fb1d5
+blake3     75490ecde74e1e49fda16acf0bbe7a94edffea33cc4a51afafe06dd9157b86d0

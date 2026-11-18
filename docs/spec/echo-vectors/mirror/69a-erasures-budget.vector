@@ -1,0 +1,12 @@
+vector     69a-erasures-budget
+kind       fragment
+note       the certificate's erasures child with one budget claim (§6.5 R4); child 4 of the certificate
+tau        @mirror/certificate root
+label      "erasures"
+k          1
+children   69
+empty      f783f56bb78a0d44e312fd3fc0db94a6eb9fb13307d48632f400e5bf7509eb02 (no budget: today's empty erasures, unchanged)
+expect     equal
+length     86
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000008657261737572657300000000000000015270ebeba5f7d4e087b9798c43eb09a8c10ab5bd41fdd1061d7fee8c232971bb
+blake3     66fe0048608f04a848fdef8025de63cd6a3550e15314827bae98d062c548f4c4

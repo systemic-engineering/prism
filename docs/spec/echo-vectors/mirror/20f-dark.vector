@@ -1,0 +1,9 @@
+vector     20f-dark
+kind       certificate: dark
+tau        @mirror/certificate root
+label      "dark"
+dark       absent
+expect     equal
+length     50
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000046461726b0000000000000000
+blake3     7fffd33cf058525c55e997e8f28f4ac41343aec5be4330c0c32a78a861075b43

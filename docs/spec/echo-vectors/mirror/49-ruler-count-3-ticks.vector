@@ -1,0 +1,11 @@
+vector     49-ruler-count-3-ticks
+kind       ruler
+note       B4: --explain=3 (CT-A12) is this ruler; the unit byte is ruler §1.1's, unchanged
+tau        @mirror/ruler root
+ruler      Count { n: 3, unit: Ticks } Independent
+tau_hex    406d6972726f722f72756c65720000
+body       010100000000000000000301
+expect     equal
+length     41
+preimage   72756c657200406d6972726f722f72756c65720000000000000000000c010100000000000000000301
+blake3     f159129a5c9e45f401159f61eaa7a9260c79b16a04aaf52ab6f64fdce578c4cb

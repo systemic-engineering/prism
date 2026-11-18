@@ -1,0 +1,13 @@
+vector     95a-program
+kind       certificate: program
+note       source: fact s(k) | fact p(k, a) | fact p(k, b) | functional p(1) -> 2 | rule r1 o(?x, a) requires s(?x), not t(?x) | rule r2 o(?x, b) requires s(?x) | functional o(1) -> 2 | fact Y
+tau        @pact/program root
+label      "program"
+line       "rule r1 o(?x, a) requires s(?x), not t(?x)" e6f5274b7d79f35aa6ee6bc6702ee26416680a314737ea47e2ceb1c8b007efa2
+line       "rule r2 o(?x, b) requires s(?x)" fe582f5bac570aaf43ffd1503d64327128b103a2bf84bfd8dcb9cc9f484cec8c
+line       "functional p(1) -> 2" c3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113
+line       "functional o(1) -> 2" fdabb2f16d2ca20b4be8f15d4b39e8deacdbb80a52bfc7b5efb8f087adb5f490
+expect     equal
+length     175
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d0000000000000004c3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113e6f5274b7d79f35aa6ee6bc6702ee26416680a314737ea47e2ceb1c8b007efa2fdabb2f16d2ca20b4be8f15d4b39e8deacdbb80a52bfc7b5efb8f087adb5f490fe582f5bac570aaf43ffd1503d64327128b103a2bf84bfd8dcb9cc9f484cec8c
+blake3     5b81f93eb98260bafe9d1698ee87d0820185b74d18d54e5eb4ceb1d6fc4bdfd2

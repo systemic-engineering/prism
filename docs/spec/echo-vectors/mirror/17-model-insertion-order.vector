@@ -1,0 +1,11 @@
+vector     17-model-insertion-order
+kind       model (negative)
+note       the facts' insertion order (03 01 02): what an unsorted encoder produces
+tau        @datalog/fact root
+label      "model"
+members    01 02 03 (a set)
+order      8e982274 0976ca11 7f65e0f7
+expect     not-equal 16-model-sorted
+length     141
+preimage   667261676d656e740040646174616c6f672f66616374000000000000000000056d6f64656c00000000000000038e982274589ba47f8dc5de45409c1379197a47eae289279481d47dabf6d8f2be0976ca1179bfa9425af4522e8796cd7d1bef52992c68ce6a5a1e31c123c91bfa7f65e0f7f42e177232cbf1de75804f6dd2dfc6de1feb43afadebfc1dee3119c8
+blake3     c603cf14ea83fde22a8332875e15dbec9c7e40aa5b32bce1b2972c4aad047755

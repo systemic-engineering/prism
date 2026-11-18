@@ -1,0 +1,9 @@
+vector     95c-result-model
+kind       certificate: result (true)
+tau        @pact/fact root
+label      "model"
+members    o(k, a) & o(k, b) & p(k, a) & p(k, b) & s(k)
+expect     equal
+length     202
+preimage   667261676d656e740040706163742f66616374000000000000000000056d6f64656c000000000000000581f0dd97c34ce1851caa491db663e5fe541adece838aa762c4bba8fc67c5b3819779d2a11ad9501dee1a688173e4fb6edb4ed655aca92affea180d6a8cbc89629793ce896934e91e70994c00fb2e490e4dbd0797289338272c85afd9715dbdddad4b9393ea8bf1d35a327b46937736792c0c0918bb0fd57e0ac7a37ee7efd7cecfaa70e041736b29f16c06514b29b7fd88bea988f3be7e7ca18ba543f1017f9c
+blake3     1a3f6d179e78f8edfeb4274dd77a43d2ccdf4821f27cc6ffd27155d671c2a136

@@ -1,0 +1,13 @@
+vector     23a-program
+kind       certificate: program
+note       source: rule p p requires not q | rule q q requires not p | rule r r requires not s | rule t t requires p
+tau        @pact/program root
+label      "program"
+line       "rule p p requires not q" f5d5d9a74256852b8345bc4d349c6496214630e0707a3601152d58e53a695faf
+line       "rule q q requires not p" dcdc285dcfba66a8b6f9dc162d998376c095e7ba198ea3e086beb964b9dcc27a
+line       "rule r r requires not s" 889fab7ef9a2340b6dec26d43936b8ff1a4af6e95ca2d6ffcc0e1d027f287ebe
+line       "rule t t requires p" cd668c5a2afbee7fd736e89fb8caf96f9af4ed03b6d72c9e6a267c03634f8c55
+expect     equal
+length     175
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d0000000000000004889fab7ef9a2340b6dec26d43936b8ff1a4af6e95ca2d6ffcc0e1d027f287ebecd668c5a2afbee7fd736e89fb8caf96f9af4ed03b6d72c9e6a267c03634f8c55dcdc285dcfba66a8b6f9dc162d998376c095e7ba198ea3e086beb964b9dcc27af5d5d9a74256852b8345bc4d349c6496214630e0707a3601152d58e53a695faf
+blake3     411ebfabe54fd0d1585d0e6e8c246abb1905c3fd32e4f782caebf87a70ed2f48

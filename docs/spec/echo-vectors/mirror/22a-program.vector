@@ -1,0 +1,10 @@
+vector     22a-program
+kind       certificate: program
+note       source: rule r p(?x) requires q(?x, ?x) | fact q(a)
+tau        @pact/program root
+label      "program"
+line       "rule r p(?x) requires q(?x, ?x)" 2787c369da96297ae59b9e1fe644428d932e68e0493df6733e59347c90fd1488
+expect     equal
+length     79
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000012787c369da96297ae59b9e1fe644428d932e68e0493df6733e59347c90fd1488
+blake3     4591e66e06dc8b8ea790be335354a9d79de484b77fd1f5f742674b83cc14f95b

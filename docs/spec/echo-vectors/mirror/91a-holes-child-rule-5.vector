@@ -1,0 +1,11 @@
+vector     91a-holes-child-rule-5
+kind       fragment
+note       H5: 91's holes child
+tau        @mirror/certificate root
+label      "holes"
+k          1
+children   91
+expect     equal
+length     83
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000005686f6c6573000000000000000115e9a43baf22234340e1eb0f22599c40dc160fe6dab31c24a55b2e7b01de6da2
+blake3     de71d8a651b070e1f1796978f9c25c6608e56ce721bb76608b3bf4885967fe3c

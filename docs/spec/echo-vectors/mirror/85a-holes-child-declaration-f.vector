@@ -1,0 +1,11 @@
+vector     85a-holes-child-declaration-f
+kind       fragment
+note       H5: 85's holes child
+tau        @mirror/certificate root
+label      "holes"
+k          1
+children   85
+expect     equal
+length     83
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000005686f6c657300000000000000015a7168e2542b827a7f1c76ff7039976d2a4ff895df8dabdc0dd879e80a8733fc
+blake3     c7e71a4927979348c3add776b7eab9b62241cd09df1808995e4c8aac3de97c6f

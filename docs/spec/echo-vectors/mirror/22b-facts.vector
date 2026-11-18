@@ -1,0 +1,9 @@
+vector     22b-facts
+kind       certificate: facts
+tau        @pact/fact root
+label      "facts"
+fact       q(a) e56e925e0c685ddbaf7eb1f2e161b2338b62b664f18174622f7e6b0f32835f1e
+expect     equal
+length     74
+preimage   667261676d656e740040706163742f666163740000000000000000000566616374730000000000000001e56e925e0c685ddbaf7eb1f2e161b2338b62b664f18174622f7e6b0f32835f1e
+blake3     7ecb9c2027db31a78d378f17790eab4838a197f88ec58b63fc331995cf5b8fcc

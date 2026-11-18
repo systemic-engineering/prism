@@ -1,0 +1,9 @@
+vector     22f-dark
+kind       certificate: dark
+tau        @mirror/certificate root
+label      "dark"
+dark       nat 2 sym "engine" sym "arity" sym "q"
+expect     equal
+length     82
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000046461726b0000000000000001a53e359e32243b1a0a263836ce75625c9702b27bb4f4e08a0bb811f6dfe5dac1
+blake3     d372a1cbc213fe654940fdacb1f3dbed261ddd7d256da0bce1b35ba5c196997a

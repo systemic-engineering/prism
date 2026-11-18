@@ -1,0 +1,11 @@
+vector     21a-program
+kind       certificate: program
+note       source: rule owner owner(?d, ?p) requires claim(?d, ?p) | fact claim(doc, alex) | fact claim(doc, reed) | functional owner(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule owner owner(?d, ?p) requires claim(?d, ?p)" 5f12d02c63ba59767256d70c8833540411829d3b21711ffac4a784a87331a3df
+line       "functional owner(1) -> 2" f37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162
+expect     equal
+length     111
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000025f12d02c63ba59767256d70c8833540411829d3b21711ffac4a784a87331a3dff37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162
+blake3     6b35f4c27dc18f7f6b581e9367936d4f34fc4b40b992eb5a6c982e09a0c9610b

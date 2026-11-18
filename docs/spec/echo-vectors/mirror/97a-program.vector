@@ -1,0 +1,12 @@
+vector     97a-program
+kind       certificate: program
+note       source: fact e(k, one) | fact e(k, two) | fact e(m, three) | fact s(k) | fact s(m) | rule rp p(?x, ?y) requires e(?x, ?y) | rule rq p(?x, four) requires s(?x), not z(?x) | functional p(1) -> 2 | Garbage
+tau        @pact/program root
+label      "program"
+line       "rule rp p(?x, ?y) requires e(?x, ?y)" 73ee6d6dd80da21b8ac6d058ec07a493672974c9ed2cc1df4a09800e32a4f84a
+line       "rule rq p(?x, four) requires s(?x), not z(?x)" 468c9c51eb37eaea60d231b1c7f28f6b5cc187b76463953a5f9f6c381a8cf022
+line       "functional p(1) -> 2" c3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113
+expect     equal
+length     143
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d0000000000000003468c9c51eb37eaea60d231b1c7f28f6b5cc187b76463953a5f9f6c381a8cf02273ee6d6dd80da21b8ac6d058ec07a493672974c9ed2cc1df4a09800e32a4f84ac3a1caee1d9708a0a98af1d72083a7150fa4e6a07d6a3d823e439bca63afe113
+blake3     773eb36750eaa9ecdb9cd8ba7ede8b8a80d24c0c031bc3d20dc51bd2a832525b

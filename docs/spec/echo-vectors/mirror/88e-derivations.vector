@@ -1,0 +1,10 @@
+vector     88e-derivations
+kind       certificate: derivations
+tau        @mirror/certificate root
+label      "derivations"
+under      p(k, one) by rp; p(k, two) by rp; q(k, a) by q1
+over       
+expect     equal
+length     153
+preimage   667261676d656e7400406d6972726f722f63657274696669636174650000000000000000000b64657269766174696f6e7300000000000000030883e24964a92f14a4b7baf20021654e73a0a59bfd86a275d72035dfc0ea762fe8a21a1cdae212af2831accfcf7a987cb76e23a050a52fc325c95356f2645adff8ebaecf242afa253f9826f271f6f1b9bc75c2007bfc00943be8d5a1b53ae79c
+blake3     723f5e7933208e7c4e5a0dfcee6ab405f8365f4594b92b9cd856bdf224a78342

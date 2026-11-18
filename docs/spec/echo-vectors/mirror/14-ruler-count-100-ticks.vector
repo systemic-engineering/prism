@@ -1,0 +1,10 @@
+vector     14-ruler-count-100-ticks
+kind       ruler
+tau        @mirror/ruler root
+ruler      Count { n: 100, unit: Ticks } Independent
+tau_hex    406d6972726f722f72756c65720000
+body       010100000000000000006401
+expect     equal
+length     41
+preimage   72756c657200406d6972726f722f72756c65720000000000000000000c010100000000000000006401
+blake3     e7b519a4ec908835dbaa132760da8871a5f4651dd9d7a819cedb58e1740d4b5e

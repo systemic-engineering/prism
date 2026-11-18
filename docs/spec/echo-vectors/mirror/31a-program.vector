@@ -1,0 +1,11 @@
+vector     31a-program
+kind       certificate: program
+note       source: rule start reach(?x) requires start(?x) | rule step reach(?y) requires reach(?x), edge(?x, ?y) | fact start(n0) | fact edge(n0, n1) | fact edge(n1, n2) | fact edge(n2, n3) | fact edge(n3, n4) | fact edge(n4, n5) | fact edge(n5, n6) | fact edge(n6, n7) | fact edge(n7, n8) | fact edge(n8, n9) | fact edge(n9, n10)
+tau        @pact/program root
+label      "program"
+line       "rule start reach(?x) requires start(?x)" 1a48c534da6674c2bbca24f7a6d2d4e4e485237453ed3f9db389ced8de37e89c
+line       "rule step reach(?y) requires reach(?x), edge(?x, ?y)" 4d4ba506a0122ef6b38529db218e79d510fbf10864b2292a37d9bb09a8e23cdf
+expect     equal
+length     111
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000021a48c534da6674c2bbca24f7a6d2d4e4e485237453ed3f9db389ced8de37e89c4d4ba506a0122ef6b38529db218e79d510fbf10864b2292a37d9bb09a8e23cdf
+blake3     6ff147a88959ec48f0a060e9f85d009aebd75e1d673649acd3c4ba75f1307f0c

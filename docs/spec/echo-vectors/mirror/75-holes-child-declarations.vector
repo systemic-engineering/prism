@@ -1,0 +1,12 @@
+vector     75-holes-child-declarations
+kind       fragment
+note       H5: 80's holes child, the two hole atoms sorted by address (children listed in that order)
+tau        @mirror/certificate root
+label      "holes"
+k          2
+children   73 74
+empty      9f20db78b49d96d14d151b088592b06e9380f22e2ca9ad52212d87fc2289d386 (no hole: today's empty holes child)
+expect     equal
+length     115
+preimage   667261676d656e7400406d6972726f722f636572746966696361746500000000000000000005686f6c657300000000000000022d0be95741512e00432e304758ee8fc17c276ea635c864d6e742c99cff4655f8d042cf15ddfaf3b1ab25992184bf0753d6dc64b3032bbeb3ac7df56249dccf00
+blake3     a1f0eb90675a21142a4ff58866e703927c30b6810d61d153222b17d53c6c38e0

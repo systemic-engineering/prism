@@ -1,0 +1,16 @@
+vector     30a-program
+kind       certificate: program
+note       source: rule start reach(?x) requires start(?x) | rule step reach(?y) requires reach(?x), edge(?x, ?y) | rule free free(?x) requires reach(?x), not blocked(?x) | rule p p requires not q | rule q q requires not p | rule owner owner(?d, ?p) requires claim(?d, ?p) | fact start(n0) | fact edge(n0, n1) | fact edge(n1, n2) | fact edge(n2, n3) | fact edge(n3, n4) | fact edge(n4, n5) | fact edge(n5, n6) | fact edge(n6, n7) | fact edge(n7, n8) | fact edge(n8, n9) | fact edge(n9, n10) | fact claim(doc, alex) | fact claim(doc, reed) | functional owner(1) -> 2
+tau        @pact/program root
+label      "program"
+line       "rule start reach(?x) requires start(?x)" 1a48c534da6674c2bbca24f7a6d2d4e4e485237453ed3f9db389ced8de37e89c
+line       "rule step reach(?y) requires reach(?x), edge(?x, ?y)" 4d4ba506a0122ef6b38529db218e79d510fbf10864b2292a37d9bb09a8e23cdf
+line       "rule free free(?x) requires reach(?x), not blocked(?x)" 20a424a9ebaf0240fc6d7e9064091ffb60a2de04a6420de3df16d7cd01a62e9c
+line       "rule p p requires not q" f5d5d9a74256852b8345bc4d349c6496214630e0707a3601152d58e53a695faf
+line       "rule q q requires not p" dcdc285dcfba66a8b6f9dc162d998376c095e7ba198ea3e086beb964b9dcc27a
+line       "rule owner owner(?d, ?p) requires claim(?d, ?p)" 5f12d02c63ba59767256d70c8833540411829d3b21711ffac4a784a87331a3df
+line       "functional owner(1) -> 2" f37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162
+expect     equal
+length     271
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000071a48c534da6674c2bbca24f7a6d2d4e4e485237453ed3f9db389ced8de37e89c20a424a9ebaf0240fc6d7e9064091ffb60a2de04a6420de3df16d7cd01a62e9c4d4ba506a0122ef6b38529db218e79d510fbf10864b2292a37d9bb09a8e23cdf5f12d02c63ba59767256d70c8833540411829d3b21711ffac4a784a87331a3dfdcdc285dcfba66a8b6f9dc162d998376c095e7ba198ea3e086beb964b9dcc27af37987e3ffa469d86108b943b6d561242107b77217a1b467545ef06bf0774162f5d5d9a74256852b8345bc4d349c6496214630e0707a3601152d58e53a695faf
+blake3     390f86515ddaa71a7a6ebb7b813bfec76996cfa370e227c339bf7080b7ec41b7

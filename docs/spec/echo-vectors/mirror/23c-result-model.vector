@@ -1,0 +1,9 @@
+vector     23c-result-model
+kind       certificate: result (true)
+tau        @pact/fact root
+label      "model"
+members    r
+expect     equal
+length     74
+preimage   667261676d656e740040706163742f66616374000000000000000000056d6f64656c00000000000000019bfdfcc7c3c4db82a700f3458b8de414fbdf002db4319e65ae33896a35f6b257
+blake3     f9600ec8aeff3cac867bb6b7d9cc5e763e35f5e3c32a89d6011d8f3d7ec374b3

@@ -1,0 +1,10 @@
+vector     15-ruler-count-100-rounds
+kind       ruler
+tau        @mirror/ruler root
+ruler      Count { n: 100, unit: Rounds } Independent
+tau_hex    406d6972726f722f72756c65720000
+body       010100000000000000006402
+expect     not-equal 14-ruler-count-100-ticks
+length     41
+preimage   72756c657200406d6972726f722f72756c65720000000000000000000c010100000000000000006402
+blake3     c40bdfaf9cb38065b3d67422f9f946e831f5fa105b0eeab024ee12f338784f03

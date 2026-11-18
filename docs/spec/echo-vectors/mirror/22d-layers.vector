@@ -1,0 +1,9 @@
+vector     22d-layers
+kind       certificate: layers
+tau        @mirror/certificate root
+label      "layers"
+ticks      0 fragments, label "tick"
+expect     equal
+length     52
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000066c61796572730000000000000000
+blake3     3ab72661db876cebb3b9619dc20c6694c1a7e1c07909fe00ee1a1f719aef051d

@@ -34,6 +34,12 @@ fn mirror_atom_vectors_read_print_back_and_encode() {
         .expect("vectors")
         .map(|e| e.expect("entry").path())
         .filter(|p| p.extension().is_some_and(|x| x == "vector"))
+        .filter(|p| {
+            let text = fs::read_to_string(p).expect("vector");
+            fields(&text)
+                .iter()
+                .any(|(k, v)| *k == "kind" && v.starts_with("atom"))
+        })
         .collect();
     files.sort();
     assert_eq!(files.len(), 46);

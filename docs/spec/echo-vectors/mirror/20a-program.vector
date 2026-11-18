@@ -1,0 +1,11 @@
+vector     20a-program
+kind       certificate: program
+note       source: rule path-base path(?x, ?y) requires edge(?x, ?y) | rule path-step path(?x, ?z) requires path(?x, ?y), edge(?y, ?z) | fact edge(a, b) | fact edge(b, c) | fact edge(c, b) | fact edge(c, d)
+tau        @pact/program root
+label      "program"
+line       "rule path-base path(?x, ?y) requires edge(?x, ?y)" a518de79be35bf23b3a919a33f477e145b03a8d56849dbe5050fc9ff2c73ae8d
+line       "rule path-step path(?x, ?z) requires path(?x, ?y), edge(?y, ?z)" 6c6bc06a7a5c3750ff61a2a5325892a2b27d639c5a1fc96b360f953c25888884
+expect     equal
+length     111
+preimage   667261676d656e740040706163742f70726f6772616d0000000000000000000770726f6772616d00000000000000026c6bc06a7a5c3750ff61a2a5325892a2b27d639c5a1fc96b360f953c25888884a518de79be35bf23b3a919a33f477e145b03a8d56849dbe5050fc9ff2c73ae8d
+blake3     3e705fddf91700b8adb16f2bf0eee3d78313c7428e308ef0d59367fd0f251edb

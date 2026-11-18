@@ -1,0 +1,11 @@
+vector     49a-ruler-count-3-rounds
+kind       ruler
+note       the other clock: one byte differs
+tau        @mirror/ruler root
+ruler      Count { n: 3, unit: Rounds } Independent
+tau_hex    406d6972726f722f72756c65720000
+body       010100000000000000000302
+expect     not-equal 49-ruler-count-3-ticks
+length     41
+preimage   72756c657200406d6972726f722f72756c65720000000000000000000c010100000000000000000302
+blake3     0eb57db4863f33c9d91a738742869633720622a46d1d9f3b43fd0c6eb1bfb769

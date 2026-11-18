@@ -1,0 +1,10 @@
+vector     95d-layers
+kind       certificate: layers
+tau        @mirror/certificate root
+label      "layers"
+under      p(k, a) & p(k, b) & s(k) | o(k, a) & o(k, b)
+over       p(k, a) & p(k, b) & s(k) | o(k, a) & o(k, b)
+expect     equal
+length     180
+preimage   667261676d656e7400406d6972726f722f6365727469666963617465000000000000000000066c617965727300000000000000042cb16d39f8b5d184c776bdaea3730c2a149718b718160e07f369a13cbabdc71b9fcb7ba37877a39b07423373373a9b9ecf70cbb6a9605dee2011fff17b75c252f8ed4f7225e7dd786a4227943093486cb01b662ab9efa3524abbe837cf2f68dbf96ca67bb877d91917df02af2ea0bd961ce06e11710973b8d99c144b808a343d
+blake3     88132d9be9ed643476f4606847c532dfe1bbd72b470a4e3a6efc16868ba1a2e5

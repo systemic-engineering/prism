@@ -1,0 +1,9 @@
+vector     22e-derivations
+kind       certificate: derivations
+tau        @mirror/certificate root
+label      "derivations"
+count      0
+expect     equal
+length     57
+preimage   667261676d656e7400406d6972726f722f63657274696669636174650000000000000000000b64657269766174696f6e730000000000000000
+blake3     202789eeca17f65eb38b270ad37c132fd42887797c85688813f11111f0d39a95

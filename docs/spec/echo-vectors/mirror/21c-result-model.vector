@@ -1,0 +1,9 @@
+vector     21c-result-model
+kind       certificate: result (M)
+tau        @pact/fact root
+label      "model"
+members    claim(doc, alex) & claim(doc, reed) & owner(doc, alex) & owner(doc, reed)
+expect     equal
+length     170
+preimage   667261676d656e740040706163742f66616374000000000000000000056d6f64656c0000000000000004038a9f6956e1130f6237e2f54e011fc4201c9d6ac0caa7208c1e60d61405f33b2d12f9ab3e4f2de595e4b8b39c092f19868af9b85001c48c78d03611b47eb4f99e16b48f74793d3951020ef760b9365d2fbec6c5d27764decae47cbebc4887a8bc757001beb55f356910098264ccaac6b3ed74d262c38114f2a83f4b124375bb
+blake3     7ffc8663ce550ee319582546f4af6595a8f843dc29f1d245b4a0287ff918861b

@@ -1,0 +1,14 @@
+vector     25-erasure-frame
+kind       fragment (ε)
+note       frame only: hand-made entries in source byte-offset order (not sorted).
+note       payload text shows a newline as \n; the bytes are 0x0a
+tau        @mirror/erasure root
+label      "erasure"
+k          3
+entry      erasure(sym "comment", sym "# a comment\n")
+entry      erasure(sym "layout", sym "  ", nat 0)
+entry      erasure(sym "layout", sym "\n\n", nat 0, nat 2)
+expect     equal
+length     145
+preimage   667261676d656e7400406d6972726f722f6572617375726500000000000000000007657261737572650000000000000003fadad9ac1d1ed157a1f2022949976bc065652393acb7aa83b594e7c9e29b9346443f8a3d5f6dc5ad0d0155be99419bf96a13188e0e89c9e6d0bfba8b58232c6885148370f207db4604fbf49c1cc008accdd98256c88148ae76eba98c91a579fe
+blake3     d3d41dc6c4f1f698edd683d986187e60b8f545003c6f83c73e5eb893fc3ea57e

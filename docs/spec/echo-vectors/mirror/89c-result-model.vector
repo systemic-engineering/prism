@@ -1,0 +1,9 @@
+vector     89c-result-model
+kind       certificate: result (M)
+tau        @pact/fact root
+label      "model"
+members    f(k, one) & f(k, two)
+expect     equal
+length     106
+preimage   667261676d656e740040706163742f66616374000000000000000000056d6f64656c0000000000000002a22d01914717d10e5c82e477698044d4ca89c36abdf1e519cf174178d0484440eb704ffee867500f0c374ff5f1bd37e761ac3146ec0ecc56f3b10a278dc8d947
+blake3     8c323efcf4bc7878f63f33ccdf73ef66c1dbfd4d4c965c5d8089f7bded77622a
