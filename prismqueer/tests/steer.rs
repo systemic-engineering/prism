@@ -101,15 +101,43 @@ fn kernel_is_tonics_plus_commas(f: &Field) -> bool {
         .unwrap_or(false)
 }
 
+/// A last-bit wobble of a float reading, the way another platform's LAPACK
+/// may round it: none, or one ulp up or down per graph, chosen by the
+/// graph's address and a salt.
+#[derive(Clone, Copy, Debug)]
+enum Wobble {
+    Still,
+    Ulp(u8),
+}
+
+fn wobbled(reading: f64, f: &Field, wobble: Wobble) -> f64 {
+    match wobble {
+        Wobble::Still => reading,
+        Wobble::Ulp(salt) => {
+            // FNV-1a over the salt and the address: a fair coin per graph.
+            let key = std::iter::once(salt)
+                .chain(f.graph().oid().as_str().bytes())
+                .fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+                    (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+                });
+            if key >> 32 & 1 == 0 {
+                reading.next_up()
+            } else {
+                reading.next_down()
+            }
+        }
+    }
+}
+
 /// The quietest non-kernel mode: prismqueer measuring where it is hardest.
-fn quietest(f: &Field) -> f64 {
+fn quietest(f: &Field, wobble: Wobble) -> f64 {
     let d = Instrument::of(&f.graph()).expect("measured");
     let mut modes: Vec<f64> = d.eigenvalues().iter().map(|x| x.abs()).collect();
     modes.sort_by(f64::total_cmp);
     modes
         .get(d.kernel_dimension().ok().expect("an exact count"))
         .copied()
-        .unwrap_or(f64::INFINITY)
+        .map_or(f64::INFINITY, |m| wobbled(m, f, wobble))
 }
 
 fn seeds(range: std::ops::Range<u64>) -> Vec<Vec<u8>> {
@@ -121,14 +149,19 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
     let budget = 200;
     let blind = seeds(0..budget)
         .into_iter()
-        .map(|s| quietest(&Seven::arbitrary(&mut Sample::from_bytes(s)).0))
+        .map(|s| {
+            quietest(
+                &Seven::arbitrary(&mut Sample::from_bytes(s)).0,
+                Wobble::Still,
+            )
+        })
         .fold(f64::INFINITY, f64::min);
 
     let steered = steer::<Seven>(
         seeds(0..8),
         Budget(budget as usize),
         Patience(budget as usize),
-        |s| quietest(&s.0),
+        |s| quietest(&s.0, Wobble::Still),
         |s| kernel_is_tonics_plus_commas(&s.0),
         |s| s.0.graph().oid(),
     );
@@ -159,6 +192,32 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
     }
 }
 
+/// Cross-platform by construction: a last-bit difference in LAPACK's
+/// eigenvalues, one ulp up or down on any graph, must not move the steered
+/// search. Same path, same best, same stop. On x86_64-linux OpenBLAS the
+/// float-steered search took another path than on aarch64-darwin.
+#[test]
+fn the_steered_search_does_not_read_the_last_bit() {
+    let run = |wobble| match steer::<Seven>(
+        seeds(0..8),
+        Budget(200),
+        Patience(200),
+        |s| quietest(&s.0, wobble),
+        |s| kernel_is_tonics_plus_commas(&s.0),
+        |s| s.0.graph().oid(),
+    ) {
+        Imperfect::Partial(run, coverage) => format!("{:?} {:?} {coverage:?}", run.best, run.stop),
+        other => panic!("expected a clean Partial, got {other:?}"),
+    };
+    let still = run(Wobble::Still);
+    for salt in 0..4 {
+        assert!(
+            run(Wobble::Ulp(salt)) == still,
+            "one ulp of wobble (salt {salt}) moved the steered search"
+        );
+    }
+}
+
 #[test]
 fn the_search_stops_moving_when_nothing_new_appears() {
     // Every covered graph on 2 or 3 labeled vertices, counted by brute force.
@@ -182,7 +241,7 @@ fn the_search_stops_moving_when_nothing_new_appears() {
         seeds(0..4),
         Budget(10_000),
         Patience(64),
-        |t| quietest(&t.0),
+        |t| quietest(&t.0, Wobble::Still),
         |t| kernel_is_tonics_plus_commas(&t.0),
         |t| {
             let a = t.0.graph().oid();
@@ -278,7 +337,7 @@ fn a_failure_is_kept_and_replays() {
         seeds(0..8),
         Budget(200),
         Patience(200),
-        |s| quietest(&s.0),
+        |s| quietest(&s.0, Wobble::Still),
         |s| betti(&s.0).1 == 0,
         |s| s.0.graph().oid(),
     ) {
@@ -300,7 +359,7 @@ fn steering_is_deterministic() {
             seeds(0..8),
             Budget(64),
             Patience(64),
-            |s| quietest(&s.0),
+            |s| quietest(&s.0, Wobble::Still),
             |s| kernel_is_tonics_plus_commas(&s.0),
             |s| s.0.graph().oid(),
         )
