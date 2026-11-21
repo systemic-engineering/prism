@@ -1867,6 +1867,62 @@ pub fn laplacian(graph: &Graph) -> Symmetric<Vertices, Z> {
     Symmetric(coboundary(graph).gram())
 }
 
+/// The quietest mode of a graph's Laplacian, exactly ([`quietest`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Quietest {
+    /// The smallest positive eigenvalue of L₀ as mirror's `0x06` tag: its
+    /// minimal polynomial and its index among that polynomial's real roots.
+    Mode(crate::poly::Algebraic),
+    /// L₀ has no positive eigenvalue: no edge joins two distinct vertices.
+    Silent,
+    /// The factoring budget ran out: the part of L₀'s minimal polynomial
+    /// (the kernel's x divided out) not yet split into irreducibles. The
+    /// quietest mode is not named. Never a guess.
+    Unresolved(crate::poly::ZPoly),
+}
+
+/// The quietest non-kernel mode of `graph`'s Laplacian L₀ = δ*δ, exactly:
+/// its smallest positive eigenvalue λ, as an algebraic number.
+///
+/// [`Instrument`](crate::spectral::instrument::Instrument)'s D has the
+/// non-kernel modes ±√λ, one pair per positive eigenvalue λ of L₀ (L₁↓
+/// shares them), so √ of this is D's quietest non-kernel |mode|, and the
+/// two order graphs alike. Nothing is measured: L₀ over ℤ, its minimal
+/// polynomial by Berkowitz, the kernel's x divided out, the rest factored
+/// over ℚ against `budget` ([`ZPoly::factor`](crate::poly::ZPoly::factor)).
+/// Every root of L₀ is real and every root of the rest positive, so each
+/// factor's least root is its root 0, and the quietest mode is the least of
+/// those, compared exactly ([`Algebraic::compare`](crate::poly::Algebraic::compare)).
+pub fn quietest(graph: &Graph, budget: crate::poly::Budget) -> Quietest {
+    use crate::poly::{Algebraic, Factored, ZPoly};
+    use std::cmp::Ordering;
+    let minimal = laplacian(graph).minimal_polynomial();
+    // L₀'s kernel holds the constants: x divides the minimal polynomial
+    // whenever there is a vertex. Divide it out.
+    let rest = match minimal.coefficients().split_first() {
+        Some((zero, rest)) if zero.is_zero() => ZPoly::from_ascending(rest.iter().cloned()),
+        _ => minimal,
+    };
+    if rest.degree().unwrap_or(0) == 0 {
+        return Quietest::Silent;
+    }
+    let factors = match rest
+        .factor(budget)
+        .expect("a factor of a square-free polynomial is square-free")
+    {
+        Factored::Certified(f) => f.factors().to_vec(),
+        Factored::Uncertified { unresolved, .. } => return Quietest::Unresolved(unresolved),
+    };
+    factors
+        .into_iter()
+        .map(|f| Algebraic::new(f, 0))
+        .reduce(|least, a| match a.compare(&least) {
+            Some(Ordering::Less) => a,
+            _ => least,
+        })
+        .map_or(Quietest::Silent, Quietest::Mode)
+}
+
 /// D = δ + δ* on C⁰ ⊕ C¹, exactly: δ from the vertex summand into the edge
 /// summand, δ* back. The same matrix, in the same basis, as
 /// [`Instrument`](crate::spectral::instrument::Instrument)'s.

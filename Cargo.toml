@@ -23,3 +23,9 @@ opt-level = 3
 
 [profile.dev.package.sha2]
 opt-level = 3
+
+# The steered search (tests/steer.rs) scores each graph exactly: Berkowitz,
+# Zassenhaus and Sturm over BigInt. Unoptimised, a score and a comparison
+# took ~50ms each; optimising num-bigint makes it ~10ms (Taut, 2026-11-21).
+[profile.dev.package.num-bigint]
+opt-level = 3

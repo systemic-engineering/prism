@@ -323,6 +323,72 @@ fn an_algebraic_tag_has_an_isolating_interval() {
 
 // --- Against room: P₄ and C₅, measured ------------------------------------------
 
+// --- 6. Exact comparison ------------------------------------------------------
+
+mod compare {
+    use super::*;
+    use std::cmp::Ordering::{Equal, Greater, Less};
+
+    fn at(minimal: &[i64], index: usize) -> Algebraic {
+        Algebraic::new(z(minimal), index)
+    }
+
+    #[test]
+    fn on_one_polynomial_the_index_orders_the_roots() {
+        assert_eq!(at(&[1, 0, -2], 0).compare(&at(&[1, 0, -2], 1)), Some(Less));
+        assert_eq!(at(&[1, 0, -2], 1).compare(&at(&[1, 0, -2], 1)), Some(Equal));
+        assert_eq!(
+            at(&[1, 0, -2], 1).compare(&at(&[1, 0, -2], 0)),
+            Some(Greater)
+        );
+    }
+
+    #[test]
+    fn close_values_are_separated_by_refining_not_by_a_float() {
+        // √2 = 1.41421356…: above 1.41421, below 1.41422. Every float
+        // reading of √2 agrees here; the point is that none is read.
+        let root2 = at(&[1, 0, -2], 1);
+        assert_eq!(root2.compare(&at(&[100_000, -141_421], 0)), Some(Greater));
+        assert_eq!(root2.compare(&at(&[100_000, -141_422], 0)), Some(Less));
+        assert_eq!(at(&[100_000, -141_422], 0).compare(&root2), Some(Greater));
+    }
+
+    #[test]
+    fn the_same_value_on_two_polynomials_is_equal() {
+        // 1 as the larger root of x² − 1 and as the root of x − 1: a tag
+        // that isn't minimal still names its value, and the gcd sees it.
+        assert_eq!(at(&[1, 0, -1], 1).compare(&at(&[1, -1], 0)), Some(Equal));
+        assert_eq!(at(&[1, 0, -1], 0).compare(&at(&[1, -1], 0)), Some(Less));
+    }
+
+    #[test]
+    fn a_tag_past_the_last_real_root_has_no_order() {
+        assert_eq!(at(&[1, 0, -2], 2).compare(&at(&[1, 0, -2], 0)), None);
+        assert_eq!(at(&[1, 0, -2], 0).compare(&at(&[1, 0, 1], 0)), None);
+    }
+
+    #[test]
+    fn the_roots_of_the_two_p7_cubics_interleave() {
+        // 2 − 2cos(kπ/7): odd k are the roots of y³ − 5y² + 6y − 1, even
+        // k ≠ 0 of y³ − 7y² + 14y − 7, and k orders them: 0.198 (odd 0),
+        // 0.753 (even 0), 1.555, 2.445, 3.247, 3.802.
+        let (odd, even) = ([1, -5, 6, -1], [1, -7, 14, -7]);
+        let ascending = [
+            at(&odd, 0),
+            at(&even, 0),
+            at(&odd, 1),
+            at(&even, 1),
+            at(&odd, 2),
+            at(&even, 2),
+        ];
+        for (i, a) in ascending.iter().enumerate() {
+            for (j, b) in ascending.iter().enumerate() {
+                assert_eq!(a.compare(b), Some(i.cmp(&j)), "{a:?} vs {b:?}");
+            }
+        }
+    }
+}
+
 #[cfg(feature = "lapack")]
 mod against_room {
     use super::*;
@@ -384,6 +450,43 @@ mod against_room {
                 tag(&[1, -4, 2], 1),
             ]
         );
+    }
+
+    #[test]
+    fn the_quietest_mode_of_p7_is_the_least_root_of_the_odd_cubic() {
+        use prismqueer::room::{quietest, Quietest};
+        // L₀(P₇) = x(y³ − 5y² + 6y − 1)(y³ − 7y² + 14y − 7). The even cubic
+        // comes first in canonical order; its least root, 2 − 2cos(2π/7),
+        // is not the quietest. 2 − 2cos(π/7) is.
+        let p7 = graph_from_edges(&[(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)]);
+        assert_eq!(
+            quietest(p7.multigraph(), PLENTY),
+            Quietest::Mode(Algebraic::new(z(&[1, -5, 6, -1]), 0))
+        );
+        // Out of budget it names no mode: the sextic is left unsplit.
+        assert_eq!(
+            quietest(p7.multigraph(), Budget(0)),
+            Quietest::Unresolved(z(&[1, -12, 55, -120, 126, -56, 7]))
+        );
+    }
+
+    #[test]
+    fn the_quietest_mode_is_the_least_over_every_component() {
+        use prismqueer::room::{quietest, Quietest};
+        // P₃ has 0, 1, 3; a separate edge has 0, 2. The quietest is 1.
+        let g = graph_from_edges(&[(0, 1), (1, 2), (3, 4)]);
+        assert_eq!(
+            quietest(g.multigraph(), PLENTY),
+            Quietest::Mode(Algebraic::new(z(&[1, -1]), 0))
+        );
+        let edge = graph_from_edges(&[(0, 1)]);
+        assert_eq!(
+            quietest(edge.multigraph(), PLENTY),
+            Quietest::Mode(Algebraic::new(z(&[1, -2]), 0))
+        );
+        // A self-loop joins no two vertices: L₀ = 0, no positive mode.
+        let lone = graph_from_edges(&[(0, 0)]);
+        assert_eq!(quietest(lone.multigraph(), PLENTY), Quietest::Silent);
     }
 
     #[test]

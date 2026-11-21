@@ -692,11 +692,11 @@ pub mod pillar {
 
     /// What a clean steered search found.
     #[derive(Clone, Debug, PartialEq)]
-    pub struct Steered {
+    pub struct Steered<S> {
         /// The replayable buffer of the lowest-scoring value seen.
         pub best: Option<Vec<u8>>,
         /// Its score under the steering measure.
-        pub best_score: Option<f64>,
+        pub best_score: Option<S>,
         /// Why the search stopped.
         pub stop: Stop,
     }
@@ -735,22 +735,30 @@ pub mod pillar {
     /// runs in a row brought no new address (the recursion stopped moving)
     /// or the `Budget` ran out. Deterministic: mutations come from a fixed
     /// sample.
-    pub fn steer<T: Arbitrary>(
+    ///
+    /// The score is `Ord`, so it is compared exactly, and a float can't
+    /// steer: one platform's last bit would choose the path. Among tied
+    /// scores the least address is kept (the first seen, if the address
+    /// ties too), so the best is the least (score, address) seen and the
+    /// path is a function of the seeds, the scores, the addresses and the
+    /// fixed mutation sample alone. On a plateau of equal scores the search
+    /// still moves, toward lower addresses.
+    pub fn steer<T: Arbitrary, S: Ord>(
         seeds: impl IntoIterator<Item = Vec<u8>>,
         budget: Budget,
         patience: Patience,
-        mut measure: impl FnMut(&T) -> f64,
+        mut measure: impl FnMut(&T) -> S,
         mut holds: impl FnMut(&T) -> bool,
         mut address: impl FnMut(&T) -> crate::oid::Oid,
-    ) -> terni::Imperfect<Steered, Counterexample, Coverage> {
+    ) -> terni::Imperfect<Steered<S>, Counterexample, Coverage> {
         use terni::Loss;
         let mut seeds = seeds.into_iter();
         let mut mutations = Sample::from_bytes(b"prismqueer::flux::steer".to_vec());
         let mut coverage = Coverage::zero();
-        let mut best: Option<(Vec<u8>, f64)> = None;
+        let mut best: Option<(Vec<u8>, S, crate::oid::Oid)> = None;
         let mut quiet = 0;
-        let clean = |best: Option<(Vec<u8>, f64)>, stop| {
-            let (best, best_score) = best.map_or((None, None), |(b, s)| (Some(b), Some(s)));
+        let clean = |best: Option<(Vec<u8>, S, crate::oid::Oid)>, stop| {
+            let (best, best_score) = best.map_or((None, None), |(b, s, _)| (Some(b), Some(s)));
             Steered {
                 best,
                 best_score,
@@ -760,20 +768,24 @@ pub mod pillar {
         for _ in 0..budget.0 {
             let buffer = match (seeds.next(), &best) {
                 (Some(seed), _) => seed,
-                (None, Some((b, _))) => mutate(b, &mut mutations),
+                (None, Some((b, _, _))) => mutate(b, &mut mutations),
                 (None, None) => break,
             };
             let mut sample = Sample::from_bytes(buffer);
             let value = T::arbitrary(&mut sample);
             let consumed = sample.consumed().to_vec();
             let before = distinct(&coverage);
-            coverage.push(Take::at(address(&value)));
+            let here = address(&value);
+            coverage.push(Take::at(here.clone()));
             if !holds(&value) {
                 return terni::Imperfect::Failure(Counterexample { buffer: consumed }, coverage);
             }
             let score = measure(&value);
-            if best.as_ref().is_none_or(|(_, s)| score < *s) {
-                best = Some((consumed, score));
+            if best
+                .as_ref()
+                .is_none_or(|(_, s, at)| (&score, &here) < (s, at))
+            {
+                best = Some((consumed, score, here));
             }
             quiet = if distinct(&coverage) > before {
                 0

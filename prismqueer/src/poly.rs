@@ -582,6 +582,16 @@ impl Roots {
         self.variations_at(lo) - self.variations_at(hi)
     }
 
+    /// The half of an isolating interval that still holds its root.
+    fn halve(&self, i: Interval) -> Interval {
+        let mid = (&i.lo + &i.hi) / BigRational::from_integer(BigInt::from(2));
+        if self.count_in(&i.lo, &mid) == 1 {
+            Interval { lo: i.lo, hi: mid }
+        } else {
+            Interval { lo: mid, hi: i.hi }
+        }
+    }
+
     /// How many roots are strictly below x, and whether x is one.
     fn below(&self, x: &BigRational) -> (usize, bool) {
         // The zero polynomial vanishes everywhere, but isolates nothing.
@@ -904,6 +914,44 @@ impl Algebraic {
     /// the last real root.
     pub fn isolating(&self) -> Option<Interval> {
         self.minimal.real_roots().intervals.get(self.index).cloned()
+    }
+
+    /// Which of two real algebraic numbers is the larger, exactly: no float
+    /// is read, so the answer is the same on every platform. `None` when a
+    /// tag names no real root (its index is past the last one).
+    ///
+    /// A tag's value is the `index`-th real root of its minimal polynomial's
+    /// square-free part. On one polynomial the indices order the roots.
+    /// Across two, the values are equal exactly when a common root (a root
+    /// of their gcd) lies in both isolating intervals; then nothing is
+    /// refined. Otherwise they differ, so halving each interval around its
+    /// own root separates them in finitely many steps.
+    pub fn compare(&self, other: &Algebraic) -> Option<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+        let (p, q) = (self.minimal.real_roots(), other.minimal.real_roots());
+        let mut a = p.intervals.get(self.index)?.clone();
+        let mut b = q.intervals.get(other.index)?.clone();
+        if p.poly == q.poly {
+            return Some(self.index.cmp(&other.index));
+        }
+        let common = p.poly.gcd(&q.poly).real_roots();
+        let (lo, hi) = (
+            std::cmp::max(&a.lo, &b.lo).clone(),
+            std::cmp::min(&a.hi, &b.hi).clone(),
+        );
+        if common.count_in(&lo, &hi) > 0 {
+            return Some(Ordering::Equal);
+        }
+        loop {
+            if a.hi <= b.lo {
+                return Some(Ordering::Less);
+            }
+            if b.hi <= a.lo {
+                return Some(Ordering::Greater);
+            }
+            a = p.halve(a);
+            b = q.halve(b);
+        }
     }
 }
 

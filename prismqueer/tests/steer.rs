@@ -7,17 +7,26 @@
 //!
 //! Steering: prismqueer's own spectrum chooses the next input. The measure is
 //! the quietest non-kernel mode of the Instrument, how close the graph is to a
-//! new tonic or comma appearing: the hardest cases for the kernel count.
+//! new tonic or comma appearing: the hardest cases for the kernel count. It is
+//! compared exactly, as an algebraic number from the room's exact Laplacian,
+//! so the path is the same on every platform; LAPACK's float is only a
+//! reading beside it.
 //!
 //! Stop: the search stops moving when the chord of distinct graphs stops
 //! growing. A clean search is Partial, never Success.
 
 #![cfg(all(feature = "lapack", feature = "bundle"))]
 
-use std::collections::BTreeSet;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Mutex, OnceLock};
+
+use num_bigint::BigInt;
 
 use prismqueer::flux::pillar::{steer, Arbitrary, Budget, Patience, Sample, Stop};
 use prismqueer::oid::Addressable;
+use prismqueer::poly::{Algebraic, Budget as Trials, ZPoly};
+use prismqueer::room;
 use prismqueer::spectral::instrument::Instrument;
 use prismqueer::spectral::{graph_from_edges, Graph};
 use terni::Imperfect;
@@ -102,8 +111,9 @@ fn kernel_is_tonics_plus_commas(f: &Field) -> bool {
 }
 
 /// A last-bit wobble of a float reading, the way another platform's LAPACK
-/// may round it: none, or one ulp up or down per graph, chosen by the
-/// graph's address and a salt.
+/// may round it: none, or 1 to 8 ulps up or down per graph, chosen by the
+/// graph's address and a salt. dsyev's error bound is a small multiple of
+/// n·ε·‖D‖, so a few ulps is what another BLAS kernel may differ by.
 #[derive(Clone, Copy, Debug)]
 enum Wobble {
     Still,
@@ -120,24 +130,106 @@ fn wobbled(reading: f64, f: &Field, wobble: Wobble) -> f64 {
                 .fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
                     (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
                 });
-            if key >> 32 & 1 == 0 {
-                reading.next_up()
+            let step = if key >> 32 & 1 == 0 {
+                f64::next_up
             } else {
-                reading.next_down()
-            }
+                f64::next_down
+            };
+            (0..=(key >> 40) % 8).fold(reading, |r, _| step(r))
         }
     }
 }
 
+/// The steering score: the quietest non-kernel mode, exactly.
+///
+/// `exact` is the smallest positive eigenvalue λ of L₀ ([`room::quietest`]);
+/// D's quietest non-kernel |mode| is √λ, so they order graphs alike. `None`
+/// is a graph with no non-kernel mode, quieter than none. `reading` is
+/// LAPACK's float for √λ, kept beside it and never compared.
+#[derive(Clone, Debug)]
+struct Quietest {
+    exact: Option<Algebraic>,
+    reading: f64,
+}
+
+impl Ord for Quietest {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (&self.exact, &other.exact) {
+            (Some(a), Some(b)) => compared(a, b),
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => Ordering::Equal,
+        }
+    }
+}
+
+impl PartialOrd for Quietest {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Quietest {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for Quietest {}
+
+/// Exact work is pure, so it is remembered across the suite's searches:
+/// each graph factored once, each pair of tags compared once.
+fn memo<K: Ord + Clone, V: Clone>(
+    cache: &'static OnceLock<Mutex<BTreeMap<K, V>>>,
+    key: K,
+    work: impl FnOnce() -> V,
+) -> V {
+    let cache = cache.get_or_init(Mutex::default);
+    if let Some(v) = cache.lock().expect("unpoisoned").get(&key) {
+        return v.clone();
+    }
+    let v = work();
+    cache.lock().expect("unpoisoned").insert(key, v.clone());
+    v
+}
+
+fn compared(a: &Algebraic, b: &Algebraic) -> Ordering {
+    static PAIRS: OnceLock<Mutex<BTreeMap<String, Ordering>>> = OnceLock::new();
+    memo(&PAIRS, format!("{a:?} {b:?}"), || {
+        a.compare(b).expect("a certified tag isolates its root")
+    })
+}
+
+fn exact(g: &Graph) -> Option<Algebraic> {
+    static MODES: OnceLock<Mutex<BTreeMap<String, Option<Algebraic>>>> = OnceLock::new();
+    memo(
+        &MODES,
+        g.oid().as_str().to_owned(),
+        || match room::quietest(g.multigraph(), Trials(10_000)) {
+            room::Quietest::Mode(a) => Some(a),
+            room::Quietest::Silent => None,
+            room::Quietest::Unresolved(rest) => panic!("factoring ran out on {rest:?}"),
+        },
+    )
+}
+
 /// The quietest non-kernel mode: prismqueer measuring where it is hardest.
-fn quietest(f: &Field, wobble: Wobble) -> f64 {
-    let d = Instrument::of(&f.graph()).expect("measured");
+fn quietest(f: &Field, wobble: Wobble) -> Quietest {
+    let g = f.graph();
+    let exact = exact(&g);
+    let d = Instrument::of(&g).expect("measured");
     let mut modes: Vec<f64> = d.eigenvalues().iter().map(|x| x.abs()).collect();
     modes.sort_by(f64::total_cmp);
-    modes
+    let reading = modes
         .get(d.kernel_dimension().ok().expect("an exact count"))
         .copied()
-        .map_or(f64::INFINITY, |m| wobbled(m, f, wobble))
+        .map_or(f64::INFINITY, |m| wobbled(m, f, wobble));
+    Quietest { exact, reading }
+}
+
+/// A ℤ[x] polynomial, leading coefficient first.
+fn z(coefficients: &[i64]) -> ZPoly {
+    ZPoly::from_descending(coefficients.iter().map(|&c| BigInt::from(c)))
 }
 
 fn seeds(range: std::ops::Range<u64>) -> Vec<Vec<u8>> {
@@ -155,9 +247,10 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
                 Wobble::Still,
             )
         })
-        .fold(f64::INFINITY, f64::min);
+        .min()
+        .expect("a budget of runs");
 
-    let steered = steer::<Seven>(
+    let steered = steer::<Seven, _>(
         seeds(0..8),
         Budget(budget as usize),
         Patience(budget as usize),
@@ -167,23 +260,28 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
     );
     match steered {
         Imperfect::Partial(run, coverage) => {
+            let best = run.best_score.expect("scored");
             eprintln!(
-                "blind best {blind:.4}; steered best {:.4} after {:?} runs, {:?}",
-                run.best_score.unwrap_or(f64::NAN),
+                "blind best {:.4}; steered best {:.4} after {:?} runs, {:?}",
+                blind.reading,
+                best.reading,
                 coverage.len(),
                 run.stop
             );
             assert!(
-                run.best_score.expect("scored") < blind,
-                "steered {:?} did not beat blind {blind}",
-                run.best_score
+                best < blind,
+                "steered {best:?} did not beat blind {blind:?}"
             );
             // Pin, for this deterministic configuration: the steered search
-            // reaches Fiedler's extremum, the path on 7 vertices, whose
-            // quietest mode is sqrt(2 - 2cos(pi/7)) in closed form.
-            let path = (2.0 - 2.0 * (std::f64::consts::PI / 7.0).cos()).sqrt();
-            assert!(
-                (run.best_score.unwrap() - path).abs() < 1e-9,
+            // reaches Fiedler's extremum, the path on 7 vertices. Its L₀ has
+            // the eigenvalues 2 − 2cos(kπ/7), and the quietest, k = 1, is the
+            // least root of y³ − 5y² + 6y − 1: the minimal polynomial of
+            // 2cos(π/7), x³ − x² − 2x + 1, at x = 2 − y. Its other factor,
+            // y³ − 7y² + 14y − 7 (the even k), comes first in canonical order
+            // and is the wrong one: its least root is 2 − 2cos(2π/7).
+            assert_eq!(
+                best.exact,
+                Some(Algebraic::new(z(&[1, -5, 6, -1]), 0)),
                 "did not reach the path"
             );
         }
@@ -193,12 +291,13 @@ fn steering_by_the_spectrum_beats_blind_sampling() {
 }
 
 /// Cross-platform by construction: a last-bit difference in LAPACK's
-/// eigenvalues, one ulp up or down on any graph, must not move the steered
-/// search. Same path, same best, same stop. On x86_64-linux OpenBLAS the
-/// float-steered search took another path than on aarch64-darwin.
+/// eigenvalues, a few ulps up or down on any graph, must not move the
+/// steered search. Same path, same best, same exact score, same stop. On
+/// x86_64-linux OpenBLAS the float-steered search took another path than on
+/// aarch64-darwin, and this wobble reproduces it on darwin.
 #[test]
 fn the_steered_search_does_not_read_the_last_bit() {
-    let run = |wobble| match steer::<Seven>(
+    let run = |wobble| match steer::<Seven, _>(
         seeds(0..8),
         Budget(200),
         Patience(200),
@@ -206,14 +305,19 @@ fn the_steered_search_does_not_read_the_last_bit() {
         |s| kernel_is_tonics_plus_commas(&s.0),
         |s| s.0.graph().oid(),
     ) {
-        Imperfect::Partial(run, coverage) => format!("{:?} {:?} {coverage:?}", run.best, run.stop),
+        Imperfect::Partial(run, coverage) => format!(
+            "{:?} {:?} {:?} {coverage:?}",
+            run.best,
+            run.best_score.map(|q| q.exact),
+            run.stop
+        ),
         other => panic!("expected a clean Partial, got {other:?}"),
     };
     let still = run(Wobble::Still);
-    for salt in 0..4 {
+    for salt in 0..16 {
         assert!(
             run(Wobble::Ulp(salt)) == still,
-            "one ulp of wobble (salt {salt}) moved the steered search"
+            "a few ulps of wobble (salt {salt}) moved the steered search"
         );
     }
 }
@@ -237,7 +341,7 @@ fn the_search_stops_moving_when_nothing_new_appears() {
 
     // Every run's address, in order: the search's own trace.
     let mut runs = Vec::new();
-    match steer::<Tiny>(
+    match steer::<Tiny, _>(
         seeds(0..4),
         Budget(10_000),
         Patience(64),
@@ -286,20 +390,45 @@ fn the_search_stops_moving_when_nothing_new_appears() {
 }
 
 #[test]
-fn among_tied_scores_the_first_seen_is_kept() {
-    // A constant measure ties every run: the best stays the first seed.
-    match steer::<u64>(
+fn among_tied_scores_the_least_address_is_kept() {
+    // A constant measure ties every run: the best is the seed with the least
+    // address, wherever it came in the order. Not the first seed here, so
+    // keeping the first seen would be caught.
+    let hash =
+        |x: &u64| prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), &x.to_le_bytes());
+    let least = (0..5u64).min_by_key(hash).expect("five seeds");
+    assert_ne!(least, 0, "the least address must not be the first seed");
+    match steer::<u64, _>(
         seeds(0..5),
         Budget(5),
         Patience(10),
-        |_| 1.0,
+        |_| 1u8,
         |_| true,
-        |x| prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), &x.to_le_bytes()),
+        hash,
+    ) {
+        Imperfect::Partial(run, _) => {
+            assert_eq!(run.best, Some(least.to_le_bytes().to_vec()));
+            assert_eq!(run.best_score, Some(1));
+            assert_eq!(run.stop, Stop::Budget);
+        }
+        other => panic!("expected a clean Partial, got {other:?}"),
+    }
+}
+
+#[test]
+fn among_tied_scores_and_addresses_the_first_seen_is_kept() {
+    // One address for every run: nothing breaks the tie, the first stays.
+    let one = prismqueer::oid::Oid::hash(&prismqueer::oid::Scope::public(), b"one");
+    match steer::<u64, _>(
+        seeds(0..5),
+        Budget(5),
+        Patience(10),
+        |_| 1u8,
+        |_| true,
+        |_| one.clone(),
     ) {
         Imperfect::Partial(run, _) => {
             assert_eq!(run.best, Some(0u64.to_le_bytes().to_vec()));
-            assert_eq!(run.best_score, Some(1.0));
-            assert_eq!(run.stop, Stop::Budget);
         }
         other => panic!("expected a clean Partial, got {other:?}"),
     }
@@ -310,11 +439,11 @@ fn a_search_that_keeps_finding_new_values_runs_out_of_budget() {
     // Every run is addressed afresh, so something new always appears. It
     // must never be called Saturated, however small the Patience.
     let mut fresh = 0u64;
-    match steer::<u64>(
+    match steer::<u64, _>(
         seeds(0..4),
         Budget(40),
         Patience(2),
-        |_| 0.0,
+        |_| 0u8,
         |_| true,
         |_| {
             fresh += 1;
@@ -333,7 +462,7 @@ fn a_search_that_keeps_finding_new_values_runs_out_of_budget() {
 #[test]
 fn a_failure_is_kept_and_replays() {
     // A deliberately false claim: no graph has a comma.
-    match steer::<Seven>(
+    match steer::<Seven, _>(
         seeds(0..8),
         Budget(200),
         Patience(200),
@@ -355,7 +484,7 @@ fn a_failure_is_kept_and_replays() {
 #[test]
 fn steering_is_deterministic() {
     let run = || {
-        steer::<Seven>(
+        steer::<Seven, _>(
             seeds(0..8),
             Budget(64),
             Patience(64),
