@@ -164,6 +164,12 @@ pub mod kleinos;
 #[cfg(feature = "lapack")]
 pub mod metrix;
 
+// measured: a precision matrix estimated exactly over ℚ from integer counts
+// under a declared (chordal) support; a Metrix only once certified and
+// sealed (prism-023 §1, D6). No float on its path.
+#[cfg(feature = "lapack")]
+pub mod measured;
+
 #[cfg(feature = "lapack")]
 pub mod question;
 

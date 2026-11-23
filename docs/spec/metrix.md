@@ -62,7 +62,7 @@ Per Mara §6.4, this is where a `Metrix` meets kleinos: beside each edge, as its
 
 ## Not built, and why
 
-- **`Measured<Metrix>` (D6).** prism has no generic measured wrapper: `band::Measurement` is one `f64` with its machine and method, and `Band` judges scalars near zero. A `Measured<Metrix>` would be a new type, not a fit. **Next:** a measured matrix (floats, machine, method, the window as signing context) that crosses into a `Metrix` only through `MetrixDraft::new` plus a seal, and the fit `Metrix::fit(sample, support) -> Result<Metrix, NotPD>` (Mara §9.1: never `mask`; zeros come from a covariance-selection fit, Dempster 1972).
+- **`Measured<Metrix>` (D6).** Built since, as `prismqueer::measured` (`docs/spec/measured.md`, prism-023 §1): from integer counts the estimate is exact over ℚ, so it needs no float, machine or LAPACK. The fit is covariance selection under the declared support (closed form for chordal support, non-chordal refused), never `mask`, and it crosses into a `Metrix` only through `MetrixDraft::new` plus a seal.
 - **A metric slot on `hypothesis::Frame`.** Not added. Composition needs no metric (Mara §4.2), and the frames test requires no metric on the composition path. A `Metrix` names its frame by address instead, so `Frame`, its address and `compose`/`hypothesize` are untouched, and nothing on that path can reference a metric. "Absent" stays "no lengths in this frame", not Euclidean (Mara §8.1).
 - **Leading minors over ℤ** (`room::determinant` on submatrices, Mara §8.1): not needed, since LDLᵀ certifies.
 - **Kronecker/sign-characteristic invariants for `Form` pairs:** OPEN (Mara §8.3), whether prism needs them.

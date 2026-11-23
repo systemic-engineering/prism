@@ -124,8 +124,8 @@
 //! # Not here
 //!
 //! - **`Measured<Metrix>`** (D6: an estimate is measured until a window
-//!   ruler signs it). prism's `band::Measurement` is one scalar float, not a
-//!   wrapper over a value, so there is no `Measured<_>` this fits. Next.
+//!   ruler signs it): [`crate::measured`], exact over ℚ from integer
+//!   counts, a `Metrix` only through a draft and a seal.
 //! - **A metric slot on `hypothesis::Frame`.** Composition needs no metric
 //!   (Mara §4.2, §6.4). A `Metrix` names its frame by address instead, and
 //!   the frame stays untouched, so nothing on the composition path can

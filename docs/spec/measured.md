@@ -109,3 +109,25 @@ measured.seal(window: &Ruler)    → Result<Metrix, Refused>             the typ
 - S. L. Lauritzen, *Graphical Models*, Oxford 1996, §5.3 (Prop. 5.9: the MLE in a decomposable model).
 - R. E. Tarjan and M. Yannakakis, *Simple linear-time algorithms to test chordality of graphs, test acyclicity of hypergraphs, and selectively reduce acyclic hypergraphs*, SIAM J. Comput. 13 (1984), 566–579.
 - J. R. S. Blair and B. Peyton, *An introduction to chordal graphs and clique trees*, in *Graph Theory and Sparse Matrix Computation*, IMA Vol. 56, Springer 1993, 1–29.
+
+## Tests (`prismqueer/tests/measured.rs`)
+
+19 tests, and 2 doctests in the module (the `compile_fail,E0308` that a `Measured` is not a `Metrix`, and its control through draft and seal). Every number is worked by hand in the test's doc comment.
+
+- **Two streams, full support,** samples (1,2), (2,2), (3,5), (4,7):
+  - `Mle`: S = [[5/4, 9/4], [9/4, 9/2]], K = [[8, −4], [−4, 20/9]], certificate D = (8, 2/9), l₂₁ = −1/2.
+  - `Unbiased`: S = [[5/3, 3], [3, 6]], K = [[6, −3], [−3, 5/3]], D = (6, 1/6).
+  - One declared edge on two streams is the full support.
+- **The path A–B–C,** samples (0,0,0), (1,1,0), (2,1,2), (1,2,2): S = [[1/2, 1/4, 1/2], [1/4, 1/2, 1/2], [1/2, 1/2, 1]]; K̂ = [[8/3, −4/3, 0], [−4/3, 14/3, −2], [0, −2, 2]] with **K̂_AC = 0**; the full inverse is [[4, 0, −2], [0, 4, −2], [−2, −2, 3]]. K̂⁻¹ agrees with S on the support, its A–C entry the implied 1/4, and D = (8/3, 4, 1). Three samples are too few for the full support and enough for the path.
+- **Chordality:** orders, cliques and separators for the path, the chorded four-cycle, two components, the full support and a star (whose separator counts twice, checked by Dempster's condition). The four-cycle is `Unresolved`, before the sample count is looked at.
+- **Refusals:** `TooFewSamples` (n ≤ d; n = 0; the covariance's own floors), `NotInvertible` for collinear streams and for the singular clique of a path, `WrongShape` for a sample's length, an edge past the frame and a self-edge. A singular S handed to `MetrixDraft` is `NotDefinite { pivot: 2, value: 0 }`.
+- **The address:** one address for one set of inputs; another window, frame, estimator, sample or support is another; a support written two ways is one. One window judgment sealed by two keepers measures to one address, and neither name is in the preimage.
+- **Sealing:** `Measured::seal` by the window ruler's signer, `OtherWindow` for another ruler; `draft().seal(anyone)` is allowed and names its signer, at the same metrix address.
+- **Dempster's condition,** over 256 seeded supports on 2–5 streams with d + 1 to d + 4 counts in 0..=4: every chordal fit is zero off its support, its inverse equals S on the support and the diagonal, and its draft certifies; every `Unresolved` support has a chordless cycle by a brute-force oracle.
+- **No float:** a source scan of `src/measured.rs` (code, comments aside) finds no `f64`, `f32`, LAPACK, BLAS, `ndarray` or `band::` (the pattern of `no_clock.rs`). It holds the module only: its exact callees (`metrix`, `room::Q`, `gl::rational`) live in files that also hold float code elsewhere.
+
+**Mutations.** Each was applied, run against `measured::` and reverted:
+- **n − 1 where `Mle` is declared:** fails 4 (both hand-checked fits on the MLE, the path's Dempster check, the collinear S).
+- **Zero-masking S⁻¹ instead of the clique formula:** fails 6, among them the path's K̂, Dempster's condition and the separator multiplicity.
+- **Inverting non-chordal support anyway** (the full S⁻¹ on `Unresolved`): fails the four-cycle test and the random Dempster property.
+- **Dropping the separator term:** fails 4, among them the path's K̂_BB (20/3 for 14/3) and the star.
