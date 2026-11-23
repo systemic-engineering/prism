@@ -36,6 +36,7 @@ mod kleinos;
 mod lambda_integration;
 mod lapack_faults;
 mod loss_laws;
+mod measured;
 mod metrix;
 mod music;
 mod no_clock;
