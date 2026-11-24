@@ -41,6 +41,10 @@ pub mod crystal;
 // sealed (prism-024 §1; Mara, mirror-029 I.1). No feature, no float.
 pub mod hold;
 pub mod luminosity;
+// The navigation floor: K3 (max, min) over Membership, K3-Datalog over
+// hyperedges; an unexplored edge reads maybe (prism-025 Addendum item 1;
+// Mara 052e5a13 §2). No feature, no float.
+pub mod navigation;
 pub mod scalar_loss;
 pub mod substrate_ref;
 pub mod trace;
