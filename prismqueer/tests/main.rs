@@ -25,6 +25,7 @@ mod field;
 mod field_faces;
 mod field_multiplicity;
 mod field_prism;
+mod flip;
 mod flux_ouroboros;
 mod gate_vectors;
 mod hodge;

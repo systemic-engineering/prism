@@ -1,0 +1,76 @@
+{
+  "fixture": "Tim Urista's handoff test (mirror-028), as flip vectors. No witness field: a witness sits beside the roll and waits for Alex's pin (Mara, mirror-029 Ask 2 item 1; long form 3333dd80 §6). Spec: docs/spec/flip.md.",
+  "ticket": "INC-1: checkout returns 502 under load",
+  "hypotheses": {
+    "H1": "the database connection pool is exhausted",
+    "H2": "the payments v2.3 deploy is bad"
+  },
+  "log": [
+    { "position": 1, "trace": "t1", "fact": "t1/gateway: 502 on POST /checkout" },
+    { "position": 2, "trace": "t1", "fact": "t1/payments: serving v2.2" },
+    { "position": 3, "trace": "t1", "fact": "t1/db: query latency normal" },
+    { "position": 4, "trace": "t2", "fact": "t2/gateway: 502 on POST /checkout" },
+    { "position": 5, "trace": "t2", "fact": "t2/pool: 12 of 50 connections in use" },
+    { "position": 6, "trace": "t2", "fact": "t2/cache: miss on cart" },
+    { "position": 7, "trace": "t2", "fact": "t2/pool: acquire wait 0 ms" }
+  ],
+  "derivations": [
+    {
+      "name": "H2.refuted",
+      "reads": "the deploy H2 blames is not the one serving",
+      "rules": [
+        [{ "fact": "t1/payments: serving v2.2" }]
+      ]
+    },
+    {
+      "name": "H1.refuted",
+      "reads": "a healthy pool reading refutes H1 unless the pool metric is sampled (unexplored: maybe); a zero acquire wait settles it",
+      "rules": [
+        [{ "fact": "t2/pool: 12 of 50 connections in use" }, { "unexplored": "pool-metric-sampling" }],
+        [{ "fact": "t2/pool: 12 of 50 connections in use" }, { "fact": "t2/pool: acquire wait 0 ms" }]
+      ]
+    }
+  ],
+  "expected": {
+    "flip_point": {
+      "H2.refuted": {
+        "maybe": { "before": 1, "at": 2, "fact": "t1/payments: serving v2.2" },
+        "true": { "before": 1, "at": 2, "fact": "t1/payments: serving v2.2" }
+      },
+      "H1.refuted": {
+        "maybe": { "before": 4, "at": 5, "fact": "t2/pool: 12 of 50 connections in use" },
+        "true": { "before": 6, "at": 7, "fact": "t2/pool: acquire wait 0 ms" }
+      }
+    },
+    "scan": {
+      "H2.refuted": [
+        { "before": 1, "at": 2, "from": "false", "to": "true" }
+      ],
+      "H1.refuted": [
+        { "before": 4, "at": 5, "from": "false", "to": "maybe" },
+        { "before": 6, "at": 7, "from": "maybe", "to": "true" }
+      ]
+    },
+    "decision": {
+      "name": "D",
+      "rule": "raise the pool size to 100",
+      "owner": "on-call-a",
+      "premises": ["H1.refuted", "H2.refuted"],
+      "sealed_at": 3,
+      "standing": [
+        { "at": 3, "reads": "stands" },
+        { "at": 4, "reads": "stands" },
+        { "at": 5, "reads": "hold", "owner": "on-call-a", "moved": [{ "premise": "H1.refuted", "sealed": "false", "now": "maybe" }] },
+        { "at": 6, "reads": "hold", "owner": "on-call-a", "moved": [{ "premise": "H1.refuted", "sealed": "false", "now": "maybe" }] },
+        { "at": 7, "reads": "hold", "owner": "on-call-a", "moved": [{ "premise": "H1.refuted", "sealed": "false", "now": "true" }] }
+      ]
+    }
+  },
+  "notes": [
+    "Positions are 1-based; a flip (before, at) is the pair of checkpoints k-1, k and the fact at k. Two readers of this log get these answers; a reader of the same facts in another order may not (the order is a ruler, Mara §5.1).",
+    "Tim's three questions from the store alone: which explanation was ruled out (H2, at checkpoint 2, by the payments span); when the decision changed (D is HOLD from checkpoint 5, where H1's refutation reaches maybe, resting on the unexplored pool-metric-sampling edge, and true at 7); who can reopen (D's owner, on-call-a, by a seal over the current tuple).",
+    "D's premises are derived verdicts (H1.refuted, H2.refuted), never the trace's fact set: a fact head as a premise would HOLD D on every span (Mara B1). D stands through checkpoint 4, an irrelevant span: early cutoff.",
+    "Status words are the K3 values of the refutation derivations; the verdict words are Alex's (mirror-029 For Alex 4).",
+    "Reading the unexplored edge as false would move H1.refuted's maybe threshold from 5 to 7, and D's HOLD with it: the frontier the HOLD rests on would vanish from the record."
+  ]
+}

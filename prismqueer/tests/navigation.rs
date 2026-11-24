@@ -18,13 +18,13 @@ use prismqueer::navigation::{plus, times, Body, Edge, Label, Membership, Program
 
 /// MT19937, seeded as CPython seeds a small non-negative int
 /// (`init_by_array([seed])`).
-struct CPython {
+pub(crate) struct CPython {
     mt: [u32; 624],
     index: usize,
 }
 
 impl CPython {
-    fn new(seed: u32) -> Self {
+    pub(crate) fn new(seed: u32) -> Self {
         let mut mt = [0u32; 624];
         mt[0] = 19_650_218;
         for i in 1..624 {
@@ -61,7 +61,7 @@ impl CPython {
         CPython { mt, index: 624 }
     }
 
-    fn next_u32(&mut self) -> u32 {
+    pub(crate) fn next_u32(&mut self) -> u32 {
         if self.index >= 624 {
             for k in 0..624 {
                 let y = (self.mt[k] & 0x8000_0000) | (self.mt[(k + 1) % 624] & 0x7fff_ffff);
@@ -98,7 +98,7 @@ impl CPython {
     }
 
     /// `_randbelow(n)`: k = n.bit_length() bits, rejected until below n.
-    fn below(&mut self, n: u32) -> u32 {
+    pub(crate) fn below(&mut self, n: u32) -> u32 {
         let k = 32 - n.leading_zeros();
         loop {
             let r = self.next_u32() >> (32 - k);
