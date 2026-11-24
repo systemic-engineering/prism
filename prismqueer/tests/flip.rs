@@ -18,8 +18,8 @@
 use std::collections::BTreeSet;
 
 use prismqueer::flip::{
-    basis, bisect, bound, earliest, flip_point, scan, Basis, Budget, Crossing, Monotone,
-    Threshold, Witness,
+    basis, bisect, bound, earliest, flip_point, scan, Basis, Budget, Crossing, Monotone, Threshold,
+    Witness,
 };
 use prismqueer::hold::{standing, Current, DecisionDraft, Output, Premise, Reading, Standing};
 use prismqueer::navigation::{Body, Edge, Membership, Program, Rule, K3};
@@ -117,8 +117,11 @@ fn agree(m: &Monotone<u32, u32>, facts: &[Fact], with_basis: bool) -> bool {
 
 /// `q :- a, unexplored(e)` and `q :- a, b`: maybe once `a`, true once `b`.
 fn two_thresholds() -> Monotone<u32, u32> {
-    let mut p = Program::new();
-    p.rule(Rule::new(Q, [Body::Atom(1), Body::Edge(Edge::Unexplored(9))]));
+    let mut p: Program<u32, u32> = Program::new();
+    p.rule(Rule::new(
+        Q,
+        [Body::Atom(1), Body::Edge(Edge::Unexplored(9))],
+    ));
     p.rule(Rule::new(Q, [Body::Atom(1), Body::Atom(2)]));
     Monotone::new(p, Q)
 }
@@ -131,11 +134,19 @@ fn both_thresholds_are_found_each_with_its_pair_and_fact() {
     let fp = flip_point(&m, &facts);
     assert_eq!(
         fp.maybe.crossing,
-        Crossing::At { before: 1, at: 2, fact: &facts[1] }
+        Crossing::At {
+            before: 1,
+            at: 2,
+            fact: &facts[1]
+        }
     );
     assert_eq!(
         fp.truth.crossing,
-        Crossing::At { before: 3, at: 4, fact: &facts[3] }
+        Crossing::At {
+            before: 3,
+            at: 4,
+            fact: &facts[3]
+        }
     );
     assert_eq!(fp.get(Threshold::Maybe), &fp.maybe);
     assert_eq!(fp.get(Threshold::True), &fp.truth);
@@ -145,8 +156,15 @@ fn both_thresholds_are_found_each_with_its_pair_and_fact() {
 
     let sc = scan(&facts, |p| m.verdict(p));
     assert_eq!(sc.initial, K3::False);
-    let flips: Vec<_> = sc.flips.iter().map(|f| (f.before, f.at, f.from, f.to)).collect();
-    assert_eq!(flips, [(1, 2, K3::False, K3::Maybe), (3, 4, K3::Maybe, K3::True)]);
+    let flips: Vec<_> = sc
+        .flips
+        .iter()
+        .map(|f| (f.before, f.at, f.from, f.to))
+        .collect();
+    assert_eq!(
+        flips,
+        [(1, 2, K3::False, K3::Maybe), (3, 4, K3::Maybe, K3::True)]
+    );
     assert!(std::ptr::eq(sc.flips[1].fact, &facts[3]));
 }
 
@@ -167,7 +185,7 @@ fn a_threshold_can_read_never_or_initially() {
     assert_eq!(fp.truth.crossing, Crossing::Never);
 
     // Initially: the empty prefix is already at the threshold; nothing flipped.
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     p.rule(Rule::new(Q, [Body::Edge(Edge::Unexplored(9))]));
     p.rule(Rule::new(Q, [Body::Atom(2)]));
     let m = Monotone::new(p, Q);
@@ -209,16 +227,16 @@ fn instance(rng: &mut Mix, n: usize) -> (Monotone<u32, u32>, Vec<Fact>) {
         })
         .collect();
     rng.shuffle(&mut facts);
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     for c in 0..1 + rng.below(3) {
         let mut body: Vec<Body<u32, u32>> = (0..1 + rng.below(3))
             .map(|_| Body::Atom(rng.below(n) as u32))
             .collect();
         match rng.below(4) {
             0 => body.push(Body::Edge(Edge::Unexplored(c as u32))),
-            1 => body.push(Body::Edge(Edge::Read(Membership::Undecided(BTreeSet::from([
-                c as u32,
-            ]))))),
+            1 => body.push(Body::Edge(Edge::Read(Membership::Undecided(
+                BTreeSet::from([c as u32]),
+            )))),
             _ => {}
         }
         p.rule(Rule::new(Q, body));
@@ -243,7 +261,10 @@ fn bisection_equals_scan_equals_the_witness_formula_on_random_monotone_instances
     }
     assert_eq!(ok, 300);
     // Both thresholds are exercised, and they come apart.
-    assert!(distinct > 50 && both > 50, "distinct {distinct}, both {both}");
+    assert!(
+        distinct > 50 && both > 50,
+        "distinct {distinct}, both {both}"
+    );
 }
 
 #[test]
@@ -252,10 +273,17 @@ fn bisection_stays_within_the_log_bound_on_long_logs() {
     for _ in 0..4 {
         let n = 512 + rng.below(100);
         let facts: Vec<Fact> = (0..n as u32).map(Rule::fact).collect();
-        let (a, b, c) = (rng.below(n) as u32, rng.below(n) as u32, rng.below(n) as u32);
-        let mut p = Program::new();
+        let (a, b, c) = (
+            rng.below(n) as u32,
+            rng.below(n) as u32,
+            rng.below(n) as u32,
+        );
+        let mut p: Program<u32, u32> = Program::new();
         p.rule(Rule::new(Q, [Body::Atom(a), Body::Atom(b)]));
-        p.rule(Rule::new(Q, [Body::Atom(c), Body::Edge(Edge::Unexplored(0))]));
+        p.rule(Rule::new(
+            Q,
+            [Body::Atom(c), Body::Edge(Edge::Unexplored(0))],
+        ));
         let m = Monotone::new(p, Q);
         assert!(agree(&m, &facts, false));
         let fp = flip_point(&m, &facts);
@@ -275,7 +303,7 @@ fn bisection_stays_within_the_log_bound_on_long_logs() {
 #[test]
 fn the_basis_is_a_minimal_antichain() {
     // q :- a, b ; q :- c ; q :- a, b, c.  Facts in order [c, a, b, d].
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     p.rule(Rule::new(Q, [Body::Atom(1), Body::Atom(2)]));
     p.rule(Rule::new(Q, [Body::Atom(3)]));
     p.rule(Rule::new(Q, [Body::Atom(1), Body::Atom(2), Body::Atom(3)]));
@@ -287,7 +315,7 @@ fn the_basis_is_a_minimal_antichain() {
     assert_eq!(earliest(&w), Some(1));
 
     // Overdetermined (Mara B5): two refuting spans, each a witness alone.
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     p.rule(Rule::new(Q, [Body::Atom(1)]));
     p.rule(Rule::new(Q, [Body::Atom(2)]));
     let m = Monotone::new(p, Q);
@@ -298,7 +326,7 @@ fn the_basis_is_a_minimal_antichain() {
 
 #[test]
 fn over_budget_is_typed_and_its_members_are_still_minimal() {
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     p.rule(Rule::new(Q, [Body::Atom(1), Body::Atom(2)]));
     p.rule(Rule::new(Q, [Body::Atom(3)]));
     let m = Monotone::new(p, Q);
@@ -348,7 +376,7 @@ fn over_budget_is_typed_and_its_members_are_still_minimal() {
 #[test]
 fn the_scan_finds_every_flip_under_negation() {
     // q :- a ; r :- q, not b (a test-side rule; navigation has no `not`).
-    let mut p = Program::new();
+    let mut p: Program<u32, u32> = Program::new();
     p.rule(Rule::new(Q, [Body::Atom(1)]));
     let m = Monotone::new(p, Q);
     let not_b = |prefix: &[Fact]| {
@@ -360,8 +388,15 @@ fn the_scan_finds_every_flip_under_negation() {
     };
     let facts = [Rule::fact(1), Rule::fact(2), Rule::fact(5)];
     let sc = scan(&facts, not_b);
-    let flips: Vec<_> = sc.flips.iter().map(|f| (f.before, f.at, f.from, f.to)).collect();
-    assert_eq!(flips, [(0, 1, K3::False, K3::True), (1, 2, K3::True, K3::False)]);
+    let flips: Vec<_> = sc
+        .flips
+        .iter()
+        .map(|f| (f.before, f.at, f.from, f.to))
+        .collect();
+    assert_eq!(
+        flips,
+        [(0, 1, K3::False, K3::True), (1, 2, K3::True, K3::False)]
+    );
     // The flip back keeps the error that dissolved; bisection would see one
     // threshold (v(n) = false: "never") and lose both.
     assert_eq!(sc.first_reaching(Threshold::True), Some(1));
@@ -423,7 +458,7 @@ fn b4_mara_400_400_400_and_144_multi_flips_under_negation() {
             })
             .collect();
         let order = sample(&mut r, &fs, 5);
-        let mut p = Program::new();
+        let mut p: Program<u32, u32> = Program::new();
         for c in &clauses {
             p.rule(Rule::new(Q, c.iter().map(|&f| Body::Atom(f))));
         }
@@ -455,7 +490,11 @@ fn b4_mara_400_400_400_and_144_multi_flips_under_negation() {
             .filter(|&k| v[k] != v[k - 1])
             .map(|k| (k - 1, k, v[k - 1], v[k]))
             .collect();
-        let got: Vec<_> = sc.flips.iter().map(|f| (f.before, f.at, f.from, f.to)).collect();
+        let got: Vec<_> = sc
+            .flips
+            .iter()
+            .map(|f| (f.before, f.at, f.from, f.to))
+            .collect();
         found += (got == expected && sc.initial == v[0]) as usize;
     }
     assert_eq!(mono_ok, 400, "B4 scan == bisection == witness-min");
@@ -582,20 +621,25 @@ fn tims_decision_d_stands_then_holds_through_hold() {
     };
     let d = &t["expected"]["decision"];
     let sealed_at = d["sealed_at"].as_u64().expect("sealed_at") as usize;
-    let premises: Vec<Premise> = outputs(sealed_at).iter().map(Premise::of).collect();
-    let names: Vec<String> = d["premises"]
+    // D's premises in its declared order, each projected from the output at
+    // the seal.
+    let at_seal = outputs(sealed_at);
+    let premises: Vec<Premise> = d["premises"]
         .as_array()
         .expect("premises")
         .iter()
-        .map(s)
+        .map(|name| {
+            let o = at_seal
+                .iter()
+                .find(|o| o.premise().as_str() == s(name))
+                .expect("a premise is a derivation");
+            Premise::of(o)
+        })
         .collect();
-    assert_eq!(
-        premises.iter().map(|p| p.premise().as_str().to_string()).collect::<Vec<_>>(),
-        names
-    );
-    let decision = DecisionDraft::new(Oid::new(&s(&d["rule"])), premises)
+    assert_eq!(premises.len(), ds.len());
+    let decision = DecisionDraft::new(Oid::new(s(&d["rule"])), premises)
         .expect("distinct premises")
-        .seal(Oid::new(&s(&d["owner"])));
+        .seal(Oid::new(s(&d["owner"])));
 
     for row in d["standing"].as_array().expect("standing") {
         let at = row["at"].as_u64().expect("at") as usize;

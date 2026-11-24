@@ -37,6 +37,11 @@ pub mod brain;
 pub mod coincidence;
 pub mod crossing;
 pub mod crystal;
+// The flip point: when a verdict over a sequence of facts changed, by
+// bisection for monotone programs, by scan for any verdict, and the minimal
+// witness basis without a sequencer (prism-024 §2; Mara, mirror-029 II.5).
+// No feature, no float.
+pub mod flip;
 // The HOLD law: a decision stands while every premise projection is the one
 // sealed (prism-024 §1; Mara, mirror-029 I.1). No feature, no float.
 pub mod hold;
