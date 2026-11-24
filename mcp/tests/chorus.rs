@@ -241,7 +241,7 @@ fn the_index_is_an_integer() {
             "chorus",
             &arguments(&v.note, &v.ed25519, &v.mldsa44, Some(&inc)),
         );
-        let a = ready(&[line.clone()]).remove(0);
+        let a = ready(std::slice::from_ref(&line)).remove(0);
         assert_eq!(code(&a), -32602, "{index}");
         let d = get(&a, &["error", "data"]);
         assert_eq!(str_of(get(d, &["argument"])), "inclusion.index");

@@ -208,7 +208,7 @@ fn heard_names_the_bytes_received() {
     let no_score = ready(&[call(
         1,
         "echo",
-        &format!(r#"{{"source":"","certificate":"","record":"","witness":false}}"#),
+        r#"{"source":"","certificate":"","record":"","witness":false}"#,
     )]);
     let t = texts(&no_score[0]);
     assert_eq!(t.len(), 2);

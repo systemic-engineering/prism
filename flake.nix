@@ -102,6 +102,17 @@
 
       toSource = fileset: fs.toSource { root = ./.; inherit fileset; };
 
+      # The independence guards: the shared walk, its two wrappers, and their
+      # fixtures, side by side (each wrapper calls the walk next to it).
+      guardSrc = toSource (
+        fs.unions [
+          ./nix/independent.sh
+          ./nix/echo-independent.sh
+          ./nix/prism-mcp-independent.sh
+          ./nix/fixtures
+        ]
+      );
+
       # ── The native build environment ───────────────────────────────────────────────────
       # prismqueer/build.rs reads FC, LAPACK_DIR and BLAS_DIR (each under
       # rerun-if-env-changed). Here they come from the store, so the build is
@@ -372,12 +383,44 @@
               nativeBuildInputs = [ pkgs.jq ];
               doInstallCargoArtifacts = false;
               buildPhaseCargoCommand = ''
-                guard=${./nix/echo-independent.sh}
+                guard=${guardSrc}/nix/echo-independent.sh
+                fixtures=${guardSrc}/nix/fixtures
                 cargo metadata --format-version 1 --locked --offline > metadata.json
                 bash $guard metadata.json
-                bash $guard ${./nix/fixtures/echo-clean.json}
-                for f in ${./nix/fixtures/echo-direct.json} ${./nix/fixtures/echo-transitive.json} ${./nix/fixtures/echo-links.json}; do
+                bash $guard $fixtures/echo-clean.json
+                for f in $fixtures/echo-direct.json $fixtures/echo-transitive.json $fixtures/echo-links.json; do
                   if bash $guard $f 2>/dev/null; then echo "echo-independent accepted $f" >&2; exit 1; fi
+                done
+              '';
+              installPhaseCommand = "touch $out";
+            };
+
+            # docs/spec/mcp.md §6: prism-mcp's graph holds no serde, no JSON
+            # crate, no prismqueer, no mirror crate and nothing LAPACK, BLAS or
+            # Fortran; every kind from prism-mcp, normal and build below it
+            # (chorus's dev-dependency serde_json is never linked into it).
+            # The guard runs on the real graph, accepts the clean fixture (that
+            # dev edge included) and refuses six: serde_json as a normal edge
+            # under chorus, serde_json as prism-mcp's own dev-dependency, a
+            # JSON crate not named serde, a mirror crate, prismqueer, and an
+            # innocently named crate with `links = "blas"`.
+            prism-mcp-independent = craneLib.mkCargoDerivation {
+              pname = "prism-mcp-independent";
+              inherit version;
+              src = packageSrc;
+              strictDeps = true;
+              cargoArtifacts = null;
+              cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+              nativeBuildInputs = [ pkgs.jq ];
+              doInstallCargoArtifacts = false;
+              buildPhaseCargoCommand = ''
+                guard=${guardSrc}/nix/prism-mcp-independent.sh
+                fixtures=${guardSrc}/nix/fixtures
+                cargo metadata --format-version 1 --locked --offline > metadata.json
+                bash $guard metadata.json
+                bash $guard $fixtures/mcp-clean.json
+                for f in serde-json root-dev json mirror prismqueer links; do
+                  if bash $guard $fixtures/mcp-$f.json 2>/dev/null; then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
                 done
               '';
               installPhaseCommand = "touch $out";

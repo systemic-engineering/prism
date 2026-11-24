@@ -86,7 +86,10 @@ fn mutated_messages_never_panic() {
                     1 => {
                         m.remove(at);
                     }
-                    _ => m.insert(at, b"\"{}[],:\\0e-"[rng.below(12)]),
+                    _ => {
+                        let structural = b"\"{}[],:\\0e-";
+                        m.insert(at, structural[rng.below(structural.len())])
+                    }
                 }
             }
             let mut input = ready.clone().into_bytes();

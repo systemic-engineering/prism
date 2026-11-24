@@ -12,37 +12,18 @@
 #     library is linked under the `links` name, whatever the crate is called.
 #
 # Input: `cargo metadata --format-version 1` JSON. The graph is resolve.nodes:
-# every dependency kind (normal, build, dev) and every target counts.
+# every dependency kind (normal, build, dev) and every target counts, at every
+# depth (the shared walk, nix/independent.sh, with <dev> = all).
 #
 # Usage: echo-independent.sh <metadata.json>
 set -euo pipefail
 
 meta=${1:?usage: echo-independent.sh <metadata.json>}
 forbidden='^(prismqueer|mirror|mirror[-_].*|.*lapack.*|.*blas.*|.*fortran.*|netlib-src|intel-mkl.*|accelerate-src)$'
-native='lapack|blas|fortran'
 
-# The closure is a fixpoint over a frontier, not jq's recurse: a dev-dependency
-# can close a cycle back to echo, and recurse would not terminate.
-found=$(jq -r --arg re "$forbidden" --arg native "$native" '
-  (.packages | map({key: .id, value: .name}) | from_entries) as $name
-  | (.packages | map({key: .id, value: (.links // "")}) | from_entries) as $links
-  | (.resolve.nodes | map({key: .id, value: [.deps[].pkg]}) | from_entries) as $deps
-  | [.packages[] | select(.name == "echo") | .id] as $roots
-  | if ($roots | length) != 1 then "!no-echo"
-    else {seen: $roots, frontier: $roots}
-      | until(.frontier | length == 0;
-          ([.frontier[] | ($deps[.] // [])[]] | unique) as $next
-          | ($next - .seen) as $new
-          | {seen: (.seen + $new), frontier: $new})
-      | .seen - $roots
-      | map(if ($name[.] | test($re)) then $name[.]
-            elif ($links[.] | test($native)) then "\($name[.]) (links \($links[.]))"
-            else empty end)
-      | unique | .[]
-    end
-' "$meta")
+found=$(bash "$(dirname "$0")/independent.sh" "$meta" echo "$forbidden" all)
 
-if [ "$found" = "!no-echo" ]; then
+if [ "$found" = "!no-root" ]; then
   echo "✖ echo-independent: no single package named echo in $meta" >&2
   exit 1
 fi

@@ -110,7 +110,7 @@ So `print(read(x))` is canonical (printing it and reading it again gives the sam
 
 ## 5. The tools
 
-Inputs are JSON strings (text) or canonical base64 (bytes), never paths. Unknown arguments, missing required ones and wrong types are `-32602`, with `data: {argument, expected}`.
+Inputs are JSON strings (text) or canonical base64 (bytes), never paths. Unknown arguments, missing required ones and wrong types are `-32602`, with `data: {argument, expected}` (`expected: "none"` for an unknown argument; a nested one is named `inclusion.<name>`). An unknown tool is `-32602` with the message `Unknown tool: <name>` and `data: {tool}`. A non-integer `inclusion.index` adds the reader's `refusal` and `at` to the data.
 
 ### 5.1 `echo`
 
@@ -144,7 +144,7 @@ Inputs are JSON strings (text) or canonical base64 (bytes), never paths. Unknown
   inclusion <index> accept | reject <why> | unchecked | none
   ```
 
-  `<why>` is `note <error>`, `body`, `extensions`, `duplicate`, `unsigned ed25519 <bool> mldsa44 <bool>`, or `inclusion`. `heard` is BLAKE3 (echo's `H`) of each string's UTF-8, and of the decoded leaf and of the decoded path hashes concatenated. `accept` needs the checkpoint and, if given, the inclusion. The timestamp is reported, never compared with a clock.
+  `<why>` is `note <error>`, `body`, `extensions`, `duplicate`, `unsigned ed25519 <bool> mldsa44 <bool>`, or `inclusion`; an inclusion's own `<why>` is RFC 9162's failure as a word (`index-out-of-range`, `path-too-long`, `path-too-short`, `root-mismatch`, …). A ruler error is one line: `error ed25519 <why>`, `error mldsa44 <why>` (the vkey's parse error, or `key` for the wrong type or length), `error inclusion.leaf base64`, `error inclusion.path <n> base64` or `error inclusion.path <n> length`. `heard` is BLAKE3 (echo's `H`) of each string's UTF-8, and of the decoded leaf and of the decoded path hashes concatenated. `accept` needs the checkpoint and, if given, the inclusion. The timestamp is reported, never compared with a clock.
 
 ## 6. Independence
 
