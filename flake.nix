@@ -48,6 +48,7 @@
         ./projections
         ./chorus
         ./echo
+        ./mcp
       ];
       sourceExts = [
         "rs"
@@ -413,6 +414,7 @@
                     ./imperfect/tests
                     ./chorus/tests
                     ./echo/tests
+                    ./mcp/tests
                   ]
                 );
                 leaked = fs.toList (fs.intersection packageFileset probes);

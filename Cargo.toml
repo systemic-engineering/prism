@@ -1,5 +1,5 @@
 [workspace]
-members = ["imperfect", "chorus", "echo", "prismqueer", "projections"]
+members = ["imperfect", "chorus", "echo", "mcp", "prismqueer", "projections"]
 resolver = "2"
 
 # Per Taut's profiling survey (mirror #286 Win 1, mirrored here on
