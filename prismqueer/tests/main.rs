@@ -40,6 +40,7 @@ mod loss_laws;
 mod measured;
 mod metrix;
 mod music;
+mod navigation;
 mod no_clock;
 mod one_graph;
 mod optics_integration;
