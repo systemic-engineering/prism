@@ -20,3 +20,4 @@ mod replay;
 mod source;
 mod typed;
 mod vectors;
+mod witness;
