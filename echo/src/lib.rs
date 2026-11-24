@@ -28,6 +28,7 @@ pub mod record;
 pub mod replay;
 pub mod source;
 pub mod value;
+pub mod witness;
 
 pub use address::{Address, Tau};
 pub use cut::{cut, Cut, Reflection};

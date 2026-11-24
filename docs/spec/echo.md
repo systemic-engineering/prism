@@ -215,6 +215,10 @@ Each of these was applied, killed by the suite, and reverted:
 | R4: a stray atom accepted (a layer line outside the model passes) | 8 tests: `r4::the_structure_cheats` (ct-a9), `r4::vector_68_byte_for_byte`, `r4::the_fixture_table`, `r4::the_kinds_agree_with_the_tune`, 4 `r3::` (ct-a4, the strata in one list, 68) |
 | R4: the budget charged per `derive` line (R1's charge) instead of per instance formed | 4 tests: `r4::the_budget_is_charged_per_instance`, `r4::the_budget_on_every_fixture`, `replay::the_budget_counts_ground_rule_instances`, `replay::a_budget_of_one_runs_out_on_real_inputs` |
 | R4: check 8 skipped (no `missing`, no `extra`) | 5 tests: `r4::the_structure_cheats` (ct-a2, ct-a10), `r4::an_extra_derivation_is_refused`, `r4::the_fixture_table`, `r4::the_kinds_agree_with_the_tune`, `r3::the_kinds_agree_with_the_tune` |
+| witness: `unknown unreplayed` answered `accept` | 3 `witness::` tests: `respond_maps_every_verdict`, `every_fixture_answers_by_the_mapping`, `a_fixture_needing_r5_is_not_now_and_contexts_is_not_covered` |
+| witness: `contexts` listed as a covered stratum, never replayed | 4 `witness::` tests: the coverage table over 38 fixtures, R5's not-now, an input not read, the record's order |
+| witness: the record hashed into the certificate's `heard` address | `witness::the_witness_never_enters_the_certificate_address`, `witness::with_the_flag_the_parity_lines_come_first_then_the_seam` |
+| witness: a parity line changed with the flag off (`rig  none`) | `witness::without_the_flag_every_fixture_is_byte_identical`, `witness::with_the_flag_the_parity_lines_come_first_then_the_seam`, `bin::the_binary_prints_the_library_answer` |
 
 ## 9. Open questions for Mara
 
@@ -709,3 +713,18 @@ Every line ends in LF; the exit is the verdict's (§10.1), unchanged.
 - **Q50. Coverage inside an input.** echo's coverage is per input and per stratum. A covered certificate with an uncovered `contexts` stratum vouches for its `layer`/`derive` lines and not its `context` lines. Should coverage name lines (or `L:C` ranges), as `settle.py`'s C1 says `unreadable` per line?
 - **Q51. The usage line.** The contract delta pins `usage: prism echo <source> <certificate> <record> [<score>]`. echo keeps it and doesn't advertise `--witness`. Should usage name the flag, or is the witness mode a separate entry (the MCP tool's structured result)?
 - **Q52. Minimality.** mirror-029 §6 checks a witness as sufficient and minimal. echo's coverage is sufficient for its answer by construction; is a witness that covers more strata than its refusal needs (one `dissonant` stratum among three `agreed`) still minimal, or should a refusal name only the strata whose lines it prints?
+
+### 11.6 As built
+
+`19a3ac0` 🔴 → this 🟢. `echo::witness` (`Roll`, `Reason`, `Response`, `respond`, `witness`, `Witness::print`); `echo::replay::traced` returns the answer and a `Trace` (`Reading` per input, `Outcome` per replayed stratum, P and F), and `replay` is `traced(…).0`, so the verdict path is the one it was. `implements` doesn't move: the parity surface is byte for byte R4's, and the pin moves at the next slice.
+
+**What the tests hold** (`echo/tests/witness.rs`, 12 tests; 163 in echo's binary, plus the `compile_fail` doctest and its control):
+- **parity:** all 38 fixtures without the flag, stdout and exit, against BLAKE3 digests taken from the binary at `982d945`; with the flag, the same bytes first, then `---\nwitness 1\n`, the same exit; no parity line is `---`;
+- **beside the roll:** `witness()`'s answer equals `replay()`'s on every fixture; the `heard` certificate slot and the record's `address` are the file's BLAKE3;
+- **the answer:** `respond` over every verdict form (`rings` accepts only with every stratum covered); 14 fixtures `refuse`, 24 `not now unreplayed contexts`, none `accept`;
+- **coverage:** per fixture, the inputs read by their digests, the score `unread` or `absent`, the decided strata covered, `waits` / `open` strata uncovered, `contexts` … `score` `unreplayed`, and the dissonant counts summing to the verdict's `<n>`; pos-v01 (R2–R4 agree) and pos-v04 (W: `model waits`) are `not now` with `contexts` uncovered; `io` stops everything, an unreadable certificate is located and stops the rest, a spent budget reads every input and decides no stratum;
+- the record's line order, the pin as `implements`'s content, the key as pos-v01's claimed `program` and `facts`; `--witness` as the second word only, usage unchanged.
+
+**Not reached by any fixture:** `open` (no fixture meets Q26 or Q40–Q42 under the flag) and the `covered` conjunction behind `accept` (short-circuited while `REPLAYED < 8`).
+
+**Gates:** `just check` clean; `checks.coverage` 96.59% of lines (the ratchet is 94; echo 98.85%, 2668 of 2699; `witness.rs` 116 of 126, `replay.rs` 178 of 178); `checks.doctest`; `checks.echo-independent` (no new dependency); `checks.echo-portable` (wasm32, thumbv7em); the no-features workspace compile. Four mutations, each killed and reverted (§8).

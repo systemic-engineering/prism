@@ -51,9 +51,7 @@ fn paths(name: &str) -> Paths {
             .find_map(|l| l.strip_prefix(key).and_then(|r| r.strip_prefix(' ')))
             .map(str::trim);
         match given {
-            Some(p) if p.starts_with("../../vectors/") => {
-                Some(data(&p["../../vectors/".len()..]))
-            }
+            Some(p) if p.starts_with("../../vectors/") => Some(data(&p["../../vectors/".len()..])),
             Some(p) => Some(data(&format!("fixtures/{name}/{p}"))),
             None if default.is_empty() => None,
             None => Some(data(&format!("fixtures/{name}/{default}"))),
@@ -98,9 +96,7 @@ fn line<'a>(r: &'a [String], key: &str) -> &'a str {
 }
 
 fn starting<'a>(r: &'a [String], key: &str) -> Vec<&'a str> {
-    r.iter()
-        .filter_map(|l| l.strip_prefix(key))
-        .collect()
+    r.iter().filter_map(|l| l.strip_prefix(key)).collect()
 }
 
 fn b3(p: &PathBuf) -> String {
@@ -109,44 +105,158 @@ fn b3(p: &PathBuf) -> String {
 
 /// Every fixture's parity output before §11: BLAKE3 of stdout ‖ `exit N\n`.
 const PARITY: [(&str, &str); 38] = [
-    ("a1-record-dark-disagrees", "bebcf4aa3cd6031de76e53158c0829fae9d58eec5f7a35928005cd218e6ce2f8"),
-    ("a1-record-dark-engine", "aa9486b2e93228aa29eb2c775d5abe04b6bfcd422d96f1368a15f435d3902c20"),
-    ("a1-record-dark-in-clear", "34f9a90597ba4666742916e04613571a6eb69284d19d8ce4a76e5fafbf5907de"),
-    ("a1-record-dark-reader", "ebe96bbd0d6cca95275495863e781ec5d52c16ccbec100c964ab92f5b7cbd798"),
-    ("a8-budget-query-unknown", "6e88b1e7a372d3ab5b960f06d78c4f01e1e0663c128048a7ffe651704750a682"),
-    ("ct-a1-stable-model-witness", "f1e4d489e66a75f0892fc874590c102a366eb92c68537b0a98f6c2460c19e477"),
-    ("ct-a10-truncated-claims-fixed", "0577663d93edddac337a40aacc5cd02f4a9c96d6cb452ef1974652b18aa8000f"),
-    ("ct-a11-model-text-sorted", "93bc683a11e6d270313e0859d7af9747203b6a19ad044f687e6dc1e694fd8b24"),
-    ("ct-a12-budget-stop", "535e75547bd5fc5049652f63374493f7ad9e0b90f0c7a7f326e8d8df8a36411d"),
-    ("ct-a2-missing-derivation", "bd3586ef5ecdc2a89c15c15912c902bdac41bffc8ae7ae9b7d8c050c3a651344"),
-    ("ct-a3-clear-hides-functional", "3aaff1e3fabae7800a6dd978a5339eb84c5ba572dccbe85caf6b3891aeed88ec"),
-    ("ct-a4-spurious-fact", "77c20e08c01ce01194c5aaec61b7bbd8ea88fbe36d5f4806f4a7f829be39dc0b"),
-    ("ct-a5-readable-dark", "1336954f046b3864deea54b7b328246643ab7b3c08da05ddaabb97a5c7ffabeb"),
-    ("ct-a6-unsafe-with-model", "fa8a738260e7e6b4821297f910eefd70b911c8f6f5fee7e55459250a12c9229b"),
-    ("ct-a8-layer-off-by-one", "0b5d933b07521d9b39cee470189faa258625165c9f185998649edc8a8f5ffc69"),
-    ("ct-a9-circular-pair", "cda383e505aa54f6651ddc5c4103ff16cfd0194de0124db03a37adaa0327e236"),
-    ("dark2-not-canonical", "6bb7c4dba500e2b566c0833e9660ce0ad40430d7df4bdf2f89bb1a8019c0b01f"),
-    ("e1-false-budget-clear", "f8acaed9d4c26f05691abe957ffeeca7e13fc4aaffdf783085c58f59c94c94ab"),
-    ("e1-false-budget-opaque", "4a780d7a24565c4e29948e039ba1f6556fc5c3f01bfeea9fc319f84eae9fa409"),
-    ("e4-dark-order", "b23bfb0b29e42cb4ce1e173271549f3de3753a922d553e3b26cf8580cc4e9989"),
-    ("p8-one-line", "19ae80a68c16491f5b37baee5cc4e22f271589394c5f12886fab6b8bf237f133"),
-    ("p8-swapped", "59ee18ee71bacfdb89bf131d7832a838529a230668d4a0debc3aad0083177fa2"),
-    ("pos-dark2-engine", "3fb4cbfa9ddd4267ecdc512f17445677c1f3917ee24ededeea13bfdccfbbbd73"),
-    ("pos-dark2-reader", "37311ff70398a94e91e96b52e76203ed81d73d8f349d52ac948cc41c53d053c9"),
-    ("pos-diamond", "c63bc20d1b859b9467edfea987acd4db42b28b1672af1ae79f16e95709a639ef"),
-    ("pos-v01", "075207c28d373de99c0fc14108ddd1e9f68d2c07c0663ee4d1cf1414c10f5415"),
-    ("pos-v03", "6d154cbecbc255259b569c6bfc8337c011e4690c7faa06b6fad1ba1fefa81243"),
-    ("pos-v04", "980b856482e850f3fd134b7513df1a3093a6dad17c1c73da16e57ecd42e0acd2"),
-    ("pos-v05", "560420861132e2bd36ac8f0ce33f9dbdb5eef10f24e38bc518c2a420ed65ced7"),
-    ("pos-v05-control", "778ee4a289db531fa62515bebcc59cdbcb286b5af1a240d1fcba797452b1776c"),
-    ("score-missing-note", "1b7130a4561c3fcb70851defb5676cc7d86903969c4db7edc72ee8b15b88851d"),
-    ("taut-20", "632daf9584cb2b4d90e2c3474dad2bda91413703af377b454931a1ec3674734f"),
-    ("taut-21", "9413304b0200843c780225b206b6140af1ddee1d0b0421bb0c475c9f1479a10f"),
-    ("taut-22", "18ba1e9e4b21e5fbc84e5b751a65399c06884525bc13c6e517cbf570843b499c"),
-    ("taut-23", "994b4d8f748aaf51fbc16c872c00a0fb99220588eb9c1b14167b74ee1df465d9"),
-    ("taut-24", "c89a3c2b5b7fb582a93eb50c19f90cf61649fd2b81becfdacdd40a8da903954c"),
-    ("taut-48", "9907981459b11ad410e57a72436b5e3e102535444e5302b07b5c28405ec0788b"),
-    ("typed-corpus-unheard", "bf1e391e13e0f6e4ec60d359a9efe4c571ecbcda79fbf1be651a2a54406a454f"),
+    (
+        "a1-record-dark-disagrees",
+        "bebcf4aa3cd6031de76e53158c0829fae9d58eec5f7a35928005cd218e6ce2f8",
+    ),
+    (
+        "a1-record-dark-engine",
+        "aa9486b2e93228aa29eb2c775d5abe04b6bfcd422d96f1368a15f435d3902c20",
+    ),
+    (
+        "a1-record-dark-in-clear",
+        "34f9a90597ba4666742916e04613571a6eb69284d19d8ce4a76e5fafbf5907de",
+    ),
+    (
+        "a1-record-dark-reader",
+        "ebe96bbd0d6cca95275495863e781ec5d52c16ccbec100c964ab92f5b7cbd798",
+    ),
+    (
+        "a8-budget-query-unknown",
+        "6e88b1e7a372d3ab5b960f06d78c4f01e1e0663c128048a7ffe651704750a682",
+    ),
+    (
+        "ct-a1-stable-model-witness",
+        "f1e4d489e66a75f0892fc874590c102a366eb92c68537b0a98f6c2460c19e477",
+    ),
+    (
+        "ct-a10-truncated-claims-fixed",
+        "0577663d93edddac337a40aacc5cd02f4a9c96d6cb452ef1974652b18aa8000f",
+    ),
+    (
+        "ct-a11-model-text-sorted",
+        "93bc683a11e6d270313e0859d7af9747203b6a19ad044f687e6dc1e694fd8b24",
+    ),
+    (
+        "ct-a12-budget-stop",
+        "535e75547bd5fc5049652f63374493f7ad9e0b90f0c7a7f326e8d8df8a36411d",
+    ),
+    (
+        "ct-a2-missing-derivation",
+        "bd3586ef5ecdc2a89c15c15912c902bdac41bffc8ae7ae9b7d8c050c3a651344",
+    ),
+    (
+        "ct-a3-clear-hides-functional",
+        "3aaff1e3fabae7800a6dd978a5339eb84c5ba572dccbe85caf6b3891aeed88ec",
+    ),
+    (
+        "ct-a4-spurious-fact",
+        "77c20e08c01ce01194c5aaec61b7bbd8ea88fbe36d5f4806f4a7f829be39dc0b",
+    ),
+    (
+        "ct-a5-readable-dark",
+        "1336954f046b3864deea54b7b328246643ab7b3c08da05ddaabb97a5c7ffabeb",
+    ),
+    (
+        "ct-a6-unsafe-with-model",
+        "fa8a738260e7e6b4821297f910eefd70b911c8f6f5fee7e55459250a12c9229b",
+    ),
+    (
+        "ct-a8-layer-off-by-one",
+        "0b5d933b07521d9b39cee470189faa258625165c9f185998649edc8a8f5ffc69",
+    ),
+    (
+        "ct-a9-circular-pair",
+        "cda383e505aa54f6651ddc5c4103ff16cfd0194de0124db03a37adaa0327e236",
+    ),
+    (
+        "dark2-not-canonical",
+        "6bb7c4dba500e2b566c0833e9660ce0ad40430d7df4bdf2f89bb1a8019c0b01f",
+    ),
+    (
+        "e1-false-budget-clear",
+        "f8acaed9d4c26f05691abe957ffeeca7e13fc4aaffdf783085c58f59c94c94ab",
+    ),
+    (
+        "e1-false-budget-opaque",
+        "4a780d7a24565c4e29948e039ba1f6556fc5c3f01bfeea9fc319f84eae9fa409",
+    ),
+    (
+        "e4-dark-order",
+        "b23bfb0b29e42cb4ce1e173271549f3de3753a922d553e3b26cf8580cc4e9989",
+    ),
+    (
+        "p8-one-line",
+        "19ae80a68c16491f5b37baee5cc4e22f271589394c5f12886fab6b8bf237f133",
+    ),
+    (
+        "p8-swapped",
+        "59ee18ee71bacfdb89bf131d7832a838529a230668d4a0debc3aad0083177fa2",
+    ),
+    (
+        "pos-dark2-engine",
+        "3fb4cbfa9ddd4267ecdc512f17445677c1f3917ee24ededeea13bfdccfbbbd73",
+    ),
+    (
+        "pos-dark2-reader",
+        "37311ff70398a94e91e96b52e76203ed81d73d8f349d52ac948cc41c53d053c9",
+    ),
+    (
+        "pos-diamond",
+        "c63bc20d1b859b9467edfea987acd4db42b28b1672af1ae79f16e95709a639ef",
+    ),
+    (
+        "pos-v01",
+        "075207c28d373de99c0fc14108ddd1e9f68d2c07c0663ee4d1cf1414c10f5415",
+    ),
+    (
+        "pos-v03",
+        "6d154cbecbc255259b569c6bfc8337c011e4690c7faa06b6fad1ba1fefa81243",
+    ),
+    (
+        "pos-v04",
+        "980b856482e850f3fd134b7513df1a3093a6dad17c1c73da16e57ecd42e0acd2",
+    ),
+    (
+        "pos-v05",
+        "560420861132e2bd36ac8f0ce33f9dbdb5eef10f24e38bc518c2a420ed65ced7",
+    ),
+    (
+        "pos-v05-control",
+        "778ee4a289db531fa62515bebcc59cdbcb286b5af1a240d1fcba797452b1776c",
+    ),
+    (
+        "score-missing-note",
+        "1b7130a4561c3fcb70851defb5676cc7d86903969c4db7edc72ee8b15b88851d",
+    ),
+    (
+        "taut-20",
+        "632daf9584cb2b4d90e2c3474dad2bda91413703af377b454931a1ec3674734f",
+    ),
+    (
+        "taut-21",
+        "9413304b0200843c780225b206b6140af1ddee1d0b0421bb0c475c9f1479a10f",
+    ),
+    (
+        "taut-22",
+        "18ba1e9e4b21e5fbc84e5b751a65399c06884525bc13c6e517cbf570843b499c",
+    ),
+    (
+        "taut-23",
+        "994b4d8f748aaf51fbc16c872c00a0fb99220588eb9c1b14167b74ee1df465d9",
+    ),
+    (
+        "taut-24",
+        "c89a3c2b5b7fb582a93eb50c19f90cf61649fd2b81becfdacdd40a8da903954c",
+    ),
+    (
+        "taut-48",
+        "9907981459b11ad410e57a72436b5e3e102535444e5302b07b5c28405ec0788b",
+    ),
+    (
+        "typed-corpus-unheard",
+        "bf1e391e13e0f6e4ec60d359a9efe4c571ecbcda79fbf1be651a2a54406a454f",
+    ),
 ];
 
 /// The 14 fixtures R2–R4 refuse (§10.4, §10.6, §10.8); the other 24 answer
@@ -214,7 +324,11 @@ fn with_the_flag_the_parity_lines_come_first_then_the_seam() {
 fn the_witness_never_enters_the_certificate_address() {
     for (name, _) in PARITY {
         let p = paths(name);
-        let bytes: Vec<Vec<u8>> = p.list().iter().map(|f| std::fs::read(f).expect("f")).collect();
+        let bytes: Vec<Vec<u8>> = p
+            .list()
+            .iter()
+            .map(|f| std::fs::read(f).expect("f"))
+            .collect();
         let inputs = Inputs {
             source: Some(&bytes[0]),
             certificate: Some(&bytes[1]),
@@ -250,7 +364,12 @@ fn respond_maps_every_verdict() {
             Response::NotNow(Reason::Uncovered),
             "not now uncovered",
         ),
-        (Verdict::Dissonant(Vec::new()), true, Response::Refuse, "refuse"),
+        (
+            Verdict::Dissonant(Vec::new()),
+            true,
+            Response::Refuse,
+            "refuse",
+        ),
         (
             Verdict::Uncertain { budget: 7 },
             true,
@@ -264,9 +383,15 @@ fn respond_maps_every_verdict() {
             "not now io source score",
         ),
         (
-            Verdict::Unreadable { input: Input::Record, at },
+            Verdict::Unreadable {
+                input: Input::Record,
+                at,
+            },
             true,
-            Response::NotNow(Reason::Unreadable { input: Input::Record, at }),
+            Response::NotNow(Reason::Unreadable {
+                input: Input::Record,
+                at,
+            }),
             "not now unreadable record:3:4",
         ),
         (
@@ -325,8 +450,17 @@ fn the_record_is_in_order() {
             let mut w = l.split(' ');
             match w.next().expect("key") {
                 k @ ("covered" | "uncovered") if l != "uncovered rest" => {
-                    if w.next() == Some("input") { if k == "covered" { "ci" } else { "ui" } }
-                    else if k == "covered" { "cs" } else { "us" }
+                    if w.next() == Some("input") {
+                        if k == "covered" {
+                            "ci"
+                        } else {
+                            "ui"
+                        }
+                    } else if k == "covered" {
+                        "cs"
+                    } else {
+                        "us"
+                    }
                 }
                 k => k,
             }
@@ -429,7 +563,9 @@ fn coverage_names_the_inputs_read_and_the_strata_replayed() {
         assert_eq!(starting(&r, "covered stratum "), covered, "{name}");
         assert_eq!(starting(&r, "uncovered stratum "), uncovered, "{name}");
         let verdict = stdout(&o).lines().next().expect("v").to_string();
-        let printed = verdict.strip_prefix("dissonant ").map_or(0, |n| n.parse().expect("n"));
+        let printed = verdict
+            .strip_prefix("dissonant ")
+            .map_or(0, |n| n.parse().expect("n"));
         assert_eq!(lines, printed, "{name}");
     }
 }
@@ -441,8 +577,14 @@ fn coverage_names_the_inputs_read_and_the_strata_replayed() {
 fn a_fixture_needing_r5_is_not_now_and_contexts_is_not_covered() {
     let r = record(&prism(true, &paths("pos-v01").list()));
     assert_eq!(line(&r, "answer "), "not now unreplayed contexts");
-    assert_eq!(starting(&r, "derived "), vec!["source agreed", "program agreed", "model agreed"]);
-    assert_eq!(starting(&r, "covered stratum "), vec!["source", "program", "model"]);
+    assert_eq!(
+        starting(&r, "derived "),
+        vec!["source agreed", "program agreed", "model agreed"]
+    );
+    assert_eq!(
+        starting(&r, "covered stratum "),
+        vec!["source", "program", "model"]
+    );
     assert!(r.contains(&"uncovered stratum contexts unreplayed".to_string()));
     assert!(!r.iter().any(|l| l.starts_with("covered stratum contexts")));
 
@@ -507,7 +649,10 @@ fn an_input_not_read_is_not_covered() {
     };
     assert_eq!(answer.exit(), 2, "{at}");
     let r: Vec<String> = w.print().lines().skip(1).map(str::to_string).collect();
-    assert_eq!(line(&r, "answer "), format!("not now unreadable certificate:{at}"));
+    assert_eq!(
+        line(&r, "answer "),
+        format!("not now unreadable certificate:{at}")
+    );
     assert_eq!(
         starting(&r, "uncovered input "),
         vec![
@@ -529,7 +674,10 @@ fn an_input_not_read_is_not_covered() {
     let (answer, w) = witness::witness(&inputs, 1);
     assert_eq!(answer.verdict, Verdict::Uncertain { budget: 1 });
     let r: Vec<String> = w.print().lines().skip(1).map(str::to_string).collect();
-    assert_eq!(line(&r, "answer "), "not now budget 1 ground rule instances");
+    assert_eq!(
+        line(&r, "answer "),
+        "not now budget 1 ground rule instances"
+    );
     assert_eq!(starting(&r, "covered input ").len(), 3);
     assert!(starting(&r, "covered stratum ").is_empty());
     assert!(starting(&r, "derived ").is_empty());
