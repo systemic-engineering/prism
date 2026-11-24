@@ -46,9 +46,9 @@ fn outputs(facts: &Facts) -> Current {
 }
 
 fn seal<P: Projection>(rule: &str, reads: &[&str], current: &Current, owner: &str) -> Decision<P> {
-    let premises = reads.iter().map(|p| {
-        Premise::<P>::of(current.get(&oid(p)).expect("the premise is derived"))
-    });
+    let premises = reads
+        .iter()
+        .map(|p| Premise::<P>::of(current.get(&oid(p)).expect("the premise is derived")));
     DecisionDraft::new(oid(rule), premises)
         .expect("each premise once")
         .seal(oid(owner))
@@ -269,8 +269,12 @@ fn b1_derive(facts: &Facts) -> Output {
 fn b1_holds<P: Projection>() -> usize {
     let log = b1_log();
     let mut facts = facts([log[0].as_str()]);
-    let mut decision: Decision<P> =
-        seal("ship", &["h1"], &Current::new([b1_derive(&facts)]).unwrap(), "owner");
+    let mut decision: Decision<P> = seal(
+        "ship",
+        &["h1"],
+        &Current::new([b1_derive(&facts)]).unwrap(),
+        "owner",
+    );
     let mut holds = 0;
     for fact in &log[1..] {
         facts.add(oid(fact));
@@ -294,9 +298,17 @@ fn b1_holds<P: Projection>() -> usize {
 #[test]
 fn a_blob_carrying_facts_head_storms() {
     assert_eq!(b1_log().len() - 1, 21, "21 facts after the first");
-    assert_eq!(b1_holds::<WithHead>(), 21, "facts_head inside: a HOLD per fact");
+    assert_eq!(
+        b1_holds::<WithHead>(),
+        21,
+        "facts_head inside: a HOLD per fact"
+    );
     assert_eq!(b1_holds::<StatusAlone>(), 1, "status alone: the one flip");
-    assert_eq!(b1_holds::<WithCites>(), 2, "cites inside: the flip and the second refutation");
+    assert_eq!(
+        b1_holds::<WithCites>(),
+        2,
+        "cites inside: the flip and the second refutation"
+    );
 }
 
 /// Two projections of one output are two addresses: a decision sealed under
@@ -412,10 +424,7 @@ fn the_address_covers_the_rule_and_the_tuple() {
 #[test]
 fn a_premise_read_twice_is_refused() {
     let out = Output::new(oid("p1"), "unrefuted");
-    let twice = DecisionDraft::<StatusAlone>::new(
-        oid("D"),
-        [Premise::of(&out), Premise::of(&out)],
-    );
+    let twice = DecisionDraft::<StatusAlone>::new(oid("D"), [Premise::of(&out), Premise::of(&out)]);
     assert_eq!(twice.err(), Some(Twice { premise: oid("p1") }));
 }
 
@@ -470,5 +479,8 @@ fn a_fact_set_grows_and_its_address_moves() {
     assert!(!f.is_empty());
     assert!(Facts::new().is_empty());
     assert_eq!(f.address(), facts(["a", "b"]).address(), "order-free");
-    assert_eq!(f.iter().cloned().collect::<Vec<_>>(), vec![oid("a"), oid("b")]);
+    assert_eq!(
+        f.iter().cloned().collect::<Vec<_>>(),
+        vec![oid("a"), oid("b")]
+    );
 }

@@ -37,6 +37,9 @@ pub mod brain;
 pub mod coincidence;
 pub mod crossing;
 pub mod crystal;
+// The HOLD law: a decision stands while every premise projection is the one
+// sealed (prism-024 §1; Mara, mirror-029 I.1). No feature, no float.
+pub mod hold;
 pub mod luminosity;
 pub mod scalar_loss;
 pub mod substrate_ref;
