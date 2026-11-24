@@ -234,3 +234,40 @@ fn a_malformed_note_is_refused() {
         Err(CheckpointError::Note(NoteError::Malformed))
     );
 }
+
+// ── The MCP crate's vector ─────────────────────────────────────────────────────────
+
+/// docs/spec/mcp-vectors/checkpoint.json is this file's AND checkpoint, as
+/// text: the note both log keys sign, the two vkeys, and RFC 9162's
+/// inclusion proof for leaf 5 of the eight. The MCP crate verifies it
+/// through its own JSON reader and has no signer; this test is where its
+/// bytes come from.
+#[test]
+fn the_mcp_vector_is_the_and_checkpoint() {
+    let v: serde_json::Value =
+        serde_json::from_str(include_str!("../../docs/spec/mcp-vectors/checkpoint.json")).unwrap();
+    let (ed, ml) = log_keys();
+    let signed = note(&text(), &[ed_line(), ml_line()]);
+    assert_eq!(v["note"], signed.as_str());
+    assert_eq!(v["ed25519"], ed.vkey().as_str());
+    assert_eq!(v["mldsa44"], ml.vkey().as_str());
+    assert!(verify(&signed, &keys()).is_ok());
+    let leaf = chorus::note::decode_base64(v["inclusion"]["leaf"].as_str().unwrap()).unwrap();
+    let path: Vec<[u8; 32]> = v["inclusion"]["path"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| {
+            chorus::note::decode_base64(p.as_str().unwrap())
+                .unwrap()
+                .try_into()
+                .unwrap()
+        })
+        .collect();
+    let (size, root) = tree();
+    assert_eq!(v["inclusion"]["index"], 5);
+    assert_eq!(
+        chorus::merkle::verify_inclusion(5, size, &chorus::merkle::leaf_hash(&leaf), &path, &root),
+        Ok(())
+    );
+}

@@ -14,6 +14,11 @@ autotests = false
 name = "main"
 path = "tests/main.rs"
 
+# The server: stdin in, stdout out, nothing else (docs/spec/mcp.md §1).
+[[bin]]
+name = "prism-mcp"
+path = "src/bin/prism-mcp.rs"
+
 # echo and chorus only (docs/spec/mcp.md §6). checks.prism-mcp-independent
 # holds the rest of the graph: no serde, no JSON crate, no mirror crate, no
 # prismqueer, nothing LAPACK, BLAS or Fortran. No dev-dependencies either:

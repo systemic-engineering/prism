@@ -55,6 +55,45 @@ fn no_serde_in_the_crate() {
     assert!(found.is_empty(), "serde in mcp/src:\n{}", found.join("\n"));
 }
 
+/// The binary touches stdin and stdout and nothing else (§1): no file,
+/// environment, clock, network or process.
+#[test]
+fn the_binary_reads_only_stdin() {
+    let src = include_str!("../src/bin/prism-mcp.rs");
+    let code: String = src
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    for forbidden in [
+        "env::",
+        "current_dir",
+        "std::net",
+        "process::Command",
+        "Instant",
+        "SystemTime",
+        "fs::",
+        "File",
+        "OpenOptions",
+        "read_dir",
+        "include_",
+        "args",
+    ] {
+        assert!(!code.contains(forbidden), "{forbidden}");
+    }
+    assert!(code.contains("stdin()"));
+    assert!(code.contains("stdout()"));
+    assert!(code.contains("Lines"));
+}
+
+/// The library holds no I/O at all: `no_std`.
+#[test]
+fn the_library_is_no_std() {
+    let lib = include_str!("../src/lib.rs");
+    assert!(lib.contains("#![no_std]"));
+    assert!(lib.contains("#![forbid(unsafe_code)]"));
+}
+
 /// The scan sees a word it is looking for (the guard can fail).
 #[test]
 fn the_scan_finds_what_it_looks_for() {
