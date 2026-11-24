@@ -52,7 +52,7 @@
 //! ```compile_fail,E0451
 //! use prismqueer::hold::Premise;
 //! use prismqueer::oid::Oid;
-//! let _: Premise = Premise { premise: Oid::new("h1"), address: Oid::new("x"), projection: std::marker::PhantomData };
+//! let _: Premise = Premise { premise: Oid::new("h1"), status: "true".into(), address: Oid::new("x"), projection: std::marker::PhantomData };
 //! ```
 //!
 //! The control: a derivation's output, projected, seals.
@@ -257,10 +257,12 @@ impl Projection for StatusAlone {
     }
 }
 
-/// A premise as a decision read it: its name and its projection's address.
-/// Made only by [`Premise::of`], projecting an [`Output`].
+/// A premise as a decision read it: its name, the status it read, and its
+/// projection's address. Made only by [`Premise::of`], projecting an
+/// [`Output`].
 pub struct Premise<P = StatusAlone> {
     premise: Oid,
+    status: String,
     address: Oid,
     projection: PhantomData<fn() -> P>,
 }
@@ -275,6 +277,7 @@ impl<P: Projection> Premise<P> {
         P::read(output, &mut preimage);
         Premise {
             premise: output.premise.clone(),
+            status: output.status.clone(),
             address: Oid::hash(&Scope::public(), &preimage),
             projection: PhantomData,
         }
@@ -287,6 +290,12 @@ impl<P> Premise<P> {
         &self.premise
     }
 
+    /// The status it read: for a sealed premise, the status it was sealed
+    /// at, readable as long as the decision is.
+    pub fn status(&self) -> &str {
+        &self.status
+    }
+
     /// The projection's address: what the decision sealed.
     pub fn address(&self) -> &Oid {
         &self.address
@@ -297,6 +306,7 @@ impl<P> Clone for Premise<P> {
     fn clone(&self) -> Self {
         Premise {
             premise: self.premise.clone(),
+            status: self.status.clone(),
             address: self.address.clone(),
             projection: PhantomData,
         }
@@ -305,7 +315,9 @@ impl<P> Clone for Premise<P> {
 
 impl<P> PartialEq for Premise<P> {
     fn eq(&self, other: &Self) -> bool {
-        self.premise == other.premise && self.address == other.address
+        self.premise == other.premise
+            && self.status == other.status
+            && self.address == other.address
     }
 }
 
@@ -315,6 +327,7 @@ impl<P> fmt::Debug for Premise<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Premise")
             .field("premise", &self.premise)
+            .field("status", &self.status)
             .field("address", &self.address)
             .finish()
     }
@@ -497,31 +510,78 @@ impl<P> fmt::Debug for Decision<P> {
 pub enum Standing {
     /// Every premise's projection is the one sealed.
     Stands,
-    /// Some moved: which (in declared order), and the owner who can re-seal.
+    /// Some moved: why, per premise (in declared order), and the owner who
+    /// can re-seal. A reason, never a new class: a move to `maybe` is a HOLD
+    /// like any other, a new reading at a new key, never a downgrade.
     Hold {
         /// The premises whose projection moved, or that have no current
-        /// output.
-        moved: Vec<Oid>,
+        /// output, each with its reason.
+        moved: Vec<Moved>,
         /// The decision's owner.
         owner: Oid,
     },
 }
 
-/// The declared premises whose current projection isn't `sealed`'s.
-fn moved<P: Projection>(sealed: &[Premise<P>], current: &Current) -> Vec<Oid> {
+/// Why a premise HOLDs a decision: which premise, the status it was sealed
+/// at, and how it reads now. The old seal is untouched and stays readable at
+/// its key; the new reading has its own.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Moved {
+    /// Which premise.
+    pub premise: Oid,
+    /// The status it was sealed at.
+    pub sealed: String,
+    /// How it reads now.
+    pub now: Reading,
+}
+
+/// How a moved premise reads now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reading {
+    /// Derived: its status now, and the key (projection address) of this
+    /// new reading.
+    At {
+        /// The status now.
+        status: String,
+        /// The new reading's key.
+        key: Oid,
+    },
+    /// No current output: unread, its own constructor (the absence rule,
+    /// `docs/spec/navigation.md`), never a status.
+    Unread,
+}
+
+/// The declared premises whose current projection isn't `sealed`'s, each with
+/// its reason.
+fn moved<P: Projection>(sealed: &[Premise<P>], current: &Current) -> Vec<Moved> {
     sealed
         .iter()
-        .filter(|p| {
-            current
-                .get(&p.premise)
-                .is_none_or(|output| Premise::<P>::of(output).address != p.address)
+        .filter_map(|p| {
+            let now = match current.get(&p.premise) {
+                None => Reading::Unread,
+                Some(output) => {
+                    let read = Premise::<P>::of(output);
+                    if read.address == p.address {
+                        return None;
+                    }
+                    Reading::At {
+                        status: read.status,
+                        key: read.address,
+                    }
+                }
+            };
+            Some(Moved {
+                premise: p.premise.clone(),
+                sealed: p.status.clone(),
+                now,
+            })
         })
-        .map(|p| p.premise.clone())
         .collect()
 }
 
 /// The HOLD law: project each declared premise's current output and compare
-/// it with the sealed projection. A missing output counts as moved.
+/// it with the sealed projection. A missing output counts as moved, and reads
+/// [`Reading::Unread`].
 pub fn standing<P: Projection>(decision: &Decision<P>, current: &Current) -> Standing {
     let moved = moved(decision.premises(), current);
     if moved.is_empty() {
@@ -582,5 +642,7 @@ pub fn reseal<P: Projection>(
     if new.premises() == held.premises() {
         return Err(Refused::OldTuple);
     }
-    Err(Refused::NotCurrent { premises: off })
+    Err(Refused::NotCurrent {
+        premises: off.into_iter().map(|m| m.premise).collect(),
+    })
 }
