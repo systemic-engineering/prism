@@ -7,15 +7,28 @@
 *A decision sealed at premise projections (p₁ … pₖ) is HOLD exactly when some pᵢ's projection address now differs from the one sealed. Only its owner's seal over the current tuple clears it.*
 
 ```
-standing(decision, current outputs) -> Stands | Hold { moved: [premise ids], owner }
+standing(decision, current outputs) -> Stands | Hold { moved: [Moved { premise, sealed, now }], owner }
+  now = At { status, key } | Unread
 reseal(held, new seal, current outputs) -> Ok(decision) | Refused { NotOwner | OtherDecision | OldTuple | NotCurrent }
 ```
 
 - **A premise** is a declared derivation's output that a decision reads. It has a name (which derivation), a **status** (the verdict word the decision acts on), and things that sit beside the status: the stage (λ, ρ), the cites, the facts head. Its **full output address** covers all of them.
 - **The premise projection** is what a decision reads of an output, and its address is what the decision seals. It is one named choice in the code (below).
 - **A decision** is a draft (the rule it decides, the tuple of projections it read) sealed by its owner. Its address is `"decision\0" ‖ projection name ‖ rule ‖ the tuple`. The owner's signer sits **beside** that address, never in it (`ruler.md`): one judgment sealed by two people is one address and two signers.
-- **Standing** projects each current output the decision declared and compares it with the sealed one. Equal everywhere: it stands. Otherwise it is HOLD, naming every premise that moved and the owner who can re-seal. A declared premise with no current output counts as moved: absence is not the sealed projection.
+- **Standing** projects each current output the decision declared and compares it with the sealed one. Equal everywhere: it stands. Otherwise it is HOLD, giving a reason for every premise that moved (below) and naming the owner who can re-seal. A declared premise with no current output counts as moved: absence is not the sealed projection. Its reason reads `Unread`.
 - **Clearing** takes a new seal. It is refused unless it is the held decision's owner's, over the same rule and premise names, and over the *current* tuple. A seal over the sealed (old) tuple is `OldTuple`; over any other tuple, `NotCurrent`, naming the premises that don't match.
+
+## The HOLD reason (amendment, prism-025 Addendum item 2)
+
+*Mara, mirror 052e5a13: "a reason, not a new class".* A HOLD carries, for each moved premise in declared order:
+
+- **which premise**;
+- **the status it was sealed at** (`sealed`). A `Premise` keeps the status it read beside its projection address, so the sealed status is readable for as long as the decision is;
+- **how it reads now** (`now`): either `At { status, key }`, the status now and the key (projection address) of the new reading, or `Unread`, when there is no current output. `Unread` is its own constructor, never a status: the absence rule of `docs/spec/navigation.md` (an unexplored edge reads `maybe`, never `false`) at the HOLD's altitude.
+
+**A move to `maybe` is free.** true → maybe is a new reading at a new key, never a downgrade of the old one. The old decision is untouched: its address, its premise's sealed status and its sealed key read exactly as sealed, and read against the outputs it sealed, it still stands. So there is no `Downgraded` class: `Standing` has two cases, and the reason says what moved.
+
+**Status only.** The key is the projection address under the decision's projection, `StatusAlone` by default, unchanged. Under a declared projection that reads more (the stage, say), a reason can name a premise whose status didn't change (sealed = now), because its key moved.
 
 ## Which half is a theorem, and which is policy
 
@@ -46,9 +59,11 @@ A decision can be sealed only over projections of derivation outputs, never over
 3. A stage move without a status move doesn't HOLD: the full output address moves, the projection doesn't. Flagged for Alex.
 4. A projection carrying `facts_head` storms: B1's 21 / 1 / 2, documenting.
 5. Only a seal naming the current tuple clears: a non-owner, the old tuple and a non-current tuple are refused; the owner over the current tuple stands.
+6. The HOLD reason names the premise, the status it was sealed at, the status now and the new reading's key (not the sealed key).
+7. true → maybe is a HOLD with that reason, and the old decision reads as it was sealed, at its key. Dropping the old status from the reason fails six tests.
 
 ## Open, for Alex or Mara
 
 - The projection: status alone, or with λ (above).
-- A missing current output counts as moved. Should it be its own case (`Unread`), since it is a `maybe`, not a new value?
+- A missing current output counts as moved, and its reason reads `Unread` (no key). Its own reason, then, not its own class; should it HOLD at all, or stand as a `maybe` until read? Mara to confirm.
 - The verdict words in the status are Alex's (mirror-029 For Alex 4). Here a status is any string.
