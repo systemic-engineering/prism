@@ -41,7 +41,11 @@ fn hits(needles: &[&str]) -> (usize, Vec<String>) {
 fn no_float_in_the_crate() {
     let (files, found) = hits(&["f64", "f32"]);
     assert!(files >= 2, "the scan found the sources");
-    assert!(found.is_empty(), "a float in mcp/src:\n{}", found.join("\n"));
+    assert!(
+        found.is_empty(),
+        "a float in mcp/src:\n{}",
+        found.join("\n")
+    );
 }
 
 /// Alex: "No serde." Not in a `use`, not in a path.

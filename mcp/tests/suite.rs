@@ -20,8 +20,14 @@ const Y_REFUSED: [(&str, Kind); 12] = [
     ("y_object_duplicated_key_and_value.json", Kind::Duplicate),
     ("y_string_escaped_noncharacter.json", Kind::Noncharacter),
     ("y_string_last_surrogates_1_and_2.json", Kind::Noncharacter),
-    ("y_string_nonCharacterInUTF-8_U+10FFFF.json", Kind::Noncharacter),
-    ("y_string_nonCharacterInUTF-8_U+FFFF.json", Kind::Noncharacter),
+    (
+        "y_string_nonCharacterInUTF-8_U+10FFFF.json",
+        Kind::Noncharacter,
+    ),
+    (
+        "y_string_nonCharacterInUTF-8_U+FFFF.json",
+        Kind::Noncharacter,
+    ),
     ("y_string_unicode_U+10FFFE_nonchar.json", Kind::Noncharacter),
     ("y_string_unicode_U+1FFFE_nonchar.json", Kind::Noncharacter),
     ("y_string_unicode_U+FDD0_nonchar.json", Kind::Noncharacter),
@@ -39,24 +45,57 @@ const I_OUTCOMES: [(&str, Option<Kind>); 35] = [
     ("i_number_real_underflow.json", None),
     ("i_number_too_big_neg_int.json", Some(Kind::IntegerRange)),
     ("i_number_too_big_pos_int.json", Some(Kind::IntegerRange)),
-    ("i_number_very_big_negative_int.json", Some(Kind::IntegerRange)),
-    ("i_object_key_lone_2nd_surrogate.json", Some(Kind::Surrogate)),
-    ("i_string_1st_surrogate_but_2nd_missing.json", Some(Kind::Surrogate)),
-    ("i_string_1st_valid_surrogate_2nd_invalid.json", Some(Kind::Surrogate)),
-    ("i_string_incomplete_surrogate_and_escape_valid.json", Some(Kind::Surrogate)),
-    ("i_string_incomplete_surrogate_pair.json", Some(Kind::Surrogate)),
-    ("i_string_incomplete_surrogates_escape_valid.json", Some(Kind::Surrogate)),
-    ("i_string_invalid_lonely_surrogate.json", Some(Kind::Surrogate)),
+    (
+        "i_number_very_big_negative_int.json",
+        Some(Kind::IntegerRange),
+    ),
+    (
+        "i_object_key_lone_2nd_surrogate.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_1st_surrogate_but_2nd_missing.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_1st_valid_surrogate_2nd_invalid.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_incomplete_surrogate_and_escape_valid.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_incomplete_surrogate_pair.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_incomplete_surrogates_escape_valid.json",
+        Some(Kind::Surrogate),
+    ),
+    (
+        "i_string_invalid_lonely_surrogate.json",
+        Some(Kind::Surrogate),
+    ),
     ("i_string_invalid_surrogate.json", Some(Kind::Surrogate)),
     ("i_string_invalid_utf-8.json", Some(Kind::Utf8)),
-    ("i_string_inverted_surrogates_U+1D11E.json", Some(Kind::Surrogate)),
+    (
+        "i_string_inverted_surrogates_U+1D11E.json",
+        Some(Kind::Surrogate),
+    ),
     ("i_string_iso_latin_1.json", Some(Kind::Utf8)),
     ("i_string_lone_second_surrogate.json", Some(Kind::Surrogate)),
-    ("i_string_lone_utf8_continuation_byte.json", Some(Kind::Utf8)),
+    (
+        "i_string_lone_utf8_continuation_byte.json",
+        Some(Kind::Utf8),
+    ),
     ("i_string_not_in_unicode_range.json", Some(Kind::Utf8)),
     ("i_string_overlong_sequence_2_bytes.json", Some(Kind::Utf8)),
     ("i_string_overlong_sequence_6_bytes.json", Some(Kind::Utf8)),
-    ("i_string_overlong_sequence_6_bytes_null.json", Some(Kind::Utf8)),
+    (
+        "i_string_overlong_sequence_6_bytes_null.json",
+        Some(Kind::Utf8),
+    ),
     ("i_string_truncated-utf-8.json", Some(Kind::Utf8)),
     ("i_string_UTF-16LE_with_BOM.json", Some(Kind::Unexpected)),
     ("i_string_UTF-8_invalid_sequence.json", Some(Kind::Utf8)),
@@ -64,7 +103,10 @@ const I_OUTCOMES: [(&str, Option<Kind>); 35] = [
     ("i_string_utf16LE_no_BOM.json", Some(Kind::Unexpected)),
     ("i_string_UTF8_surrogate_U+D800.json", Some(Kind::Utf8)),
     ("i_structure_500_nested_arrays.json", Some(Kind::Depth)),
-    ("i_structure_UTF-8_BOM_empty_object.json", Some(Kind::Unexpected)),
+    (
+        "i_structure_UTF-8_BOM_empty_object.json",
+        Some(Kind::Unexpected),
+    ),
 ];
 
 fn cases() -> Vec<(String, Vec<u8>)> {

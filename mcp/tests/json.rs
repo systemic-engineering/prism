@@ -169,7 +169,10 @@ fn noncharacters_are_refused() {
     refused(br#"["\uD83F\uDFFE"]"#, Kind::Noncharacter, 2);
     refused("[\"x\u{FFFE}\"]".as_bytes(), Kind::Noncharacter, 3);
     refused("[\"\u{10FFFF}\"]".as_bytes(), Kind::Noncharacter, 2);
-    assert_eq!(read(br#""\uFDCF\uFDF0\uFFFD""#), Ok(s("\u{FDCF}\u{FDF0}\u{FFFD}")));
+    assert_eq!(
+        read(br#""\uFDCF\uFDF0\uFFFD""#),
+        Ok(s("\u{FDCF}\u{FDF0}\u{FFFD}"))
+    );
 }
 
 // ------------------------------------------------------------ objects
@@ -224,7 +227,10 @@ fn leading_zeros_are_refused() {
     refused(b"[-01]", Kind::LeadingZero, 3);
     refused(b"00", Kind::LeadingZero, 1);
     refused(b"012.5", Kind::LeadingZero, 1);
-    assert_eq!(read(b"[0,10,0.5]").map(|v| print(&v)), Ok("[0,10,0.5]".into()));
+    assert_eq!(
+        read(b"[0,10,0.5]").map(|v| print(&v)),
+        Ok("[0,10,0.5]".into())
+    );
 }
 
 /// §3.2: the integer domain has one zero, spelled `0`.
