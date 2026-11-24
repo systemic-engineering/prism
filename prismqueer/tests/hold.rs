@@ -6,8 +6,8 @@
 //! tuple clears it. No feature: the law is in the default build.
 
 use prismqueer::hold::{
-    field, reseal, standing, Conflict, Current, Decision, DecisionDraft, Facts, Output, Premise,
-    Projection, Refused, Standing, StatusAlone, Twice,
+    field, reseal, standing, Conflict, Current, Decision, DecisionDraft, Facts, Moved, Output,
+    Premise, Projection, Reading, Refused, Standing, StatusAlone, Twice,
 };
 use prismqueer::oid::Oid;
 
@@ -52,6 +52,20 @@ fn seal<P: Projection>(rule: &str, reads: &[&str], current: &Current, owner: &st
     DecisionDraft::new(oid(rule), premises)
         .expect("each premise once")
         .seal(oid(owner))
+}
+
+/// The reason a HOLD gives for `premise`: sealed at `sealed`, now read at
+/// its current output's status, under the key `P` projects it to.
+fn reason<P: Projection>(premise: &str, sealed: &str, now: &Current) -> Moved {
+    let out = now.get(&oid(premise)).expect("the premise is derived");
+    Moved {
+        premise: oid(premise),
+        sealed: sealed.into(),
+        now: Reading::At {
+            status: out.status().into(),
+            key: Premise::<P>::of(out).address().clone(),
+        },
+    }
 }
 
 /// D1 reads p1; D2 reads p1 and p2; D3 reads p3.
@@ -108,14 +122,14 @@ fn a_relevant_fact_holds_exactly_the_dependents() {
     assert_eq!(
         standing(&d1, &now),
         Standing::Hold {
-            moved: vec![oid("p1")],
+            moved: vec![reason::<StatusAlone>("p1", "unrefuted", &now)],
             owner: oid("o1")
         }
     );
     assert_eq!(
         standing(&d2, &now),
         Standing::Hold {
-            moved: vec![oid("p1")],
+            moved: vec![reason::<StatusAlone>("p1", "unrefuted", &now)],
             owner: oid("o2")
         }
     );
@@ -133,7 +147,10 @@ fn a_hold_names_every_moved_premise() {
     assert_eq!(
         standing(&d2, &now),
         Standing::Hold {
-            moved: vec![oid("p1"), oid("p2")],
+            moved: vec![
+                reason::<StatusAlone>("p1", "unrefuted", &now),
+                reason::<StatusAlone>("p2", "unrefuted", &now),
+            ],
             owner: oid("o2")
         }
     );
@@ -141,7 +158,8 @@ fn a_hold_names_every_moved_premise() {
 }
 
 /// A declared premise with no current output counts as moved: its absence is
-/// not the projection that was sealed.
+/// not the projection that was sealed. Its reason says so: `Unread`, its own
+/// constructor, with no key (the absence rule, `docs/spec/navigation.md`).
 #[test]
 fn an_unread_premise_counts_as_moved() {
     let log = facts(["ok0"]);
@@ -150,7 +168,11 @@ fn an_unread_premise_counts_as_moved() {
     assert_eq!(
         standing(&d2, &only_p2),
         Standing::Hold {
-            moved: vec![oid("p1")],
+            moved: vec![Moved {
+                premise: oid("p1"),
+                sealed: "unrefuted".into(),
+                now: Reading::Unread,
+            }],
             owner: oid("o2")
         }
     );
@@ -185,7 +207,7 @@ fn a_stage_move_without_a_status_move_does_not_hold() {
     assert_eq!(
         standing(&staged, &now),
         Standing::Hold {
-            moved: vec![oid("h1")],
+            moved: vec![reason::<WithStage>("h1", "contradicted", &now)],
             owner: oid("owner")
         }
     );
@@ -281,7 +303,8 @@ fn b1_holds<P: Projection>() -> usize {
         let out = b1_derive(&facts);
         let now = Current::new([out]).unwrap();
         if let Standing::Hold { moved, owner } = standing(&decision, &now) {
-            assert_eq!(moved, vec![oid("h1")]);
+            assert_eq!(moved.len(), 1);
+            assert_eq!(moved[0].premise, oid("h1"));
             holds += 1;
             let new = seal("ship", &["h1"], &now, owner.as_str());
             decision = reseal(&decision, new, &now).expect("the owner over the current tuple");
@@ -496,5 +519,84 @@ fn a_fact_set_grows_and_its_address_moves() {
     assert_eq!(
         f.iter().cloned().collect::<Vec<_>>(),
         vec![oid("a"), oid("b")]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The HOLD reason (prism-025 Addendum item 2; Mara 052e5a13: "a reason, not
+// a new class")
+// ---------------------------------------------------------------------------
+
+/// A HOLD's reason names, per moved premise: which premise, the status it was
+/// sealed at, the status now, and the key of the new reading.
+#[test]
+fn a_hold_reason_names_premise_old_status_new_status_and_new_key() {
+    let mut log = facts(["ok0"]);
+    let sealed = outputs(&log);
+    let [d1, _, _] = graph(&sealed);
+    log.add(oid("err1"));
+    let now = outputs(&log);
+    let Standing::Hold { moved, owner } = standing(&d1, &now) else {
+        panic!("err1 moved p1, so D1 HOLDs")
+    };
+    assert_eq!(owner, oid("o1"));
+    assert_eq!(moved.len(), 1);
+    let Moved {
+        premise,
+        sealed: was,
+        now: reading,
+    } = &moved[0];
+    assert_eq!(premise, &oid("p1"));
+    assert_eq!(was, "unrefuted", "the status it was sealed at");
+    let Reading::At { status, key } = reading else {
+        panic!("p1 is derived, so it is read")
+    };
+    assert_eq!(status, "contradicted", "the status now");
+    let new = Premise::<StatusAlone>::of(now.get(&oid("p1")).unwrap());
+    assert_eq!(key, new.address(), "the key of the new reading");
+    assert_ne!(
+        key,
+        d1.premises()[0].address(),
+        "a new key, not the sealed one"
+    );
+}
+
+/// true -> maybe is free: a new reading at a new key, never a downgrade of
+/// the old one. It is a HOLD with that reason (no `Downgraded` class: the
+/// match below is exhaustive over two), and the old decision still reads as
+/// it was sealed, at its key.
+#[test]
+fn true_to_maybe_is_a_hold_with_that_reason_and_the_old_decision_reads_as_sealed() {
+    let was = Output::new(oid("h1"), "true");
+    let then = Current::new([was.clone()]).unwrap();
+    let d: Decision = seal("ship", &["h1"], &then, "owner");
+    let address = d.address();
+    let sealed_key = Premise::<StatusAlone>::of(&was).address().clone();
+
+    let now = Current::new([Output::new(oid("h1"), "maybe")]).unwrap();
+    let held = standing(&d, &now);
+    assert_eq!(
+        held,
+        Standing::Hold {
+            moved: vec![reason::<StatusAlone>("h1", "true", &now)],
+            owner: oid("owner"),
+        }
+    );
+    match held {
+        Standing::Stands => panic!("true -> maybe moved the status"),
+        Standing::Hold { moved, .. } => {
+            assert_eq!(moved[0].sealed, "true");
+            assert!(matches!(&moved[0].now, Reading::At { status, .. } if status == "maybe"));
+        }
+    }
+
+    // The old seal is untouched and readable at its key.
+    assert_eq!(d.address(), address);
+    assert_eq!(d.premises()[0].status(), "true");
+    assert_eq!(d.premises()[0].address(), &sealed_key);
+    assert_eq!(
+        standing(&d, &then),
+        Standing::Stands,
+        "read at its own key, it stands"
     );
 }
