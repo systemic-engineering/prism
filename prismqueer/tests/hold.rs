@@ -409,6 +409,20 @@ fn the_owner_sits_beside_the_address() {
     assert_eq!(by_o1.premises()[0].premise(), &oid("p1"));
 }
 
+/// A decision and its premises clone to equals and print their parts, with
+/// no bound on the projection.
+#[test]
+fn a_decision_clones_and_prints() {
+    let now = outputs(&facts(["ok0"]));
+    let d: Decision<WithHead> = seal("D1", &["p1"], &now, "o1");
+    assert_eq!(d.clone(), d);
+    assert_eq!(d.premises()[0].clone(), d.premises()[0]);
+    let printed = format!("{d:?}");
+    for part in ["Decision", "rule", "Premise", "address", "signer"] {
+        assert!(printed.contains(part), "{part} in {printed}");
+    }
+}
+
 /// The address covers the rule and the tuple, in order.
 #[test]
 fn the_address_covers_the_rule_and_the_tuple() {
