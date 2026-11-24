@@ -1,6 +1,6 @@
 # echo: prism's second reader of mirror
 
-*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 6: S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface), R2 (the source and the Dark-2 report, §10.4), R3 (P, F and the interval, §10.6) and R4 (the positive run, §10.8). Crate `echo`: a no_std library and the std binary `prism echo …`.*
+*prism-022 (mirror-Reed → prism-Reed, 2026-11-18). Version 7: the witness (§11, `prism echo --witness`), beside S5's mechanical checks, prism-020 P1 (the facts reader), P3 (the cut), P2 (the address law `H`), P4 (V0 integrity), and certificate replay's slices R1 (the surface), R2 (the source and the Dark-2 report, §10.4), R3 (P, F and the interval, §10.6) and R4 (the positive run, §10.8). Crate `echo`: a no_std library and the std binary `prism echo …`.*
 
 Echo can only give back the last words she was given, and she never speaks first. The checker never authors: it replays the engine's own record from the text and gives it back exactly, so where the two differ, the difference is named and located.
 
@@ -19,6 +19,8 @@ Echo can only give back the last words she was given, and she never speaks first
 | **S1/S2, certificate replay, R2** | `echo::source` (the pact reader), `echo::dark2` (the Dark-2 report and check 10), `echo::interval` | Seam's pact-eval audit §1.2; certificate §2.4, §3.1, §3.1.1 J, J′, M4; Note v3.3.2 §6.2, §6.4, §6.5 G7, G8, §6.7 H1–H5, H7 (§10.4 here) |
 | **S1/S2, certificate replay, R3** | `echo::program` (P, F, check 1) | certificate §3.1, §3.1.1 A, B, F, G, §3.2; Note v3.3.2 §6.2, §6.7 H5 (§10.6 here) |
 | **S1/S2, certificate replay, R4** | `echo::model` (the positive run, checks 3, 4, 5, 8; the positive core) | certificate §1, §2.1, §3.1, §3.2, §4.1, §4.2; Note v3.3.2 §2.1, §2.2, §6.2 (the `structure` rows), §6.5 G5, §6.7 H1, H3 v3.3 (§10.8 here) |
+
+| **The witness** (prism-025 Addendum item 3) | `echo::witness` (`Response`, `Roll`, the record); `prism echo --witness` | Mara 052e5a13 §1.1, §1.2; Seam SF §5; mirror-029 §6 (§11 here) |
 
 Not yet: P5 (V2, the second reading), and certificate replay's R5–R10 (§10).
 
@@ -621,3 +623,89 @@ Atoms are addressed at `@pact/fact` root. A derivation is named by its **Note** 
 - **Q47. Which declarations make a paradox certain.** echo checks the eval program's well-formed, non-trivial declarations over the stable set's key groups, and decides the header with it only where R3 couldn't (a reader hole beside open light). Confirm that an ill-formed declaration (a hole) and a trivial one (value among its keys) never make one certain.
 
 **Gates at `a2bddbb`:** `just check` clean; echo's 151 tests pass; `checks.coverage` 96.28% of lines (the ratchet is 94; echo 99.17%, 2503 of 2524; `model.rs` 329 of 336, `replay.rs` 138 of 138, `dark2.rs` 466 of 467, `interval.rs` 92 of 92); `checks.doctest`; `checks.echo-independent` (R4 adds no dependency); `checks.echo-portable` (wasm32, thumbv7em). Five mutations, each killed and reverted (§8). No rustc abort under `-j 4`.
+
+## 11. The witness (`prism echo --witness`)
+
+*prism-025 Addendum item 3 and Response §5 item 3; Mara's witness grade (mirror `mara/witness-navigation-grade` 052e5a13, `docs/math/2026-11-24-mara-witness-navigation-event-sourced.md` §1.1, §1.2), which adds coverage to Seam's SF §5 (`seam/floor-shape-attack` 8e8f2610, `docs/audits/2026-11-22-seam-floor-shape-attack.md` §5); mirror-029 §6: the witness sits beside the roll, never in its address, and is checked as sufficient and minimal. The record's format is **provisional**: mirror-text lines in echo's style, until Mara or mirror pins one.*
+
+### 11.1 The definition, as read
+
+**Witnessed = address + key + the reader's pin + an independent re-derivation + coverage** (SF §5's four clauses; Mara §1.1 adds the fifth).
+- **The key** (SF §5, "Sufficiency", item 1): "An address agreed on by two readers says nothing unless both derived it from the same **(rules, bytes, scope)**." The key is that triple: what the address was derived from.
+- **The pin** (SF §5 item 2): "the reader's identity and pin. Independence that can't be named can't be graded."
+- **Coverage** (Mara §1.1): "the reader's verdict ranges only over the bytes it read, and everything else is `unreadable`." *A witness is a computation that can say no about every byte it vouches for.*
+- **The answers** (Mara §1.2): {accept, refuse, not now}, the witness's, **never fused** with the roll's {true, maybe, false}. The third answer is what keeps a refusal sound when there are inputs the reader can't decide (PROVED there). The "not now"s are **one answer with several reasons** (coverage, a budget stop, a capacity hole), each naming what would settle it.
+
+### 11.2 echo's pieces
+
+| clause | echo's | from |
+|---|---|---|
+| address | `address certificate <addr \| none>`: plain BLAKE3 of the certificate's raw bytes, the `heard` slot. Not the certificate fragment's address under `H` (check 9 is R8's, unreplayed; Q48) | §10.1 `heard` |
+| key | `key program <P> facts <F> scope none`: echo's own P and F (§10.6) over the source's lines that read, when echo read the source; `none` when it didn't. The rules are P, the bytes F; echo's inputs carry no scope (Q49) | §10.6 |
+| pin | `pin spec <commit> vectors <tree> rig none`: the `implements` line's content, word for word | §10.1 `implements` |
+| re-derivation | one `derived <stratum> <outcome>` line per stratum echo replayed on this input, in §10's order: `source` (R2), `program` (R3), `model` (R4) | §10.4–§10.8 |
+| coverage | `covered` / `uncovered` lines for every input and every stratum, then `uncovered rest` | below |
+
+**The outcome of a stratum** (what its checks did on this input):
+- `agreed`: its checks ran and found nothing;
+- `dissonant <n>`: its checks printed `<n>` interval lines (of the verdict's list);
+- `waits`: its checks turn on a later stratum, or it has nothing to judge until one runs (R2's light that needs a run; R3's header that turns on that light; R4 on a Dark, unlit or W source, or a performance with W, budget or `dark 2` lines);
+- `open`: its check's bytes are open in the spec (R2's check 2, Q26; R4's Q40–Q42); `dissonant <n> open` when R4 printed lines and also met an open case.
+
+**Coverage.** echo vouches for a byte only if a stratum it replayed read it and decided:
+- `covered input <input> <addr>`: an input echo read whole (the source by R2; the certificate and the record by R1's readers), by its `heard` address;
+- `uncovered input <input> <addr | none> <why>`: `absent` (no score given), `io` (couldn't be read), `unreadable <L>:<C>` (refused at that byte), `stopped` (not read, because an earlier answer ended the run), `unread` (hashed for `heard`, never read: the score until R9);
+- `covered stratum <stratum>`: replayed, with outcome `agreed` or `dissonant <n>`;
+- `uncovered stratum <stratum> <why>`: `waits` or `open` (replayed, undecided), `stopped` (not reached: `io`, `unreadable` or the budget answered first), `unreplayed` (no method yet: `contexts` … `score`, R5–R9);
+- `uncovered rest`: everything else, explicitly not vouched for. Inside a covered input, a covered stratum vouches only for what its own checks read (R1 reads the record's line form, R6 its values).
+
+### 11.3 The answer
+
+| echo's verdict | the witness's answer |
+|---|---|
+| `rings` | `answer accept` |
+| `dissonant <n>` | `answer refuse` |
+| `uncertain budget <n> ground rule instances` | `answer not now budget <n> ground rule instances` |
+| `unknown io <input> …` | `answer not now io <input> …` |
+| `unknown unreadable <input>:<L>:<C>` | `answer not now unreadable <input>:<L>:<C>` |
+| `unknown unreplayed <stratum>` | `answer not now unreplayed <stratum>` |
+
+The reason is the verdict's own words, so `uncertain budget` (exit 1) and `unknown` (exit 2) stay distinct inside one answer. **The floor:** `accept` comes only from `rings` *and* every stratum covered; a `rings` with an uncovered stratum would be `answer not now uncovered`. echo never accepts what it didn't replay.
+
+**Two types.** In code the answer is `echo::witness::Response { Accept, Refuse, NotNow(Reason) }` and the roll's value is `echo::witness::Roll { True, Maybe, False }`. Neither converts to the other; a `compile_fail` doctest shows a `Response` can't stand where a `Roll` is expected, beside a control that compiles.
+
+### 11.4 The mode, and why it comes after a seam
+
+`prism echo --witness <source> <certificate> <record> [<score>]` prints:
+
+```text
+<the parity lines, byte for byte as without the flag>
+---
+witness 1
+answer <accept | refuse | not now <reason>>
+address certificate <addr | none>
+key program <addr | none> facts <addr | none> scope none
+pin spec <commit> vectors <tree> rig none
+derived <stratum> <outcome>                     (one per stratum replayed)
+covered input <input> <addr>                    (in input order)
+uncovered input <input> <addr | none> <why>
+covered stratum <stratum>                       (in §10's order)
+uncovered stratum <stratum> <why>
+uncovered rest
+```
+
+Every line ends in LF; the exit is the verdict's (§10.1), unchanged.
+
+- **After a seam, not instead.** The parity lines are pinned for byte parity with the tune (prism-022 S2; Note §6.3; the contract delta: "`heard` and `implements` stay the second and third lines in every case"). The witness can't be a line in that surface. `---` is the seam of mirror's reflection (§3, P3): `a ‖ "---\n" ‖ r`, and "the part above the seam is never read" as a reflection. So `a` is the parity surface, unchanged, and `r` the witness: a consumer comparing with the tune cuts at the first `---` and compares `a` byte for byte. No parity line is ever exactly `---`. Printing the record *instead* would make the witness's `heard` and `pin` a restatement; printing it after keeps one source for both.
+- **Without the flag**, the output and the exit are byte-identical to before this section: a guard pins every fixture's output.
+- **Beside the roll.** The record is computed from the answer and a trace of the replay, after the verdict; nothing in it enters the verdict, an interval, `heard`, a recomputed address, or the certificate's address.
+- **The flag selects the output, never the budget**, which stays the pinned constant (§10.1). It is the second word only (`prism echo --witness …`). The usage line stays the contract delta's, byte for byte (Q51).
+- **No new dependency**, no serde, no JSON: `checks.echo-independent` unchanged. The library stays `no_std` (`echo::witness`).
+
+### 11.5 Questions the witness adds for Mara
+
+- **Q48. The address.** SF §5's address is the one two readers agree on. echo's is the certificate's raw bytes (BLAKE3), because the certificate's own address under `H` (check 9) is R8's. Should the witness name the roll's `result`, the certificate fragment, or the bytes? Until R8 echo names the bytes.
+- **Q49. The key's scope.** echo's inputs carry no scope, so it prints `scope none`. Is the scope a fourth input echo should read, or a claim it should leave to the record?
+- **Q50. Coverage inside an input.** echo's coverage is per input and per stratum. A covered certificate with an uncovered `contexts` stratum vouches for its `layer`/`derive` lines and not its `context` lines. Should coverage name lines (or `L:C` ranges), as `settle.py`'s C1 says `unreadable` per line?
+- **Q51. The usage line.** The contract delta pins `usage: prism echo <source> <certificate> <record> [<score>]`. echo keeps it and doesn't advertise `--witness`. Should usage name the flag, or is the witness mode a separate entry (the MCP tool's structured result)?
+- **Q52. Minimality.** mirror-029 §6 checks a witness as sufficient and minimal. echo's coverage is sufficient for its answer by construction; is a witness that covers more strata than its refusal needs (one `dissonant` stratum among three `agreed`) still minimal, or should a refusal name only the strata whose lines it prints?
