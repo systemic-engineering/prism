@@ -1150,6 +1150,7 @@ dependencies = [
  "num-rational",
  "num-traits",
  "terni",
+ "zeroize",
 ]
 
 [[package]]

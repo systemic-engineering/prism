@@ -609,8 +609,17 @@ impl Erasure {
     /// key's scope is refused as a [`Stranger`], and the key comes back
     /// unconsumed.
     pub fn mint(key: ScopeKey, census: &[Crystal]) -> Result<Erasure, Stranger> {
+        let held = Scope::keyed(&key);
+        let stranger = census
+            .iter()
+            .find(|c| &Oid::hash(&held, c.bytes()) != c.address())
+            .map(|c| c.address().clone());
+        if let Some(address) = stranger {
+            return Err(Stranger { key, address });
+        }
         let covers = census.iter().map(|c| c.address().clone()).collect();
         let scope = key.id();
+        // The key is consumed here: dropped, so its bytes are zeroed.
         drop(key);
         Ok(Erasure { scope, covers })
     }

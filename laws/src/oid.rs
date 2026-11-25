@@ -6,6 +6,8 @@
 
 use std::sync::LazyLock;
 
+use zeroize::Zeroize;
+
 /// The context string of the public scope. Names the scope for the whole
 /// stack; `v1` versions the identity function.
 pub const PUBLIC_CONTEXT: &str = "systemic.engineering://visibility/public/v1";
@@ -85,9 +87,23 @@ pub const SCOPE_ID_CONTEXT: &str = "systemic.engineering://scope-id/v1";
 /// let moved = key;
 /// let _ = Oid::hash(&scope, b"x");
 /// ```
-#[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct ScopeKey([u8; 32]);
+
+/// Zeroed on drop: `zeroize` writes the zeros with `write_volatile` and a
+/// compiler fence, so the store isn't elided as dead. (prism-laws forbids
+/// `unsafe`, so the volatile write is zeroize's, not hand-rolled here.)
+impl Drop for ScopeKey {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl std::fmt::Debug for ScopeKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ScopeKey(held)")
+    }
+}
 
 /// The bytes offered as a key were `K_public`'s: anyone can derive them, so
 /// they are nobody's capability, and there is no [`ScopeKey`] for them.
@@ -99,7 +115,12 @@ impl ScopeKey {
     /// doesn't outlive the handover. Refused, and `source` left as it was,
     /// if the bytes are the public scope's key.
     pub fn take(source: &mut [u8; 32]) -> Result<ScopeKey, IsPublic> {
-        Ok(ScopeKey(*source))
+        if *source == *PUBLIC_KEY {
+            return Err(IsPublic);
+        }
+        let key = ScopeKey(*source);
+        source.zeroize();
+        Ok(key)
     }
 
     /// The scope's public id. Safe to store; it doesn't reveal the key.
