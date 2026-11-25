@@ -244,7 +244,10 @@ impl Oid {
     /// in neither the content domain nor the scope-id domain, so no crystal's
     /// bytes can land on a slot.
     pub fn slot(scope: &Scope<'_>, label: &[u8]) -> Self {
-        Oid::hash(scope, label)
+        let mut hasher = blake3::Hasher::new_derive_key(SLOT_CONTEXT);
+        hasher.update(scope.key);
+        hasher.update(label);
+        Oid(hasher.finalize().to_hex().to_string())
     }
 
     /// The dark OID. The address of absence. Constant, and not the address

@@ -933,8 +933,103 @@ fn census<B: Backend + ?Sized>(
     backend: &B,
     scope: &Scope<'_>,
 ) -> Result<BTreeSet<Oid>, Strange<B::Error>> {
-    let _ = backend;
-    Ok(Slots::of(scope).all().into_iter().cloned().collect())
+    let slots = Slots::of(scope);
+    let mut covers: BTreeSet<Oid> = slots.all().into_iter().cloned().collect();
+    let manifest = unless_erased(read_list(backend, &slots.manifest))?;
+    for crystal in &manifest {
+        covers.insert(references_slot(scope, crystal));
+        own(backend, scope, crystal)?;
+        covers.insert(crystal.clone());
+    }
+    Ok(covers)
+}
+
+/// A census read: an erased slot covers nothing more (the scope was purged
+/// before, and its crystals are tombstoned already); every other refusal is
+/// the mint's.
+fn unless_erased<T: Default, E>(read: Result<T, Recall<E>>) -> Result<T, Strange<E>> {
+    match read {
+        Ok(value) => Ok(value),
+        Err(Recall::Lost { .. }) => Ok(T::default()),
+        Err(Recall::Forged(slot)) => Err(Strange::Malformed(slot)),
+        Err(Recall::Backend(e)) => Err(Strange::Backend(e)),
+    }
+}
+
+/// Whether a listed address is the scope's: bytes held must rehash to it
+/// under the live key. Tombstoned or missing bytes are covered: the address
+/// is in the scope's own list, and a lost disk never blocks an erasure.
+fn own<B: Backend + ?Sized>(
+    backend: &B,
+    scope: &Scope<'_>,
+    address: &Oid,
+) -> Result<(), Strange<B::Error>> {
+    if backend.erased(address).map_err(Strange::Backend)?.is_some() {
+        return Ok(());
+    }
+    match backend.fetch(address).map_err(Strange::Backend)? {
+        Some(bytes) if &Oid::hash(scope, &bytes) != address => {
+            Err(Strange::Foreign(address.clone()))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Read a slot, checked: the tombstone first, so an erased slot reads
+/// `Lost(Erased)` even on a backend that kept its bytes.
+fn read_slot<B: Backend + ?Sized>(
+    backend: &B,
+    slot: &Oid,
+) -> Result<Option<Vec<u8>>, Recall<B::Error>> {
+    if let Some(receipt) = backend.erased(slot).map_err(Recall::Backend)? {
+        return Err(Recall::Lost {
+            address: slot.clone(),
+            reason: Loss::Erased(receipt),
+        });
+    }
+    backend.fetch(slot).map_err(Recall::Backend)
+}
+
+/// A slot's lines; none if the slot was never written. Bytes that aren't
+/// UTF-8 are `Forged`, never believed.
+fn read_lines<B: Backend + ?Sized>(
+    backend: &B,
+    slot: &Oid,
+) -> Result<Vec<String>, Recall<B::Error>> {
+    let Some(bytes) = read_slot(backend, slot)? else {
+        return Ok(Vec::new());
+    };
+    let text = String::from_utf8(bytes).map_err(|_| Recall::Forged(slot.clone()))?;
+    Ok(text
+        .split('\n')
+        .filter(|l| !l.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
+/// A slot's list of addresses, one per line, each 64 lowercase hex.
+fn read_list<B: Backend + ?Sized>(backend: &B, slot: &Oid) -> Result<Vec<Oid>, Recall<B::Error>> {
+    read_lines(backend, slot)?
+        .into_iter()
+        .map(|line| address(slot, &line))
+        .collect()
+}
+
+fn address<E>(slot: &Oid, word: &str) -> Result<Oid, Recall<E>> {
+    let hex = |c: char| c.is_ascii_digit() || ('a'..='f').contains(&c);
+    if word.len() == 64 && word.chars().all(hex) {
+        Ok(Oid::new(word))
+    } else {
+        Err(Recall::Forged(slot.clone()))
+    }
+}
+
+fn list_bytes<'o>(list: impl IntoIterator<Item = &'o Oid>) -> Vec<u8> {
+    list.into_iter()
+        .map(Oid::as_str)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into_bytes()
 }
 
 /// A mint refused: something listed in the scope's state isn't the scope's
@@ -1119,18 +1214,52 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
         bytes: Vec<u8>,
         references: impl IntoIterator<Item = Oid>,
     ) -> Result<Oid, Recall<B::Error>> {
-        let _ = references.into_iter().count();
         let crystal = Crystal::settle(&self.scope, bytes);
-        self.backend.persist(&crystal).map_err(Recall::Backend)?;
-        Ok(crystal.address().clone())
+        let address = crystal.address().clone();
+        let slots = self.slots();
+        // Read first: an erased scope refuses before anything is written.
+        let mut manifest = read_list(&*self.backend, &slots.manifest)?;
+        let list = self.references_slot(&address);
+        let mut declared: BTreeSet<Oid> = read_list(&*self.backend, &list)?.into_iter().collect();
+        let before = declared.len();
+        declared.extend(references);
+        let new = !manifest.contains(&address);
+        if new {
+            self.backend.persist(&crystal).map_err(Recall::Backend)?;
+        }
+        if new || declared.len() != before {
+            self.write(&list, &list_bytes(&declared))?;
+        }
+        if new {
+            manifest.push(address.clone());
+            self.write(&slots.manifest, &list_bytes(&manifest))?;
+        }
+        Ok(address)
     }
 
-    /// The scope's reference index, rebuilt from its persisted lists.
+    /// The scope's reference index: a projection, rebuilt from the
+    /// persisted lists (the manifest, then each crystal's references).
+    /// Empty if nothing was ever settled in the scope; `Lost(Erased)` once
+    /// it is purged.
     pub fn index(&self) -> Result<Index, Recall<B::Error>> {
+        let mut entries = BTreeMap::new();
+        for crystal in read_list(&*self.backend, self.slots().manifest())? {
+            let list = read_list(&*self.backend, &self.references_slot(&crystal))?;
+            entries.insert(crystal, list.into_iter().collect());
+        }
         Ok(Index {
             scope: self.scope.id(),
-            entries: BTreeMap::new(),
+            entries,
         })
+    }
+
+    fn write(&mut self, slot: &Oid, bytes: &[u8]) -> Result<(), Recall<B::Error>> {
+        self.backend
+            .write(&Slot {
+                address: slot,
+                bytes,
+            })
+            .map_err(Recall::Backend)
     }
 
     /// Read a crystal of the scope back by address, checked under its key.
