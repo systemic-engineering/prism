@@ -73,7 +73,7 @@ The observer appears in identity **only through its boundary, never through its 
 
 ## Out of scope
 
-**Key management.** Where held keys come from (the key hierarchy, sharing, rotation by key epochs, revocation, and whether a scope is deterministic or per-crystal) is designed outside prism (Mara's design, in mirror). prism takes a key as 32 bytes and never stores, derives, prints or rotates it. In prism, `Scope`'s `Debug` doesn't print the key.
+**Key management.** Where held keys come from (the key hierarchy, sharing, rotation by key epochs, revocation, and whether a scope is deterministic or per-crystal) is designed outside prism (Mara's design, in mirror). prism takes a key from its caller for the duration of a call and never stores, derives, prints or rotates it. In prism, `Scope`'s `Debug` doesn't print the key. Since prism-026 the key is a `ScopeKey` (move-only, `Debug` `ScopeKey(held)`, zeroed on drop, taken by `ScopeKey::take`, none for `K_public`), and `Scope::keyed` borrows it. What may be stored is the scope's public id, `ScopeId = BLAKE3-derive-key("systemic.engineering://scope-id/v1", K_scope)`: one-way, and in no content address's domain (`brain.md`, "Keyed scopes and erasure").
 
 **Keys from passwords.** BLAKE3 must never derive a key from a password or any other low-entropy secret. BLAKE3 is fast by design, so a key derived that way can be brute-forced from its addresses. A held key is 32 bytes of real entropy: random, or derived from such a key. If a key ever has to come from a password, that is a password hash's job (Argon2id, for example), outside prism.
 

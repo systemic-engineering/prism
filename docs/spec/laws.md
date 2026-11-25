@@ -21,7 +21,7 @@ A crate is the boundary: what `laws` doesn't depend on, no law can call.
 
 | module | what it holds |
 |---|---|
-| `oid` | the identity law: `Oid`, `Scope`, BLAKE3 keyed by scope (docs/spec/identity.md) |
+| `oid` | the identity law: `Oid`, `Scope`, BLAKE3 keyed by scope (docs/spec/identity.md); `ScopeKey` (the holder's capability, zeroed on drop by `zeroize`, the floor's one dependency for it, since the floor forbids `unsafe`) and `ScopeId` (brain.md, "Keyed scopes and erasure") |
 | `crystal` | `Crystal`: settled bytes and their address (it was `brain::Crystal`; `crossing` replays over it) |
 | `room` | rooms and maps over ℤ, ℤ/n, ℚ/ℤ, ℚ; Smith, charpoly, minimal polynomial, `quietest`, `solve`, `classify`, `bounds`, `holes` |
 | `field` | groups, lattices, graphs, faces, `check_flat`, `check_flat_by` |

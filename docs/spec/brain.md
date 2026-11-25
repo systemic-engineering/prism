@@ -242,8 +242,9 @@ An Erasure produces a `Receipt`:
   - **Dark** is an address this brain can't see into: a set in `Reach`.
   - **`Lost`** is a `Recall` error, final when its reason is `Erased`.
   - None of them converts into another (`compile_fail`).
-- **The purge law** (`tests/brain.rs`, run over every backend prism has: `Memory`, and
-  the independent test backend `Ledger`):
+- **The purge law** (`tests/brain.rs`, run over every backend prism has: `Memory`, the
+  independently written test backend `Ledger`, and `Counted`, which wraps `Memory`. A
+  `Hoarding` backend, which keeps purged bytes, shows the read failing closed):
   - after `purge(erasure)`, every covered address reads `Lost(Erased(receipt))`;
   - and `fetch` holds no bytes for it;
   - the crystals of another keyed scope, and of the public scope, still read back;
