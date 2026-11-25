@@ -237,6 +237,31 @@
             }
           );
 
+          coverage = craneLib.cargoLlvmCov (
+              gate
+              // {
+                cargoArtifacts = coverageDeps;
+                # --remap-path-prefix: rustc maps the workspace root (the
+                # per-build directory) to "" in the workspace crates only
+                # (cargo-llvm-cov's wrapper; dependencies keep their flags, so
+                # coverageDeps still serves), and the SF: paths come out
+                # repo-relative. llvm-cov's -path-equivalence would not do:
+                # it locates sources, the exported SF: names stay absolute.
+                # Relative, the build script's out/ under target/ slips past
+                # cargo-llvm-cov's own target-dir filter; ^target/ keeps it out.
+                cargoLlvmCovExtraArgs = "--remap-path-prefix --ignore-filename-regex ^target/ --fail-under-lines ${coverageFloor} --lcov --output-path $out";
+                # The output is checked, not just produced: every SF: path
+                # repo-relative, so a rebuild gives the same bytes.
+                doInstallCheck = true;
+                installCheckPhase = "bash ${./nix/lcov-paths.sh} $out";
+              }
+            );
+
+          # The floor's sources, as the lcov names them (laws/src/…), for
+          # checks.laws-coverage's markers; and the filter's fixtures.
+          lawsSrc = toSource (fs.fileFilter (f: f.hasExt "rs") ./laws/src);
+          coverageFixtures = toSource ./nix/coverage-fixtures + "/nix/coverage-fixtures";
+
           release = common // {
             src = packageSrc;
             cargoExtraArgs = "--locked --workspace --features ${features}";
@@ -296,25 +321,52 @@
 
             test = craneLib.cargoTest (gate // { cargoArtifacts = gateDeps; });
 
-            coverage = craneLib.cargoLlvmCov (
-              gate
-              // {
-                cargoArtifacts = coverageDeps;
-                # --remap-path-prefix: rustc maps the workspace root (the
-                # per-build directory) to "" in the workspace crates only
-                # (cargo-llvm-cov's wrapper; dependencies keep their flags, so
-                # coverageDeps still serves), and the SF: paths come out
-                # repo-relative. llvm-cov's -path-equivalence would not do:
-                # it locates sources, the exported SF: names stay absolute.
-                # Relative, the build script's out/ under target/ slips past
-                # cargo-llvm-cov's own target-dir filter; ^target/ keeps it out.
-                cargoLlvmCovExtraArgs = "--remap-path-prefix --ignore-filename-regex ^target/ --fail-under-lines ${coverageFloor} --lcov --output-path $out";
-                # The output is checked, not just produced: every SF: path
-                # repo-relative, so a rebuild gives the same bytes.
-                doInstallCheck = true;
-                installCheckPhase = "bash ${./nix/lcov-paths.sh} $out";
-              }
-            );
+            inherit coverage;
+
+            # docs/spec/coverage.md: prism's floor at 100% line coverage, with
+            # every gap an explicit, reasoned skip. nix/coverage-skips.sh reads
+            # checks.coverage's lcov and laws/src, drops the lines under a
+            # `// coverage: skip(<reason>)` or a `skip-start(<reason>)` …
+            # `skip-end` region, and fails unless every other line ran, no
+            # skip covers an executed line or none, every marker has a reason,
+            # and the skipped lines number exactly nix/laws-skips-max (a
+            # ratchet: it only goes down). The output is the ledger
+            # (skips.txt, one line per skip: file:lines, count, reason) and
+            # the verdict (summary.txt). The workspace keeps its own ratchet
+            # (coverageFloor) in checks.coverage.
+            laws-coverage = pkgs.runCommand "prism-laws-coverage" { } ''
+              mkdir -p $out
+              bash ${./nix/coverage-skips.sh} ${coverage} ${lawsSrc} laws/src ${./nix/laws-skips-max} \
+                > $out/skips.txt 2> $out/summary.txt || { cat $out/summary.txt >&2; exit 1; }
+              cat $out/summary.txt >&2
+            '';
+
+            # The filter itself, on tiny lcov + source pairs
+            # (nix/coverage-fixtures/<case>/: cov.lcov, laws/src/*.rs, max,
+            # expect, and for some accepted cases the exact ledger): the
+            # accepted ones pass with their ledger, and each refused one fails
+            # for its own reason (the text after `refuse: ` in its expect).
+            coverage-skips = pkgs.runCommand "prism-coverage-skips" { } ''
+              filter=${./nix/coverage-skips.sh}
+              for d in ${coverageFixtures}/*/; do
+                d=''${d%/}; n=''${d##*/}; expect=$(cat $d/expect)
+                if said=$(bash $filter $d/cov.lcov $d laws/src $d/max 2> err); then rc=0; else rc=$?; fi
+                case "$expect" in
+                  ok)
+                    if [ $rc -ne 0 ]; then echo "coverage-skips refused $n:" >&2; cat err >&2; exit 1; fi
+                    if [ -f $d/ledger ] && [ "$said" != "$(cat $d/ledger)" ]; then
+                      echo "coverage-skips: $n's ledger is [$said], not [$(cat $d/ledger)]" >&2; exit 1
+                    fi ;;
+                  refuse:*)
+                    why=''${expect#refuse: }
+                    if [ $rc -eq 0 ]; then echo "coverage-skips accepted $n" >&2; exit 1; fi
+                    if ! grep -qF -- "$why" err; then echo "coverage-skips refused $n, but not for $why:" >&2; cat err >&2; exit 1; fi ;;
+                  *) echo "coverage-skips: $n's expect is unreadable: $expect" >&2; exit 1 ;;
+                esac
+                echo "coverage-skips: $n as expected" >&2
+              done
+              touch $out
+            '';
 
             # The guard itself: it must reject an absolute or build-directory
             # SF: path, a file under target/ (generated, not source), and an
