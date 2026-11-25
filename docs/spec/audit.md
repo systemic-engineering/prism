@@ -13,7 +13,7 @@ At a 5 % sample, one wrong item among 1000 is caught with probability 5 %. It is
 
 S3\* audits the **unchanged** mass, the verdicts nobody touched. What it can establish is a statement about the whole cache: "fewer than p of these are wrong, at confidence c". It can't vouch for any single item.
 
-Beer's S3\* is the sporadic audit: the control function doesn't only trust what it's told; now and then it looks for itself. Here the "looking" is Mara's sampled recompute.
+The sporadic audit: the control function doesn't only trust what it's told; now and then it looks for itself. In *Brain of the Firm* (Beer, 1981) the audit sits inside S3; the name "3\*" is OPEN until *Heart of Enterprise* is read (Mara). Here the "looking" is Mara's sampled recompute.
 
 ## Setting
 
