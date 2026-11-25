@@ -50,8 +50,10 @@ in @mirror/spec
 #   Q2  `needs [ ]` between crates: documented between emissions
 #       (release needs [binary, ci]); here it is a cargo dependency.
 #   Q3  `algedonic bypass variety → eigen`: the documented form, though a
-#       red gate is raised at coherence. Beer's bypass runs from S1, so it
-#       is kept as written.
+#       red gate is raised at coherence. The bypass is mirror's departure,
+#       not Beer's: Beer's algedonic signal passes arousal filters and
+#       rises one level at a time (Mara's grade, mirror `mara/beer-graded`
+#       40db77ee). It is kept as written, as mirror's.
 #   Q4  settle_on predicate names (`clippy.lints`, `test.tests_pass`, ...)
 #       follow mirror.spec's `lint.lints` / `tests.tests_pass` pattern;
 #       the ones mirror.spec doesn't use are invented names, not grammar.

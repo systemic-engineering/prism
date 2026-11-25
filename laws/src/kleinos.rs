@@ -33,9 +33,9 @@
 //! trace DAG is not the third: it's the ground, kept by address.
 //!
 //! **Refused, typed, never a panic** ([`KleinosError`]): a hash that isn't a
-//! full commit; a span from a commit to itself; an empty party; a frame no
-//! party holds; one span id with two pairs of endpoints (a collision, not an
-//! edge) or two readings; and whatever [`compose`] refuses. A reading that
+//! full commit; a span from a commit to itself; a frame no party holds; one
+//! span id with two pairs of endpoints (a collision, not an edge) or two
+//! readings; and whatever [`compose`] refuses. A reading that
 //! doesn't invert never gets this far: [`Gl::new`] refuses it.
 //!
 //! **λ₂ is a reading, not a law** (the lab's `Pushout::fiedler`): measured on

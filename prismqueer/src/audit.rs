@@ -1,7 +1,9 @@
 //! S3*: the sampled audit of a verdict cache, stated exactly.
 //!
-//! Beer's S3* is the sporadic audit: besides the verdicts it is handed, the
-//! control function now and then recomputes one itself. For a verdict cache
+//! The sporadic audit: besides the verdicts it is handed, the control
+//! function now and then recomputes one itself. In *Brain of the Firm*
+//! (Beer, 1981) the audit sits inside S3; the name "3*" is OPEN until
+//! *Heart of Enterprise* is read (Mara). For a verdict cache
 //! that is Mara's sampled recompute: n of the N unchanged items, uniformly,
 //! without replacement. This module is the maths of what such a sample can
 //! say, in exact rationals (`docs/spec/audit.md`):

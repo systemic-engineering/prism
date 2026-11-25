@@ -587,6 +587,15 @@ impl Calibration {
 /// T3's clock, as data (Beer B11): the reaction time and importance agreed
 /// with the person concerned, and the delay they set. In ticks the caller
 /// counts; prism reads no wall clock.
+///
+/// **Which ruler this is stays OPEN** (prism-028 Response §3). Its own words
+/// for [`Clock::delay`], "the delay before the signal breaks with the
+/// autonomy", describe Beer's recovery time R at a level (*Brain of the
+/// Firm*, p. 276): the time before the alert leaves the level. Seam's model
+/// reads it as the delivery WINDOW (`age < W`). Those are two rulers, not
+/// one; Alex and Mara decide which one `Clock` is, and the other becomes its
+/// own sealed ruler beside it, never folded into it. Clock carries no level
+/// index.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Clock {
     reaction: u64,
