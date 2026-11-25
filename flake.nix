@@ -396,15 +396,20 @@
               installPhaseCommand = "touch $out";
             };
 
-            # docs/spec/mcp.md §6: prism-mcp's graph holds no serde, no JSON
-            # crate, no prismqueer, no mirror crate and nothing LAPACK, BLAS or
-            # Fortran; every kind from prism-mcp, normal and build below it
-            # (chorus's dev-dependency serde_json is never linked into it).
-            # The guard runs on the real graph, accepts the clean fixture (that
-            # dev edge included) and refuses six: serde_json as a normal edge
-            # under chorus, serde_json as prism-mcp's own dev-dependency, a
-            # JSON crate not named serde, a mirror crate, prismqueer, and an
-            # innocently named crate with `links = "blas"`.
+            # docs/spec/mcp.md §6: prism-mcp's own build graph holds no serde,
+            # no JSON crate, no mirror crate and nothing LAPACK, BLAS or
+            # Fortran, and prismqueer only with exactly the feature `exact`.
+            # The graph is `cargo tree -p prism-mcp` (cargo's resolve for
+            # prism-mcp alone: its own dev edges, never its dependencies',
+            # features as that build turns them on), with `links` from the
+            # metadata. The guard runs on the real graph; accepts mcp-merged
+            # (prism-mcp → prismqueer under exact, the real tree), whose
+            # workspace-union metadata the old reading refused for terni →
+            # serde (asserted here); and refuses nine, each for its own
+            # reason: prismqueer with lapack, prismqueer with default, terni's
+            # serde really on, serde_json as a normal edge, a JSON crate, a
+            # mirror crate, `links = "blas"`, a package the metadata doesn't
+            # have, and a line that doesn't parse.
             prism-mcp-independent = craneLib.mkCargoDerivation {
               pname = "prism-mcp-independent";
               inherit version;
@@ -418,11 +423,27 @@
                 guard=${guardSrc}/nix/prism-mcp-independent.sh
                 fixtures=${guardSrc}/nix/fixtures
                 cargo metadata --format-version 1 --locked --offline > metadata.json
-                bash $guard metadata.json
-                bash $guard $fixtures/mcp-clean.json
-                for f in serde-json root-dev json mirror prismqueer links; do
-                  if bash $guard $fixtures/mcp-$f.json 2>/dev/null; then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
-                done
+                cargo tree --locked --offline -p prism-mcp -e normal,build,dev --target all --prefix none -f '{p}|{f}' > tree.txt
+                bash $guard tree.txt metadata.json
+                bash $guard $fixtures/mcp-merged.tree $fixtures/mcp-merged.json
+                # The old reading, the workspace union, refused that graph.
+                union='^(mirror|mirror[-_].*|.*serde.*|.*json.*|.*lapack.*|.*blas.*|.*fortran.*|netlib-src|intel-mkl.*|accelerate-src)$'
+                old=$(bash ${guardSrc}/nix/independent.sh $fixtures/mcp-merged.json prism-mcp "$union" root)
+                if ! echo "$old" | grep -qx serde; then echo "the union reading no longer refuses mcp-merged: $old" >&2; exit 1; fi
+                while read -r f why; do
+                  if bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>/dev/null; then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
+                  if ! bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>&1 | grep -qF -- "$why"; then echo "prism-mcp-independent refused mcp-$f, but not for $why" >&2; exit 1; fi
+                done <<'EOF'
+                lapack prismqueer (features exact,lapack)
+                default prismqueer (features default,exact)
+                terni-serde serde_derive
+                serde-json serde_json
+                json tinyjson
+                mirror mirror-ast
+                links quietly (links blas)
+                missing unheard-of 9.9.9 (not in the metadata)
+                unparsed unparsed: chorus v0.1.0
+                EOF
               '';
               installPhaseCommand = "touch $out";
             };
