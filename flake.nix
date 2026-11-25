@@ -293,9 +293,7 @@
                 passthru.fileset = packageFileset;
               }
             );
-        in
-        {
-          inherit toolchain craneLib pkgs;
+
           packages = {
             prismqueer = crate "prismqueer" ./prismqueer [
               ./imperfect
@@ -305,9 +303,23 @@
             terni = crate "terni" ./imperfect [ ] "";
           };
 
+          # A package's store path, or "" when the flake doesn't build it
+          # (checks.packages-built reads "" as missing).
+          built = name: if packages ? ${name} then "${packages.${name}}" else "";
+        in
+        {
+          inherit toolchain craneLib pkgs packages;
+
           # Named after the justfile's gate: `just check` is fmt + clippy,
           # `just test` is test, `just test coverage` is coverage + doctest.
           checks = {
+            # The binaries as packages: each bin/ holds its one executable, and
+            # it runs (echo's usage exit 2; prism-mcp's initialize round-trip).
+            packages-built = pkgs.runCommand "prism-packages-built" { } ''
+              bash ${./nix/packages-built.sh} "${built "echo"}" "${built "prism-mcp"}"
+              touch $out
+            '';
+
             fmt = craneLib.cargoFmt { src = testSrc; inherit (common) pname version; };
 
             clippy = craneLib.cargoClippy (
