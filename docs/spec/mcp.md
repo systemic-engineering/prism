@@ -4,11 +4,11 @@
 
 ## 1. What it is
 
-A std binary that speaks the Model Context Protocol over stdio and exposes four of prism's readers, read-only: the verifiers `echo` and `chorus`, and, on prismqueer's certified path (`docs/spec/features.md`), `check` and `measure`.
+A std binary that speaks the Model Context Protocol over stdio and exposes four of prism's readers, read-only: the verifiers `echo` and `chorus`, and, on prism's floor (`prism-laws`, `docs/spec/laws.md`), `check` and `measure`.
 
 - **Read-only.** No keys, no signing, no file beyond stdin and stdout, no network, no clock, no environment-dependent behaviour. Every input travels inline in the request. It verifies and never authorizes (prism-025 edge 1): `chorus` returns a grade, never an admission.
-- **Three dependencies:** `echo` and `chorus`, both workspace crates, both `no_std`; and `prismqueer = { default-features = false, features = ["exact"] }` for `check` and `measure` (no LAPACK, BLAS or Fortran; ¶6). The library (`prism_mcp`) is `no_std` with `alloc` in its own code: bytes in, bytes out. prismqueer is a std crate, so the build links std. Only the binary touches stdin and stdout.
-- **What `exact` costs on the floor:** prismqueer brings a proc-macro crate (prismqueer-projections, with syn, quote and proc-macro2) and terni's macros (terni-macros), the num-* stack (num-bigint, num-rational, num-integer, num-traits), sha2 and hex. All are pure Rust; none is a numeric native library. The tree is in `nix/fixtures/mcp-merged.tree`.
+- **Three dependencies:** `echo` and `chorus`, both workspace crates, both `no_std`; and `prism-laws` for `check` and `measure` (¶6). The library (`prism_mcp`) is `no_std` with `alloc` in its own code: bytes in, bytes out. prism-laws is a std crate, so the build links std. Only the binary touches stdin and stdout.
+- **What the laws cost on the floor:** blake3, the num-* stack (num-bigint, num-rational, num-integer, num-traits) and terni with `fractal` only. No proc-macro (`checks.laws-independent`). Until prism-laws (2026-11-25) these came through prismqueer under `exact`, which brought prismqueer-projections, syn, quote, proc-macro2, terni-macros, sha2 and hex too. The tree is in `nix/fixtures/mcp-merged.tree`.
 - **No serde, no JSON crate of any kind, never mirror's parser.** The JSON reader and printer are hand-written in `prism_mcp::json` (§3), from RFC 8259 and RFC 7493's text.
 - **Never `f64`** (contract rule 7). A source guard scans `mcp/src` for `f32` and `f64`.
 
@@ -149,7 +149,7 @@ Inputs are JSON strings (text), canonical base64 (bytes), JSON integers, or exac
 
 ### 5.3 `check`
 
-`prismqueer::agreement::check`: is a selection inside the consistent readings of exact relations among items?
+`prism_laws::agreement::check`: is a selection inside the consistent readings of exact relations among items?
 
 - **Arguments:**
   - `ring`: `"Z"`, `"ZMod"` or `"QModOne"`; `modulus` (an integer) with `ZMod` and only with it;
@@ -181,7 +181,7 @@ Inputs are JSON strings (text), canonical base64 (bytes), JSON integers, or exac
 
 ### 5.4 `measure`
 
-`prismqueer::measured::measure`: a precision matrix estimated exactly over ℚ from integer counts (`docs/spec/measured.md`).
+`prism_laws::measured::measure`: a precision matrix estimated exactly over ℚ from integer counts (`docs/spec/measured.md`).
 
 - **Arguments:** `samples` (`[[x₁, …, x_d], …]`, integers), `streams` (d, an integer ≥ 0), `estimator` (`"mle"` or `"unbiased"`), `support` (`[[i, j], …]`, the declared edges), `window` (64 hex: the window ruler's address), `reader` (64 hex: the frame's reader). All six are required.
 - **The frame** is `Frame::new(reader, streams)`: prism derives a frame's address from its reader and dimension, so the tool takes those, not a frame address, and prints the address.
@@ -216,13 +216,13 @@ Inputs are JSON strings (text), canonical base64 (bytes), JSON integers, or exac
 - any mirror crate (`mirror`, `mirror-*`, `mirror_*`);
 - `*serde*` (serde, serde_json, serde_core, serde_derive, miniserde, nanoserde) and `*json*` (any JSON crate);
 - `*lapack*`, `*blas*`, `*fortran*`, `netlib-src`, `intel-mkl*`, `accelerate-src`;
-- `prismqueer` with any feature set but exactly `exact`: `default` or `lapack` is refused, with the features named. Its closure under `exact` is held by `checks.prismqueer-exact` (no `cc` but blake3's, nothing native);
+- `prismqueer` (and `prismqueer-*`), with any features: the lab. The laws come from `prism-laws`, whose own closure `checks.laws-independent` holds (no proc-macro, no `cc` but blake3's, nothing native). From `9f1f958` until prism-laws, prismqueer was allowed under exactly `exact`;
 
 and any package whose `links` names lapack, blas or fortran.
 
 ### 6.1 Which graph: prism-mcp's resolve, not the workspace's
 
-`cargo metadata` resolves features once for the whole workspace, dev-dependencies included. prismqueer's dev-dependency `terni = { features = ["serde"] }` turns terni's `serde` on in that union, so the union shows a normal edge prismqueer → terni → serde (and serde_core, serde_derive) under prism-mcp, though `cargo build -p prism-mcp` never builds it. Read on the union, the guard would refuse a graph that holds no serde.
+`cargo metadata` resolves features once for the whole workspace, dev-dependencies included. prismqueer's dev-dependency `terni = { features = ["serde"] }` turns terni's `serde` on in that union, so the union shows a normal edge prism-laws → terni → serde (and serde_core, serde_derive) under prism-mcp (prism-laws takes terni with `fractal` only), though `cargo build -p prism-mcp` never builds it. Read on the union, the guard would refuse a graph that holds no serde.
 
 So the guard reads
 
@@ -242,10 +242,9 @@ beside `cargo metadata --locked --offline`:
 
 Trees in `nix/fixtures/mcp-*.tree`, read against `mcp-packages.json` (the metadata's `packages`, with the extra names the fixtures use):
 
-- **`mcp-merged`** passes: the real tree of prism-mcp with prismqueer under `exact`, beside its real workspace-union metadata (`mcp-merged.json`, trimmed to prism-mcp's closure). The check also runs the old reading (`independent.sh`, policy `root`, the same names) on that metadata and requires it to refuse (serde, serde_core, serde_derive): the false positive, kept as a fixture;
+- **`mcp-merged`** passes: the real tree of prism-mcp with prism-laws, beside its real workspace-union metadata (`mcp-merged.json`, trimmed to prism-mcp's closure). The check also runs the old reading (`independent.sh`, policy `root`, the same names) on that metadata and requires it to refuse (serde, serde_core, serde_derive): the false positive, kept as a fixture;
 - refused, each for its own reason (the check matches the reason, not only the exit):
-  - `mcp-lapack`: `prismqueer (features exact,lapack)`;
-  - `mcp-default`: `prismqueer (features default,exact)`;
+  - `mcp-prismqueer`: `prismqueer` (any features: the lab);
   - `mcp-terni-serde`: terni's `serde` really on, serde in the tree;
   - `mcp-serde-json`: serde_json on a normal edge under chorus;
   - `mcp-json`: a JSON crate not named serde;
@@ -279,7 +278,7 @@ prism-mcp's own dev-dependencies are in the tree, so serde as one is refused as 
 ## 9. Questions
 
 - **For Alex:** the crate's name (`prism-mcp` is provisional). And the revision: stay on 2025-06-18's handshake, or move to 2026-07-28 (per-request `_meta` version, `server/discover`)?
-- **For Alex:** the floor now carries prismqueer's proc-macro crates and num-* (§1). Worth it for `check` and `measure`, or should those two live in a second server?
+- ~~**For Alex:** the floor now carries prismqueer's proc-macro crates and num-* (§1). Worth it for `check` and `measure`, or should those two live in a second server?~~ Answered by prism-laws (mirror-034, `docs/spec/laws.md`): no proc-macro on the floor; num-* and blake3 remain.
 - **For Mara:**
   - `check`: is a selection that misses an item a broken ruler (`isError`, as now) or a subject that fails (`out`)? And is a value outside the declared ring the ruler's fault, the subject's, or a protocol error?
   - `measure`: is naming the window by address enough (`measure_under`), or should the tool take the window ruler's draft and its signer label, so the window is a ruler and not only an address?

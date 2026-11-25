@@ -2,6 +2,8 @@
 
 *prism, 2026-11-25 (prism-025 Response §1 and its Log: "the `exact` feature split, which unlocks `check` and `measure` as tools"). The name `exact` is provisional; Alex names it. Code: `prismqueer/Cargo.toml` `[features]`, `prismqueer/src/lib.rs`, and `src/<module>/reading.rs` for each measured half. Tests: `prismqueer/tests/exact.rs`. Check: `checks.prismqueer-exact` (`nix/prismqueer-exact.sh`).*
 
+*Since 2026-11-25 the exact modules live in their own crate, `prism-laws` (`docs/spec/laws.md`): the boundary is a crate, not a feature. prismqueer re-exports them at the same paths under the same features, so the map below still says where each is reachable from prismqueer; the measured halves are prismqueer's `<module>/reading.rs` as extension traits on the laws' types (R2), and poly's measured reading became the judges `locate` and `identify`, in every build.*
+
 ## Why
 
 Contract rule 7: the certified path is exact. Until now the exact modules (`agreement`, `gl`, `metrix`, `measured`, `hypothesis`, `kleinos`, room's exact half) sat behind `lapack`, because `room` and `field` were gated as a whole and five of room's call sites use `ffi` for eigen *readings*. So `prism-mcp` couldn't offer `check` or `measure` without linking LAPACK, and with it the residue in `lapack-failures.md`, into the tool meant to be the floor.
@@ -65,7 +67,7 @@ So the check refuses `cc` reached by any path but blake3's own edge: prismqueer'
 
 ## For prism-mcp
 
-*Done: prism-mcp takes prismqueer under `exact`, and its guard reads its own resolve (`docs/spec/mcp.md` §6.1). The notes below are the plan as it stood.*
+*Done: prism-mcp took prismqueer under `exact`, and its guard reads its own resolve (`docs/spec/mcp.md` §6.1). Superseded 2026-11-25: prism-mcp depends on `prism-laws`, and its guard refuses prismqueer again (`docs/spec/laws.md`). The notes below are the plan as it stood.*
 
 - To offer `check` and `measure`, prism-mcp depends on `prismqueer = { path = "../prismqueer", default-features = false, features = ["exact"] }`.
 - Its independence check refuses `prismqueer` by name today. It would allow prismqueer exactly under that feature set: the walk from prism-mcp stays, and prismqueer's own closure is held by `checks.prismqueer-exact`.
