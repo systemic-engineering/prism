@@ -149,3 +149,129 @@ induction reads the backend except through `crystal`, so nothing else changes.
 **Status:** Capacity's verdict-neutrality is **proved relative to A1–A3**. A2 is checked on
 every read. A1 and A3 are the tenant's obligations, so a tenant that can't meet A1 keeps
 Capacity at **kind 3**, a signed ruler, until it can.
+
+## Keyed scopes and erasure (prism-026 items 1, 7, 2; mirror-036 E1)
+
+*prism-Reed, 2026-11-25. The design is prism-026's Response. This run builds items 1, 7
+and 2 and E1's reason on `Lost`. Mara's F8 gate stands: **no personal data enters
+`brain`** until items 1–7 are red-tested. Every test here uses synthetic bytes and
+throwaway keys.*
+
+### The key is the caller's capability (item 1)
+
+prism holds no keys. A keyed scope needs its key at computation time, so the key is
+**passed in by the caller for the duration of a call**: never stored, never derived from
+a master inside prism, never persisted, never logged.
+
+- **`ScopeKey`** (`prism_laws::oid`) holds the 32 bytes. It is **move-only**: no `Clone`,
+  no `Copy`, no `Display`, and a `Debug` that prints `ScopeKey(held)`. Its bytes are
+  **zeroed on drop**. Its only constructor, `ScopeKey::take(&mut [u8; 32])`, copies the
+  caller's buffer and zeroes it, so the caller's copy doesn't outlive the handover.
+- **There is no `ScopeKey` for the public scope.** `take` refuses `K_public`'s bytes
+  (`IsPublic`): anyone can derive them, so they are nobody's capability.
+- **`Scope::keyed(&ScopeKey) -> Scope<'k>`** borrows the key. A `Scope` holds a
+  reference, never a copy, so a keyed scope can't outlive its key: the borrow checker
+  enforces "for the duration of a call". `Scope::public()` is a `Scope<'static>`, and
+  `Brain` stores only that.
+- **What is stored is the scope's public id, `ScopeId`**:
+  `BLAKE3-derive-key("systemic.engineering://scope-id/v1", K_scope)`. It's one-way, so
+  it doesn't reveal the key. It's domain-separated from every content address, so no
+  crystal's bytes can collide with it, as `Oid::hash(keyed, b"scope")` could. It is 32
+  bytes and nothing else. An `Erasure`, a receipt and a backend's tombstone hold a
+  `ScopeId`, never a `Scope` or a key.
+
+### What an Erasure can and can't claim
+
+`Erasure::mint(key: ScopeKey, epoch, census)` takes the key **by value**. Once it
+returns, the key value is gone from this process and its bytes are zeroed. The type
+makes using the key after the mint unrepresentable (`compile_fail`, E0382).
+
+- **It can't prove that no copy exists elsewhere.** Nothing can, cryptographically. So an
+  Erasure is **the holder's attested act**: in `crossing`'s grades it is **Sealed**,
+  never Law. The receipt carries that grade.
+- **The public scope is unerasable by type.** There is no `ScopeKey` for it, so no
+  `Erasure` can name it: `Erasure::mint(Scope::public(), ..)` doesn't compile, and
+  `ScopeKey::take` refuses `K_public`'s bytes.
+- **The census.** An Erasure covers exactly the crystals the holder showed it while the
+  key was still live: each must rehash to its address under the key. A crystal that
+  doesn't is refused (`Stranger`), and the key is handed back unconsumed. So an Erasure
+  can purge only its own scope's crystals, never the public scope's or another
+  holder's. Without the census, one holder's erasure could delete anyone's bytes,
+  because an address doesn't say which scope it's in. Item 3's per-scope index will
+  take the census's place.
+- **A dangling verdict is never erasure evidence.** It is never final (`compile_fail`).
+
+### The receipt (item 7)
+
+An Erasure produces a `Receipt`:
+
+- **What it names:** the scope's public id and an `Epoch`, the holder's count of when the
+  erasure was attested. An epoch is not a clock, since prism reads no time. **It never
+  names the person.** No field, and no address input, is derived from the holder's
+  identity beyond the `ScopeId`.
+- **Its address:** `Oid::hash(Scope::public(), scope_id ‖ epoch)`. The preimage is
+  exactly 40 bytes: the 32 raw bytes of the `ScopeId`, then the epoch as a big-endian
+  `u64`. It's in the public scope, so anyone holding the receipt can recompute it.
+- **The signer sits beside the address, never in it** (`ruler.md`). The receipt is a
+  `crossing::Claim` with no proof and one seal, so its grade is `Sealed` by
+  construction. The seal's signer label is the **scope id itself**: the holder appears
+  through its boundary (the scope), never its name (`identity.md`). When item 6 lands,
+  a per-scope pseudonym may take that place.
+
+### Purge, and `Lost`'s reason (item 2, E1)
+
+- **`purge(backend, &erasure)`** is a free function, like `recall`. For each covered
+  address it hands the backend a `Purge` order, which only this function can build.
+  The order tells the backend to delete the bytes and keep the receipt as the
+  address's tombstone.
+- **`Backend` gains two required methods:** `purge(&Purge)` and `erased(&Oid)`, which
+  returns the tombstone's receipt. They're required, not defaulted, because a default
+  would either delete nothing or forget the receipt. Deleting across replicas, outside
+  git, is the adapter's obligation (mirror-036 §3), as durability is under A2.
+- **`Recall::Lost` gets a reason:** `Lost { address, reason }`, where `reason` is a
+  `Loss`, either `Erased(Receipt)` or `Missing`.
+  - `recall` asks for the tombstone **first**. An erased address reads
+    `Lost(Erased(receipt))` even if a faulty backend kept the bytes. A purge is final,
+    so it fails closed.
+  - Otherwise, no bytes read `Lost(Missing)`: a durability fault, never a lawful act.
+  - The two never compare equal, and only `Erased` carries a receipt.
+  - An edge from Y's world into a purged X reads `Lost(Erased(receipt))`. Y never needs
+    X's key to read it.
+- **The three states stay apart in the types:**
+  - **`Dangling`** (in `Reach`) is "not reached as of", never final.
+  - **Dark** is an address this brain can't see into: a set in `Reach`.
+  - **`Lost`** is a `Recall` error, final when its reason is `Erased`.
+  - None of them converts into another (`compile_fail`).
+- **The purge law** (`tests/brain.rs`, run over every backend prism has: `Memory`, and
+  the independent test backend `Ledger`):
+  - after `purge(erasure)`, every covered address reads `Lost(Erased(receipt))`;
+  - and `fetch` holds no bytes for it;
+  - the crystals of another keyed scope, and of the public scope, still read back;
+  - persisting an erased address again stores nothing.
+
+### Why A1–A3 still hold
+
+A purge deletes bytes that only a keyed scope could have settled. `Brain` works only in
+the public scope, and the public scope has no Erasure, so no step of the proof above
+meets a purge. A2 gains one clause: a tombstoned address reads `Lost(Erased)`, never
+bytes.
+
+### What a tombstone keeps, and a question for Mara
+
+A tombstone maps an address to its receipt. After a purge, the backend still holds the
+set of X's (keyed, now unrecomputable) addresses and how many there were, under X's
+scope id. That is what lets Y's edge read `Erased` instead of `Missing`. Whether the
+count is itself a leak is Mara's to grade. The alternative is a tombstone per scope,
+with Y's edges carrying the target's scope id.
+
+### Next (not in this run)
+
+- **Item 3.** The per-scope reference index, persisted beside the crystal in its own
+  scope and purged with it. It replaces the census. It waits on Alex's answer about
+  retiring "the index never shrinks" for keyed scopes.
+- **Item 4.** Lums and deposit ticks per scope, erased with it.
+- **Item 5.** A per-scope root, with an optional root chain.
+- **Item 6.** Held until mirror's pin is signed and Alex answers "per scope or per
+  (role, scope)".
+- **A keyed `Brain`.** `Brain` still works only in the public scope. A keyed brain would
+  take its `ScopeKey` per call, never at construction.
