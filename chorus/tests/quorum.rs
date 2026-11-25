@@ -9,6 +9,7 @@ use chorus::quorum::{live, required, QuorumError, Tally, Witness, Witnesses};
 use crate::common::{
     cosignature_v1, flip, hash_hex, note, tree, vkey, witnesses, Witness as W, ORIGIN,
 };
+use crate::mutants::or_quorum;
 
 const TIME: u64 = 1_763_400_000;
 
@@ -212,6 +213,64 @@ fn five_with_one_forged_mldsa44_rejects() {
     let t = seven(2).tally(&checkpoint(), &lines);
     assert_eq!((t.valid, t.partial, t.invalid), (4, 1, 1));
     assert!(!t.accepted());
+}
+
+// ── The broken lean: AND → OR per witness (tests/mutants.rs) ───────────────────────
+
+/// Five of seven (Q = 5 at f = 2) where at least one witness has only one
+/// cosignature valid: absent or forged. The OR mutant's counterexamples;
+/// the last two forge a quorum by breaking one scheme alone.
+fn single_signature() -> Vec<(&'static str, Vec<SignatureLine>)> {
+    let w = witnesses();
+    let with = |extra: SignatureLine| {
+        let mut lines = from(&[0, 1, 2, 3]);
+        lines.push(extra);
+        lines
+    };
+    let mut forged_ed = from(&[0, 1, 2, 3, 4]);
+    forged_ed[8].signature = flip(&forged_ed[8].signature, 40);
+    let mut forged_ml = from(&[0, 1, 2, 3, 4]);
+    forged_ml[9].signature = flip(&forged_ml[9].signature, 200);
+    vec![
+        ("four, and one with only its mldsa44", with(ml(&w[4]))),
+        ("four, and one with only its ed25519", with(ed(&w[4]))),
+        ("five, one ed25519 forged", forged_ed),
+        ("five, one mldsa44 forged", forged_ml),
+        (
+            "five with only their ed25519",
+            (0..5).map(|i| ed(&w[i])).collect(),
+        ),
+        (
+            "five with only their mldsa44",
+            (0..5).map(|i| ml(&w[i])).collect(),
+        ),
+    ]
+}
+
+#[test]
+fn the_or_mutant_reaches_q_on_single_signatures() {
+    for (what, lines) in single_signature() {
+        let t = seven(2).tally(&checkpoint(), &lines);
+        assert!(or_quorum(&t), "OR refused {what}: {t:?}");
+    }
+}
+
+#[test]
+fn the_and_rule_refuses_every_quorum_the_or_mutant_accepts() {
+    for (what, lines) in single_signature() {
+        let t = seven(2).tally(&checkpoint(), &lines);
+        assert!(!t.accepted(), "AND accepted {what}: {t:?}");
+    }
+}
+
+#[test]
+fn the_or_mutant_still_counts_to_q() {
+    // The control: OR isn't "accept anything". Four witnesses with both
+    // cosignatures, both rules refuse; five, both accept.
+    let four = seven(2).tally(&checkpoint(), &from(&[0, 1, 2, 3]));
+    assert!(!or_quorum(&four) && !four.accepted());
+    let five = seven(2).tally(&checkpoint(), &from(&[0, 1, 2, 3, 4]));
+    assert!(or_quorum(&five) && five.accepted());
 }
 
 #[test]

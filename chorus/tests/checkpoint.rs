@@ -7,6 +7,7 @@ use chorus::checkpoint::{
 use chorus::note::{NoteError, Vkey};
 
 use crate::common::{body, cosigned_subtree, flip, line, log_keys, note, tree, Ed, Ml, ORIGIN};
+use crate::mutants::or_checkpoint;
 
 const TIME: u64 = 1_763_400_000;
 
@@ -233,6 +234,68 @@ fn a_malformed_note_is_refused() {
         verify(&text(), &keys()),
         Err(CheckpointError::Note(NoteError::Malformed))
     );
+}
+
+// ── The broken lean: AND → OR (tests/mutants.rs) ────────────────────────────────────────
+
+/// The notes on which one scheme verifies and the other doesn't: absent, or
+/// forged by one bit. The OR mutant's counterexamples.
+fn single_signature() -> Vec<(&'static str, String)> {
+    let (size, root) = tree();
+    let (ed, ml) = log_keys();
+    let forged_ml = flip(&ml.cosignature(ORIGIN, size, &root, TIME), 100);
+    let forged_ed = flip(&ed.sign(text().as_bytes()), 3);
+    vec![
+        ("ed25519 alone", note(&text(), &[ed_line()])),
+        ("mldsa44 alone", note(&text(), &[ml_line()])),
+        (
+            "ed25519 beside a forged mldsa44",
+            note(&text(), &[ed_line(), line(&ml.name, ml.id(), &forged_ml)]),
+        ),
+        (
+            "mldsa44 beside a forged ed25519",
+            note(&text(), &[line(&ed.name, ed.id(), &forged_ed), ml_line()]),
+        ),
+    ]
+}
+
+#[test]
+fn the_or_mutant_accepts_a_single_signature() {
+    for (what, signed) in single_signature() {
+        assert!(or_checkpoint(&signed, &keys()), "OR refused {what}");
+    }
+}
+
+#[test]
+fn the_and_rule_refuses_every_single_signature_the_or_mutant_accepts() {
+    for (what, signed) in single_signature() {
+        assert!(
+            matches!(
+                verify(&signed, &keys()),
+                Err(CheckpointError::Unsigned { .. })
+            ),
+            "AND accepted {what}"
+        );
+    }
+}
+
+#[test]
+fn the_or_mutant_still_reads_the_signatures() {
+    // The control: OR isn't "accept anything". Both signatures, both rules
+    // accept; signatures under other keys only, both refuse.
+    let both = note(&text(), &[ed_line(), ml_line()]);
+    assert!(or_checkpoint(&both, &keys()));
+    assert!(verify(&both, &keys()).is_ok());
+    let (size, root) = tree();
+    let strangers = note(
+        &text(),
+        &[
+            Ed::new(ORIGIN, 99).line(&text()),
+            Ml::new(ORIGIN, 98).line(ORIGIN, size, &root, TIME),
+        ],
+    );
+    assert!(!or_checkpoint(&strangers, &keys()));
+    assert!(verify(&strangers, &keys()).is_err());
 }
 
 // ── The MCP crate's vector ─────────────────────────────────────────────────────────

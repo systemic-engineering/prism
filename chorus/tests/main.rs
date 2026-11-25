@@ -11,6 +11,7 @@ mod anchor;
 mod checkpoint;
 mod commitment;
 mod merkle;
+mod mutants;
 mod note;
 mod quorum;
 mod sshsig;
