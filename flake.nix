@@ -431,8 +431,8 @@
                 old=$(bash ${guardSrc}/nix/independent.sh $fixtures/mcp-merged.json prism-mcp "$union" root)
                 if ! echo "$old" | grep -qx serde; then echo "the union reading no longer refuses mcp-merged: $old" >&2; exit 1; fi
                 while read -r f why; do
-                  if bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>/dev/null; then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
-                  if ! bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>&1 | grep -qF -- "$why"; then echo "prism-mcp-independent refused mcp-$f, but not for $why" >&2; exit 1; fi
+                  if out=$(bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>&1); then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
+                  case "$out" in *"$why"*) ;; *) echo "prism-mcp-independent refused mcp-$f, but not for $why: $out" >&2; exit 1 ;; esac
                 done <<'EOF'
                 lapack prismqueer (features exact,lapack)
                 default prismqueer (features default,exact)
