@@ -11,6 +11,7 @@ jobs:
     with:
       coverage_threshold: '94'
       features: 'lapack,fate'
+      flake_check: true
 
   format:
     name: format
