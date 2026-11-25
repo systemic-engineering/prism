@@ -2,6 +2,7 @@
 //! vectors in `docs/spec/identity-vectors.json` were computed with the `b3sum`
 //! CLI and Python's `blake3`, never with prism; this test holds prism to them.
 
+use prismqueer::oid::{IsPublic, ScopeKey};
 use prismqueer::{Oid, Scope};
 use serde_json::Value;
 
@@ -25,16 +26,16 @@ fn key(hex_str: &str) -> [u8; 32] {
         .expect("32-byte key")
 }
 
-fn scope(name: &Value) -> Scope {
-    match name.as_str().expect("scope") {
-        "public" => Scope::public(),
-        held => Scope::keyed(key(held)),
-    }
-}
-
 fn address(scope_name: &Value, input_hex: &Value) -> String {
     let input = bytes(input_hex.as_str().expect("input_hex"));
-    Oid::hash(&scope(scope_name), &input).as_str().to_owned()
+    let oid = match scope_name.as_str().expect("scope") {
+        "public" => Oid::hash(&Scope::public(), &input),
+        held => {
+            let held = ScopeKey::take(&mut key(held)).expect("a held key");
+            Oid::hash(&Scope::keyed(&held), &input)
+        }
+    };
+    oid.as_str().to_owned()
 }
 
 #[test]
@@ -45,12 +46,15 @@ fn the_public_scope_is_keyed_by_k_public() {
         prismqueer::oid::PUBLIC_CONTEXT,
         "the context string"
     );
-    let k_public = Scope::keyed(key(v["k_public"]["key"].as_str().expect("key")));
+    // The vector's K_public is the public scope's key: so it is nobody's
+    // capability, and no held key can be taken from it (prism-026 item 1).
+    let mut k_public = key(v["k_public"]["key"].as_str().expect("key"));
+    assert_eq!(ScopeKey::take(&mut k_public).err(), Some(IsPublic));
     for case in v["cases"].as_array().expect("cases") {
         let input = bytes(case["input_hex"].as_str().expect("input_hex"));
         assert_eq!(
-            Oid::hash(&Scope::public(), &input),
-            Oid::hash(&k_public, &input),
+            Oid::hash(&Scope::public(), &input).as_str(),
+            blake3::keyed_hash(&k_public, &input).to_hex().as_str(),
             "{}",
             case["name"]
         );

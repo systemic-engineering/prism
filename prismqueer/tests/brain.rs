@@ -26,10 +26,10 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Fact, Interner, Memory, Recall, Relation, Roots, Stats, Sym,
-    Tick,
+    Backend, Brain, Capacity, Crystal, Erasure, Fact, Interner, Memory, Recall, Relation, Roots,
+    Stats, Sym, Tick,
 };
-use prismqueer::oid::{Oid, Scope};
+use prismqueer::oid::{Oid, Scope, ScopeKey};
 
 // ---------------------------------------------------------------------------
 // The test-local evaluator: semi-naive, positive, over `brain`.
@@ -870,7 +870,8 @@ fn interned_constants_and_relations_are_stable() {
 
 /// An address in a scope this brain doesn't hold: dark here, not dangling.
 fn elsewhere(bytes: &[u8]) -> Oid {
-    Oid::hash(&Scope::keyed([7; 32]), bytes)
+    let key = ScopeKey::take(&mut [7; 32]).expect("a throwaway held key");
+    Oid::hash(&Scope::keyed(&key), bytes)
 }
 
 /// A small public crystal DAG, by name. References are declared beside the
@@ -1098,4 +1099,58 @@ fn references_never_change_an_address() {
     assert_eq!(referring.references(&a).map(BTreeSet::len), Some(3));
     assert_eq!(plain.references(&a), Some(&BTreeSet::new()));
     assert_eq!(plain.references(&elsewhere(b"x")), None);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Keyed scopes and erasure (prism-026; docs/spec/brain.md, "Keyed scopes
+//    and erasure"). Synthetic bytes and throwaway keys only (Mara's F8).
+// ---------------------------------------------------------------------------
+
+/// A throwaway held key: synthetic bytes, never a real secret.
+fn throwaway(byte: u8) -> ScopeKey {
+    ScopeKey::take(&mut [byte; 32]).expect("a throwaway held key")
+}
+
+/// `n` synthetic crystals in `key`'s scope.
+fn crystals_of(key: &ScopeKey, tag: &str, n: usize) -> Vec<Crystal> {
+    (0..n)
+        .map(|i| Crystal::settle(&Scope::keyed(key), format!("{tag} {i}").into_bytes()))
+        .collect()
+}
+
+#[test]
+fn an_erasure_names_its_scope_by_public_id_and_covers_its_census() {
+    let key = throwaway(0x11);
+    let id = key.id();
+    let census = crystals_of(&key, "node", 3);
+    let erasure = Erasure::mint(key, &census).expect("all in the scope");
+    assert_eq!(erasure.scope(), id);
+    assert_ne!(erasure.scope(), Scope::public().id());
+    assert_eq!(
+        erasure.covers(),
+        &census.iter().map(|c| c.address().clone()).collect::<BTreeSet<_>>()
+    );
+}
+
+#[test]
+fn an_erasure_never_covers_another_scopes_crystal_and_hands_the_key_back() {
+    let key = throwaway(0x11);
+    let other = throwaway(0x22);
+    let mut census = crystals_of(&key, "node", 2);
+    let foreign = Crystal::settle(&Scope::keyed(&other), b"node 0".to_vec());
+    let public = Crystal::settle(&Scope::public(), b"node 1".to_vec());
+
+    census.push(foreign.clone());
+    let stranger = Erasure::mint(key, &census).expect_err("another holder's crystal");
+    assert_eq!(stranger.address(), foreign.address());
+    let key = stranger.into_key();
+    assert_eq!(key.id(), throwaway(0x11).id(), "the same key, unconsumed");
+
+    census.pop();
+    census.push(public.clone());
+    let stranger = Erasure::mint(key, &census).expect_err("a public crystal");
+    assert_eq!(stranger.address(), public.address());
+    let shown = format!("{stranger:?}");
+    assert!(shown.contains("ScopeKey(held)"), "{shown}");
+    assert!(!shown.contains("17, 17"), "{shown}");
 }

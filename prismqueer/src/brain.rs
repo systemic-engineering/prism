@@ -93,11 +93,11 @@
 //! - **Cooling is lossless forgetting** (invariant 2). [`Brain::cool`]
 //!   evicts from memory; the backend still holds the bytes, and they read
 //!   back by address.
-//! - **Erasure** (deleting a scope's `K_id`) is a separate act, outside
-//!   prism, and unreachability never drives it.
+//! - **Erasure** (deleting a scope's `K_id`) is the holder's act, and
+//!   unreachability never drives it.
 //! - **Purge** (deleting bytes) is irreversible: allowed only with an
-//!   [`Erasure`], which only an erasure mints. The public key can't be
-//!   erased, so the public scope cools and never purges.
+//!   [`Erasure`], which only consuming a held scope's key mints. The public
+//!   scope has no key to consume, so it cools and never purges.
 //! - **Dangling is relative to the scopes this brain holds.** An address it
 //!   can't see into is dark, never dangling; reach doesn't pass through it.
 //! - **Unreachability is a negation**, decided only on a [`SealedRoots`]
@@ -110,8 +110,9 @@
 //! [`Roots::seal`]. Reach reuses [`crate::dependency`]. A vacuum pass
 //! changes no answer, no crystal and no lum (invariant 1).
 //!
-//! Not here yet: keyed private scopes (and so erasure, and purge), and
-//! windowed input.
+//! Keyed scopes and their erasure are below ([`Erasure`]; prism-026,
+//! `docs/spec/brain.md`). Not here yet: a keyed [`Brain`], and windowed
+//! input.
 //!
 //! # One port
 //!
@@ -248,77 +249,88 @@
 //! assert!(reach.reachable().contains(&root));
 //! ```
 //!
-//! # The public scope can cool, never purge
+//! # The public scope has no Erasure
 //!
-//! A purge needs an [`Erasure`], and only an erasure of the scope's key can
-//! mint one. The public key can't be erased, and erasure happens outside
-//! prism, so nothing in prism mints one. The control compiles: given that
-//! evidence, a purge is callable, and cooling needs none.
+//! An [`Erasure`] is minted only by consuming a held scope's [`ScopeKey`],
+//! and there is no `ScopeKey` for the public scope (`ScopeKey::take` refuses
+//! `K_public`'s bytes). The control compiles: a held key, a crystal of its
+//! scope, a mint, and cooling, which needs no evidence.
 //!
 //! ```
-//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Oid, Scope};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let mut backend = Memory::default();
-//! fn after_erasure(backend: &mut Memory, erasure: &Erasure, address: &Oid) {
-//!     let _ = backend.purge(erasure, address);
-//! }
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let census = [Crystal::settle(&Scope::keyed(&key), b"node e".to_vec())];
+//! let erasure = Erasure::mint(key, &census).unwrap();
+//! assert_eq!(erasure.covers().len(), 1);
 //! ```
 //!
 //! Each of the following changes its last lines, and doesn't compile. The
-//! public scope can't mint the evidence:
-//!
-//! ```compile_fail,E0599
-//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Oid, Scope};
-//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let address = brain.settle(b"node e".to_vec()).unwrap();
-//! let reach = brain.vacuum(&Roots::default().seal());
-//! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let mut backend = Memory::default();
-//! let _ = backend.purge(&Erasure::of(&Scope::public()), &address);
-//! ```
-//!
-//! nor build it by hand:
-//!
-//! ```compile_fail,E0451
-//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Oid, Scope};
-//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let address = brain.settle(b"node e".to_vec()).unwrap();
-//! let reach = brain.vacuum(&Roots::default().seal());
-//! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let mut backend = Memory::default();
-//! let _ = backend.purge(&Erasure { never: loop {} }, &address);
-//! ```
-//!
-//! a dangling verdict is not erasure evidence (it is never final):
+//! public scope is not a key:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Oid, Scope};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let mut backend = Memory::default();
-//! let _ = backend.purge(reach.dangling(), &address);
+//! let erasure = Erasure::mint(Scope::public(), &[]).unwrap();
 //! ```
 //!
-//! and there is no purge without evidence:
+//! and has none:
 //!
-//! ```compile_fail,E0061
-//! use prismqueer::brain::{Backend, Brain, Capacity, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Oid, Scope};
+//! ```compile_fail,E0599
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let address = brain.settle(b"node e".to_vec()).unwrap();
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let mut backend = Memory::default();
-//! let _ = backend.purge(&address);
+//! let erasure = Erasure::mint(ScopeKey::public(), &[]).unwrap();
+//! ```
+//!
+//! an Erasure can't be built by hand:
+//!
+//! ```compile_fail,E0451
+//! use std::collections::BTreeSet;
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let erasure = Erasure { scope: Scope::public().id(), covers: BTreeSet::new() };
+//! ```
+//!
+//! a dangling verdict is not a key (it is never final):
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let erasure = Erasure::mint(reach.dangling().clone(), &[]).unwrap();
+//! ```
+//!
+//! and minting consumes the key: it can't be used after.
+//!
+//! ```compile_fail,E0382
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let erasure = Erasure::mint(key, &[]).unwrap();
+//! let again = Scope::keyed(&key);
 //! ```
 
 use std::cell::Cell;
@@ -328,7 +340,7 @@ use std::ops::Bound;
 use std::sync::Arc;
 
 use crate::dependency::{DependencyGraph, Sign, Through};
-use crate::oid::{Oid, Scope};
+use crate::oid::{Oid, Scope, ScopeId, ScopeKey};
 
 // ---------------------------------------------------------------------------
 // Constants, relations, ticks
@@ -570,33 +582,68 @@ pub trait Backend {
 
     /// The bytes persisted under `address`, if any.
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Self::Error>;
+}
 
-    /// Delete the bytes under `address`: irreversible, so it takes evidence
-    /// that the scope's key was erased. Nothing in prism mints that
-    /// evidence (see [`Erasure`]), so this can't be called today, and the
-    /// default body is the proof: there is no value to match.
-    fn purge(&mut self, erasure: &Erasure, address: &Oid) -> Result<(), Self::Error> {
-        let _ = address;
-        match erasure.never {}
+/// Evidence that a held scope's key was erased: the holder's attested act
+/// (prism-026 item 1).
+///
+/// **Minted only by consuming the scope's [`ScopeKey`]** ([`Erasure::mint`]
+/// takes it by value), so in this process the key is gone once the mint
+/// returns. It can't prove that no copy exists elsewhere, and nothing can:
+/// an Erasure is a sealed judgment, never a law. The public scope has no
+/// `ScopeKey`, so it has no Erasure: it cools and never purges. A dangling
+/// verdict is never this evidence; it is never final.
+///
+/// It covers exactly the crystals the holder showed it while the key was
+/// live (the census), each checked to be in the key's scope, so an Erasure
+/// can never reach another scope's crystals.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Erasure {
+    scope: ScopeId,
+    covers: BTreeSet<Oid>,
+}
+
+impl Erasure {
+    /// Erase a held scope: consume its key, covering the `census`, the
+    /// scope's crystals the holder shows it. A crystal that isn't in the
+    /// key's scope is refused as a [`Stranger`], and the key comes back
+    /// unconsumed.
+    pub fn mint(key: ScopeKey, census: &[Crystal]) -> Result<Erasure, Stranger> {
+        let covers = census.iter().map(|c| c.address().clone()).collect();
+        let scope = key.id();
+        drop(key);
+        Ok(Erasure { scope, covers })
+    }
+
+    /// The erased scope's public id.
+    pub fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    /// The addresses it covers.
+    pub fn covers(&self) -> &BTreeSet<Oid> {
+        &self.covers
     }
 }
 
-/// Uninhabited: no value of it exists.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Never {}
+/// A crystal offered to [`Erasure::mint`] that isn't in the key's scope. The
+/// key comes back unconsumed.
+#[derive(Debug)]
+pub struct Stranger {
+    key: ScopeKey,
+    address: Oid,
+}
 
-/// Evidence that a scope's `K_id` was erased: the only thing that lets a
-/// [`Backend::purge`] delete bytes.
-///
-/// **Only an erasure can mint it**, and erasure happens outside prism, by
-/// the key holder, never because something became unreachable. The public
-/// key can't be erased (anyone can derive it), so the public scope never
-/// has this evidence: the public-scope vacuum can cool, never purge. Today
-/// the type is uninhabited, because prism holds no held scope and builds no
-/// erasure. A dangling verdict is never this evidence; it is never final.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Erasure {
-    never: Never,
+impl Stranger {
+    /// The crystal's address.
+    pub fn address(&self) -> &Oid {
+        &self.address
+    }
+
+    /// The key, back to its holder.
+    pub fn into_key(self) -> ScopeKey {
+        self.key
+    }
 }
 
 /// The in-memory backend, for tests.
@@ -742,7 +789,7 @@ impl Reach {
 /// - the backend failed: [`Recall::Backend`].
 pub fn recall<B: Backend + ?Sized>(
     backend: &B,
-    scope: &Scope,
+    scope: &Scope<'_>,
     address: &Oid,
 ) -> Result<Crystal, Recall<B::Error>> {
     let bytes = backend
@@ -820,7 +867,7 @@ fn matches(tuple: &[Sym], pattern: &[Option<Sym>]) -> bool {
 /// The store: a hot tier of facts, the Drop, and eviction under a
 /// [`Capacity`]. Public scope only (see the module docs).
 pub struct Brain<B> {
-    scope: Scope,
+    scope: Scope<'static>,
     capacity: Capacity,
     backend: B,
     ruler: Box<dyn Ruler>,
@@ -880,7 +927,7 @@ impl<B: Backend> Brain<B> {
     }
 
     /// The scope every address is taken in: public, for now.
-    pub fn scope(&self) -> &Scope {
+    pub fn scope(&self) -> &Scope<'static> {
         &self.scope
     }
 
