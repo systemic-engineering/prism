@@ -413,8 +413,8 @@ use std::ops::Bound;
 use std::sync::Arc;
 
 use crate::dependency::{DependencyGraph, Sign, Through};
-use prism_laws::crossing::{attest, Claim, Grade};
 use crate::oid::{Oid, Scope, ScopeId, ScopeKey};
+use prism_laws::crossing::{attest, Claim, Grade};
 
 // ---------------------------------------------------------------------------
 // Constants, relations, ticks
@@ -748,7 +748,12 @@ pub struct Epoch(pub u64);
 ///   its label is the scope id: the holder appears through its boundary,
 ///   never its name.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Receipt {
+pub struct Receipt(Arc<Receipted>);
+
+/// A receipt's body, shared: a receipt is copied into every tombstone and
+/// every `Lost` that reads it.
+#[derive(Debug, PartialEq, Eq)]
+struct Receipted {
     scope: ScopeId,
     epoch: Epoch,
     claim: Claim,
@@ -759,11 +764,11 @@ impl Receipt {
         let address = Oid::hash(&Scope::public(), &Self::preimage_of(scope, epoch));
         let seal = attest(&address, scope.oid());
         let claim = Claim::new(address, None, [seal]).expect("one seal: never anonymous");
-        Receipt {
+        Receipt(Arc::new(Receipted {
             scope,
             epoch,
             claim,
-        }
+        }))
     }
 
     fn preimage_of(scope: ScopeId, epoch: Epoch) -> Vec<u8> {
@@ -775,32 +780,32 @@ impl Receipt {
 
     /// The bytes its address is the hash of: scope id ‖ epoch (big-endian).
     pub fn preimage(&self) -> Vec<u8> {
-        Self::preimage_of(self.scope, self.epoch)
+        Self::preimage_of(self.0.scope, self.0.epoch)
     }
 
     /// Its address, in the public scope.
     pub fn address(&self) -> &Oid {
-        self.claim.value()
+        self.0.claim.value()
     }
 
     /// The erased scope's public id.
     pub fn scope(&self) -> ScopeId {
-        self.scope
+        self.0.scope
     }
 
     /// When the erasure was attested.
     pub fn epoch(&self) -> Epoch {
-        self.epoch
+        self.0.epoch
     }
 
     /// The claim: the address, no proof, the holder's seal beside it.
     pub fn claim(&self) -> &Claim {
-        &self.claim
+        &self.0.claim
     }
 
     /// Always [`Grade::Sealed`]: the holder's attested act, never a law.
     pub fn grade(&self) -> Grade {
-        self.claim.grade()
+        self.0.claim.grade()
     }
 }
 
@@ -830,7 +835,7 @@ impl Erasure {
 
     /// The erased scope's public id.
     pub fn scope(&self) -> ScopeId {
-        self.receipt.scope
+        self.receipt.scope()
     }
 
     /// The receipt: scope id and epoch, never the person.
@@ -887,8 +892,11 @@ impl Backend for Memory {
     type Error = Infallible;
 
     fn persist(&mut self, crystal: &Crystal) -> Result<(), Infallible> {
-        self.crystals
-            .insert(crystal.address().clone(), crystal.shared_bytes());
+        // A purge is final: an erased address stores nothing again.
+        if !self.erased.contains_key(crystal.address()) {
+            self.crystals
+                .insert(crystal.address().clone(), crystal.shared_bytes());
+        }
         Ok(())
     }
 
@@ -1026,6 +1034,12 @@ pub fn recall<B: Backend + ?Sized>(
     scope: &Scope<'_>,
     address: &Oid,
 ) -> Result<Crystal, Recall<B::Error>> {
+    if let Some(receipt) = backend.erased(address).map_err(Recall::Backend)? {
+        return Err(Recall::Lost {
+            address: address.clone(),
+            reason: Loss::Erased(receipt),
+        });
+    }
     let bytes = backend
         .fetch(address)
         .map_err(Recall::Backend)?

@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use prismqueer::brain::{self, Backend, Crystal, Loss, Memory, Purge, Receipt, Recall};
+use prismqueer::brain::{self, Backend, Crystal, Loss, Memory, Purge, Recall, Receipt};
 use prismqueer::merkle::{diff, MerkleTree};
 use prismqueer::oid::{Addressable, Oid, Scope};
 

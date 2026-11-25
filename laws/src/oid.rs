@@ -497,7 +497,11 @@ mod tests {
             id.as_bytes(),
             &blake3::derive_key("systemic.engineering://scope-id/v1", &[9; 32])
         );
-        assert_eq!(std::mem::size_of::<ScopeId>(), 32, "the id and nothing else");
+        assert_eq!(
+            std::mem::size_of::<ScopeId>(),
+            32,
+            "the id and nothing else"
+        );
         assert_ne!(id.as_bytes(), &[9; 32]);
         assert_eq!(Scope::keyed(&key).id(), id, "the scope and its key agree");
         assert_ne!(Scope::public().id(), id);

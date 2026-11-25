@@ -26,8 +26,8 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Loss, Purge, Receipt, Interner, Memory, Recall, Relation, Roots,
-    Stats, Sym, Tick,
+    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Interner, Loss, Memory, Purge, Recall,
+    Receipt, Relation, Roots, Stats, Sym, Tick,
 };
 use prismqueer::crossing::Grade;
 use prismqueer::oid::{Oid, Scope, ScopeKey};
@@ -1159,7 +1159,10 @@ fn an_erasure_names_its_scope_by_public_id_and_covers_its_census() {
     assert_ne!(erasure.scope(), Scope::public().id());
     assert_eq!(
         erasure.covers(),
-        &census.iter().map(|c| c.address().clone()).collect::<BTreeSet<_>>()
+        &census
+            .iter()
+            .map(|c| c.address().clone())
+            .collect::<BTreeSet<_>>()
     );
 }
 
@@ -1195,10 +1198,15 @@ fn the_receipt_preimage_is_exactly_scope_id_then_epoch() {
 
     // Computed here from the key's bytes and the epoch alone, never through
     // the receipt: BLAKE3-derive-key(scope-id context, K) ‖ epoch (BE).
-    let mut expected = blake3::derive_key("systemic.engineering://scope-id/v1", &[0x33; 32]).to_vec();
+    let mut expected =
+        blake3::derive_key("systemic.engineering://scope-id/v1", &[0x33; 32]).to_vec();
     expected.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
     assert_eq!(expected.len(), 40);
-    assert_eq!(receipt.preimage(), expected, "scope id ‖ epoch, nothing else");
+    assert_eq!(
+        receipt.preimage(),
+        expected,
+        "scope id ‖ epoch, nothing else"
+    );
     assert_eq!(receipt.address(), &Oid::hash(&Scope::public(), &expected));
     assert_eq!(receipt.scope(), erasure.scope());
     assert_eq!(receipt.epoch(), Epoch(0x0102_0304_0506_0708));
@@ -1219,10 +1227,17 @@ fn the_receipt_is_sealed_by_the_scope_never_a_law_and_never_names_the_person() {
     let receipt = erasure.receipt();
     assert_eq!(receipt.grade(), Grade::Sealed);
     assert_ne!(receipt.grade(), Grade::Law);
-    assert!(receipt.claim().proof().is_none(), "no proof: an attested act");
+    assert!(
+        receipt.claim().proof().is_none(),
+        "no proof: an attested act"
+    );
     let seals: Vec<_> = receipt.claim().seals().iter().collect();
     assert_eq!(seals.len(), 1);
-    assert_eq!(seals[0].by(), &id.oid(), "the signer is the scope, beside it");
+    assert_eq!(
+        seals[0].by(),
+        &id.oid(),
+        "the signer is the scope, beside it"
+    );
     assert_eq!(seals[0].over(), receipt.address());
     assert_eq!(receipt.claim().value(), receipt.address());
 }
@@ -1284,7 +1299,10 @@ fn purge_law<B: Backend<Error = Infallible>>(mut backend: B) {
         backend.persist(c).unwrap();
     }
     for c in &xs {
-        assert_eq!(prismqueer::brain::recall(&backend, &Scope::keyed(&x), c.address()).as_ref(), Ok(c));
+        assert_eq!(
+            prismqueer::brain::recall(&backend, &Scope::keyed(&x), c.address()).as_ref(),
+            Ok(c)
+        );
     }
 
     let erasure = Erasure::mint(x, Epoch(7), &xs).expect("X's own crystals");
@@ -1310,11 +1328,17 @@ fn purge_law<B: Backend<Error = Infallible>>(mut backend: B) {
         assert_eq!(backend.fetch(c.address()), Ok(None), "not stored again");
     }
     for c in &ys {
-        assert_eq!(prismqueer::brain::recall(&backend, &Scope::keyed(&y), c.address()).as_ref(), Ok(c));
+        assert_eq!(
+            prismqueer::brain::recall(&backend, &Scope::keyed(&y), c.address()).as_ref(),
+            Ok(c)
+        );
         assert_eq!(backend.erased(c.address()), Ok(None));
     }
     for c in &public {
-        assert_eq!(prismqueer::brain::recall(&backend, &Scope::public(), c.address()).as_ref(), Ok(c));
+        assert_eq!(
+            prismqueer::brain::recall(&backend, &Scope::public(), c.address()).as_ref(),
+            Ok(c)
+        );
     }
 }
 
@@ -1348,8 +1372,9 @@ fn erased_and_missing_never_compare_equal_and_only_erased_carries_a_receipt() {
     else {
         panic!("an erased address is lost");
     };
-    let Err(Recall::Lost { reason: missing, .. }) =
-        prismqueer::brain::recall(&backend, &Scope::public(), &never)
+    let Err(Recall::Lost {
+        reason: missing, ..
+    }) = prismqueer::brain::recall(&backend, &Scope::public(), &never)
     else {
         panic!("a never-settled address is lost");
     };
@@ -1360,8 +1385,14 @@ fn erased_and_missing_never_compare_equal_and_only_erased_carries_a_receipt() {
     assert_eq!(missing.receipt(), None);
     // The same address lost both ways still reads two different answers.
     assert_ne!(
-        Recall::<Infallible>::Lost { address: never.clone(), reason: erased.clone() },
-        Recall::<Infallible>::Lost { address: never, reason: missing }
+        Recall::<Infallible>::Lost {
+            address: never.clone(),
+            reason: erased.clone()
+        },
+        Recall::<Infallible>::Lost {
+            address: never,
+            reason: missing
+        }
     );
 }
 
@@ -1399,7 +1430,10 @@ fn a_backend_that_keeps_purged_bytes_still_reads_erased() {
     backend.persist(&xs[0]).unwrap();
     let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
     prismqueer::brain::purge(&mut backend, &erasure).unwrap();
-    assert!(backend.fetch(xs[0].address()).unwrap().is_some(), "it hoarded");
+    assert!(
+        backend.fetch(xs[0].address()).unwrap().is_some(),
+        "it hoarded"
+    );
     assert_eq!(
         prismqueer::brain::recall(&backend, &Scope::public(), xs[0].address()),
         Err(Recall::Lost {
@@ -1414,7 +1448,10 @@ fn a_refusing_backend_refuses_the_purge_and_the_tombstone_read() {
     let x = throwaway(0x72);
     let xs = crystals_of(&x, "node", 1);
     let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
-    assert_eq!(prismqueer::brain::purge(&mut Refusing, &erasure), Err(Refused));
+    assert_eq!(
+        prismqueer::brain::purge(&mut Refusing, &erasure),
+        Err(Refused)
+    );
     assert_eq!(
         prismqueer::brain::recall(&Refusing, &Scope::public(), xs[0].address()),
         Err(Recall::Backend(Refused))
