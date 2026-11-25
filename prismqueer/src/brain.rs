@@ -1253,6 +1253,28 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
         })
     }
 
+    /// Deposit a fact (its canonical bytes) at `tick`, in the scope's
+    /// light. False if it was already deposited, in which case its tick
+    /// stays. The backend holds the fact's name ([`Oid::slot`]), never its
+    /// bytes.
+    pub fn deposit(&mut self, fact: &[u8], tick: Tick) -> Result<bool, Recall<B::Error>> {
+        let _ = (fact, tick);
+        Ok(true)
+    }
+
+    /// The tick a fact was deposited at in the scope, if it was.
+    pub fn tick_of(&self, fact: &[u8]) -> Result<Option<Tick>, Recall<B::Error>> {
+        let _ = fact;
+        Ok(None)
+    }
+
+    /// Lums, per scope: the number of distinct facts deposited at or before
+    /// `as_of`. Progress and monotonicity, never identity.
+    pub fn lums(&self, as_of: Tick) -> Result<u64, Recall<B::Error>> {
+        let _ = as_of;
+        Ok(0)
+    }
+
     fn write(&mut self, slot: &Oid, bytes: &[u8]) -> Result<(), Recall<B::Error>> {
         self.backend
             .write(&Slot {

@@ -1773,3 +1773,121 @@ fn a_malformed_slot_is_never_believed() {
     assert_eq!(stranger.address(), Some(&manifest));
     assert_eq!(stranger.into_key().id(), throwaway(0x86).id());
 }
+
+// --- Item 4: lums and deposit ticks per scope, erased with it ---------------
+
+/// The light law, over one backend: X's deposits and lums persist in X's
+/// light, Y's apart; after X's purge none of X's reads, and Y's is
+/// untouched.
+fn light_law<B: Backend<Error = Infallible>>(mut backend: B, keeps_bytes: bool) {
+    let x = throwaway(0x91);
+    let y = throwaway(0x92);
+    {
+        let mut held = Held::open(&mut backend, &x);
+        assert_eq!(held.lums(Tick(9)), Ok(0), "no light yet");
+        assert_eq!(held.tick_of(b"edge a b"), Ok(None));
+        assert_eq!(held.deposit(b"edge a b", Tick(0)), Ok(true));
+        assert_eq!(held.deposit(b"edge b c", Tick(0)), Ok(true));
+        assert_eq!(held.deposit(b"path a c", Tick(1)), Ok(true));
+        // Known already: false, and its tick stays.
+        assert_eq!(held.deposit(b"edge a b", Tick(2)), Ok(false));
+    }
+    assert_eq!(
+        Held::open(&mut backend, &y).deposit(b"edge a b", Tick(5)),
+        Ok(true)
+    );
+
+    // Read back by a fresh borrow: persisted, never kept.
+    let read = |backend: &mut B, key: &ScopeKey| {
+        let held = Held::open(backend, key);
+        (
+            held.tick_of(b"edge a b"),
+            held.tick_of(b"path a c"),
+            [0, 1, 4, 5, 7].map(|t| held.lums(Tick(t))),
+        )
+    };
+    let ours = read(&mut backend, &x);
+    assert_eq!(
+        ours,
+        (
+            Ok(Some(Tick(0))),
+            Ok(Some(Tick(1))),
+            [Ok(2), Ok(3), Ok(3), Ok(3), Ok(3)]
+        )
+    );
+    let theirs = read(&mut backend, &y);
+    assert_eq!(
+        theirs,
+        (
+            Ok(Some(Tick(5))),
+            Ok(None),
+            [Ok(0), Ok(0), Ok(0), Ok(1), Ok(1)]
+        )
+    );
+
+    let light = Held::open(&mut backend, &x).slots().light().clone();
+    let erasure = Erasure::mint(x, Epoch(4), &backend).expect("X's own light");
+    assert!(erasure.covers().contains(&light));
+    purge(&mut backend, &erasure).unwrap();
+
+    // A copy of X's synthetic key, only to look: nothing of X's light reads.
+    let x = throwaway(0x91);
+    let erased = Recall::Lost {
+        address: light.clone(),
+        reason: Loss::Erased(erasure.receipt().clone()),
+    };
+    assert_eq!(
+        read(&mut backend, &x),
+        (
+            Err(erased.clone()),
+            Err(erased.clone()),
+            [0, 1, 4, 5, 7].map(|_| Err(erased.clone()))
+        )
+    );
+    assert_eq!(
+        Held::open(&mut backend, &x).deposit(b"edge a b", Tick(8)),
+        Err(erased)
+    );
+    assert_eq!(backend.erased(&light), Ok(Some(erasure.receipt().clone())));
+    if !keeps_bytes {
+        assert_eq!(backend.fetch(&light), Ok(None), "the light is gone");
+    }
+    assert_eq!(read(&mut backend, &y), theirs, "Y's light untouched");
+}
+
+#[test]
+fn lums_and_ticks_are_per_scope_and_erased_with_it_on_memory() {
+    light_law(Memory::default(), false);
+}
+
+#[test]
+fn lums_and_ticks_are_per_scope_and_erased_with_it_on_the_ledger() {
+    light_law(Ledger::default(), false);
+}
+
+#[test]
+fn lums_and_ticks_are_per_scope_and_erased_with_it_through_a_wrapper() {
+    light_law(Counted::default(), false);
+}
+
+#[test]
+fn hoarded_lums_and_ticks_still_read_erased_through_the_tombstone() {
+    light_law(Hoarding::default(), true);
+}
+
+#[test]
+fn the_backend_holds_a_facts_name_never_its_bytes() {
+    let mut ledger = Ledger::default();
+    let x = throwaway(0x93);
+    let mut held = Held::open(&mut ledger, &x);
+    assert_eq!(held.deposit(b"edge alpha beta", Tick(3)), Ok(true));
+    let light = held.slots().light().clone();
+    let (_, bytes) = ledger
+        .slots
+        .iter()
+        .find(|(a, _)| a == &light)
+        .expect("the light is written");
+    let text = String::from_utf8_lossy(bytes);
+    assert!(!text.contains("alpha"), "{text}");
+    assert!(text.ends_with(" 3"), "a name and its tick: {text}");
+}
