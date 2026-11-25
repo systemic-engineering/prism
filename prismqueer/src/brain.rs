@@ -1176,6 +1176,7 @@ impl Index {
 pub struct Held<'a, 'k, B: ?Sized> {
     backend: &'a mut B,
     scope: Scope<'k>,
+    chained: bool,
 }
 
 impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
@@ -1184,7 +1185,28 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
         Held {
             backend,
             scope: Scope::keyed(key),
+            chained: false,
         }
+    }
+
+    /// Keep the root chain too (item 5): each root persists as a crystal in
+    /// the scope and joins the chain, the scope's own history, walkable
+    /// from the head. Unchained, a root lives only in the root slot.
+    pub fn chained(mut self) -> Self {
+        self.chained = true;
+        self
+    }
+
+    /// The scope's root: the address of its root bytes, which name the last
+    /// crystal settled and the root before. `None` before the first settle.
+    pub fn root(&self) -> Result<Option<Oid>, Recall<B::Error>> {
+        Ok(None)
+    }
+
+    /// Every root, in order, if the scope was settled chained.
+    pub fn chain(&self) -> Result<Vec<Oid>, Recall<B::Error>> {
+        let _ = self.chained;
+        Ok(Vec::new())
     }
 
     /// The scope.

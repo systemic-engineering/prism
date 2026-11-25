@@ -1896,3 +1896,147 @@ fn the_backend_holds_a_facts_name_never_its_bytes() {
     assert!(!text.contains("alpha"), "{text}");
     assert!(text.ends_with(" 3"), "a name and its tick: {text}");
 }
+
+// --- Item 5: a per-scope root, with an optional chain, purged with it -------
+
+/// The root law, over one backend: X's root advances with X's settles and
+/// its chain is X's history; Y's root is Y's; after X's purge, X's root and
+/// chain read erased, and so does any edge into them.
+fn root_law<B: Backend<Error = Infallible>>(mut backend: B, keeps_bytes: bool) {
+    let x = throwaway(0xa1);
+    let y = throwaway(0xa2);
+    let roots = {
+        let mut held = Held::open(&mut backend, &x).chained();
+        assert_eq!(held.root(), Ok(None), "no root before a settle");
+        assert_eq!(held.chain(), Ok(vec![]));
+        let a = held.settle_with(b"node a".to_vec(), []).unwrap();
+        let first = held.root().unwrap().expect("a root after a settle");
+        held.settle_with(b"node a".to_vec(), [elsewhere(b"z")])
+            .unwrap();
+        assert_eq!(
+            held.root(),
+            Ok(Some(first.clone())),
+            "nothing new: no advance"
+        );
+        let b = held.settle_with(b"node b".to_vec(), [a.clone()]).unwrap();
+        let head = held.root().unwrap().expect("a root");
+        assert_ne!(head, first, "the root advances");
+        assert_eq!(held.chain(), Ok(vec![first.clone(), head.clone()]));
+        // The chain is walkable: each root names its settle and the root
+        // before it.
+        let text =
+            |root: &Oid| String::from_utf8(held.crystal(root).unwrap().bytes().to_vec()).unwrap();
+        let (h, f) = (text(&head), text(&first));
+        assert!(h.contains(b.as_str()) && h.contains(first.as_str()), "{h}");
+        assert!(f.contains(a.as_str()) && !f.contains(b.as_str()), "{f}");
+        vec![first, head]
+    };
+    // Y, unchained, the same settles: another root, no chain, and its root
+    // lives only in its slot.
+    let theirs = {
+        let mut held = Held::open(&mut backend, &y);
+        held.settle_with(b"node a".to_vec(), []).unwrap();
+        held.settle_with(b"node b".to_vec(), []).unwrap();
+        let root = held.root().unwrap().expect("a root");
+        assert_eq!(held.chain(), Ok(vec![]));
+        assert_eq!(
+            held.crystal(&root),
+            Err(Recall::Lost {
+                address: root.clone(),
+                reason: Loss::Missing
+            })
+        );
+        root
+    };
+    assert!(!roots.contains(&theirs));
+
+    let slots = Held::open(&mut backend, &x).slots();
+    let erasure = Erasure::mint(x, Epoch(6), &backend).expect("X's own roots");
+    for address in roots.iter().chain([slots.root(), slots.chain()]) {
+        assert!(erasure.covers().contains(address), "{address:?}");
+    }
+    purge(&mut backend, &erasure).unwrap();
+
+    // A copy of X's synthetic key, only to look.
+    let x = throwaway(0xa1);
+    let lost = |address: &Oid| Recall::Lost {
+        address: address.clone(),
+        reason: Loss::Erased(erasure.receipt().clone()),
+    };
+    let held = Held::open(&mut backend, &x);
+    assert_eq!(held.root(), Err(lost(slots.root())));
+    assert_eq!(held.chain(), Err(lost(slots.chain())));
+    // Any edge into X's roots, read from Y's world without X's key.
+    for root in &roots {
+        for reader in [Scope::keyed(&y), Scope::public()] {
+            assert_eq!(recall(&backend, &reader, root), Err(lost(root)));
+        }
+    }
+    if !keeps_bytes {
+        for address in roots.iter().chain([slots.root(), slots.chain()]) {
+            assert_eq!(backend.fetch(address), Ok(None), "{address:?} is gone");
+        }
+    }
+    assert_eq!(
+        Held::open(&mut backend, &y).root(),
+        Ok(Some(theirs)),
+        "Y's root untouched"
+    );
+}
+
+#[test]
+fn the_root_and_its_chain_are_per_scope_and_purged_on_memory() {
+    root_law(Memory::default(), false);
+}
+
+#[test]
+fn the_root_and_its_chain_are_per_scope_and_purged_on_the_ledger() {
+    root_law(Ledger::default(), false);
+}
+
+#[test]
+fn the_root_and_its_chain_are_per_scope_and_purged_through_a_wrapper() {
+    root_law(Counted::default(), false);
+}
+
+#[test]
+fn a_hoarded_root_and_chain_still_read_erased_through_the_tombstone() {
+    root_law(Hoarding::default(), true);
+}
+
+#[test]
+fn the_root_commits_to_the_settle_history() {
+    let key = throwaway(0xa3);
+    let root_after = |order: [&[u8]; 2]| {
+        let mut backend = Memory::default();
+        let mut held = Held::open(&mut backend, &key);
+        for bytes in order {
+            held.settle_with(bytes.to_vec(), []).unwrap();
+        }
+        held.root().unwrap().expect("a root")
+    };
+    let ab = root_after([b"node a", b"node b"]);
+    assert_eq!(ab, root_after([b"node a", b"node b"]), "deterministic");
+    assert_ne!(ab, root_after([b"node b", b"node a"]), "another history");
+}
+
+#[test]
+fn an_unchained_root_is_erased_with_its_scope() {
+    let mut backend = Memory::default();
+    let x = throwaway(0xa4);
+    let root = {
+        let mut held = Held::open(&mut backend, &x);
+        held.settle_with(b"node a".to_vec(), []).unwrap();
+        held.root().unwrap().expect("a root")
+    };
+    let erasure = Erasure::mint(x, Epoch(1), &backend).unwrap();
+    assert!(erasure.covers().contains(&root));
+    purge(&mut backend, &erasure).unwrap();
+    assert_eq!(
+        recall(&backend, &Scope::public(), &root),
+        Err(Recall::Lost {
+            address: root.clone(),
+            reason: Loss::Erased(erasure.receipt().clone())
+        })
+    );
+}
