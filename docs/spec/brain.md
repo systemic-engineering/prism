@@ -182,7 +182,8 @@ a master inside prism, never persisted, never logged.
 
 ### What an Erasure can and can't claim
 
-`Erasure::mint(key: ScopeKey, epoch, census)` takes the key **by value**. Once it
+`Erasure::mint(key: ScopeKey, epoch, census)` (since item 3, `Erasure::mint(key, epoch,
+&backend)`) takes the key **by value**. Once it
 returns, the key value is gone from this process and its bytes are zeroed. The type
 makes using the key after the mint unrepresentable (`compile_fail`, E0382).
 
@@ -192,7 +193,7 @@ makes using the key after the mint unrepresentable (`compile_fail`, E0382).
 - **The public scope is unerasable by type.** There is no `ScopeKey` for it, so no
   `Erasure` can name it: `Erasure::mint(Scope::public(), ..)` doesn't compile, and
   `ScopeKey::take` refuses `K_public`'s bytes.
-- **The census.** An Erasure covers exactly the crystals the holder showed it while the
+- **The census (as built in this run; replaced in item 3).** An Erasure covered exactly the crystals the holder showed it while the
   key was still live: each must rehash to its address under the key. A crystal that
   doesn't is refused (`Stranger`), and the key is handed back unconsumed. So an Erasure
   can purge only its own scope's crystals, never the public scope's or another
