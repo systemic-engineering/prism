@@ -110,6 +110,7 @@
           ./nix/echo-independent.sh
           ./nix/prism-mcp-independent.sh
           ./nix/prismqueer-exact.sh
+          ./nix/laws-independent.sh
           ./nix/fixtures
         ]
       );
@@ -481,6 +482,56 @@
                 done
                 cargo build --locked --offline -p prismqueer $exact
                 cargo test --locked --offline -p prismqueer $exact
+              '';
+              installPhaseCommand = "touch $out";
+            };
+
+            # docs/spec/laws.md: prism's floor, prism-laws, builds alone
+            # without the native environment (no gfortran, LAPACK or BLAS
+            # here), passes its own tests (the float scan among them), and
+            # its own resolve (`cargo tree -p prism-laws`, `links` and
+            # proc-macro targets from the metadata) holds no proc-macro, no
+            # serde or JSON crate, no mirror crate, no prismqueer, nothing
+            # LAPACK, BLAS or Fortran, and no cc but blake3's. The guard runs
+            # on the real graph, accepts the clean fixture, and refuses
+            # fourteen, each for its own reason.
+            laws-independent = craneLib.mkCargoDerivation {
+              pname = "laws-independent";
+              inherit version;
+              src = testSrc;
+              strictDeps = true;
+              cargoArtifacts = null;
+              cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+              nativeBuildInputs = [ pkgs.jq ];
+              doInstallCargoArtifacts = false;
+              buildPhaseCargoCommand = ''
+                guard=${guardSrc}/nix/laws-independent.sh
+                fixtures=${guardSrc}/nix/fixtures
+                cargo metadata --format-version 1 --locked --offline > metadata.json
+                cargo tree --locked --offline -p prism-laws -e normal,build,dev --target all --prefix depth -f '{p}|{f}' > tree.txt
+                bash $guard tree.txt metadata.json
+                bash $guard $fixtures/laws-clean.tree $fixtures/laws-packages.json
+                while read -r f why; do
+                  if said=$(bash $guard $fixtures/laws-$f.tree $fixtures/laws-packages.json 2>&1); then echo "laws-independent accepted laws-$f" >&2; exit 1; fi
+                  case "$said" in *"$why"*) ;; *) echo "laws-independent refused laws-$f, but not for $why: $said" >&2; exit 1 ;; esac
+                done <<'EOF'
+                terni-macros terni-macros (proc-macro)
+                projections prismqueer-projections
+                serde serde_core
+                json tinyjson
+                mirror mirror-ast
+                prismqueer prismqueer
+                lapack netlib-src
+                links quietly (links blas)
+                cc cc (through psm)
+                missing unheard-of 9.9.9 (not in the metadata)
+                unparsed unparsed: 1chorus 0.1.0|
+                depth unparsed: depth 3 after 1: num-traits
+                empty does not start with prism-laws
+                wrong-root does not start with prism-laws
+                EOF
+                cargo build --locked --offline -p prism-laws
+                cargo test --locked --offline -p prism-laws
               '';
               installPhaseCommand = "touch $out";
             };

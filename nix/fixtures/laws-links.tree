@@ -1,0 +1,22 @@
+0prism-laws v0.1.0 (/build/laws)|
+1blake3 v1.8.7|default,std
+2arrayref v0.3.9|
+2arrayvec v0.7.8|
+2cfg-if v1.0.4|
+2constant_time_eq v0.4.2|
+2cc v1.2.60|
+3find-msvc-tools v0.1.9|
+3shlex v1.3.0|default,std
+1num-bigint v0.4.6|default,std
+2num-integer v0.1.46|i128,std
+3num-traits v0.2.19|default,i128,std
+4autocfg v1.5.0|
+2num-traits v0.2.19|default,i128,std (*)
+1num-integer v0.1.46|i128,std (*)
+1num-rational v0.4.2|num-bigint,num-bigint-std,std
+2num-bigint v0.4.6|default,std (*)
+2num-integer v0.1.46|i128,std (*)
+2num-traits v0.2.19|default,i128,std (*)
+1num-traits v0.2.19|default,i128,std (*)
+1terni v0.7.0 (/build/imperfect)|fractal
+1quietly v0.1.0|
