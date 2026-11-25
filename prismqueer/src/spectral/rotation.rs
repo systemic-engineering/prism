@@ -561,15 +561,32 @@ impl Default for RotationConfig {
 /// 2. the apparatus read across from Anna Jakobs's 2012 thesis observes composed graph Fiedler λ₂ at K_3 basepoint (LAPACK
 ///    dsyev via FLANG; reading the composed graph's spectrum doesn't change the phases)
 /// 3. Compute Kuramoto order parameter r ∈ [0, 1] (coupling-coherence readout)
-/// 4. Foerster gauge check: Fiedler λ₂ must monotone-non-decrease across ticks
-///    (topology cannot narrow — Rice-safe substrate-scale-invariance per Rec #92)
+/// 4. The `FiedlerRise` gate, once called the Foerster gauge check: λ₂ must not
+///    decrease across ticks. It is not a gauge of choices (see below).
 /// 5. Address the gauge-fixed state under `config.grain` and deposit it at the tick
 /// 6. Stop on consecutive equality (`Fixed`), a recurrence (`Cycle`), or the budget
 ///
 /// Returns [`spin`]'s shape. `Failure`: fewer than two loops, kleinos refused,
-/// phase_lock FFI failed, or the Foerster gauge was violated; the loss is the tick.
+/// phase_lock FFI failed, or the gate fired; the loss is the tick.
 ///
 /// N-loop case (Phase 2+): reserved for iterative wedge-at-K_n composition.
+///
+/// # The gate can't fire, and would be wrong if it could
+///
+/// In Phase 1 the gate compares `fiedler_at_basepoint < previous_fiedler`,
+/// one constant with itself (the topology is fixed during rotation), so it
+/// never fires (pinned by `the_fiedler_gate_cannot_fire_in_phase_1`;
+/// docs/spec/checks.md, "Can't flip"). Its docs call it a guardrail for
+/// Phase 2+ topology-evolving rotation, which is exactly where it fails.
+/// Mara, mirror `mara/foerster-gauge-literal` §3: adding a vertex moves λ₂
+/// either way, and a pendant never raises it. Over every labelled connected
+/// graph on 2..5 vertices with a pendant added at each vertex (probe G1,
+/// 3,806 cases), λ₂ dropped 3,537 times and rose 0. So a Phase 2 rotation
+/// that adds a pendant vertex fails `FiedlerRise` while nothing narrows;
+/// her K1 is the same for a lawful glue (K₃ and K₃ over one span: λ₂
+/// 3 → (5 − √17)/2, every held gauge up). `FiedlerRise` is a legacy
+/// property of the join, not the Foerster gauge ([`Property::FiedlerRise`]);
+/// the gate stays, marked, until Alex decides.
 pub fn infer_via_rotation(
     loops: &[Graph],
     ticks: usize,
@@ -631,9 +648,10 @@ pub fn infer_via_rotation(
         })?;
         phases = new_phases;
 
-        // Foerster gauge: Fiedler λ₂ monotone-non-decrease across ticks.
-        // Phase 1: trivially holds (topology fixed). Guardrail for Phase 2+
-        // topology-evolving rotation.
+        // The FiedlerRise gate, not a gauge (see the docblock): λ₂ must not
+        // decrease across ticks. Phase 1: both sides are one constant, so it
+        // can't fire. Phase 2+ would fail on a pendant that narrows nothing
+        // (Mara, mirror `mara/foerster-gauge-literal` §3.3, probe G1).
         if fiedler_at_basepoint < previous_fiedler {
             return Err(Transparency::single(
                 Property::FiedlerRise,

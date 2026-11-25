@@ -101,6 +101,21 @@ pub enum Property {
     /// Q-Mara-κ Alex ratification 2026-09-01; non-strict = only fires at
     /// kintsugi settle to λ₀ harmonic-component fixed-point). Checked per
     /// composition; a theorem only for operands that share no vertex.
+    ///
+    /// **A legacy property of this join (the complete bridge), not a
+    /// viability gauge and not the Foerster gauge.** It holds here because
+    /// the join adds the bridges that make it hold. Mara, mirror
+    /// `mara/foerster-gauge-literal` §3 (BROKEN as a stand-in for "choices
+    /// narrowed"): λ₂ isn't monotone under adding vertices, so it can't hold
+    /// for a lawful glue. Her K1: the lawful `kleinos` of K₃ and K₃ over one
+    /// span keeps everything (frames 3, 3 → 6, relations 3, 3 → 7, b₁ 1, 1
+    /// → 2) while λ₂ falls from exactly 3 to (5 − √17)/2 < 1 (pinned
+    /// exactly in `laws/tests/fiedler_not_a_gauge.rs`). And between two
+    /// parties it counts messages (K2: k spans give 2k). λ₂ stays what it
+    /// already is beside an address, a reading (`kleinos::Pushout::fiedler`).
+    ///
+    /// It stays in this join's property set, marked: removing it is Alex's
+    /// call, not this file's.
     FiedlerRise,
     /// PAPER §3.6.4: refuses composition when inputs would fuse (identical
     /// content-address; equivalent to attempted collapse of K_2 to K_1).
@@ -637,9 +652,14 @@ fn verify_emergent_third(
 /// **Uncertified** (prism-016 item 2, follow-up). The `>` compares raw
 /// floats, so a composed λ₂ within float error of `max(λ₂(a), λ₂(b))` may
 /// pass on one machine and fail on another. It enters no address, but it
-/// decides whether a [`Composition`], and so its address, exists. To be
-/// certified exactly (`poly` root isolation on `room::charpoly`) or by an
-/// outward-rounded bound, with `Undecided` in between.
+/// decides whether a [`Composition`], and so its address, exists. The plan
+/// was to certify it exactly (`poly` root isolation on `room::charpoly`) or
+/// by an outward-rounded bound, with `Undecided` in between.
+///
+/// **That plan is struck** (docs/spec/checks.md): it is a
+/// legacy property of the complete bridge, not a gauge of choices, and
+/// making a broken criterion exact makes it no less broken (Mara, mirror
+/// `mara/foerster-gauge-literal` §3; see [`Property::FiedlerRise`]).
 fn verify_fiedler_rise(lambda_a: f64, lambda_b: f64, lambda_composed: f64) -> PropertyVerdict {
     let max_ab = lambda_a.max(lambda_b);
     if lambda_composed > max_ab {

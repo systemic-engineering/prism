@@ -142,6 +142,10 @@ pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, Convergenc
         Ok(evals) => evals,
         Err(fault) => {
             let why = format!("LAPACK: {fault}");
+            // FiedlerRise is only the label of the old join's coordinate
+            // here, the spectrum's failure: a legacy property, not a gauge
+            // (Mara, mirror `mara/foerster-gauge-literal` §3; see
+            // `Property::FiedlerRise`).
             return Imperfect::Failure(
                 Transparency::single(
                     Property::FiedlerRise,

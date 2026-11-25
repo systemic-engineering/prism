@@ -37,6 +37,12 @@
 //! there is no net: `(0, 0)`, `(0.4, 0.4)` and `(0.9, 0.9)` all net to zero,
 //! and stay three signals. Pleasure is never `1 − pain`.
 //!
+//! "Never netted" rests on **two type distinctions**, not on a rule: an
+//! event is not a gauge (there is nothing to cancel a level against), and
+//! each system has its own ruler (two systems' levels are in different
+//! units, so there is no sum to take). Mara, mirror LOG rev 109,
+//! `mara/foerster-gauge-literal` §1.4.
+//!
 //! # The ruler is a signed record (A2)
 //!
 //! A [`Ruler`] is `{ region, question, (α, β), clock, signer }`.

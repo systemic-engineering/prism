@@ -94,6 +94,12 @@ pub struct Shard<T> {
     /// LOVE-monoid `Transparency<Property>` verdict per Rec #92 M2.1 four properties
     /// (Sovereignty + EmergentThird + FiedlerRise + FusionRefusal).
     ///
+    /// `FiedlerRise` is a legacy property of the old join (the complete
+    /// bridge), not a viability or Foerster gauge: λ₂ falls under a lawful
+    /// glue that narrows nothing (Mara, mirror `mara/foerster-gauge-literal`
+    /// §3, K1; `spectral::Property::FiedlerRise`). It stays in the
+    /// set, marked, until Alex decides.
+    ///
     /// Composes over `terni::Transparency<Property>` LANDED. Encodes Foerster-gauge
     /// preservation as the ternary variant per Alex 2026-09-04 Move 3 substrate-fix
     /// (Clear = gauge preserved; Opaque = residual gauge-observation).
