@@ -133,13 +133,14 @@ fn echelon(mut m: Vec<Vec<Q>>, cols: usize) -> (Vec<Vec<Q>>, Vec<usize>) {
     let mut pivots = Vec::new();
     let mut row = 0;
     for col in 0..cols {
-        let Some(p) = (row..m.len()).find(|&i| m[i][col] != Q::from(0)) else {
+        // The pivot is the first entry with an inverse: over ℚ, exactly the
+        // nonzero ones, so every pivot found scales to 1.
+        let Some((p, inv)) = (row..m.len()).find_map(|i| m[i][col].recip().map(|inv| (i, inv)))
+        else {
             continue;
         };
         m.swap(row, p);
-        if let Some(inv) = m[row][col].recip() {
-            m[row] = m[row].iter().map(|x| x.mul(&inv)).collect();
-        }
+        m[row] = m[row].iter().map(|x| x.mul(&inv)).collect();
         for i in 0..m.len() {
             if i != row && m[i][col] != Q::from(0) {
                 let f = m[i][col].clone();
@@ -435,6 +436,16 @@ mod tests {
     fn the_q_kernel_of_nothing_is_everything() {
         assert_eq!(Q::kernel(&[], 2), vec![vec![q(1), q(0)], vec![q(0), q(1)]]);
         assert!(Q::kernel(&[vec![q(1), q(0)], vec![q(0), q(1)]], 2).is_empty());
+    }
+
+    #[test]
+    fn q_is_one_ring_and_times_is_repeated_addition() {
+        // ℚ needs no ring data: every Q's ring is the one unit value.
+        assert_eq!(Q::new(3, 4).expect("3/4").ring(), &());
+        let x = Q::new(3, 4).expect("3/4");
+        assert_eq!(x.times(&BigInt::from(3)), x.add(&x).add(&x));
+        assert_eq!(x.times(&BigInt::from(-2)), Q::new(-3, 2).expect("-3/2"));
+        assert_eq!(x.times(&BigInt::from(0)), Q::zero(&()));
     }
 
     #[test]

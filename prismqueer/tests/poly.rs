@@ -238,6 +238,18 @@ fn isolation_separates_close_and_irrational_roots() {
 }
 
 #[test]
+fn zero_is_its_own_square_free_part_and_monic_and_isolates_nothing() {
+    // 0 has no square-free part to take but itself, its monic is itself (no
+    // leading coefficient to divide by), and its Sturm sequence is empty: no
+    // root is isolated.
+    assert_eq!(z(&[]).square_free(), z(&[]));
+    assert_eq!(qp(&[]).monic(), qp(&[]));
+    assert!(z(&[]).real_roots().is_empty());
+    // The control: a nonzero rational polynomial divides by its leading one.
+    assert_eq!(qp(&[(2, 1), (1, 1)]).monic(), qp(&[(1, 1), (1, 2)]));
+}
+
+#[test]
 fn polynomials_without_real_roots_have_none() {
     assert_eq!(z(&[1, 0, 1]).real_roots().len(), 0);
     assert_eq!(z(&[5]).real_roots().len(), 0);

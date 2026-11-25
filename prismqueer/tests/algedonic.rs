@@ -1168,3 +1168,60 @@ fn the_pair_is_ordered_componentwise() {
     let other = Signal::new(exact(1, 10), exact(1, 10), oid("ear"));
     assert_eq!(s(1, 1).partial_cmp(&other), None);
 }
+
+#[test]
+/// An enclosure keeps both its ends; an exact one has them equal.
+fn an_enclosure_has_both_ends() {
+    let e = enclose(q(1, 3), q(1, 2));
+    assert_eq!((e.lo(), e.hi()), (&q(1, 3), &q(1, 2)));
+    let x = exact(2, 1);
+    assert_eq!(x.lo(), x.hi());
+}
+
+#[test]
+/// The empty neighbourhood reads each semiring's unit (0 for Max and Sum,
+/// 1 for Product), then crosses the region like any reading: above 1/2,
+/// 0 is Out and 1 is In.
+fn the_empty_neighbourhood_reads_the_unit() {
+    for (question, unit) in [
+        (Question::Max, q(0, 1)),
+        (Question::Sum, q(0, 1)),
+        (Question::Product, q(1, 1)),
+    ] {
+        let ruler = Draft::new(
+            Region::above(q(1, 2)),
+            question,
+            Wald::new(q(1, 20), q(1, 20)).expect("valid rates"),
+            Clock::agreed(10, 1, 100),
+        )
+        .seal(oid("engineer"));
+        let read = ruler.read(&[]);
+        let unit = Enclosure::exact(unit);
+        let expected = if unit.lo() > &q(1, 2) {
+            Membership::In(unit)
+        } else {
+            Membership::Out(unit)
+        };
+        assert_eq!(read, expected, "{question:?}");
+    }
+}
+
+#[test]
+/// Evidence names its site, and addresses every decision it holds by
+/// `decision_oid`: one per (ruler, nbhd, instrument), a repeat adding none.
+fn evidence_names_its_site_and_addresses_each_decision() {
+    let ruler = ruler_above(q(1, 1), "engineer");
+    let mut ev = Evidence::at(oid("leg"));
+    assert_eq!(ev.site(), &oid("leg"));
+    assert!(ev.oids().is_empty());
+    for (n, d) in [("song", Decision::In), ("walk", Decision::Out)] {
+        ev.record(oid(n), oid("knee"), &ruler, d).expect("new");
+    }
+    ev.record(oid("song"), oid("knee"), &ruler, Decision::In)
+        .expect("a repeat");
+    let got: std::collections::BTreeSet<Oid> = ev.oids().into_iter().collect();
+    let want = [("song", Decision::In), ("walk", Decision::Out)]
+        .map(|(n, d)| decision_oid(&oid("leg"), &oid(n), &oid("knee"), &ruler.oid(), d));
+    assert_eq!(ev.oids().len(), 2);
+    assert_eq!(got, want.into_iter().collect());
+}

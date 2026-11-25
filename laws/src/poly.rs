@@ -1448,3 +1448,46 @@ mod modp {
         factors
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn z(descending: &[i64]) -> ZPoly {
+        ZPoly::from_descending(descending.iter().map(|&c| BigInt::from(c)))
+    }
+
+    #[test]
+    fn zero_divided_exactly_is_zero() {
+        // 0 = 0·d for every d ≠ 0.
+        assert_eq!(z(&[]).div_exact(&z(&[2, 1])), Some(z(&[])));
+    }
+
+    #[test]
+    fn a_quotient_that_leaves_z_is_refused() {
+        // x² + 1 by 2x + 1: the first quotient digit is 1/2, not in ℤ.
+        assert_eq!(z(&[1, 0, 1]).div_exact(&z(&[2, 1])), None);
+        // A lower degree is refused before any digit; a true factor isn't.
+        assert_eq!(z(&[1, 1]).div_exact(&z(&[1, 0, 1])), None);
+        assert_eq!(z(&[1, 0, -1]).div_exact(&z(&[1, 1])), Some(z(&[1, -1])));
+    }
+
+    #[test]
+    fn the_gcd_of_nothing_over_fp_is_nothing() {
+        // gcd(0, 0) = 0, and the monic of 0 is 0.
+        assert_eq!(modp::gcd(&[], &[], 5), Vec::<u64>::new());
+        assert_eq!(modp::monic(&[], 5), Vec::<u64>::new());
+        // 3x + 1 over 𝔽₅ is x + 2 once monic (3⁻¹ = 2).
+        assert_eq!(modp::monic(&[1, 3], 5), vec![2, 1]);
+    }
+
+    #[test]
+    fn berlekamp_returns_a_line_as_it_is() {
+        // x + 3 over 𝔽₇ is irreducible: one factor, itself.
+        assert_eq!(modp::berlekamp(&[3, 1], 7), vec![vec![3, 1]]);
+        // x² − 1 = (x − 1)(x + 1) over 𝔽₇: two lines.
+        let mut lines = modp::berlekamp(&[6, 0, 1], 7);
+        lines.sort();
+        assert_eq!(lines, vec![vec![1, 1], vec![6, 1]]);
+    }
+}

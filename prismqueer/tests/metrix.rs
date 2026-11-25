@@ -561,6 +561,50 @@ fn the_relative_spectrum_of_a_non_diagonal_pair_is_an_irreducible_quadratic() {
     );
 }
 
+/// No budget: diag(1, 2, 3) splits into three lines mod every good prime,
+/// so naming any of them takes a recombination trial. With none, nothing is
+/// named and the whole square-free charpoly is unresolved; never a guess.
+#[test]
+fn without_a_budget_the_relative_spectrum_is_unresolved() {
+    let f = frame("a", 3);
+    let i = MetrixDraft::identity(&f).seal(signer());
+    let g = metrix(&f, &[&[1, 0, 0], &[0, 2, 0], &[0, 0, 3]]);
+    let s = relative_spectrum(&i, &g, Budget(0)).expect("one frame");
+    assert!(!s.is_certified());
+    assert!(s.eigenvalues().is_empty());
+    // (x − 1)(x − 2)(x − 3).
+    assert_eq!(
+        s.unresolved(),
+        Some(&ZPoly::from_descending([1, -6, 11, -6].map(Into::into)))
+    );
+    // With a budget, certified, and nothing left unresolved.
+    let s = relative_spectrum(&i, &g, budget()).expect("one frame");
+    assert_eq!(s.unresolved(), None);
+    assert_eq!(s.eigenvalues().len(), 3);
+}
+
+/// A form has its size; a P larger than it is refused, not truncated.
+#[test]
+fn a_congruence_larger_than_the_form_is_refused() {
+    let f = form(&[&[2, 1], &[1, 2]]);
+    assert_eq!(f.dim(), 2);
+    // diag(1, 1, 2): its third axis is past the form's two.
+    let p = Gl::new(ints(&[&[1, 0, 0], &[0, 1, 0], &[0, 0, 2]])).expect("invertible");
+    assert_eq!(p.size(), 3);
+    assert_eq!(
+        f.congruent(&p).err(),
+        Some(MetrixError::WrongSize {
+            expected: 2,
+            found: 3
+        })
+    );
+    // A smaller P acts as the identity past its size.
+    let two = Gl::new(ints(&[&[2]])).expect("invertible");
+    let moved = f.congruent(&two).expect("within the form");
+    assert_eq!(moved.dim(), 2);
+    assert_eq!(moved.rows(), &ints(&[&[8, 2], &[2, 2]])[..]);
+}
+
 /// Seam's ×10 axis (Mara P11d): {1, 1, 100}, with multiplicity.
 #[test]
 fn a_repeated_relative_eigenvalue_keeps_its_multiplicity() {

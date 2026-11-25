@@ -119,6 +119,12 @@ fn three_frames_with_a_rotation_agree_on_nothing_and_hold_one_located_loop() {
     assert_eq!(oids(l.frames()), oids([t.a.oid(), t.b.oid(), t.c.oid()]));
     let all: Vec<Oid> = t.relations.iter().map(|r| r.oid().clone()).collect();
     assert_eq!(oids(l.relations()), oids(&all));
+    // Its address is its own, and a function of the composite: built again,
+    // the same.
+    assert!(!oids(l.frames()).contains(l.id().oid()));
+    assert!(!oids(&all).contains(l.id().oid()));
+    let again = composite(&t, &[]);
+    assert_eq!(again.holonomy().loops()[0].id().oid(), l.id().oid());
 
     // Its holonomy is R or R⁻¹ exactly (the base path is the identity), and
     // R⁻¹ = D·R·D⁻¹ with D = diag(1, −1): conjugate to R either way.
@@ -363,6 +369,10 @@ fn f5_a_face_carrying_cs_report_is_curvature_on_the_face_and_no_open_loop() {
     assert_eq!(c.curvature().len(), 1);
     let curl = &c.curvature()[0];
     assert_eq!(curl.face(), face.oid());
+    // Around the face, first frame repeated last.
+    assert_eq!(curl.frames().len(), 4);
+    assert_eq!(curl.frames().first(), curl.frames().last());
+    assert_eq!(oids(curl.frames()), oids([t.a.oid(), t.b.oid(), t.c.oid()]));
     assert!(!curl.holonomy().is_identity());
     assert_eq!(
         curl.holonomy().charpoly(2),

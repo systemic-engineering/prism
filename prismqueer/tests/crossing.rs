@@ -159,3 +159,12 @@ fn a_trigger_rulers_signer_joins_as_it_is() {
         .iter()
         .any(|s| s.over() == &trigger.oid() && s.by() == &oid("ana")));
 }
+
+#[test]
+/// A crystal prints its address, short, and its length: never its bytes.
+fn a_crystal_debugs_as_its_address_and_length() {
+    let c = crystal(b"ab");
+    let short: String = c.address().to_string().chars().take(12).collect();
+    assert_eq!(format!("{c:?}"), format!("Crystal(Oid({short}), 2 B)"));
+    assert_eq!(format!("{c:?}"), "Crystal(Oid(201c0cad2ce0), 2 B)");
+}

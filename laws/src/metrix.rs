@@ -541,10 +541,15 @@ pub fn relative_spectrum(
     let charpoly = Charpoly::of(&a, n);
     let p = QPoly::from_descending(charpoly.coefficients().iter().map(|c| c.value().clone()))
         .primitive();
-    let (irreducible, rest) = match p.square_free().factor(budget) {
-        Ok(Factored::Certified(f)) => (f.factors().to_vec(), None),
-        Ok(Factored::Uncertified { irreducible, .. }) => (irreducible, Some(())),
-        Err(_) => (Vec::new(), Some(())),
+    // The charpoly is monic, so p ≠ 0, and the square-free part of a nonzero
+    // polynomial is square-free: `factor` has nothing to refuse.
+    let (irreducible, rest) = match p
+        .square_free()
+        .factor(budget)
+        .expect("the square-free part of a nonzero polynomial is square-free")
+    {
+        Factored::Certified(f) => (f.factors().to_vec(), None),
+        Factored::Uncertified { irreducible, .. } => (irreducible, Some(())),
     };
     let mut left = p.to_rational();
     let mut eigenvalues = Vec::new();

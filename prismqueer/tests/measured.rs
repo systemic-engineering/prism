@@ -150,6 +150,8 @@ fn two_streams_full_support_mle_is_the_exact_inverse() {
         rows(&[&[(8, 1), (-4, 1)], &[(-4, 1), (20, 9)]])
     );
     assert_eq!(m.samples(), 4);
+    assert_eq!(m.frame(), &f, "measured in the frame it was given");
+    assert_eq!(m.method(), &full(2), "by the method it was given");
     let draft = m.draft().expect("positive definite");
     assert_eq!(draft.certificate().d(), [q(8, 1), q(2, 9)]);
     assert_eq!(draft.certificate().l()[1][0], q(-1, 2));

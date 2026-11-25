@@ -229,6 +229,11 @@ fn spans_whose_labels_collide_are_two_edges() {
         &commit(&format!("bbbb1111{}", "1".repeat(32))),
     );
     assert_eq!(x.label().as_str(), "aaaa0000bbbb1111");
+    assert_eq!(
+        x.label().to_string(),
+        "aaaa0000bbbb1111",
+        "Display: the 16 hex"
+    );
     assert_eq!(x.label(), y.label(), "one label");
     assert_ne!(x, y, "two events");
 

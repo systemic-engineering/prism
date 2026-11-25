@@ -286,6 +286,38 @@ fn swinnerton_dyer_s3_needs_a_real_budget() {
     assert_eq!(factors(&s3), vec![s3.clone()]);
 }
 
+// A float read against the roots: `Factorization::identify` is under `lapack`.
+#[cfg(feature = "lapack")]
+#[test]
+fn a_constant_identifies_nothing_and_a_negative_radius_measures_nothing() {
+    // A constant has no irreducible factor, so no root: absent, whatever was
+    // measured, a NaN too.
+    let constant = match z(&[7]).factor(PLENTY).expect("square-free") {
+        Factored::Certified(f) => f,
+        other => panic!("{other:?}"),
+    };
+    assert!(constant.factors().is_empty());
+    assert_eq!(constant.identify(7.0, 1.0), Identified::Absent);
+    assert_eq!(constant.identify(f64::NAN, 1.0), Identified::Absent);
+    let f = match z(&[1, 0, -2]).factor(PLENTY).expect("square-free") {
+        Factored::Certified(f) => f,
+        other => panic!("{other:?}"),
+    };
+    // A negative radius is no window at all.
+    assert_eq!(
+        f.identify(std::f64::consts::SQRT_2, -1e-9),
+        Identified::Unmeasured
+    );
+    // A window over both roots of one factor refuses, naming both.
+    assert_eq!(
+        f.identify(0.0, 2.0),
+        Identified::Ambiguous(vec![
+            Algebraic::new(z(&[1, 0, -2]), 0),
+            Algebraic::new(z(&[1, 0, -2]), 1),
+        ])
+    );
+}
+
 // --- Law 5: the algebraic tag ---------------------------------------------------
 
 // A float read against the roots: `Factorization::identify` is under `lapack`.
@@ -477,6 +509,17 @@ mod against_room {
             quietest(p7.multigraph(), Budget(0)),
             Quietest::Unresolved(z(&[1, -12, 55, -120, 126, -56, 7]))
         );
+    }
+
+    #[test]
+    fn the_empty_graph_is_silent() {
+        use prismqueer::field::Graph;
+        use prismqueer::room::{quietest, Quietest};
+        // No vertex, so no kernel: L₀ is 0×0, its minimal polynomial 1, and
+        // there is no x to divide out and no mode to name.
+        assert_eq!(quietest(&Graph::new([], []), PLENTY), Quietest::Silent);
+        // One vertex: x, the kernel alone. Silent too.
+        assert_eq!(quietest(&Graph::new([0], []), PLENTY), Quietest::Silent);
     }
 
     #[test]
