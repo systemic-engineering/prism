@@ -51,7 +51,7 @@ fn another_revision_is_answered_with_ours() {
 }
 
 #[test]
-fn tools_list_names_echo_and_chorus_with_their_schemas() {
+fn tools_list_names_the_four_tools_with_their_schemas() {
     let out = ready(&[r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#.into()]);
     assert_eq!(out.len(), 1);
     let tools = match get(&out[0], &["result", "tools"]) {
@@ -59,7 +59,7 @@ fn tools_list_names_echo_and_chorus_with_their_schemas() {
         other => panic!("{other:?}"),
     };
     let names: Vec<&str> = tools.iter().map(|t| str_of(get(t, &["name"]))).collect();
-    assert_eq!(names, ["echo", "chorus"]);
+    assert_eq!(names, ["echo", "chorus", "check", "measure"]);
     assert!(!has(get(&out[0], &["result"]), "nextCursor"));
     let echo = &tools[0];
     assert_eq!(
@@ -122,6 +122,38 @@ fn the_echo_description_is_generated_from_echo() {
     assert!(d.contains(&echo::replay::STRATA[echo::replay::REPLAYED..].join(", ")));
     let manifest = std::fs::read_to_string(repo("echo/Cargo.toml")).expect("manifest");
     assert!(manifest.contains(r#"blake3 = { version = "=1.8.7""#));
+}
+
+/// One session calls every tool: each answers a result, not an error.
+#[test]
+fn tools_call_works_on_each_of_the_four() {
+    let by = crate::check::BY;
+    let out = ready(&[
+        call(1, "echo", &echo_arguments(PARITY[0].0, false)),
+        call(2, "chorus", r#"{"note":"","ed25519":"","mldsa44":""}"#),
+        call(
+            3,
+            "check",
+            &format!(
+                r#"{{"ring":"Z","relations":[[0,1,3]],"selection":[[0,0],[1,3]],"by":"{by}"}}"#
+            ),
+        ),
+        call(
+            4,
+            "measure",
+            &format!(
+                r#"{{"samples":[[1,2],[2,2],[3,5],[4,7]],"streams":2,"estimator":"mle","support":[[0,1]],"window":"{by}","reader":"{by}"}}"#
+            ),
+        ),
+    ]);
+    assert_eq!(out.len(), 4);
+    for (n, a) in out.iter().enumerate() {
+        assert_eq!(get(a, &["id"]), &Value::Int(n as i64 + 1));
+        assert!(has(a, "result"), "{a:?}");
+    }
+    assert!(is_error(&out[1]), "an empty vkey is a broken ruler");
+    assert!(texts(&out[2])[0].starts_with("in\n"));
+    assert!(texts(&out[3])[0].starts_with("measured\n"));
 }
 
 /// §5.1: the texts, concatenated, are the binary's stdout followed by

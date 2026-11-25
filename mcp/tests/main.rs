@@ -8,10 +8,12 @@
 mod common;
 mod digests;
 
+mod check;
 mod chorus;
 mod fuzz;
 mod guard;
 mod json;
+mod measure;
 mod protocol;
 mod session;
 mod suite;

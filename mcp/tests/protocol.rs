@@ -189,7 +189,7 @@ fn params_must_be_an_object() {
 fn unknown_tools_and_bad_arguments_are_invalid_params() {
     let good = r#""source":"","certificate":"","record":"""#;
     let cases = [
-        (call(1, "check", "{}"), r#"{"tool":"check"}"#),
+        (call(1, "hold", "{}"), r#"{"tool":"hold"}"#),
         (
             call(2, "echo", r#"{"source":"","certificate":""}"#),
             r#"{"argument":"record","expected":"string"}"#,
@@ -219,7 +219,7 @@ fn unknown_tools_and_bad_arguments_are_invalid_params() {
     }
     assert_eq!(
         str_of(get(&out[0], &["error", "message"])),
-        "Unknown tool: check"
+        "Unknown tool: hold"
     );
 }
 

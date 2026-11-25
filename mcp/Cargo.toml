@@ -3,7 +3,7 @@ name = "prism-mcp"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "prism's floor as a read-only MCP server over stdio (prism-025 §2): echo and chorus as tools, over a hand-written JSON wire (RFC 8259 + I-JSON, exact numbers or refused). No serde, no JSON crate, no mirror crate, no keys."
+description = "prism's floor as a read-only MCP server over stdio (prism-025 §2): echo, chorus, check and measure as tools, over a hand-written JSON wire (RFC 8259 + I-JSON, exact numbers or refused). No serde, no JSON crate, no mirror crate, no keys."
 repository = "https://github.com/systemic-engineering/prism"
 publish = false
 
@@ -19,10 +19,14 @@ path = "tests/main.rs"
 name = "prism-mcp"
 path = "src/bin/prism-mcp.rs"
 
-# echo and chorus only (docs/spec/mcp.md §6). checks.prism-mcp-independent
-# holds the rest of the graph: no serde, no JSON crate, no mirror crate, no
-# prismqueer, nothing LAPACK, BLAS or Fortran. No dev-dependencies either:
-# the root's dev edges count.
+# echo, chorus and prismqueer's exact path (docs/spec/mcp.md §6).
+# checks.prism-mcp-independent holds the rest of prism-mcp's own build graph:
+# no serde, no JSON crate, no mirror crate, nothing LAPACK, BLAS or Fortran,
+# and prismqueer with exactly the feature `exact`. No dev-dependencies
+# either: the root's dev edges count.
 [dependencies]
 echo = { path = "../echo" }
 chorus = { path = "../chorus" }
+# check and measure: prismqueer's certified path only, no LAPACK (docs/spec/
+# features.md). The guard allows prismqueer under exactly this feature set.
+prismqueer = { path = "../prismqueer", default-features = false, features = ["exact"] }
