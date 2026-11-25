@@ -1258,21 +1258,62 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
     /// stays. The backend holds the fact's name ([`Oid::slot`]), never its
     /// bytes.
     pub fn deposit(&mut self, fact: &[u8], tick: Tick) -> Result<bool, Recall<B::Error>> {
-        let _ = (fact, tick);
+        let name = self.fact_name(fact);
+        let light = self.slots().light;
+        let mut deposits = self.light()?;
+        if deposits.iter().any(|(known, _)| known == &name) {
+            return Ok(false);
+        }
+        deposits.push((name, tick));
+        let bytes = deposits
+            .iter()
+            .map(|(name, tick)| format!("{} {}", name.as_str(), tick.0))
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.write(&light, bytes.as_bytes())?;
         Ok(true)
     }
 
     /// The tick a fact was deposited at in the scope, if it was.
     pub fn tick_of(&self, fact: &[u8]) -> Result<Option<Tick>, Recall<B::Error>> {
-        let _ = fact;
-        Ok(None)
+        let name = self.fact_name(fact);
+        Ok(self
+            .light()?
+            .into_iter()
+            .find_map(|(known, tick)| (known == name).then_some(tick)))
     }
 
     /// Lums, per scope: the number of distinct facts deposited at or before
     /// `as_of`. Progress and monotonicity, never identity.
     pub fn lums(&self, as_of: Tick) -> Result<u64, Recall<B::Error>> {
-        let _ = as_of;
-        Ok(0)
+        Ok(self
+            .light()?
+            .iter()
+            .filter(|(_, tick)| *tick <= as_of)
+            .count() as u64)
+    }
+
+    /// A fact's name in the scope: its slot address, one-way, never its
+    /// bytes.
+    fn fact_name(&self, fact: &[u8]) -> Oid {
+        let mut label = b"fact\0".to_vec();
+        label.extend_from_slice(fact);
+        Oid::slot(&self.scope, &label)
+    }
+
+    /// The light: each deposited fact's name and tick, one per line.
+    fn light(&self) -> Result<Vec<(Oid, Tick)>, Recall<B::Error>> {
+        let slot = self.slots().light;
+        read_lines(&*self.backend, &slot)?
+            .into_iter()
+            .map(|line| {
+                let (name, tick) = line
+                    .split_once(' ')
+                    .ok_or_else(|| Recall::Forged(slot.clone()))?;
+                let tick = tick.parse().map_err(|_| Recall::Forged(slot.clone()))?;
+                Ok((address(&slot, name)?, Tick(tick)))
+            })
+            .collect()
     }
 
     fn write(&mut self, slot: &Oid, bytes: &[u8]) -> Result<(), Recall<B::Error>> {

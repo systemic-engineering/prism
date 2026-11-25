@@ -1768,6 +1768,11 @@ fn a_malformed_slot_is_never_believed() {
         Held::open(&mut forger, &x).index(),
         Err(Recall::Forged(manifest.clone()))
     );
+    let light = Held::open(&mut forger, &x).slots().light().clone();
+    assert_eq!(
+        Held::open(&mut forger, &x).lums(Tick(0)),
+        Err(Recall::Forged(light))
+    );
     let stranger = Erasure::mint(x, Epoch(1), &forger).expect_err("a malformed manifest");
     assert_eq!(stranger.reason(), &Strange::Malformed(manifest.clone()));
     assert_eq!(stranger.address(), Some(&manifest));
