@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use prismqueer::brain::{self, Backend, Crystal, Memory, Recall};
+use prismqueer::brain::{self, Backend, Crystal, Loss, Memory, Purge, Receipt, Recall};
 use prismqueer::merkle::{diff, MerkleTree};
 use prismqueer::oid::{Addressable, Oid, Scope};
 
@@ -130,7 +130,10 @@ fn an_address_never_persisted_is_lost() {
     let never = Oid::hash(&Scope::public(), b"never");
     assert_eq!(
         brain::recall(&backend, &Scope::public(), &never),
-        Err(Recall::Lost(never))
+        Err(Recall::Lost {
+            address: never,
+            reason: Loss::Missing
+        })
     );
 }
 
@@ -153,6 +156,13 @@ impl Backend for Swapping {
             .iter()
             .find(|(other, _)| *other != address)
             .map(|(_, bytes)| bytes.clone()))
+    }
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.held.remove(order.address());
+        Ok(())
+    }
+    fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(None)
     }
 }
 

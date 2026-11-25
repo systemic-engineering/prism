@@ -100,7 +100,7 @@ pub fn diff<M: MerkleTree>(a: &M, b: &M) -> Vec<Delta> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::brain::{recall, Backend, Crystal, Memory, Recall};
+    use crate::brain::{recall, Backend, Crystal, Loss, Memory, Recall};
     use crate::oid::Scope;
 
     // A simple test tree
@@ -349,7 +349,10 @@ mod tests {
         let never = Oid::hash(&Scope::public(), b"nonexistent");
         assert_eq!(
             recall(&backend, &Scope::public(), &never),
-            Err(Recall::Lost(never))
+            Err(Recall::Lost {
+                address: never,
+                reason: Loss::Missing
+            })
         );
     }
 

@@ -335,6 +335,76 @@
 //! let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
 //! let again = Scope::keyed(&key);
 //! ```
+//!
+//! # A purge reads `Lost`, erased; dangling and dark are not `Lost`
+//!
+//! The control compiles: an erasure purges what it covers, and the read
+//! says why the bytes are gone.
+//!
+//! ```
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let crystal = Crystal::settle(&Scope::keyed(&key), b"node e".to_vec());
+//! let mut backend = Memory::default();
+//! backend.persist(&crystal).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &[crystal.clone()]).unwrap();
+//! purge(&mut backend, &erasure).unwrap();
+//! let loss: Loss = Loss::Erased(erasure.receipt().clone());
+//! assert_eq!(
+//!     recall(&backend, &Scope::public(), crystal.address()),
+//!     Err(Recall::Lost { address: crystal.address().clone(), reason: loss })
+//! );
+//! ```
+//!
+//! A dangling verdict is not erasure evidence:
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let crystal = Crystal::settle(&Scope::keyed(&key), b"node e".to_vec());
+//! let mut backend = Memory::default();
+//! backend.persist(&crystal).unwrap();
+//! purge(&mut backend, reach.dangling()).unwrap();
+//! ```
+//!
+//! a dangling verdict is not a loss:
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! let loss: Loss = reach.dangling().clone();
+//! ```
+//!
+//! nor is a dark set:
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! let loss: Loss = reach.dark().clone();
+//! ```
+//!
+//! and a purge order can't be written by hand, to reach past the census:
+//!
+//! ```compile_fail,E0451
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Purge, Recall, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let public = brain.settle(b"node e".to_vec()).unwrap();
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
+//! let mut backend = Memory::default();
+//! backend.purge(&Purge { address: &public, receipt: erasure.receipt() }).unwrap();
+//! ```
 
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -586,6 +656,56 @@ pub trait Backend {
 
     /// The bytes persisted under `address`, if any.
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Self::Error>;
+
+    /// Carry out a purge order: delete the bytes under [`Purge::address`],
+    /// everywhere this backend keeps them (every replica, outside git), and
+    /// keep [`Purge::receipt`] as the address's tombstone, so it reads
+    /// [`Loss::Erased`] from then on. Irreversible. Only [`purge`] issues an
+    /// order, and only for an address its [`Erasure`] covers.
+    ///
+    /// Required, never defaulted: a default would either delete nothing or
+    /// forget the receipt. A persist of a tombstoned address stores nothing.
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Self::Error>;
+
+    /// The receipt of the erasure that purged `address`, if one did.
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Self::Error>;
+}
+
+/// One purge order: an address an [`Erasure`] covers, and its receipt. No
+/// public constructor: only [`purge`] builds one, so a backend is never asked
+/// to delete an address outside an erasure's census.
+#[derive(Debug)]
+pub struct Purge<'e> {
+    address: &'e Oid,
+    receipt: &'e Receipt,
+}
+
+impl Purge<'_> {
+    /// The address to delete.
+    pub fn address(&self) -> &Oid {
+        self.address
+    }
+
+    /// The receipt to keep as its tombstone.
+    pub fn receipt(&self) -> &Receipt {
+        self.receipt
+    }
+}
+
+/// Purge every address `erasure` covers from `backend`: each one's bytes
+/// deleted, its receipt kept as the tombstone. After it, [`recall`] reads
+/// each as `Lost { reason: Loss::Erased(receipt) }`, on every backend.
+///
+/// A free function, like [`recall`], so no adapter can widen an order: the
+/// erasure's census is the whole of what it deletes.
+pub fn purge<B: Backend + ?Sized>(backend: &mut B, erasure: &Erasure) -> Result<(), B::Error> {
+    for address in &erasure.covers {
+        backend.purge(&Purge {
+            address,
+            receipt: &erasure.receipt,
+        })?;
+    }
+    Ok(())
 }
 
 /// Evidence that a held scope's key was erased: the holder's attested act
@@ -748,6 +868,7 @@ impl Stranger {
 #[derive(Clone, Debug, Default)]
 pub struct Memory {
     crystals: BTreeMap<Oid, Arc<[u8]>>,
+    erased: BTreeMap<Oid, Receipt>,
 }
 
 impl Memory {
@@ -773,6 +894,17 @@ impl Backend for Memory {
 
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
         Ok(self.crystals.get(address).map(|b| b.to_vec()))
+    }
+
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.crystals.remove(order.address());
+        self.erased
+            .insert(order.address().clone(), order.receipt().clone());
+        Ok(())
+    }
+
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(self.erased.get(address).cloned())
     }
 }
 
@@ -881,8 +1013,12 @@ impl Reach {
 /// free function, not a trait method, so no adapter can override it and
 /// skip the rehash.
 ///
+/// - an erased address: [`Recall::Lost`] with [`Loss::Erased`] and the
+///   receipt, asked first, so it fails closed even if a faulty backend kept
+///   the bytes (a purge is final);
 /// - bytes that hash to `address`: the crystal;
-/// - no bytes: [`Recall::Lost`], never an empty value;
+/// - no bytes: [`Recall::Lost`] with [`Loss::Missing`], never an empty
+///   value;
 /// - other bytes: [`Recall::Forged`], never believed;
 /// - the backend failed: [`Recall::Backend`].
 pub fn recall<B: Backend + ?Sized>(
@@ -893,7 +1029,10 @@ pub fn recall<B: Backend + ?Sized>(
     let bytes = backend
         .fetch(address)
         .map_err(Recall::Backend)?
-        .ok_or_else(|| Recall::Lost(address.clone()))?;
+        .ok_or_else(|| Recall::Lost {
+            address: address.clone(),
+            reason: Loss::Missing,
+        })?;
     let crystal = Crystal::settle(scope, bytes);
     if crystal.address() != address {
         return Err(Recall::Forged(address.clone()));
@@ -906,11 +1045,42 @@ pub fn recall<B: Backend + ?Sized>(
 pub enum Recall<E> {
     /// The backend failed.
     Backend(E),
-    /// Neither hot nor in the backend: the address was never settled here,
-    /// or the backend lost it.
-    Lost(Oid),
+    /// Neither hot nor in the backend, and why: erased (final, with its
+    /// receipt) or missing (never settled here, or the backend lost it).
+    Lost {
+        /// The address read.
+        address: Oid,
+        /// Why there are no bytes.
+        reason: Loss,
+    },
     /// The backend's bytes don't hash to the address. Not believed.
     Forged(Oid),
+}
+
+/// Why an address has no bytes (mirror-036 E1). A purge and a lost disk
+/// never read the same.
+///
+/// Kept apart from the vacuum's verdicts: [`Dangling`] is "not reached as
+/// of" and never final, a dark address is one this brain can't see into,
+/// and `Lost` is a read's answer. None converts into another.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Loss {
+    /// Purged under an [`Erasure`]: lawful and final. The receipt names the
+    /// scope's public id and the epoch, never the person.
+    Erased(Receipt),
+    /// No bytes and no tombstone: never settled here, or a durability fault
+    /// (A2: keeping the bytes is the adapter's obligation).
+    Missing,
+}
+
+impl Loss {
+    /// The erasure receipt, if the bytes were erased. `Missing` has none.
+    pub fn receipt(&self) -> Option<&Receipt> {
+        match self {
+            Loss::Erased(receipt) => Some(receipt),
+            Loss::Missing => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

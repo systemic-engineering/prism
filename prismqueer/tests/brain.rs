@@ -26,7 +26,7 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Interner, Memory, Recall, Relation, Roots,
+    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Loss, Purge, Receipt, Interner, Memory, Recall, Relation, Roots,
     Stats, Sym, Tick,
 };
 use prismqueer::crossing::Grade;
@@ -700,6 +700,12 @@ impl Backend for Counted {
         self.fetches.set(self.fetches.get() + 1);
         self.inner.fetch(address)
     }
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.inner.purge(order)
+    }
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
+        self.inner.erased(address)
+    }
 }
 
 #[test]
@@ -743,6 +749,12 @@ impl Backend for Forgetful {
     fn fetch(&self, _: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
         Ok(None)
     }
+    fn purge(&mut self, _: &Purge<'_>) -> Result<(), Infallible> {
+        Ok(())
+    }
+    fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(None)
+    }
 }
 
 /// A backend that hands back other bytes than it was given.
@@ -755,6 +767,12 @@ impl Backend for Forger {
     }
     fn fetch(&self, _: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
         Ok(Some(b"something else".to_vec()))
+    }
+    fn purge(&mut self, _: &Purge<'_>) -> Result<(), Infallible> {
+        Ok(())
+    }
+    fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(None)
     }
 }
 
@@ -772,13 +790,25 @@ impl Backend for Refusing {
     fn fetch(&self, _: &Oid) -> Result<Option<Vec<u8>>, Refused> {
         Err(Refused)
     }
+    fn purge(&mut self, _: &Purge<'_>) -> Result<(), Refused> {
+        Err(Refused)
+    }
+    fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Refused> {
+        Err(Refused)
+    }
 }
 
 #[test]
 fn a_backend_that_loses_or_forges_is_named_never_believed() {
     let mut lost = Brain::new(Capacity::bytes(0), Forgetful);
     let a = lost.settle(b"reach b".to_vec()).unwrap();
-    assert_eq!(lost.crystal(&a), Err(Recall::Lost(a.clone())));
+    assert_eq!(
+        lost.crystal(&a),
+        Err(Recall::Lost {
+            address: a.clone(),
+            reason: Loss::Missing
+        })
+    );
 
     let mut forged = Brain::new(Capacity::bytes(0), Forger);
     let b = forged.settle(b"reach c".to_vec()).unwrap();
@@ -1195,4 +1225,198 @@ fn the_receipt_is_sealed_by_the_scope_never_a_law_and_never_names_the_person() {
     assert_eq!(seals[0].by(), &id.oid(), "the signer is the scope, beside it");
     assert_eq!(seals[0].over(), receipt.address());
     assert_eq!(receipt.claim().value(), receipt.address());
+}
+
+// --- The purge law (item 2) and Lost's reason (E1) -------------------------
+
+/// A second backend, written independently of `Memory`: flat lists, linear
+/// scans. The purge law holds of the port, so it must hold here too.
+#[derive(Default)]
+struct Ledger {
+    held: Vec<(Oid, Vec<u8>)>,
+    tombstones: Vec<(Oid, Receipt)>,
+}
+
+impl Backend for Ledger {
+    type Error = Infallible;
+    fn persist(&mut self, crystal: &Crystal) -> Result<(), Infallible> {
+        let address = crystal.address();
+        let known = self.held.iter().any(|(a, _)| a == address);
+        let erased = self.tombstones.iter().any(|(a, _)| a == address);
+        if !known && !erased {
+            self.held.push((address.clone(), crystal.bytes().to_vec()));
+        }
+        Ok(())
+    }
+    fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
+        Ok(self
+            .held
+            .iter()
+            .find(|(a, _)| a == address)
+            .map(|(_, b)| b.clone()))
+    }
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.held.retain(|(a, _)| a != order.address());
+        self.tombstones
+            .push((order.address().clone(), order.receipt().clone()));
+        Ok(())
+    }
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(self
+            .tombstones
+            .iter()
+            .find(|(a, _)| a == address)
+            .map(|(_, r)| r.clone()))
+    }
+}
+
+/// The purge law, over one backend: X's scope purged, Y's held scope and
+/// the public scope untouched.
+fn purge_law<B: Backend<Error = Infallible>>(mut backend: B) {
+    let x = throwaway(0x51);
+    let y = throwaway(0x52);
+    let xs = crystals_of(&x, "node", 3);
+    let ys = crystals_of(&y, "node", 3);
+    let public: Vec<Crystal> = (0..3)
+        .map(|i| Crystal::settle(&Scope::public(), format!("node {i}").into_bytes()))
+        .collect();
+    for c in xs.iter().chain(&ys).chain(&public) {
+        backend.persist(c).unwrap();
+    }
+    for c in &xs {
+        assert_eq!(prismqueer::brain::recall(&backend, &Scope::keyed(&x), c.address()).as_ref(), Ok(c));
+    }
+
+    let erasure = Erasure::mint(x, Epoch(7), &xs).expect("X's own crystals");
+    let receipt = erasure.receipt().clone();
+    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+
+    for c in &xs {
+        // Y reads its edge into X without X's key (Y's scope, or the public
+        // one): Lost, erased, with the receipt.
+        for reader in [Scope::keyed(&y), Scope::public()] {
+            assert_eq!(
+                prismqueer::brain::recall(&backend, &reader, c.address()),
+                Err(Recall::Lost {
+                    address: c.address().clone(),
+                    reason: Loss::Erased(receipt.clone())
+                })
+            );
+        }
+        assert_eq!(backend.fetch(c.address()), Ok(None), "the bytes are gone");
+        assert_eq!(backend.erased(c.address()), Ok(Some(receipt.clone())));
+        // A purge is final: persisting the same crystal again stores nothing.
+        backend.persist(c).unwrap();
+        assert_eq!(backend.fetch(c.address()), Ok(None), "not stored again");
+    }
+    for c in &ys {
+        assert_eq!(prismqueer::brain::recall(&backend, &Scope::keyed(&y), c.address()).as_ref(), Ok(c));
+        assert_eq!(backend.erased(c.address()), Ok(None));
+    }
+    for c in &public {
+        assert_eq!(prismqueer::brain::recall(&backend, &Scope::public(), c.address()).as_ref(), Ok(c));
+    }
+}
+
+#[test]
+fn after_purge_recall_is_lost_erased_on_memory() {
+    purge_law(Memory::default());
+}
+
+#[test]
+fn after_purge_recall_is_lost_erased_on_the_ledger() {
+    purge_law(Ledger::default());
+}
+
+#[test]
+fn after_purge_recall_is_lost_erased_through_a_wrapping_backend() {
+    purge_law(Counted::default());
+}
+
+#[test]
+fn erased_and_missing_never_compare_equal_and_only_erased_carries_a_receipt() {
+    let x = throwaway(0x61);
+    let xs = crystals_of(&x, "node", 1);
+    let mut backend = Memory::default();
+    backend.persist(&xs[0]).unwrap();
+    let erasure = Erasure::mint(x, Epoch(1), &xs).unwrap();
+    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+
+    let never = Oid::hash(&Scope::public(), b"node never");
+    let Err(Recall::Lost { reason: erased, .. }) =
+        prismqueer::brain::recall(&backend, &Scope::public(), xs[0].address())
+    else {
+        panic!("an erased address is lost");
+    };
+    let Err(Recall::Lost { reason: missing, .. }) =
+        prismqueer::brain::recall(&backend, &Scope::public(), &never)
+    else {
+        panic!("a never-settled address is lost");
+    };
+    assert_eq!(erased, Loss::Erased(erasure.receipt().clone()));
+    assert_eq!(missing, Loss::Missing);
+    assert_ne!(erased, missing);
+    assert_eq!(erased.receipt(), Some(erasure.receipt()));
+    assert_eq!(missing.receipt(), None);
+    // The same address lost both ways still reads two different answers.
+    assert_ne!(
+        Recall::<Infallible>::Lost { address: never.clone(), reason: erased.clone() },
+        Recall::<Infallible>::Lost { address: never, reason: missing }
+    );
+}
+
+/// A faulty backend that keeps the bytes it was told to purge: the read
+/// fails closed, because a purge is final.
+#[derive(Default)]
+struct Hoarding {
+    inner: Memory,
+    tombstones: BTreeMap<Oid, Receipt>,
+}
+
+impl Backend for Hoarding {
+    type Error = Infallible;
+    fn persist(&mut self, crystal: &Crystal) -> Result<(), Infallible> {
+        self.inner.persist(crystal)
+    }
+    fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
+        self.inner.fetch(address)
+    }
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.tombstones
+            .insert(order.address().clone(), order.receipt().clone());
+        Ok(())
+    }
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
+        Ok(self.tombstones.get(address).cloned())
+    }
+}
+
+#[test]
+fn a_backend_that_keeps_purged_bytes_still_reads_erased() {
+    let x = throwaway(0x71);
+    let xs = crystals_of(&x, "node", 1);
+    let mut backend = Hoarding::default();
+    backend.persist(&xs[0]).unwrap();
+    let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
+    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+    assert!(backend.fetch(xs[0].address()).unwrap().is_some(), "it hoarded");
+    assert_eq!(
+        prismqueer::brain::recall(&backend, &Scope::public(), xs[0].address()),
+        Err(Recall::Lost {
+            address: xs[0].address().clone(),
+            reason: Loss::Erased(erasure.receipt().clone())
+        })
+    );
+}
+
+#[test]
+fn a_refusing_backend_refuses_the_purge_and_the_tombstone_read() {
+    let x = throwaway(0x72);
+    let xs = crystals_of(&x, "node", 1);
+    let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
+    assert_eq!(prismqueer::brain::purge(&mut Refusing, &erasure), Err(Refused));
+    assert_eq!(
+        prismqueer::brain::recall(&Refusing, &Scope::public(), xs[0].address()),
+        Err(Recall::Backend(Refused))
+    );
 }
