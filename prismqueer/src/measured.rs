@@ -314,6 +314,21 @@ pub fn measure(
     counts: &[Vec<Z>],
     method: Method,
 ) -> Result<Measured, Refused> {
+    measure_under(window.oid(), frame, counts, method)
+}
+
+/// [`measure`], with the window named by its address alone: what a caller
+/// that holds the address but not the ruler (prism-mcp's `measure` tool)
+/// can give. The window is a claim the caller vouches for, as a signer's
+/// identity is; nothing here reads more of the ruler than its address, and
+/// [`Measured::seal`] still takes the ruler itself and refuses another
+/// ([`Refused::OtherWindow`]).
+pub fn measure_under(
+    window: Oid,
+    frame: &Frame,
+    counts: &[Vec<Z>],
+    method: Method,
+) -> Result<Measured, Refused> {
     let d = frame.dim();
     shaped(d, counts)?;
     let parts = decompose(d, &method.support)?;
@@ -333,7 +348,7 @@ pub fn measure(
     }
     Ok(Measured {
         frame: frame.clone(),
-        window: window.oid(),
+        window,
         samples_oid: samples_oid(d, counts),
         method,
         samples: n,

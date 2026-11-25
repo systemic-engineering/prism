@@ -18,7 +18,8 @@ use prismqueer::algedonic::{Clock, Draft, Question, Region, Ruler, Wald};
 use prismqueer::flux::pillar::{forall, Arbitrary, Sample};
 use prismqueer::hypothesis::Frame;
 use prismqueer::measured::{
-    covariance, decompose, measure, Estimator, Measured, Method, Refused, Shape, Support,
+    covariance, decompose, measure, measure_under, Estimator, Measured, Method, Refused, Shape,
+    Support,
 };
 use prismqueer::metrix::{MetrixDraft, MetrixError};
 use prismqueer::oid::Oid;
@@ -735,4 +736,19 @@ fn the_measured_module_has_no_float() {
         "a float on the exact path:\n{}",
         hits.join("\n")
     );
+}
+
+/// `measure_under` is `measure` with the window named by its address: the
+/// same `Measured`, and the seal still takes the ruler.
+#[test]
+fn measuring_under_an_address_is_measuring_under_its_ruler() {
+    let f = frame(2);
+    let by_ruler = measured(&f, &TWO, full(2));
+    let by_address = measure_under(window().oid(), &f, &counts(&TWO), full(2)).expect("measurable");
+    assert_eq!(by_address, by_ruler);
+    let other = window_by(1, "window-keeper");
+    assert!(matches!(
+        by_address.seal(&other),
+        Err(Refused::OtherWindow { .. })
+    ));
 }

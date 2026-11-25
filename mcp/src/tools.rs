@@ -1,4 +1,5 @@
-//! The tools (docs/spec/mcp.md §5): `echo` and `chorus`, read-only.
+//! The tools (docs/spec/mcp.md §5): `echo` and `chorus`, read-only; `check`
+//! and `measure` are in [`crate::exact`].
 //!
 //! Arguments are checked against the tool's schema first: a missing,
 //! unknown or mistyped argument is a protocol error (`-32602`). What the
@@ -21,7 +22,7 @@ use echo::witness;
 use crate::json::Value;
 use crate::server::{object, text, Error, INVALID_PARAMS};
 
-type Args = BTreeMap<String, Value>;
+pub(crate) type Args = BTreeMap<String, Value>;
 
 /// The echo tool's description (§5.1; Seam, prism-025 §2), from echo's own
 /// constants: R1 is the surface, R2 onwards one stratum each.
@@ -47,11 +48,11 @@ fn typed(kind: &str, description: &str) -> Value {
     object([("description", text(description)), ("type", text(kind))])
 }
 
-fn names<const N: usize>(names: [&str; N]) -> Value {
+pub(crate) fn names<const N: usize>(names: [&str; N]) -> Value {
     Value::Array(names.iter().map(|n| text(n)).collect())
 }
 
-fn schema<const N: usize, const R: usize>(
+pub(crate) fn schema<const N: usize, const R: usize>(
     properties: [(&str, Value); N],
     required: [&str; R],
 ) -> Value {
@@ -147,7 +148,12 @@ fn chorus_tool() -> Value {
 pub fn list() -> Value {
     object([(
         "tools",
-        Value::Array(alloc::vec![echo_tool(), chorus_tool()]),
+        Value::Array(alloc::vec![
+            echo_tool(),
+            chorus_tool(),
+            crate::exact::check_tool(),
+            crate::exact::measure_tool(),
+        ]),
     )])
 }
 
@@ -165,13 +171,15 @@ pub fn call(params: &Args) -> Result<Value, Error> {
     match name.as_str() {
         "echo" => echo(args),
         "chorus" => chorus(args),
+        "check" => crate::exact::check(args),
+        "measure" => crate::exact::measure(args),
         _ => Err(Error::new(INVALID_PARAMS, &format!("Unknown tool: {name}"))
             .with(object([("tool", text(name))]))),
     }
 }
 
 /// A tool result: text contents and `isError`.
-fn result(texts: Vec<String>, is_error: bool) -> Value {
+pub(crate) fn result(texts: Vec<String>, is_error: bool) -> Value {
     let content = texts
         .into_iter()
         .map(|t| object([("text", Value::Str(t)), ("type", text("text"))]))
@@ -183,7 +191,7 @@ fn result(texts: Vec<String>, is_error: bool) -> Value {
 }
 
 /// The first argument not in `known`, under `prefix`.
-fn only(args: &Args, known: &[&str], prefix: &str) -> Result<(), Error> {
+pub(crate) fn only(args: &Args, known: &[&str], prefix: &str) -> Result<(), Error> {
     match args.keys().find(|k| !known.contains(&k.as_str())) {
         Some(k) => Err(Error::params(&format!("{prefix}{k}"), "none")),
         None => Ok(()),
