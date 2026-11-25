@@ -20,6 +20,7 @@ mod declaration_round_trip;
 mod dependency;
 mod determinism;
 mod discoball;
+mod exact;
 mod fate_composition;
 mod field;
 mod field_faces;

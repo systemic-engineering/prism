@@ -6,9 +6,10 @@
 //! along the other leaves `g·h⁻¹`, in the group's own terms. A loop is a
 //! hole; filled by a 2-cell (a bigon) it's curvature on that face.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use prismqueer::field::{check_flat, Edge, Field, FieldError, Flatness, Graph, Group, Perm, Ratio};
+#[cfg(feature = "lapack")]
 use prismqueer::spectral::graph_from_edges;
 
 /// A pure fifth and a grave fifth (40/27, just D–A) on the same pair.
@@ -162,6 +163,8 @@ fn a_bigon_off_the_graph_or_on_two_pairs_is_refused() {
     );
 }
 
+// `Field::transports` takes spectral's simple graph: under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn a_simple_graph_has_one_edge_per_pair() {
     let field = Field::transports(

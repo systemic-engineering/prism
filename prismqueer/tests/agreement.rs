@@ -17,7 +17,7 @@
 //! 5. **The ring decides**: the tritone pair (room_rings's fixture) needs a
 //!    ruling over ℤ and has consistent readings over ℤ/12.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use std::collections::BTreeMap;
 

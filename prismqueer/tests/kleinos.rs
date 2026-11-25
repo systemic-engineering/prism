@@ -16,7 +16,7 @@
 //! B→A read as I gives no comma; dropping the span gives zero loops; two
 //! spans whose 16-hex labels collide but whose full ids differ are two edges.
 
-#![cfg(all(feature = "lapack", feature = "bundle"))]
+#![cfg(all(feature = "exact", feature = "bundle"))]
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -398,6 +398,8 @@ fn a_commit_is_a_full_hash_and_a_span_is_two() {
 /// Between two parties joined by k spans, L = [[k, −k], [−k, k]] and
 /// λ₂ = 2k (Mara S7). It counts messages: what the readings say never moves
 /// it, and it stays beside the address. k spans add k − 1 loops.
+// λ₂ is measured by LAPACK: under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn lambda_2_between_two_parties_counts_messages() {
     let (a, b) = (frame("A"), frame("B"));

@@ -23,7 +23,9 @@
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{Signed, Zero};
-use prismqueer::poly::{Algebraic, Budget, Factored, Identified, NotSquareFree, QPoly, ZPoly};
+#[cfg(feature = "lapack")]
+use prismqueer::poly::Identified;
+use prismqueer::poly::{Algebraic, Budget, Factored, NotSquareFree, QPoly, ZPoly};
 
 /// A ℤ[x] polynomial, leading coefficient first.
 fn z(coefficients: &[i64]) -> ZPoly {
@@ -133,20 +135,25 @@ fn two_irreducible_quadratics_and_root_two_at_index_one() {
     // (x² − 2)(x² − 3) = x⁴ − 5x² + 6.
     let p = z(&[1, 0, -5, 0, 6]);
     assert_factors(&p, &[z(&[1, 0, -3]), z(&[1, 0, -2])]);
-    let f = match p.factor(PLENTY).expect("square-free") {
-        Factored::Certified(f) => f,
-        other => panic!("{other:?}"),
-    };
-    // √2 ≈ 1.41421356: the larger of x² − 2's roots ±√2, so index 1.
-    assert_eq!(
-        f.identify(std::f64::consts::SQRT_2, 1e-9),
-        Identified::Algebraic(Algebraic::new(z(&[1, 0, -2]), 1))
-    );
-    // −√3 is the smaller of x² − 3's: index 0.
-    assert_eq!(
-        f.identify(-(3f64.sqrt()), 1e-9),
-        Identified::Algebraic(Algebraic::new(z(&[1, 0, -3]), 0))
-    );
+    // A float read against the roots: `Factorization::identify` is under
+    // `lapack`.
+    #[cfg(feature = "lapack")]
+    {
+        let f = match p.factor(PLENTY).expect("square-free") {
+            Factored::Certified(f) => f,
+            other => panic!("{other:?}"),
+        };
+        // √2 ≈ 1.41421356: the larger of x² − 2's roots ±√2, so index 1.
+        assert_eq!(
+            f.identify(std::f64::consts::SQRT_2, 1e-9),
+            Identified::Algebraic(Algebraic::new(z(&[1, 0, -2]), 1))
+        );
+        // −√3 is the smaller of x² − 3's: index 0.
+        assert_eq!(
+            f.identify(-(3f64.sqrt()), 1e-9),
+            Identified::Algebraic(Algebraic::new(z(&[1, 0, -3]), 0))
+        );
+    }
 }
 
 #[test]
@@ -281,6 +288,8 @@ fn swinnerton_dyer_s3_needs_a_real_budget() {
 
 // --- Law 5: the algebraic tag ---------------------------------------------------
 
+// A float read against the roots: `Factorization::identify` is under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn an_exact_rational_root_is_its_own_linear_tag() {
     // x(x − 2): 2 is the root of x − 2, index 0.

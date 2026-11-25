@@ -8,7 +8,7 @@
 //! Every number below is worked by hand in exact rationals, in the doc
 //! comment of the test that checks it.
 
-#![cfg(all(feature = "lapack", feature = "bundle"))]
+#![cfg(all(feature = "exact", feature = "bundle"))]
 
 use std::cell::Cell;
 use std::path::Path;

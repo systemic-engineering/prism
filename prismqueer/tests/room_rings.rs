@@ -23,7 +23,7 @@
 //!    `RoomError::Modulus`; two ring kinds is a compile error (the module
 //!    doctests).
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use std::collections::BTreeMap;
 

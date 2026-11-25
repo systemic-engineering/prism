@@ -17,7 +17,7 @@
 //! which catch the shear the charpoly misses. Received darkness lives in
 //! the ball's outer channel, never in a facet's triple.
 
-#![cfg(all(feature = "lapack", feature = "bundle"))]
+#![cfg(all(feature = "exact", feature = "bundle"))]
 
 use std::collections::BTreeSet;
 

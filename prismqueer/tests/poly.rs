@@ -17,7 +17,9 @@
 
 use num_bigint::BigInt;
 use num_rational::BigRational;
-use prismqueer::poly::{Located, QPoly, ZPoly};
+#[cfg(feature = "lapack")]
+use prismqueer::poly::Located;
+use prismqueer::poly::{QPoly, ZPoly};
 
 /// A ℤ[x] polynomial, leading coefficient first.
 fn z(coefficients: &[i64]) -> ZPoly {
@@ -244,6 +246,8 @@ fn polynomials_without_real_roots_have_none() {
 
 // --- Law 4: matching a measurement, or refusing -------------------------------
 
+// A float read against the roots: `Roots::locate` is under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn a_measured_eigenvalue_is_matched_to_its_root() {
     let roots = z(&[1, -6, 9, 0]).real_roots();
@@ -254,6 +258,8 @@ fn a_measured_eigenvalue_is_matched_to_its_root() {
     assert_eq!(roots.locate(2.5, 0.5), Located::Root(1));
 }
 
+// A float read against the roots: `Roots::locate` is under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn an_ambiguous_match_refuses() {
     // The window [−0.5, 3.5] is wider than the separation 3: both roots are
@@ -265,6 +271,8 @@ fn an_ambiguous_match_refuses() {
     assert_eq!(close.locate(1.25, 0.3), Located::Ambiguous(1..4));
 }
 
+// A float read against the roots: `Roots::locate` is under `lapack`.
+#[cfg(feature = "lapack")]
 #[test]
 fn a_measurement_near_no_root_is_absent_and_a_non_finite_one_unmeasured() {
     let roots = z(&[1, -6, 9, 0]).real_roots();

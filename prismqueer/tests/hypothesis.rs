@@ -12,7 +12,7 @@
 //!
 //! Falsifiers F1–F6, the unit, refusals, and no metric anywhere on the path.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use std::collections::BTreeSet;
 

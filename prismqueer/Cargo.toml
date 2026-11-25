@@ -17,7 +17,13 @@ default = []
 optics = []
 bundle = ["optics"]
 lambda = []
-lapack = ["dep:cc"]
+# The certified path, exact over ℤ and ℚ: room's exact half, field, gl, poly,
+# agreement, metrix, measured, hypothesis, kleinos, discoball. No float, no
+# cc, no LAPACK/BLAS/Fortran, no native build step (docs/spec/features.md).
+exact = []
+# The measured readings on top of it: ffi (LAPACK through Fortran), room's
+# eigen readings, band, spectral and everything built on them.
+lapack = ["exact", "dep:cc"]
 pq = ["dep:serde", "dep:serde_json"]
 # Fate — the 5-model inference selector, sibling-of-mind of prismqueer.
 # Source-mirrored from `/Users/alexwolf/dev/projects/fate/` per Alex
@@ -36,7 +42,8 @@ sha2 = "0.10"
 hex = "0.4"
 # room::Z: arbitrary-precision integers, so exact topology never overflows.
 num-bigint = "0.4"
-# BigInt → f64 (room::Measure), the one explicit step to floats.
+# BigInt → f64 (room::Measure, under `lapack`), the one explicit step to
+# floats; ToPrimitive's integer conversions elsewhere.
 num-traits = "0.2"
 # poly: exact ℚ and ℚ[x] (reduced BigInt ratios), and gcds over ℤ.
 num-rational = "0.4"

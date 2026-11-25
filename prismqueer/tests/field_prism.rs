@@ -5,7 +5,7 @@
 //! truth. Nothing to implement: a prism is a field prism by what it settles
 //! into.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use prismqueer::field::{Discrete, Field, FieldPrism, Lattice, Least, Point, ScalarPrism};
 use prismqueer::{Beam, Optic, Prism};

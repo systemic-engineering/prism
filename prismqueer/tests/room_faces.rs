@@ -10,7 +10,7 @@
 //! 2. **C² sits over C¹.** Its `one_skeleton` is C¹'s address, its `skeleton`
 //!    C⁰'s; refilling the faces changes C² over a fixed C¹.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use num_bigint::{BigInt, Sign};
 use num_traits::{ToPrimitive, Zero};

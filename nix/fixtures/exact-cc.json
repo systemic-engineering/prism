@@ -1,0 +1,111 @@
+{
+  "packages": [
+    {
+      "id": "path+file:///w/prismqueer#0.1.1",
+      "name": "prismqueer"
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.7",
+      "name": "blake3"
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.0",
+      "name": "cc"
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#num-bigint@0.4.6",
+      "name": "num-bigint"
+    },
+    {
+      "id": "registry+https://github.com/rust-lang/crates.io-index#criterion@0.5.1",
+      "name": "criterion"
+    }
+  ],
+  "resolve": {
+    "nodes": [
+      {
+        "id": "path+file:///w/prismqueer#0.1.1",
+        "deps": [
+          {
+            "name": "blake3",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.7",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "num_bigint",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#num-bigint@0.4.6",
+            "dep_kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "criterion",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#criterion@0.5.1",
+            "dep_kinds": [
+              {
+                "kind": "dev",
+                "target": null
+              }
+            ]
+          },
+          {
+            "name": "cc",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.0",
+            "dep_kinds": [
+              {
+                "kind": "build",
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#num-bigint@0.4.6",
+        "deps": []
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.7",
+        "deps": [
+          {
+            "name": "cc",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.0",
+            "dep_kinds": [
+              {
+                "kind": "build",
+                "target": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.0",
+        "deps": []
+      },
+      {
+        "id": "registry+https://github.com/rust-lang/crates.io-index#criterion@0.5.1",
+        "deps": [
+          {
+            "name": "cc",
+            "pkg": "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.0",
+            "dep_kinds": [
+              {
+                "kind": "build",
+                "target": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

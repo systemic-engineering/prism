@@ -109,6 +109,7 @@
           ./nix/independent.sh
           ./nix/echo-independent.sh
           ./nix/prism-mcp-independent.sh
+          ./nix/prismqueer-exact.sh
           ./nix/fixtures
         ]
       );
@@ -422,6 +423,43 @@
                 for f in serde-json root-dev json mirror prismqueer links; do
                   if bash $guard $fixtures/mcp-$f.json 2>/dev/null; then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
                 done
+              '';
+              installPhaseCommand = "touch $out";
+            };
+
+            # docs/spec/features.md: prismqueer's certified path builds and
+            # passes its tests with `--no-default-features --features exact`
+            # and without the native environment (no gfortran, LAPACK or BLAS
+            # here: a Fortran step would fail the build). Its library closure
+            # (normal and build edges) holds no cc but blake3's own, nothing
+            # LAPACK, BLAS or Fortran, by name or `links`. The guard runs on
+            # the real graph under `exact`, refuses it under `lapack` (cc),
+            # accepts the clean fixture (blake3's cc, dev-only cc and
+            # openblas-src) and refuses four: prismqueer's own cc, cc through
+            # another crate, `links = "lapack"`, a Fortran runtime by name.
+            prismqueer-exact = craneLib.mkCargoDerivation {
+              pname = "prismqueer-exact";
+              inherit version;
+              src = testSrc;
+              strictDeps = true;
+              cargoArtifacts = null;
+              cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = ./Cargo.lock; };
+              nativeBuildInputs = [ pkgs.jq ];
+              doInstallCargoArtifacts = false;
+              buildPhaseCargoCommand = ''
+                guard=${guardSrc}/nix/prismqueer-exact.sh
+                fixtures=${guardSrc}/nix/fixtures
+                exact="--no-default-features --features prismqueer/exact"
+                cargo metadata --format-version 1 --locked --offline $exact > exact.json
+                bash $guard exact.json
+                cargo metadata --format-version 1 --locked --offline --no-default-features --features prismqueer/lapack > lapack.json
+                if bash $guard lapack.json 2>/dev/null; then echo "prismqueer-exact accepted lapack" >&2; exit 1; fi
+                bash $guard $fixtures/exact-clean.json
+                for f in cc transitive links fortran; do
+                  if bash $guard $fixtures/exact-$f.json 2>/dev/null; then echo "prismqueer-exact accepted exact-$f" >&2; exit 1; fi
+                done
+                cargo build --locked --offline -p prismqueer $exact
+                cargo test --locked --offline -p prismqueer $exact
               '';
               installPhaseCommand = "touch $out";
             };

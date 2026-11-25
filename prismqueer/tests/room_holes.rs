@@ -25,7 +25,7 @@
 //! 4. **The comma.** On a curved c, two cycles around one hole read
 //!    differently, by exactly ⟨w, δ₁c⟩ for the w between them.
 
-#![cfg(feature = "lapack")]
+#![cfg(feature = "exact")]
 
 use num_bigint::BigInt;
 use num_traits::Zero;
