@@ -274,8 +274,15 @@
           # prism is a library: its consumers link it through cargo. The
           # package is the release build of one crate, with its target dir
           # installed, so the build is cached and the boundary is testable.
-          crate =
-            name: dir: localDeps: extraArgs:
+          crate = crateWith { };
+
+          # echo and prism-mcp are executables: their package is the binary
+          # alone (bin/), no target dir, so its store path names the
+          # executable (a port executable by hash, prism-028 §3 (b)).
+          binary = crateWith { doInstallCargoArtifacts = false; };
+
+          crateWith =
+            extra: name: dir: localDeps: extraArgs:
             craneLib.buildPackage (
               release
               // {
@@ -292,6 +299,7 @@
                 doInstallCargoArtifacts = true;
                 passthru.fileset = packageFileset;
               }
+              // extra
             );
 
           packages = {
@@ -301,6 +309,14 @@
               ./projections
             ] "--features ${features}";
             terni = crate "terni" ./imperfect [ ] "";
+            # `prism echo`: the binary is `prism` (echo/Cargo.toml [[bin]]).
+            echo = binary "echo" ./echo [ ] "";
+            prism-mcp = binary "prism-mcp" ./mcp [
+              ./echo
+              ./chorus
+              ./laws
+              ./imperfect
+            ] "";
           };
 
           # A package's store path, or "" when the flake doesn't build it
