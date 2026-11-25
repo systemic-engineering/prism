@@ -17,19 +17,21 @@
 //! - a tally's witnesses with either cosignature valid are `valid` (both)
 //!   plus `partial` (exactly one).
 
-use chorus::checkpoint::{verify, LogKeys};
+use chorus::checkpoint::{verify, CheckpointError, LogKeys};
 use chorus::quorum::Tally;
 
 /// The OR rule on a checkpoint: accepted iff Ed25519 **or** ML-DSA-44
 /// verifies.
 pub fn or_checkpoint(note: &str, keys: &LogKeys) -> bool {
-    // Not yet a mutant: the real rule's verdict.
-    verify(note, keys).is_ok()
+    match verify(note, keys) {
+        Ok(_) => true,
+        Err(CheckpointError::Unsigned { ed25519, mldsa44 }) => ed25519 || mldsa44,
+        Err(_) => false,
+    }
 }
 
 /// The OR rule on witnesses: a witness counts toward Q if **either** of its
 /// cosignatures verifies.
 pub fn or_quorum(t: &Tally) -> bool {
-    // Not yet a mutant: the real rule's verdict.
-    t.accepted()
+    t.valid + t.partial >= t.required
 }
