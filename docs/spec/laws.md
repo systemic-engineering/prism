@@ -82,7 +82,7 @@ The dependencies are blake3 (`=1.8.7`), num-bigint, num-rational, num-integer, n
 
 ## Coverage
 
-`laws/src` is measured on its own, as a number beside the workspace's. The lab's uncovered lines no longer hide the floor's. 100% on the floor, with explicit skips, is the next step.
+`laws/src` is measured on its own, as a number beside the workspace's. The lab's uncovered lines no longer hide the floor's. The floor is held at 100% of its lines, every gap an explicit, reasoned skip (docs/spec/coverage.md): `checks.laws-coverage` reads `checks.coverage`'s lcov through `nix/coverage-skips.sh`, with the skipped lines ratcheted by `nix/laws-skips-max`.
 
 ## Relation to `prism.spec` and mirror
 
