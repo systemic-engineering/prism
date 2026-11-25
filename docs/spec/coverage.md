@@ -68,12 +68,14 @@ A line counts as instrumented when the lcov has a `DA:` record for it; a skipped
 
 At `f98de6d` the floor stood at 98.95% (5725/5786; 61 lines uncovered). The 61, and what answered each:
 
-- **Accessors, tested:** `algedonic::Enclosure::hi`, `Evidence::site`, `Evidence::oids`; `hypothesis::LoopId::oid`, `Located::frames`; `measured::Measured::frame`, `Measured::method`; `metrix::Form::dim`, `RelativeSpectrum::unresolved`; `room::Q`'s `Coefficient::ring` and `Coefficient::times`.
+- **Accessors, tested:** `algedonic::Enclosure::hi`, `Evidence::site`, `Evidence::oids`; `hypothesis::LoopId::oid`, `Curvature::frames`; `measured::Measured::frame`, `Measured::method`; `metrix::Form::dim`, `RelativeSpectrum::unresolved`; `room::Q`'s `Coefficient::ring` and `Coefficient::times`.
 - **`Debug` and `Display`, pinned:** `crystal::Crystal`'s `Debug`, `kleinos::Label`'s `Display`.
 - **Branches and error paths, tested by constructing the input:** `ZPoly::square_free` and `QPoly::monic` of 0; the real roots of 0 (an empty Sturm sequence); `ZPoly::div_exact` of 0, and with a leading coefficient that doesn't divide; 𝔽ₚ's `gcd(0, 0) = 0` (the monic of nothing); Berlekamp on a linear polynomial; `Factorization::identify` on a constant's factorization (no factors: `Absent`), with a negative radius (`Unmeasured`), and with two roots of one factor in the window (`Ambiguous`); `room::quietest` of the empty graph (its minimal polynomial is 1: no kernel to divide out, `Silent`); `Form::congruent` by a P larger than the form (`WrongSize`); `relative_spectrum` with no budget (`Uncertified`, the rest `unresolved`); `Ruler::read` of an empty neighbourhood under `Max` (the unit, 0).
 - **States made unrepresentable:**
   - `gl`'s echelon form asked a nonzero pivot for its inverse and carried an `if let` for a nonzero rational with none. The pivot search now finds the row whose entry *has* an inverse (`find_map` over `Q::recip`), which is exactly the nonzero test, so there is no second branch.
   - `metrix::relative_spectrum` factored the square-free part of its charpoly and kept an `Err` arm for `NotSquareFree`. The charpoly is monic, so nonzero, and the square-free part of a nonzero polynomial is square-free: the arm is the invariant `room::quietest` already states for the same call, `expect`ed with that reason.
+
+After: 5815/5815 lines of `laws/src` (100%, 0 skipped; ratchet 0). The mutations, each caught: a marker with an empty reason ("a coverage marker without a reason"), a region over the `Debug` of `Crystal` while its test runs ("skip covers executed code"), that test deleted ("3 neither executed nor skipped", `crystal.rs:48-50`), and then those three lines honestly skipped under a ratchet of 0 ("3 skipped lines exceed the ratchet of 0").
 
 ## Why not `#[coverage(off)]`
 
