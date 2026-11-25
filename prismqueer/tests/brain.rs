@@ -26,9 +26,10 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Erasure, Fact, Interner, Memory, Recall, Relation, Roots,
+    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Interner, Memory, Recall, Relation, Roots,
     Stats, Sym, Tick,
 };
+use prismqueer::crossing::Grade;
 use prismqueer::oid::{Oid, Scope, ScopeKey};
 
 // ---------------------------------------------------------------------------
@@ -1123,7 +1124,7 @@ fn an_erasure_names_its_scope_by_public_id_and_covers_its_census() {
     let key = throwaway(0x11);
     let id = key.id();
     let census = crystals_of(&key, "node", 3);
-    let erasure = Erasure::mint(key, &census).expect("all in the scope");
+    let erasure = Erasure::mint(key, Epoch(3), &census).expect("all in the scope");
     assert_eq!(erasure.scope(), id);
     assert_ne!(erasure.scope(), Scope::public().id());
     assert_eq!(
@@ -1141,16 +1142,57 @@ fn an_erasure_never_covers_another_scopes_crystal_and_hands_the_key_back() {
     let public = Crystal::settle(&Scope::public(), b"node 1".to_vec());
 
     census.push(foreign.clone());
-    let stranger = Erasure::mint(key, &census).expect_err("another holder's crystal");
+    let stranger = Erasure::mint(key, Epoch(3), &census).expect_err("another holder's crystal");
     assert_eq!(stranger.address(), foreign.address());
     let key = stranger.into_key();
     assert_eq!(key.id(), throwaway(0x11).id(), "the same key, unconsumed");
 
     census.pop();
     census.push(public.clone());
-    let stranger = Erasure::mint(key, &census).expect_err("a public crystal");
+    let stranger = Erasure::mint(key, Epoch(3), &census).expect_err("a public crystal");
     assert_eq!(stranger.address(), public.address());
     let shown = format!("{stranger:?}");
     assert!(shown.contains("ScopeKey(held)"), "{shown}");
     assert!(!shown.contains("17, 17"), "{shown}");
+}
+
+#[test]
+fn the_receipt_preimage_is_exactly_scope_id_then_epoch() {
+    let key = throwaway(0x33);
+    let census = crystals_of(&key, "node", 1);
+    let erasure = Erasure::mint(key, Epoch(0x0102_0304_0506_0708), &census).unwrap();
+    let receipt = erasure.receipt();
+
+    // Computed here from the key's bytes and the epoch alone, never through
+    // the receipt: BLAKE3-derive-key(scope-id context, K) ‖ epoch (BE).
+    let mut expected = blake3::derive_key("systemic.engineering://scope-id/v1", &[0x33; 32]).to_vec();
+    expected.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(expected.len(), 40);
+    assert_eq!(receipt.preimage(), expected, "scope id ‖ epoch, nothing else");
+    assert_eq!(receipt.address(), &Oid::hash(&Scope::public(), &expected));
+    assert_eq!(receipt.scope(), erasure.scope());
+    assert_eq!(receipt.epoch(), Epoch(0x0102_0304_0506_0708));
+
+    // Another epoch, another receipt; the same scope and epoch, the same
+    // address whatever the census (it never enters the address).
+    let again = Erasure::mint(throwaway(0x33), Epoch(0x0102_0304_0506_0708), &[]).unwrap();
+    assert_eq!(again.receipt().address(), receipt.address());
+    let later = Erasure::mint(throwaway(0x33), Epoch(9), &[]).unwrap();
+    assert_ne!(later.receipt().address(), receipt.address());
+}
+
+#[test]
+fn the_receipt_is_sealed_by_the_scope_never_a_law_and_never_names_the_person() {
+    let key = throwaway(0x44);
+    let id = key.id();
+    let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
+    let receipt = erasure.receipt();
+    assert_eq!(receipt.grade(), Grade::Sealed);
+    assert_ne!(receipt.grade(), Grade::Law);
+    assert!(receipt.claim().proof().is_none(), "no proof: an attested act");
+    let seals: Vec<_> = receipt.claim().seals().iter().collect();
+    assert_eq!(seals.len(), 1);
+    assert_eq!(seals[0].by(), &id.oid(), "the signer is the scope, beside it");
+    assert_eq!(seals[0].over(), receipt.address());
+    assert_eq!(receipt.claim().value(), receipt.address());
 }

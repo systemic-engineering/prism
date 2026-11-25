@@ -257,7 +257,7 @@
 //! scope, a mint, and cooling, which needs no evidence.
 //!
 //! ```
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
@@ -265,7 +265,7 @@
 //! assert_eq!(brain.cool(reach.dangling()), 1);
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
 //! let census = [Crystal::settle(&Scope::keyed(&key), b"node e".to_vec())];
-//! let erasure = Erasure::mint(key, &census).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &census).unwrap();
 //! assert_eq!(erasure.covers().len(), 1);
 //! ```
 //!
@@ -273,63 +273,66 @@
 //! public scope is not a key:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(Scope::public(), &[]).unwrap();
+//! let erasure = Erasure::mint(Scope::public(), Epoch(1), &[]).unwrap();
 //! ```
 //!
 //! and has none:
 //!
 //! ```compile_fail,E0599
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(ScopeKey::public(), &[]).unwrap();
+//! let erasure = Erasure::mint(ScopeKey::public(), Epoch(1), &[]).unwrap();
 //! ```
 //!
-//! an Erasure can't be built by hand:
+//! an Erasure can't be built by hand, say to cover a public crystal:
 //!
 //! ```compile_fail,E0451
 //! use std::collections::BTreeSet;
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Scope, ScopeKey};
-//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let _ = brain.settle(b"node e".to_vec()).unwrap();
-//! let reach = brain.vacuum(&Roots::default().seal());
-//! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure { scope: Scope::public().id(), covers: BTreeSet::new() };
-//! ```
-//!
-//! a dangling verdict is not a key (it is never final):
-//!
-//! ```compile_fail,E0308
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
-//! use prismqueer::oid::{Scope, ScopeKey};
-//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
-//! let _ = brain.settle(b"node e".to_vec()).unwrap();
-//! let reach = brain.vacuum(&Roots::default().seal());
-//! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(reach.dangling().clone(), &[]).unwrap();
-//! ```
-//!
-//! and minting consumes the key: it can't be used after.
-//!
-//! ```compile_fail,E0382
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let erasure = Erasure::mint(key, &[]).unwrap();
+//! let real = Erasure::mint(key, Epoch(1), &[]).unwrap();
+//! let public = brain.settle(b"node e".to_vec()).unwrap();
+//! let erasure = Erasure { receipt: real.receipt().clone(), covers: BTreeSet::from([public]) };
+//! ```
+//!
+//! a dangling verdict is not a key (it is never final):
+//!
+//! ```compile_fail,E0308
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let erasure = Erasure::mint(reach.dangling().clone(), Epoch(1), &[]).unwrap();
+//! ```
+//!
+//! and minting consumes the key: it can't be used after.
+//!
+//! ```compile_fail,E0382
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::oid::{Scope, ScopeKey};
+//! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
+//! let _ = brain.settle(b"node e".to_vec()).unwrap();
+//! let reach = brain.vacuum(&Roots::default().seal());
+//! assert_eq!(brain.cool(reach.dangling()), 1);
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
 //! let again = Scope::keyed(&key);
 //! ```
 
@@ -340,6 +343,7 @@ use std::ops::Bound;
 use std::sync::Arc;
 
 use crate::dependency::{DependencyGraph, Sign, Through};
+use prism_laws::crossing::{attest, Claim, Grade};
 use crate::oid::{Oid, Scope, ScopeId, ScopeKey};
 
 // ---------------------------------------------------------------------------
@@ -599,8 +603,83 @@ pub trait Backend {
 /// can never reach another scope's crystals.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Erasure {
-    scope: ScopeId,
+    receipt: Receipt,
     covers: BTreeSet<Oid>,
+}
+
+/// When an erasure was attested, in the holder's own count: an evaluator's
+/// round or a store's committed point. Not a clock; prism reads no time.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Epoch(pub u64);
+
+/// An erasure receipt (prism-026 item 7): the scope's public id and an
+/// epoch, **never the person**.
+///
+/// - **Its address** is `Oid::hash(Scope::public(), scope_id ‖ epoch)`: the
+///   32 bytes of the [`ScopeId`], then the epoch as a big-endian `u64`
+///   ([`Receipt::preimage`], 40 bytes). Nothing derived from the holder's
+///   identity beyond the scope id goes in. Public, so anyone holding the
+///   receipt recomputes it.
+/// - **Its grade is [`Grade::Sealed`]**, never Law: the receipt is a
+///   [`Claim`] with no proof and one seal. An erasure is the holder's
+///   attested act; consuming the key in this process can't prove that no
+///   copy exists elsewhere.
+/// - **The signer sits beside the address**, never in it (`ruler.md`), and
+///   its label is the scope id: the holder appears through its boundary,
+///   never its name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Receipt {
+    scope: ScopeId,
+    epoch: Epoch,
+    claim: Claim,
+}
+
+impl Receipt {
+    fn mint(scope: ScopeId, epoch: Epoch) -> Self {
+        let address = Oid::hash(&Scope::public(), &Self::preimage_of(scope, epoch));
+        let seal = attest(&address, scope.oid());
+        let claim = Claim::new(address, None, [seal]).expect("one seal: never anonymous");
+        Receipt {
+            scope,
+            epoch,
+            claim,
+        }
+    }
+
+    fn preimage_of(scope: ScopeId, epoch: Epoch) -> Vec<u8> {
+        let _ = epoch;
+        scope.as_bytes().to_vec()
+    }
+
+    /// The bytes its address is the hash of: scope id ‖ epoch (big-endian).
+    pub fn preimage(&self) -> Vec<u8> {
+        Self::preimage_of(self.scope, self.epoch)
+    }
+
+    /// Its address, in the public scope.
+    pub fn address(&self) -> &Oid {
+        self.claim.value()
+    }
+
+    /// The erased scope's public id.
+    pub fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    /// When the erasure was attested.
+    pub fn epoch(&self) -> Epoch {
+        self.epoch
+    }
+
+    /// The claim: the address, no proof, the holder's seal beside it.
+    pub fn claim(&self) -> &Claim {
+        &self.claim
+    }
+
+    /// Always [`Grade::Sealed`]: the holder's attested act, never a law.
+    pub fn grade(&self) -> Grade {
+        self.claim.grade()
+    }
 }
 
 impl Erasure {
@@ -608,7 +687,7 @@ impl Erasure {
     /// scope's crystals the holder shows it. A crystal that isn't in the
     /// key's scope is refused as a [`Stranger`], and the key comes back
     /// unconsumed.
-    pub fn mint(key: ScopeKey, census: &[Crystal]) -> Result<Erasure, Stranger> {
+    pub fn mint(key: ScopeKey, epoch: Epoch, census: &[Crystal]) -> Result<Erasure, Stranger> {
         let held = Scope::keyed(&key);
         let stranger = census
             .iter()
@@ -621,12 +700,20 @@ impl Erasure {
         let scope = key.id();
         // The key is consumed here: dropped, so its bytes are zeroed.
         drop(key);
-        Ok(Erasure { scope, covers })
+        Ok(Erasure {
+            receipt: Receipt::mint(scope, epoch),
+            covers,
+        })
     }
 
     /// The erased scope's public id.
     pub fn scope(&self) -> ScopeId {
-        self.scope
+        self.receipt.scope
+    }
+
+    /// The receipt: scope id and epoch, never the person.
+    pub fn receipt(&self) -> &Receipt {
+        &self.receipt
     }
 
     /// The addresses it covers.
