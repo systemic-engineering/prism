@@ -647,8 +647,10 @@ impl Receipt {
     }
 
     fn preimage_of(scope: ScopeId, epoch: Epoch) -> Vec<u8> {
-        let _ = epoch;
-        scope.as_bytes().to_vec()
+        let mut preimage = Vec::with_capacity(40);
+        preimage.extend_from_slice(scope.as_bytes());
+        preimage.extend_from_slice(&epoch.0.to_be_bytes());
+        preimage
     }
 
     /// The bytes its address is the hash of: scope id ‖ epoch (big-endian).
