@@ -19,6 +19,12 @@ static PUBLIC_KEY: LazyLock<[u8; 32]> = LazyLock::new(|| blake3::derive_key(PUBL
 /// (a keyed hash) can ever equal a scope id.
 pub const SCOPE_ID_CONTEXT: &str = "systemic.engineering://scope-id/v1";
 
+/// The context of a slot's address: `Oid::slot(scope, label) =
+/// BLAKE3-derive-key(SLOT_CONTEXT, K_scope ‖ label)`. A derive-key context of
+/// its own, so a slot is never a content address (a keyed hash) or a scope
+/// id (brain.md, "Slots").
+pub const SLOT_CONTEXT: &str = "systemic.engineering://slot/v1";
+
 /// A held scope's key: the holder's capability (prism-026 item 1).
 ///
 /// prism holds no keys. The caller passes one in for the duration of a call;
@@ -229,6 +235,16 @@ impl Oid {
     /// 64 lowercase hex characters. Every caller names its scope.
     pub fn hash(scope: &Scope<'_>, bytes: &[u8]) -> Self {
         Oid(blake3::keyed_hash(scope.key, bytes).to_hex().to_string())
+    }
+
+    /// The address of the slot `label` in `scope`: a named place for state
+    /// that changes (a list that grows, a root that advances), which only
+    /// the scope's key holder can compute. `BLAKE3-derive-key(SLOT_CONTEXT,
+    /// K_scope ‖ label)`, 64 lowercase hex: one-way like a [`ScopeId`], and
+    /// in neither the content domain nor the scope-id domain, so no crystal's
+    /// bytes can land on a slot.
+    pub fn slot(scope: &Scope<'_>, label: &[u8]) -> Self {
+        Oid::hash(scope, label)
     }
 
     /// The dark OID. The address of absence. Constant, and not the address
@@ -512,6 +528,32 @@ mod tests {
         // Domain-separated from content: no keyed hash names it.
         assert_ne!(id.oid(), Oid::hash(&Scope::keyed(&key), b"scope"));
         assert_ne!(id.oid(), Oid::hash(&Scope::keyed(&key), id.as_bytes()));
+    }
+
+    #[test]
+    fn a_slot_is_derived_one_way_in_its_own_domain() {
+        let key = throwaway(9);
+        let scope = Scope::keyed(&key);
+        let slot = Oid::slot(&scope, b"manifest");
+        // Byte for byte: derive-key over the key, then the label.
+        let mut material = [9u8; 32].to_vec();
+        material.extend_from_slice(b"manifest");
+        assert_eq!(
+            slot.as_str(),
+            blake3::Hash::from(blake3::derive_key(SLOT_CONTEXT, &material))
+                .to_hex()
+                .as_str()
+        );
+        assert_eq!(slot.as_str().len(), 64);
+        assert_eq!(slot, Oid::slot(&scope, b"manifest"), "deterministic");
+        // Never a content address, never the scope id.
+        assert_ne!(slot, Oid::hash(&scope, b"manifest"));
+        assert_ne!(slot, key.id().oid());
+        // Another label, another slot; another scope, another slot.
+        assert_ne!(slot, Oid::slot(&scope, b"light"));
+        let other = throwaway(10);
+        assert_ne!(slot, Oid::slot(&Scope::keyed(&other), b"manifest"));
+        assert_ne!(slot, Oid::slot(&Scope::public(), b"manifest"));
     }
 
     #[test]

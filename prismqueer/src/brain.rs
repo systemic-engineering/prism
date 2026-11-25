@@ -111,8 +111,9 @@
 //! changes no answer, no crystal and no lum (invariant 1).
 //!
 //! Keyed scopes and their erasure are below ([`Erasure`]; prism-026,
-//! `docs/spec/brain.md`). Not here yet: a keyed [`Brain`], and windowed
-//! input.
+//! `docs/spec/brain.md`), and a keyed scope's own state (its index, light
+//! and root) is [`Held`], in the scope's slots. Not here yet: a keyed hot
+//! tier ([`Brain`] is public only), and windowed input.
 //!
 //! # One port
 //!
@@ -257,55 +258,56 @@
 //! scope, a mint, and cooling, which needs no evidence.
 //!
 //! ```
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let census = [Crystal::settle(&Scope::keyed(&key), b"node e".to_vec())];
-//! let erasure = Erasure::mint(key, Epoch(1), &census).unwrap();
-//! assert_eq!(erasure.covers().len(), 1);
+//! let mut store = Memory::default();
+//! let held = Held::open(&mut store, &key).settle_with(b"node e".to_vec(), []).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &store).unwrap();
+//! assert!(erasure.covers().contains(&held));
 //! ```
 //!
 //! Each of the following changes its last lines, and doesn't compile. The
 //! public scope is not a key:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(Scope::public(), Epoch(1), &[]).unwrap();
+//! let erasure = Erasure::mint(Scope::public(), Epoch(1), &Memory::default()).unwrap();
 //! ```
 //!
 //! and has none:
 //!
 //! ```compile_fail,E0599
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(ScopeKey::public(), Epoch(1), &[]).unwrap();
+//! let erasure = Erasure::mint(ScopeKey::public(), Epoch(1), &Memory::default()).unwrap();
 //! ```
 //!
 //! an Erasure can't be built by hand, say to cover a public crystal:
 //!
 //! ```compile_fail,E0451
 //! use std::collections::BTreeSet;
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let real = Erasure::mint(key, Epoch(1), &[]).unwrap();
+//! let real = Erasure::mint(key, Epoch(1), &Memory::default()).unwrap();
 //! let public = brain.settle(b"node e".to_vec()).unwrap();
 //! let erasure = Erasure { receipt: real.receipt().clone(), covers: BTreeSet::from([public]) };
 //! ```
@@ -313,26 +315,26 @@
 //! a dangling verdict is not a key (it is never final):
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
-//! let erasure = Erasure::mint(reach.dangling().clone(), Epoch(1), &[]).unwrap();
+//! let erasure = Erasure::mint(reach.dangling().clone(), Epoch(1), &Memory::default()).unwrap();
 //! ```
 //!
 //! and minting consumes the key: it can't be used after.
 //!
 //! ```compile_fail,E0382
-//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Memory, Roots};
+//! use prismqueer::brain::{Brain, Capacity, Crystal, Epoch, Erasure, Held, Memory, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let _ = brain.settle(b"node e".to_vec()).unwrap();
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! assert_eq!(brain.cool(reach.dangling()), 1);
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &Memory::default()).unwrap();
 //! let again = Scope::keyed(&key);
 //! ```
 //!
@@ -342,15 +344,16 @@
 //! says why the bytes are gone.
 //!
 //! ```
-//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Held, Loss, Memory, Recall, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let reach = brain.vacuum(&Roots::default().seal());
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let crystal = Crystal::settle(&Scope::keyed(&key), b"node e".to_vec());
 //! let mut backend = Memory::default();
-//! backend.persist(&crystal).unwrap();
-//! let erasure = Erasure::mint(key, Epoch(1), &[crystal.clone()]).unwrap();
+//! let address = Held::open(&mut backend, &key).settle_with(b"node e".to_vec(), []).unwrap();
+//! let crystal = Crystal::settle(&Scope::keyed(&key), b"node e".to_vec());
+//! assert_eq!(&address, crystal.address());
+//! let erasure = Erasure::mint(key, Epoch(1), &backend).unwrap();
 //! purge(&mut backend, &erasure).unwrap();
 //! let loss: Loss = Loss::Erased(erasure.receipt().clone());
 //! assert_eq!(
@@ -362,7 +365,7 @@
 //! A dangling verdict is not erasure evidence:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Held, Loss, Memory, Recall, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let reach = brain.vacuum(&Roots::default().seal());
@@ -376,7 +379,7 @@
 //! a dangling verdict is not a loss:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Held, Loss, Memory, Recall, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let reach = brain.vacuum(&Roots::default().seal());
@@ -386,7 +389,7 @@
 //! nor is a dark set:
 //!
 //! ```compile_fail,E0308
-//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Loss, Memory, Recall, Roots};
+//! use prismqueer::brain::{purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Held, Loss, Memory, Recall, Roots};
 //! use prismqueer::oid::{Scope, ScopeKey};
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let reach = brain.vacuum(&Roots::default().seal());
@@ -401,9 +404,52 @@
 //! let mut brain = Brain::new(Capacity::unbounded(), Memory::default());
 //! let public = brain.settle(b"node e".to_vec()).unwrap();
 //! let key = ScopeKey::take(&mut [7; 32]).unwrap();
-//! let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
+//! let erasure = Erasure::mint(key, Epoch(1), &Memory::default()).unwrap();
 //! let mut backend = Memory::default();
 //! backend.purge(&Purge { address: &public, receipt: erasure.receipt() }).unwrap();
+//! ```
+//!
+//! # A keyed scope's state is under its key, for the duration of a borrow
+//!
+//! The control compiles: a [`Held`] scope settles, and its key is moved
+//! once the scope is done with it.
+//!
+//! ```
+//! use prismqueer::brain::{Backend, Held, Memory, Slot};
+//! use prismqueer::oid::ScopeKey;
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let mut backend = Memory::default();
+//! let mut held = Held::open(&mut backend, &key);
+//! let _ = held.settle_with(b"node e".to_vec(), []).unwrap();
+//! let manifest = held.slots().manifest().clone();
+//! let moved = key;
+//! ```
+//!
+//! A held scope can't outlive its key:
+//!
+//! ```compile_fail,E0505
+//! use prismqueer::brain::{Backend, Held, Memory, Slot};
+//! use prismqueer::oid::ScopeKey;
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let mut backend = Memory::default();
+//! let mut held = Held::open(&mut backend, &key);
+//! let _ = held.settle_with(b"node e".to_vec(), []).unwrap();
+//! let moved = key;
+//! let manifest = held.slots().manifest().clone();
+//! ```
+//!
+//! and a slot write can't be built by hand, to write outside the scope:
+//!
+//! ```compile_fail,E0451
+//! use prismqueer::brain::{Backend, Held, Memory, Slot};
+//! use prismqueer::oid::ScopeKey;
+//! let key = ScopeKey::take(&mut [7; 32]).unwrap();
+//! let mut backend = Memory::default();
+//! let mut held = Held::open(&mut backend, &key);
+//! let _ = held.settle_with(b"node e".to_vec(), []).unwrap();
+//! let manifest = held.slots().manifest().clone();
+//! let moved = key;
+//! backend.write(&Slot { address: &manifest, bytes: b"" }).unwrap();
 //! ```
 
 use std::cell::Cell;
@@ -669,6 +715,36 @@ pub trait Backend {
 
     /// The receipt of the erasure that purged `address`, if one did.
     fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Self::Error>;
+
+    /// Replace the bytes under a slot address ([`Slot::address`]) with
+    /// [`Slot::bytes`]: a keyed scope's mutable state (its manifest, its
+    /// reference lists, its light, its root). They read back through
+    /// [`Backend::fetch`]. Only [`Held`] issues a slot write, and only under
+    /// its own scope's key.
+    ///
+    /// Required, never defaulted: a default would drop the scope's state.
+    /// A write to a tombstoned slot stores nothing (a purge is final).
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Self::Error>;
+}
+
+/// One slot write: a slot's address and its new bytes. No public
+/// constructor: only [`Held`] builds one, under its scope's key.
+#[derive(Debug)]
+pub struct Slot<'s> {
+    address: &'s Oid,
+    bytes: &'s [u8],
+}
+
+impl Slot<'_> {
+    /// The slot's address ([`Oid::slot`]).
+    pub fn address(&self) -> &Oid {
+        self.address
+    }
+
+    /// The bytes it now holds.
+    pub fn bytes(&self) -> &[u8] {
+        self.bytes
+    }
 }
 
 /// One purge order: an address an [`Erasure`] covers, and its receipt. No
@@ -718,9 +794,11 @@ pub fn purge<B: Backend + ?Sized>(backend: &mut B, erasure: &Erasure) -> Result<
 /// `ScopeKey`, so it has no Erasure: it cools and never purges. A dangling
 /// verdict is never this evidence; it is never final.
 ///
-/// It covers exactly the crystals the holder showed it while the key was
-/// live (the census), each checked to be in the key's scope, so an Erasure
-/// can never reach another scope's crystals.
+/// It covers the scope's whole state as the backend holds it while the key
+/// is live (the census, read by the mint itself): every crystal in the
+/// scope's manifest, every root, and every slot, each crystal checked to be
+/// in the key's scope, so an Erasure can never reach another scope's
+/// crystals.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Erasure {
     receipt: Receipt,
@@ -810,20 +888,20 @@ impl Receipt {
 }
 
 impl Erasure {
-    /// Erase a held scope: consume its key, covering the `census`, the
-    /// scope's crystals the holder shows it. A crystal that isn't in the
-    /// key's scope is refused as a [`Stranger`], and the key comes back
-    /// unconsumed.
-    pub fn mint(key: ScopeKey, epoch: Epoch, census: &[Crystal]) -> Result<Erasure, Stranger> {
-        let held = Scope::keyed(&key);
-        let stranger = census
-            .iter()
-            .find(|c| &Oid::hash(&held, c.bytes()) != c.address())
-            .map(|c| c.address().clone());
-        if let Some(address) = stranger {
-            return Err(Stranger { key, address });
-        }
-        let covers = census.iter().map(|c| c.address().clone()).collect();
+    /// Erase a held scope: consume its key, covering the scope's state as
+    /// `backend` holds it now, read under the live key (the census; see
+    /// [`Held`]). Anything listed there that isn't in the key's scope is
+    /// refused as a [`Stranger`], and the key comes back unconsumed; so does
+    /// a backend failure.
+    pub fn mint<B: Backend + ?Sized>(
+        key: ScopeKey,
+        epoch: Epoch,
+        backend: &B,
+    ) -> Result<Erasure, Stranger<B::Error>> {
+        let covers = match census(backend, &Scope::keyed(&key)) {
+            Ok(covers) => covers,
+            Err(reason) => return Err(Stranger { key, reason }),
+        };
         let scope = key.id();
         // The key is consumed here: dropped, so its bytes are zeroed.
         drop(key);
@@ -849,18 +927,37 @@ impl Erasure {
     }
 }
 
-/// A crystal offered to [`Erasure::mint`] that isn't in the key's scope. The
-/// key comes back unconsumed.
-#[derive(Debug)]
-pub struct Stranger {
-    key: ScopeKey,
-    address: Oid,
+/// The scope's census, read under the live key: every slot, every crystal
+/// in the manifest, every chained root and the current root.
+fn census<B: Backend + ?Sized>(
+    backend: &B,
+    scope: &Scope<'_>,
+) -> Result<BTreeSet<Oid>, Strange<B::Error>> {
+    let _ = backend;
+    Ok(Slots::of(scope).all().into_iter().cloned().collect())
 }
 
-impl Stranger {
-    /// The crystal's address.
-    pub fn address(&self) -> &Oid {
-        &self.address
+/// A mint refused: something listed in the scope's state isn't the scope's
+/// under the live key, or the backend couldn't say. The key comes back
+/// unconsumed.
+#[derive(Debug)]
+pub struct Stranger<E = Infallible> {
+    key: ScopeKey,
+    reason: Strange<E>,
+}
+
+impl<E> Stranger<E> {
+    /// Why the mint was refused.
+    pub fn reason(&self) -> &Strange<E> {
+        &self.reason
+    }
+
+    /// The address refused, if an address was.
+    pub fn address(&self) -> Option<&Oid> {
+        match &self.reason {
+            Strange::Foreign(address) | Strange::Malformed(address) => Some(address),
+            Strange::Backend(_) => None,
+        }
     }
 
     /// The key, back to its holder.
@@ -869,10 +966,184 @@ impl Stranger {
     }
 }
 
+/// Why a mint was refused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Strange<E> {
+    /// A crystal listed in the scope whose bytes don't rehash under the live
+    /// key: another scope's.
+    Foreign(Oid),
+    /// A slot whose bytes aren't a well-formed list: not believed.
+    Malformed(Oid),
+    /// The backend failed.
+    Backend(E),
+}
+
+// ---------------------------------------------------------------------------
+// A keyed scope's own state, in its slots (prism-026 items 3, 4, 5)
+// ---------------------------------------------------------------------------
+
+/// A keyed scope's fixed slots ([`Oid::slot`] under its key). A crystal's
+/// reference list has its own slot, [`Held::references_slot`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Slots {
+    manifest: Oid,
+    light: Oid,
+    root: Oid,
+    chain: Oid,
+}
+
+impl Slots {
+    fn of(scope: &Scope<'_>) -> Self {
+        Slots {
+            manifest: Oid::slot(scope, b"manifest"),
+            light: Oid::slot(scope, b"light"),
+            root: Oid::slot(scope, b"root"),
+            chain: Oid::slot(scope, b"chain"),
+        }
+    }
+
+    /// The crystals settled in the scope, in settle order.
+    pub fn manifest(&self) -> &Oid {
+        &self.manifest
+    }
+
+    /// Each deposited fact's name and its deposit tick.
+    pub fn light(&self) -> &Oid {
+        &self.light
+    }
+
+    /// The current root's bytes.
+    pub fn root(&self) -> &Oid {
+        &self.root
+    }
+
+    /// Every root's address, in order, when chained.
+    pub fn chain(&self) -> &Oid {
+        &self.chain
+    }
+
+    fn all(&self) -> [&Oid; 4] {
+        [&self.manifest, &self.light, &self.root, &self.chain]
+    }
+}
+
+fn references_slot(scope: &Scope<'_>, crystal: &Oid) -> Oid {
+    let mut label = b"references\0".to_vec();
+    label.extend_from_slice(crystal.as_str().as_bytes());
+    Oid::slot(scope, &label)
+}
+
+/// A keyed scope's reference index (item 3): each crystal settled in the
+/// scope, with the references declared for it. A projection, rebuilt from
+/// the scope's persisted lists by [`Held::index`]; nothing caches it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Index {
+    scope: ScopeId,
+    entries: BTreeMap<Oid, BTreeSet<Oid>>,
+}
+
+impl Index {
+    /// The scope it was rebuilt in.
+    pub fn scope(&self) -> ScopeId {
+        self.scope
+    }
+
+    /// Every crystal settled in the scope, with its references.
+    pub fn entries(&self) -> &BTreeMap<Oid, BTreeSet<Oid>> {
+        &self.entries
+    }
+
+    /// The references declared for `crystal`, or `None` if it wasn't
+    /// settled in the scope.
+    pub fn references(&self, crystal: &Oid) -> Option<&BTreeSet<Oid>> {
+        self.entries.get(crystal)
+    }
+
+    /// How many crystals the scope holds.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether it holds none.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+/// A keyed scope, for the duration of a borrow: its crystals and its own
+/// state (index, light, root), read and written through a [`Backend`] in
+/// the scope's slots (`docs/spec/brain.md`, "A keyed scope's own state").
+///
+/// It keeps nothing beside the borrow: no cache, no index in memory, and no
+/// key. It holds a [`Scope`], which borrows the key, so it can't outlive
+/// it. Everything it writes is under the scope's key, so the scope's
+/// [`Erasure`] covers all of it.
+pub struct Held<'a, 'k, B: ?Sized> {
+    backend: &'a mut B,
+    scope: Scope<'k>,
+}
+
+impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
+    /// Open the scope `key` holds, over `backend`.
+    pub fn open(backend: &'a mut B, key: &'k ScopeKey) -> Self {
+        Held {
+            backend,
+            scope: Scope::keyed(key),
+        }
+    }
+
+    /// The scope.
+    pub fn scope(&self) -> &Scope<'k> {
+        &self.scope
+    }
+
+    /// The backend.
+    pub fn backend(&self) -> &B {
+        self.backend
+    }
+
+    /// The scope's fixed slots.
+    pub fn slots(&self) -> Slots {
+        Slots::of(&self.scope)
+    }
+
+    /// The slot holding `crystal`'s declared references.
+    pub fn references_slot(&self, crystal: &Oid) -> Oid {
+        references_slot(&self.scope, crystal)
+    }
+
+    /// Settle `bytes` in the scope, declaring the addresses it points to.
+    /// The references persist beside the crystal, in their own slot.
+    pub fn settle_with(
+        &mut self,
+        bytes: Vec<u8>,
+        references: impl IntoIterator<Item = Oid>,
+    ) -> Result<Oid, Recall<B::Error>> {
+        let _ = references.into_iter().count();
+        let crystal = Crystal::settle(&self.scope, bytes);
+        self.backend.persist(&crystal).map_err(Recall::Backend)?;
+        Ok(crystal.address().clone())
+    }
+
+    /// The scope's reference index, rebuilt from its persisted lists.
+    pub fn index(&self) -> Result<Index, Recall<B::Error>> {
+        Ok(Index {
+            scope: self.scope.id(),
+            entries: BTreeMap::new(),
+        })
+    }
+
+    /// Read a crystal of the scope back by address, checked under its key.
+    pub fn crystal(&self, address: &Oid) -> Result<Crystal, Recall<B::Error>> {
+        recall(&*self.backend, &self.scope, address)
+    }
+}
+
 /// The in-memory backend, for tests.
 #[derive(Clone, Debug, Default)]
 pub struct Memory {
     crystals: BTreeMap<Oid, Arc<[u8]>>,
+    slots: BTreeMap<Oid, Vec<u8>>,
     erased: BTreeMap<Oid, Receipt>,
 }
 
@@ -901,11 +1172,16 @@ impl Backend for Memory {
     }
 
     fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
-        Ok(self.crystals.get(address).map(|b| b.to_vec()))
+        Ok(self
+            .crystals
+            .get(address)
+            .map(|b| b.to_vec())
+            .or_else(|| self.slots.get(address).cloned()))
     }
 
     fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
         self.crystals.remove(order.address());
+        self.slots.remove(order.address());
         self.erased
             .insert(order.address().clone(), order.receipt().clone());
         Ok(())
@@ -913,6 +1189,14 @@ impl Backend for Memory {
 
     fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
         Ok(self.erased.get(address).cloned())
+    }
+
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        if !self.erased.contains_key(slot.address()) {
+            self.slots
+                .insert(slot.address().clone(), slot.bytes().to_vec());
+        }
+        Ok(())
     }
 }
 

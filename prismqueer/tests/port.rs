@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use prismqueer::brain::{self, Backend, Crystal, Loss, Memory, Purge, Recall, Receipt};
+use prismqueer::brain::{self, Backend, Crystal, Loss, Memory, Purge, Recall, Receipt, Slot};
 use prismqueer::merkle::{diff, MerkleTree};
 use prismqueer::oid::{Addressable, Oid, Scope};
 
@@ -163,6 +163,11 @@ impl Backend for Swapping {
     }
     fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
         Ok(None)
+    }
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        self.held
+            .insert(slot.address().clone(), slot.bytes().to_vec());
+        Ok(())
     }
 }
 

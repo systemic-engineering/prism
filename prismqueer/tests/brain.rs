@@ -26,8 +26,8 @@ use std::convert::Infallible;
 use std::rc::Rc;
 
 use prismqueer::brain::{
-    Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Interner, Loss, Memory, Purge, Recall,
-    Receipt, Relation, Roots, Stats, Sym, Tick,
+    purge, recall, Backend, Brain, Capacity, Crystal, Epoch, Erasure, Fact, Held, Interner, Loss,
+    Memory, Purge, Recall, Receipt, Relation, Roots, Slot, Stats, Strange, Sym, Tick,
 };
 use prismqueer::crossing::Grade;
 use prismqueer::oid::{Oid, Scope, ScopeKey};
@@ -706,6 +706,9 @@ impl Backend for Counted {
     fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
         self.inner.erased(address)
     }
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        self.inner.write(slot)
+    }
 }
 
 #[test]
@@ -755,6 +758,9 @@ impl Backend for Forgetful {
     fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
         Ok(None)
     }
+    fn write(&mut self, _: &Slot<'_>) -> Result<(), Infallible> {
+        Ok(())
+    }
 }
 
 /// A backend that hands back other bytes than it was given.
@@ -773,6 +779,9 @@ impl Backend for Forger {
     }
     fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Infallible> {
         Ok(None)
+    }
+    fn write(&mut self, _: &Slot<'_>) -> Result<(), Infallible> {
+        Ok(())
     }
 }
 
@@ -794,6 +803,9 @@ impl Backend for Refusing {
         Err(Refused)
     }
     fn erased(&self, _: &Oid) -> Result<Option<Receipt>, Refused> {
+        Err(Refused)
+    }
+    fn write(&mut self, _: &Slot<'_>) -> Result<(), Refused> {
         Err(Refused)
     }
 }
@@ -1142,58 +1154,124 @@ fn throwaway(byte: u8) -> ScopeKey {
     ScopeKey::take(&mut [byte; 32]).expect("a throwaway held key")
 }
 
-/// `n` synthetic crystals in `key`'s scope.
-fn crystals_of(key: &ScopeKey, tag: &str, n: usize) -> Vec<Crystal> {
+/// `n` synthetic crystals settled in `key`'s scope, through `backend`.
+fn settled<B: Backend<Error = Infallible>>(
+    backend: &mut B,
+    key: &ScopeKey,
+    tag: &str,
+    n: usize,
+) -> Vec<Crystal> {
+    let mut held = Held::open(backend, key);
     (0..n)
-        .map(|i| Crystal::settle(&Scope::keyed(key), format!("{tag} {i}").into_bytes()))
+        .map(|i| {
+            let bytes = format!("{tag} {i}").into_bytes();
+            let address = held.settle_with(bytes.clone(), []).unwrap();
+            let crystal = Crystal::settle(&Scope::keyed(key), bytes);
+            assert_eq!(&address, crystal.address());
+            crystal
+        })
         .collect()
 }
 
 #[test]
-fn an_erasure_names_its_scope_by_public_id_and_covers_its_census() {
+fn an_erasure_names_its_scope_by_public_id_and_covers_its_index() {
     let key = throwaway(0x11);
     let id = key.id();
-    let census = crystals_of(&key, "node", 3);
-    let erasure = Erasure::mint(key, Epoch(3), &census).expect("all in the scope");
+    let mut backend = Memory::default();
+    let census = settled(&mut backend, &key, "node", 3);
+    let slots = Held::open(&mut backend, &key).slots();
+    let erasure = Erasure::mint(key, Epoch(3), &backend).expect("all in the scope");
     assert_eq!(erasure.scope(), id);
     assert_ne!(erasure.scope(), Scope::public().id());
-    assert_eq!(
-        erasure.covers(),
-        &census
-            .iter()
-            .map(|c| c.address().clone())
-            .collect::<BTreeSet<_>>()
-    );
+    for c in &census {
+        assert!(erasure.covers().contains(c.address()), "{c:?}");
+    }
+    for slot in [slots.manifest(), slots.light(), slots.root(), slots.chain()] {
+        assert!(erasure.covers().contains(slot), "{slot:?}");
+    }
+}
+
+/// A faulty adapter that lists one more address in a scope's manifest than
+/// the scope settled there.
+struct Planted {
+    inner: Memory,
+    manifest: Oid,
+    extra: Oid,
+}
+
+impl Backend for Planted {
+    type Error = Infallible;
+    fn persist(&mut self, crystal: &Crystal) -> Result<(), Infallible> {
+        self.inner.persist(crystal)
+    }
+    fn fetch(&self, address: &Oid) -> Result<Option<Vec<u8>>, Infallible> {
+        let held = self.inner.fetch(address)?;
+        if address != &self.manifest {
+            return Ok(held);
+        }
+        let mut list = held.unwrap_or_default();
+        if !list.is_empty() {
+            list.push(b'\n');
+        }
+        list.extend_from_slice(self.extra.as_str().as_bytes());
+        Ok(Some(list))
+    }
+    fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
+        self.inner.purge(order)
+    }
+    fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
+        self.inner.erased(address)
+    }
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        self.inner.write(slot)
+    }
 }
 
 #[test]
 fn an_erasure_never_covers_another_scopes_crystal_and_hands_the_key_back() {
     let key = throwaway(0x11);
     let other = throwaway(0x22);
-    let mut census = crystals_of(&key, "node", 2);
-    let foreign = Crystal::settle(&Scope::keyed(&other), b"node 0".to_vec());
+    let mut inner = Memory::default();
+    let _ = settled(&mut inner, &key, "node", 2);
+    let foreign = settled(&mut inner, &other, "node", 1).remove(0);
     let public = Crystal::settle(&Scope::public(), b"node 1".to_vec());
+    inner.persist(&public).unwrap();
+    let manifest = Held::open(&mut inner, &key).slots().manifest().clone();
+    let mut planted = Planted {
+        inner,
+        manifest,
+        extra: foreign.address().clone(),
+    };
 
-    census.push(foreign.clone());
-    let stranger = Erasure::mint(key, Epoch(3), &census).expect_err("another holder's crystal");
-    assert_eq!(stranger.address(), foreign.address());
+    let stranger = Erasure::mint(key, Epoch(3), &planted).expect_err("another holder's crystal");
+    assert_eq!(
+        stranger.reason(),
+        &Strange::Foreign(foreign.address().clone())
+    );
+    assert_eq!(stranger.address(), Some(foreign.address()));
     let key = stranger.into_key();
     assert_eq!(key.id(), throwaway(0x11).id(), "the same key, unconsumed");
 
-    census.pop();
-    census.push(public.clone());
-    let stranger = Erasure::mint(key, Epoch(3), &census).expect_err("a public crystal");
-    assert_eq!(stranger.address(), public.address());
+    planted.extra = public.address().clone();
+    let stranger = Erasure::mint(key, Epoch(3), &planted).expect_err("a public crystal");
+    assert_eq!(stranger.address(), Some(public.address()));
     let shown = format!("{stranger:?}");
     assert!(shown.contains("ScopeKey(held)"), "{shown}");
     assert!(!shown.contains("17, 17"), "{shown}");
+
+    // A listed address with no bytes is the scope's own list's: covered.
+    let key = stranger.into_key();
+    planted.extra = Oid::hash(&Scope::keyed(&key), b"node lost");
+    let erasure = Erasure::mint(key, Epoch(3), &planted).expect("missing bytes are covered");
+    assert!(erasure.covers().contains(&planted.extra));
 }
 
 #[test]
 fn the_receipt_preimage_is_exactly_scope_id_then_epoch() {
     let key = throwaway(0x33);
-    let census = crystals_of(&key, "node", 1);
-    let erasure = Erasure::mint(key, Epoch(0x0102_0304_0506_0708), &census).unwrap();
+    let mut backend = Memory::default();
+    let _ = settled(&mut backend, &key, "node", 1);
+    let erasure = Erasure::mint(key, Epoch(0x0102_0304_0506_0708), &backend).unwrap();
     let receipt = erasure.receipt();
 
     // Computed here from the key's bytes and the epoch alone, never through
@@ -1213,9 +1291,14 @@ fn the_receipt_preimage_is_exactly_scope_id_then_epoch() {
 
     // Another epoch, another receipt; the same scope and epoch, the same
     // address whatever the census (it never enters the address).
-    let again = Erasure::mint(throwaway(0x33), Epoch(0x0102_0304_0506_0708), &[]).unwrap();
+    let again = Erasure::mint(
+        throwaway(0x33),
+        Epoch(0x0102_0304_0506_0708),
+        &Memory::default(),
+    )
+    .unwrap();
     assert_eq!(again.receipt().address(), receipt.address());
-    let later = Erasure::mint(throwaway(0x33), Epoch(9), &[]).unwrap();
+    let later = Erasure::mint(throwaway(0x33), Epoch(9), &Memory::default()).unwrap();
     assert_ne!(later.receipt().address(), receipt.address());
 }
 
@@ -1223,7 +1306,7 @@ fn the_receipt_preimage_is_exactly_scope_id_then_epoch() {
 fn the_receipt_is_sealed_by_the_scope_never_a_law_and_never_names_the_person() {
     let key = throwaway(0x44);
     let id = key.id();
-    let erasure = Erasure::mint(key, Epoch(1), &[]).unwrap();
+    let erasure = Erasure::mint(key, Epoch(1), &Memory::default()).unwrap();
     let receipt = erasure.receipt();
     assert_eq!(receipt.grade(), Grade::Sealed);
     assert_ne!(receipt.grade(), Grade::Law);
@@ -1249,6 +1332,8 @@ fn the_receipt_is_sealed_by_the_scope_never_a_law_and_never_names_the_person() {
 #[derive(Default)]
 struct Ledger {
     held: Vec<(Oid, Vec<u8>)>,
+    /// Every slot ever written, in first-write order, with its bytes now.
+    slots: Vec<(Oid, Vec<u8>)>,
     tombstones: Vec<(Oid, Receipt)>,
 }
 
@@ -1267,11 +1352,13 @@ impl Backend for Ledger {
         Ok(self
             .held
             .iter()
+            .chain(&self.slots)
             .find(|(a, _)| a == address)
             .map(|(_, b)| b.clone()))
     }
     fn purge(&mut self, order: &Purge<'_>) -> Result<(), Infallible> {
         self.held.retain(|(a, _)| a != order.address());
+        self.slots.retain(|(a, _)| a != order.address());
         self.tombstones
             .push((order.address().clone(), order.receipt().clone()));
         Ok(())
@@ -1283,6 +1370,18 @@ impl Backend for Ledger {
             .find(|(a, _)| a == address)
             .map(|(_, r)| r.clone()))
     }
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        if self.tombstones.iter().any(|(a, _)| a == slot.address()) {
+            return Ok(());
+        }
+        match self.slots.iter_mut().find(|(a, _)| a == slot.address()) {
+            Some((_, bytes)) => *bytes = slot.bytes().to_vec(),
+            None => self
+                .slots
+                .push((slot.address().clone(), slot.bytes().to_vec())),
+        }
+        Ok(())
+    }
 }
 
 /// The purge law, over one backend: X's scope purged, Y's held scope and
@@ -1290,31 +1389,31 @@ impl Backend for Ledger {
 fn purge_law<B: Backend<Error = Infallible>>(mut backend: B) {
     let x = throwaway(0x51);
     let y = throwaway(0x52);
-    let xs = crystals_of(&x, "node", 3);
-    let ys = crystals_of(&y, "node", 3);
+    let xs = settled(&mut backend, &x, "node", 3);
+    let ys = settled(&mut backend, &y, "node", 3);
     let public: Vec<Crystal> = (0..3)
         .map(|i| Crystal::settle(&Scope::public(), format!("node {i}").into_bytes()))
         .collect();
-    for c in xs.iter().chain(&ys).chain(&public) {
+    for c in &public {
         backend.persist(c).unwrap();
     }
     for c in &xs {
         assert_eq!(
-            prismqueer::brain::recall(&backend, &Scope::keyed(&x), c.address()).as_ref(),
+            recall(&backend, &Scope::keyed(&x), c.address()).as_ref(),
             Ok(c)
         );
     }
 
-    let erasure = Erasure::mint(x, Epoch(7), &xs).expect("X's own crystals");
+    let erasure = Erasure::mint(x, Epoch(7), &backend).expect("X's own crystals");
     let receipt = erasure.receipt().clone();
-    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+    purge(&mut backend, &erasure).unwrap();
 
     for c in &xs {
         // Y reads its edge into X without X's key (Y's scope, or the public
         // one): Lost, erased, with the receipt.
         for reader in [Scope::keyed(&y), Scope::public()] {
             assert_eq!(
-                prismqueer::brain::recall(&backend, &reader, c.address()),
+                recall(&backend, &reader, c.address()),
                 Err(Recall::Lost {
                     address: c.address().clone(),
                     reason: Loss::Erased(receipt.clone())
@@ -1329,14 +1428,14 @@ fn purge_law<B: Backend<Error = Infallible>>(mut backend: B) {
     }
     for c in &ys {
         assert_eq!(
-            prismqueer::brain::recall(&backend, &Scope::keyed(&y), c.address()).as_ref(),
+            recall(&backend, &Scope::keyed(&y), c.address()).as_ref(),
             Ok(c)
         );
         assert_eq!(backend.erased(c.address()), Ok(None));
     }
     for c in &public {
         assert_eq!(
-            prismqueer::brain::recall(&backend, &Scope::public(), c.address()).as_ref(),
+            recall(&backend, &Scope::public(), c.address()).as_ref(),
             Ok(c)
         );
     }
@@ -1360,21 +1459,20 @@ fn after_purge_recall_is_lost_erased_through_a_wrapping_backend() {
 #[test]
 fn erased_and_missing_never_compare_equal_and_only_erased_carries_a_receipt() {
     let x = throwaway(0x61);
-    let xs = crystals_of(&x, "node", 1);
     let mut backend = Memory::default();
-    backend.persist(&xs[0]).unwrap();
-    let erasure = Erasure::mint(x, Epoch(1), &xs).unwrap();
-    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+    let xs = settled(&mut backend, &x, "node", 1);
+    let erasure = Erasure::mint(x, Epoch(1), &backend).unwrap();
+    purge(&mut backend, &erasure).unwrap();
 
     let never = Oid::hash(&Scope::public(), b"node never");
     let Err(Recall::Lost { reason: erased, .. }) =
-        prismqueer::brain::recall(&backend, &Scope::public(), xs[0].address())
+        recall(&backend, &Scope::public(), xs[0].address())
     else {
         panic!("an erased address is lost");
     };
     let Err(Recall::Lost {
         reason: missing, ..
-    }) = prismqueer::brain::recall(&backend, &Scope::public(), &never)
+    }) = recall(&backend, &Scope::public(), &never)
     else {
         panic!("a never-settled address is lost");
     };
@@ -1420,22 +1518,24 @@ impl Backend for Hoarding {
     fn erased(&self, address: &Oid) -> Result<Option<Receipt>, Infallible> {
         Ok(self.tombstones.get(address).cloned())
     }
+    fn write(&mut self, slot: &Slot<'_>) -> Result<(), Infallible> {
+        self.inner.write(slot)
+    }
 }
 
 #[test]
 fn a_backend_that_keeps_purged_bytes_still_reads_erased() {
     let x = throwaway(0x71);
-    let xs = crystals_of(&x, "node", 1);
     let mut backend = Hoarding::default();
-    backend.persist(&xs[0]).unwrap();
-    let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
-    prismqueer::brain::purge(&mut backend, &erasure).unwrap();
+    let xs = settled(&mut backend, &x, "node", 1);
+    let erasure = Erasure::mint(x, Epoch(2), &backend).unwrap();
+    purge(&mut backend, &erasure).unwrap();
     assert!(
         backend.fetch(xs[0].address()).unwrap().is_some(),
         "it hoarded"
     );
     assert_eq!(
-        prismqueer::brain::recall(&backend, &Scope::public(), xs[0].address()),
+        recall(&backend, &Scope::public(), xs[0].address()),
         Err(Recall::Lost {
             address: xs[0].address().clone(),
             reason: Loss::Erased(erasure.receipt().clone())
@@ -1446,14 +1546,230 @@ fn a_backend_that_keeps_purged_bytes_still_reads_erased() {
 #[test]
 fn a_refusing_backend_refuses_the_purge_and_the_tombstone_read() {
     let x = throwaway(0x72);
-    let xs = crystals_of(&x, "node", 1);
-    let erasure = Erasure::mint(x, Epoch(2), &xs).unwrap();
+    let mut backend = Memory::default();
+    let xs = settled(&mut backend, &x, "node", 1);
+    let stranger = Erasure::mint(throwaway(0x72), Epoch(2), &Refusing).expect_err("refused");
+    assert_eq!(stranger.reason(), &Strange::Backend(Refused));
+    assert_eq!(stranger.address(), None);
+    assert_eq!(stranger.into_key().id(), x.id(), "the key, unconsumed");
     assert_eq!(
-        prismqueer::brain::purge(&mut Refusing, &erasure),
-        Err(Refused)
-    );
-    assert_eq!(
-        prismqueer::brain::recall(&Refusing, &Scope::public(), xs[0].address()),
+        Held::open(&mut Refusing, &x).settle_with(b"node 0".to_vec(), []),
         Err(Recall::Backend(Refused))
     );
+    let erasure = Erasure::mint(x, Epoch(2), &backend).unwrap();
+    assert_eq!(purge(&mut Refusing, &erasure), Err(Refused));
+    assert_eq!(
+        recall(&Refusing, &Scope::public(), xs[0].address()),
+        Err(Recall::Backend(Refused))
+    );
+}
+
+// --- Item 3: the per-scope reference index, purged with the scope -----------
+
+/// The index law, over one backend: X's index is the projection of the
+/// lists X declared, persisted in X's slots; Y's is Y's alone; after X's
+/// purge, X's index reads erased and Y's is untouched. `keeps_bytes` is
+/// false for a faithful backend, whose slots must be gone too.
+fn index_law<B: Backend<Error = Infallible>>(mut backend: B, keeps_bytes: bool) {
+    let x = throwaway(0x81);
+    let y = throwaway(0x82);
+    let outside = elsewhere(b"outside");
+    let (a, b, c) = {
+        let mut held = Held::open(&mut backend, &x);
+        assert!(held.index().unwrap().is_empty(), "never settled: empty");
+        let a = held
+            .settle_with(b"node a".to_vec(), [outside.clone()])
+            .unwrap();
+        let b = held.settle_with(b"node b".to_vec(), [a.clone()]).unwrap();
+        let c = held.settle_with(b"node c".to_vec(), []).unwrap();
+        // The same bytes again, with another reference: a union.
+        let again = held.settle_with(b"node b".to_vec(), [c.clone()]).unwrap();
+        assert_eq!(again, b);
+        (a, b, c)
+    };
+    let declared = BTreeMap::from([
+        (a.clone(), BTreeSet::from([outside.clone()])),
+        (b.clone(), BTreeSet::from([a.clone(), c.clone()])),
+        (c.clone(), BTreeSet::new()),
+    ]);
+    let ya = Held::open(&mut backend, &y)
+        .settle_with(b"node a".to_vec(), [a.clone()])
+        .unwrap();
+    assert_ne!(ya, a, "the same bytes, another scope, another address");
+
+    // Rebuilt from the persisted lists by a fresh borrow: nothing was kept.
+    let index = Held::open(&mut backend, &x).index().unwrap();
+    assert_eq!(index.entries(), &declared);
+    assert_eq!(index.scope(), x.id());
+    assert_eq!(index.len(), 3);
+    assert_eq!(index.references(&b), declared.get(&b));
+    assert_eq!(index.references(&ya), None, "Y's crystal isn't X's");
+    assert_eq!(
+        Held::open(&mut backend, &x).index().unwrap(),
+        index,
+        "a projection: the same every time"
+    );
+    let theirs = Held::open(&mut backend, &y).index().unwrap();
+    assert_eq!(
+        theirs.entries(),
+        &BTreeMap::from([(ya.clone(), BTreeSet::from([a.clone()]))])
+    );
+    assert_eq!(
+        Held::open(&mut backend, &x).crystal(&a).unwrap().bytes(),
+        b"node a"
+    );
+
+    let slots = Held::open(&mut backend, &x).slots();
+    let lists: Vec<Oid> = {
+        let held = Held::open(&mut backend, &x);
+        [&a, &b, &c].map(|k| held.references_slot(k)).to_vec()
+    };
+    let erasure = Erasure::mint(x, Epoch(5), &backend).expect("X's own index");
+    let receipt = erasure.receipt().clone();
+    for list in &lists {
+        assert!(erasure.covers().contains(list), "{list:?}");
+    }
+    purge(&mut backend, &erasure).unwrap();
+
+    // A copy of X's synthetic key, only to look: the index reads erased.
+    let x = throwaway(0x81);
+    let erased = Recall::Lost {
+        address: slots.manifest().clone(),
+        reason: Loss::Erased(receipt.clone()),
+    };
+    assert_eq!(Held::open(&mut backend, &x).index(), Err(erased.clone()));
+    for slot in lists.iter().chain([slots.manifest()]) {
+        assert_eq!(backend.erased(slot), Ok(Some(receipt.clone())));
+        if !keeps_bytes {
+            assert_eq!(backend.fetch(slot), Ok(None), "the list is gone");
+        }
+    }
+    // A purge is final: nothing settles in the scope again.
+    assert_eq!(
+        Held::open(&mut backend, &x).settle_with(b"node d".to_vec(), []),
+        Err(erased)
+    );
+    // Y's index is untouched.
+    assert_eq!(Held::open(&mut backend, &y).index().unwrap(), theirs);
+}
+
+#[test]
+fn the_index_is_rebuilt_from_persisted_lists_and_purged_on_memory() {
+    index_law(Memory::default(), false);
+}
+
+#[test]
+fn the_index_is_rebuilt_from_persisted_lists_and_purged_on_the_ledger() {
+    index_law(Ledger::default(), false);
+}
+
+#[test]
+fn the_index_is_rebuilt_from_persisted_lists_and_purged_through_a_wrapper() {
+    index_law(Counted::default(), false);
+}
+
+#[test]
+fn a_hoarded_index_still_reads_erased_through_the_tombstone() {
+    index_law(Hoarding::default(), true);
+}
+
+#[test]
+fn no_slot_is_written_outside_its_scope() {
+    let mut ledger = Ledger::default();
+    let x = throwaway(0x83);
+    let y = throwaway(0x84);
+    let mut theirs = BTreeSet::new();
+    for key in [&x, &y] {
+        let mut held = Held::open(&mut ledger, key);
+        let a = held.settle_with(b"node a".to_vec(), []).unwrap();
+        let b = held.settle_with(b"node b".to_vec(), [a.clone()]).unwrap();
+        let slots = held.slots();
+        theirs
+            .extend([slots.manifest(), slots.light(), slots.root(), slots.chain()].map(Oid::clone));
+        theirs.extend([held.references_slot(&a), held.references_slot(&b)]);
+    }
+    let written: BTreeSet<Oid> = ledger.slots.iter().map(|(a, _)| a.clone()).collect();
+    assert!(!written.is_empty());
+    assert!(
+        written.is_subset(&theirs),
+        "a slot outside both scopes: {:?}",
+        written.difference(&theirs).collect::<Vec<_>>()
+    );
+    assert!(!written.contains(&Oid::slot(&Scope::public(), b"manifest")));
+}
+
+#[test]
+fn the_mint_reads_the_census_at_the_mint_never_a_stale_one() {
+    let mut backend = Memory::default();
+    let x = throwaway(0x85);
+    let early = {
+        let mut held = Held::open(&mut backend, &x);
+        held.settle_with(b"node 0".to_vec(), []).unwrap();
+        held.settle_with(b"node 1".to_vec(), []).unwrap();
+        held.index().unwrap()
+    };
+    let late = Held::open(&mut backend, &x)
+        .settle_with(b"node 2".to_vec(), [])
+        .unwrap();
+    assert_eq!(early.references(&late), None, "settled after");
+    let erasure = Erasure::mint(x, Epoch(1), &backend).unwrap();
+    for c in early.entries().keys().chain([&late]) {
+        assert!(erasure.covers().contains(c), "{c:?}");
+    }
+    purge(&mut backend, &erasure).unwrap();
+    assert_eq!(
+        recall(&backend, &Scope::public(), &late),
+        Err(Recall::Lost {
+            address: late.clone(),
+            reason: Loss::Erased(erasure.receipt().clone())
+        })
+    );
+}
+
+#[test]
+fn the_public_scopes_index_never_shrinks() {
+    let mut brain = Brain::new(Capacity::bytes(0), Memory::default());
+    let a = brain
+        .settle_with(b"node a".to_vec(), [elsewhere(b"x")])
+        .unwrap();
+    let b = brain.settle_with(b"node b".to_vec(), [a.clone()]).unwrap();
+    assert!(brain.stats().evicted_crystals >= 2, "every crystal evicted");
+    let reach = brain.vacuum(&Roots::default().seal());
+    let _ = brain.cool(reach.dangling());
+    brain.settle_with(b"node a".to_vec(), []).unwrap();
+    // A keyed scope purged elsewhere touches nothing here.
+    let mut other = Memory::default();
+    let x = throwaway(0x87);
+    let _ = settled(&mut other, &x, "node", 2);
+    let erasure = Erasure::mint(x, Epoch(1), &other).unwrap();
+    purge(&mut other, &erasure).unwrap();
+    // Outside Capacity, never evicted, never shrinking.
+    assert_eq!(
+        brain.references(&a),
+        Some(&BTreeSet::from([elsewhere(b"x")]))
+    );
+    assert_eq!(brain.references(&b), Some(&BTreeSet::from([a.clone()])));
+    assert_eq!(
+        brain
+            .vacuum(&Roots::default().seal())
+            .dangling()
+            .addresses()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn a_malformed_slot_is_never_believed() {
+    let x = throwaway(0x86);
+    let mut forger = Forger;
+    let manifest = Held::open(&mut forger, &x).slots().manifest().clone();
+    assert_eq!(
+        Held::open(&mut forger, &x).index(),
+        Err(Recall::Forged(manifest.clone()))
+    );
+    let stranger = Erasure::mint(x, Epoch(1), &forger).expect_err("a malformed manifest");
+    assert_eq!(stranger.reason(), &Strange::Malformed(manifest.clone()));
+    assert_eq!(stranger.address(), Some(&manifest));
+    assert_eq!(stranger.into_key().id(), throwaway(0x86).id());
 }
