@@ -4,10 +4,11 @@
 
 ## 1. What it is
 
-A std binary that speaks the Model Context Protocol over stdio and exposes two of prism's verifiers, `echo` and `chorus`, read-only.
+A std binary that speaks the Model Context Protocol over stdio and exposes four of prism's readers, read-only: the verifiers `echo` and `chorus`, and, on prismqueer's certified path (`docs/spec/features.md`), `check` and `measure`.
 
 - **Read-only.** No keys, no signing, no file beyond stdin and stdout, no network, no clock, no environment-dependent behaviour. Every input travels inline in the request. It verifies and never authorizes (prism-025 edge 1): `chorus` returns a grade, never an admission.
-- **Two dependencies:** `echo` and `chorus`, both workspace crates, both `no_std`. The library (`prism_mcp`) is `no_std` with `alloc` too: bytes in, bytes out. Only the binary touches stdin and stdout.
+- **Three dependencies:** `echo` and `chorus`, both workspace crates, both `no_std`; and `prismqueer = { default-features = false, features = ["exact"] }` for `check` and `measure` (no LAPACK, BLAS or Fortran; ¶6). The library (`prism_mcp`) is `no_std` with `alloc` in its own code: bytes in, bytes out. prismqueer is a std crate, so the build links std. Only the binary touches stdin and stdout.
+- **What `exact` costs on the floor:** prismqueer brings a proc-macro crate (prismqueer-projections, with syn, quote and proc-macro2) and terni's macros (terni-macros), the num-* stack (num-bigint, num-rational, num-integer, num-traits), sha2 and hex. All are pure Rust; none is a numeric native library. The tree is in `nix/fixtures/mcp-merged.tree`.
 - **No serde, no JSON crate of any kind, never mirror's parser.** The JSON reader and printer are hand-written in `prism_mcp::json` (§3), from RFC 8259 and RFC 7493's text.
 - **Never `f64`** (contract rule 7). A source guard scans `mcp/src` for `f32` and `f64`.
 
@@ -110,7 +111,7 @@ So `print(read(x))` is canonical (printing it and reading it again gives the sam
 
 ## 5. The tools
 
-Inputs are JSON strings (text) or canonical base64 (bytes), never paths. Unknown arguments, missing required ones and wrong types are `-32602`, with `data: {argument, expected}` (`expected: "none"` for an unknown argument; a nested one is named `inclusion.<name>`). An unknown tool is `-32602` with the message `Unknown tool: <name>` and `data: {tool}`. A non-integer `inclusion.index` adds the reader's `refusal` and `at` to the data.
+Inputs are JSON strings (text), canonical base64 (bytes), JSON integers, or exact rationals as `"p/q"` strings (`check`, `measure`), never paths and never decimals. Unknown arguments, missing required ones and wrong types are `-32602`, with `data: {argument, expected}` (`expected: "none"` for an unknown argument; a nested one is named `inclusion.<name>`). An unknown tool is `-32602` with the message `Unknown tool: <name>` and `data: {tool}`. A non-integer `inclusion.index` adds the reader's `refusal` and `at` to the data.
 
 ### 5.1 `echo`
 
@@ -146,27 +147,114 @@ Inputs are JSON strings (text) or canonical base64 (bytes), never paths. Unknown
 
   `<why>` is `note <error>`, `body`, `extensions`, `duplicate`, `unsigned ed25519 <bool> mldsa44 <bool>`, or `inclusion`; an inclusion's own `<why>` is RFC 9162's failure as a word (`index-out-of-range`, `path-too-long`, `path-too-short`, `root-mismatch`, …). A ruler error is one line: `error ed25519 <why>`, `error mldsa44 <why>` (the vkey's parse error, or `key` for the wrong type or length), `error inclusion.leaf base64`, `error inclusion.path <n> base64` or `error inclusion.path <n> length`. `heard` is BLAKE3 (echo's `H`) of each string's UTF-8, and of the decoded leaf and of the decoded path hashes concatenated. `accept` needs the checkpoint and, if given, the inclusion. The timestamp is reported, never compared with a clock.
 
+### 5.3 `check`
+
+`prismqueer::agreement::check`: is a selection inside the consistent readings of exact relations among items?
+
+- **Arguments:**
+  - `ring`: `"Z"`, `"ZMod"` or `"QModOne"`; `modulus` (an integer) with `ZMod` and only with it;
+  - `relations`: `[[from, to, t], …]`, s(to) − s(from) = t; items are integers ≥ 0;
+  - `selection`: `[[item, reading], …]` (an item given twice keeps its last reading, as `SelectionDraft::new` does);
+  - optional `items`: items beyond those the relations name;
+  - `by`: 64 lowercase hex, the Oid the selection is attributed to.
+
+  A value is a JSON integer in `Z` and `ZMod` (any integer; ZMod reads it mod n) and `"p/q"` in `QModOne` (`-?(0|[1-9][0-9]*)/[1-9][0-9]*`, within i64; reduced by the ring).
+- **`by` is a label, never a signature.** `SelectionDraft::seal(by)` is the only road to a `Selection`, and the `Signer` it mints is "a signature *claim* (who, over which address), held and never checked cryptographically" (`crossing.rs`; `algedonic`: "prism checks that a signer exists, never who it is"). The signer sits beside the selection's address, never in it. So the tool takes `by` and prints it, and its description says prism holds no keys and never signs. Sealing here authorizes nothing: what a seal is worth is the receiver's policy.
+- **The answer, `isError: false`.** One text block:
+
+  ```
+  in | out | needs-ruling
+  ring Z | ring ZMod <n> | ring QModOne
+  selection <address> by <by>
+  edge <a>-<b>#<nth> required <t> found <t'>      (in: every relation, in the graph's order)
+  coordinate <item> <x>                          (in: one per component, at its smallest item)
+  violated <a>-<b>#<nth> required <t> found <t'>  (out: exactly the broken relations)
+  cycle twist <t> vertices <v…> edges <e…>        (needs-ruling: the witness cycles)
+  ```
+
+  Edges are written smaller end first, with which parallel edge (`#0`, `#1`, …). Values are integers, ZMod residues, or `p/q` (`p` when q is 1). `out` and `needs-ruling` are verdicts about the subject, the selection and the relations' curvature; `needs-ruling` never picks a reading.
+- **No verdict, `isError: true`** (the ruler is broken: there is nothing to check):
+  - `error selection missing <item>` / `error selection unknown <item>`: the selection doesn't read exactly the relations' items (`agreement::Refused`);
+  - `error ring <relations.k | selection.k> <integer | p/q>`: a value outside the declared ring (a `"p/q"` in ℤ or ℤ/n, an integer in ℚ/ℤ);
+  - `error ring modulus <n>`: n < 2.
+- **`-32602`:** a missing or unknown argument, an unknown ring, `modulus` missing for ZMod or given for another ring, a row of the wrong length, a negative or non-integer item, a decimal, a string that isn't `p/q`, `by` not 64 lowercase hex.
+
+### 5.4 `measure`
+
+`prismqueer::measured::measure`: a precision matrix estimated exactly over ℚ from integer counts (`docs/spec/measured.md`).
+
+- **Arguments:** `samples` (`[[x₁, …, x_d], …]`, integers), `streams` (d, an integer ≥ 0), `estimator` (`"mle"` or `"unbiased"`), `support` (`[[i, j], …]`, the declared edges), `window` (64 hex: the window ruler's address), `reader` (64 hex: the frame's reader). All six are required.
+- **The frame** is `Frame::new(reader, streams)`: prism derives a frame's address from its reader and dimension, so the tool takes those, not a frame address, and prints the address.
+- **The window** is named by its address. `measure` took the `Ruler` and read only its address; the tool calls `measured::measure_under(window, …)`, which `measure(&Ruler, …)` now wraps, so both give the same `Measured` (pinned in `prismqueer/tests/measured.rs`). `Measured::seal` still takes the ruler and refuses another.
+- **It measures and never seals.** No `by`, no draft, no `Metrix`: a `by` argument is `-32602` ("none"), and no line names a signer.
+- **The answer, `isError: false`:**
+
+  ```
+  measured
+  address <the Measured's address>
+  window <window>
+  frame <frame address> reader <reader> streams <d>
+  method mle | unbiased support <i>-<j> … | none
+  samples <n> <the samples' address>
+  row <i> <K̂_i0> … <K̂_i(d−1)>
+  ```
+
+  Entries are exact: `p` or `p/q` in lowest terms, never a decimal.
+- **A refusal is an answer, `isError: false`:** `refused <kind>`, then the window, frame and method lines:
+  - `unresolved support <edges>`: the support isn't chordal; no closed form, never approximated;
+  - `too-few-samples samples <n> needed <k>`;
+  - `not-invertible clique <streams>`;
+  - `wrong-shape sample <index> len <len> streams <d>` / `wrong-shape edge <from> <to>`.
+
+  `OtherWindow` and `Draft` come only from sealing, which the tool never does.
+- **`-32602`:** a missing or unknown argument, a row that isn't an array of integers (a decimal included), a negative `streams`, an unknown estimator, an edge that isn't two integers ≥ 0, a window or reader that isn't 64 lowercase hex.
+
 ## 6. Independence
 
-`checks.prism-mcp-independent` runs `nix/independent.sh` (the walk `nix/echo-independent.sh` had, now shared) over `cargo metadata --locked --offline` from the root `prism-mcp`. It refuses, by name:
+`checks.prism-mcp-independent` (`nix/prism-mcp-independent.sh`) judges **prism-mcp's own build graph**. It refuses, by name:
 
-- `prismqueer`, any mirror crate (`mirror`, `mirror-*`, `mirror_*`);
+- any mirror crate (`mirror`, `mirror-*`, `mirror_*`);
 - `*serde*` (serde, serde_json, serde_core, serde_derive, miniserde, nanoserde) and `*json*` (any JSON crate);
 - `*lapack*`, `*blas*`, `*fortran*`, `netlib-src`, `intel-mkl*`, `accelerate-src`;
+- `prismqueer` with any feature set but exactly `exact`: `default` or `lapack` is refused, with the features named. Its closure under `exact` is held by `checks.prismqueer-exact` (no `cc` but blake3's, nothing native);
 
 and any package whose `links` names lapack, blas or fortran.
 
-**One difference from echo's walk, and why.** From the root, every dependency kind counts (normal, build, dev). Below the root, dev-dependencies don't: a dependency's dev-dependencies are built only for that dependency's own tests and are never linked into a dependent. This matters because `chorus` has `serde_json` as a dev-dependency for its vector tests, and cargo's `resolve.nodes` lists a workspace member's dev edges. `checks.echo-independent` keeps every kind at every depth, exactly as strict as before: echo's wrapper calls the shared walk with the policy `all`.
+### 6.1 Which graph: prism-mcp's resolve, not the workspace's
 
-The fixtures (`nix/fixtures/mcp-*.json`):
+`cargo metadata` resolves features once for the whole workspace, dev-dependencies included. prismqueer's dev-dependency `terni = { features = ["serde"] }` turns terni's `serde` on in that union, so the union shows a normal edge prismqueer → terni → serde (and serde_core, serde_derive) under prism-mcp, though `cargo build -p prism-mcp` never builds it. Read on the union, the guard would refuse a graph that holds no serde.
 
-- `mcp-clean.json` passes: prism-mcp → echo, chorus; chorus → serde_json as a dev edge only;
-- `mcp-serde-json.json` is refused: prism-mcp → chorus → serde_json, a normal edge;
-- `mcp-root-dev.json` is refused: prism-mcp → serde_json as its own dev-dependency;
-- `mcp-json.json` is refused: a JSON crate not named serde;
-- `mcp-mirror.json` is refused: a mirror crate behind echo;
-- `mcp-prismqueer.json` is refused: prismqueer, directly;
-- `mcp-links.json` is refused: an innocently named crate with `links = "blas"`.
+So the guard reads
+
+```
+cargo tree --locked --offline -p prism-mcp -e normal,build,dev --target all --prefix none -f '{p}|{f}'
+```
+
+beside `cargo metadata --locked --offline`:
+
+- **`cargo tree -p prism-mcp`** is cargo's resolver run for prism-mcp alone, as `cargo build` and `cargo test -p prism-mcp` run it: each package with the features *that* build turns on (`{f}`), prism-mcp's own dev edges, and never its dependencies' dev edges (chorus's `serde_json` doesn't appear; nothing below the root needs a dev policy). `--target all` keeps every platform's edges, a superset of any one build. It's stable cargo; `--locked --offline` reads the lockfile and the vendored sources only.
+- **`links`** is a manifest key, the same in any resolve, so it comes from the metadata's `packages`, joined by name and version.
+- **Read strictly, failing closed:** the first line must be `prism-mcp`, every line must parse as `name vVERSION[ (proc-macro)][ (source)]|features[ (*)]`, and every package must be in the metadata. An empty, truncated or reformatted tree is refused, not passed.
+
+`checks.echo-independent` and `checks.prismqueer-exact` keep the metadata walk (`nix/independent.sh`, policies `all` and `none`), unchanged and exactly as strict.
+
+### 6.2 The fixtures
+
+Trees in `nix/fixtures/mcp-*.tree`, read against `mcp-packages.json` (the metadata's `packages`, with the extra names the fixtures use):
+
+- **`mcp-merged`** passes: the real tree of prism-mcp with prismqueer under `exact`, beside its real workspace-union metadata (`mcp-merged.json`, trimmed to prism-mcp's closure). The check also runs the old reading (`independent.sh`, policy `root`, the same names) on that metadata and requires it to refuse (serde, serde_core, serde_derive): the false positive, kept as a fixture;
+- refused, each for its own reason (the check matches the reason, not only the exit):
+  - `mcp-lapack`: `prismqueer (features exact,lapack)`;
+  - `mcp-default`: `prismqueer (features default,exact)`;
+  - `mcp-terni-serde`: terni's `serde` really on, serde in the tree;
+  - `mcp-serde-json`: serde_json on a normal edge under chorus;
+  - `mcp-json`: a JSON crate not named serde;
+  - `mcp-mirror`: a mirror crate behind echo;
+  - `mcp-links`: an innocently named crate with `links = "blas"`;
+  - `mcp-missing`: a package the metadata doesn't have;
+  - `mcp-unparsed`: a line that doesn't parse.
+
+prism-mcp's own dev-dependencies are in the tree, so serde as one is refused as before. (Alex allowed it as a dev-dependency, for a differential test against serde_json; that would be a deliberate change to this guard, not made here.)
 
 **What independence means here** (Seam's finding, prism-025 §3): `echo` is independent of mirror in method, not in toolchain, spec or priors. It shares blake3 1.8.7, the spec's authorship lineage and its builders' model. The tool's description says so.
 
@@ -174,21 +262,27 @@ The fixtures (`nix/fixtures/mcp-*.json`):
 
 - **JSON:** the JSONTestSuite table; hand cases for a duplicate key (also after unescaping), a lone surrogate (high and low), invalid UTF-8, an overlong form, a BOM, the depth limit (64 passes, 65 refused at the 65th bracket), the size limit, leading zeros, `-0`, a fraction and an exponent where an integer is expected, an integer past `i64`, trailing garbage; each refused with its kind at its offset. The printer: key order, escapes, determinism, canonical round trip.
 - **Session:** initialize → initialized → `tools/list` → `tools/call echo` on all 38 fixtures of `docs/spec/echo-vectors/mirror/fixtures`: the texts, concatenated, hash to `echo/tests/witness.rs`'s `PARITY` digests (the binary's stdout ‖ `exit N`, taken at `982d945`). With `witness: true`, they hash to the binary's `--witness` stdout ‖ `exit N`, pinned at `83ec822`. The binary itself is run on a scripted stdin once.
+- **check** (`mcp/tests/check.rs`), on `prismqueer/tests/agreement.rs`'s values: the consistent triangle (0 → 1 +3, 1 → 2 +4, 0 → 2 +7) at (10, 13, 17) is `in` with coordinate 10; (10, 14, 17) is `out` on exactly 0-1#0 and 1-2#0; 3 + 4 ≠ 8 needs a ruling (twist ±1); the tritone pair needs a ruling over ℤ (twist 12, the octave) and is `in` mod 12; ℚ/ℤ in and curved; missing, unknown and outside-the-ring are `isError`; malformed is `-32602`. The addresses are the library's own.
+- **measure** (`mcp/tests/measure.rs`), on `prismqueer/tests/measured.rs`'s values: (1,2), (2,2), (3,5), (4,7) under MLE give K = [[8, −4], [−4, 20/9]], unbiased [[6, −3], [−3, 5/3]]; the path A–B–C gives K̂_AC = 0; the four-cycle is `unresolved`; too-few-samples, not-invertible and wrong-shape are answers; a `by` is refused. The window is a real ruler's address, and the expected addresses are `measure` under that ruler.
+- **Session:** `tools/list` names echo, chorus, check and measure; one session calls each.
 - **chorus:** `docs/spec/mcp-vectors/checkpoint.json` (the AND checkpoint of `chorus/tests/checkpoint.rs`, which checks the file) accepts, with its inclusion proof; one corrupted signature byte in either line rejects; a bad vkey is `isError`.
 - **Bad input never panics:** a seeded property over random byte strings and over byte mutations of valid messages, through the server's line loop; every output line reads back as a JSON-RPC response.
 - **Guards:** no `f32`/`f64` in `mcp/src`; the binary's source makes no file, environment, clock, network or process call.
-- **Mutations** (each makes a test fail, then is reverted): accept a duplicate key; read an exponent as an integer; drop `isError` on a tool failure; let `echo` answer `rings` where the library said `unknown`.
+- **Mutations** (each makes a test fail, then is reverted): accept a duplicate key; read an exponent as an integer; drop `isError` on a tool failure; let `echo` answer `rings` where the library said `unknown`; emit a decimal for a rational; return `isError: true` for `out`; let `measure` take a `by` and print a seal; and, in the guard, accept prismqueer with `lapack`.
 
 ## 8. Not here
 
-- `check` and `measure` wait for prismqueer's `exact` split (prism-025 §1); `hold` and `flip_point` as tools come after.
+- `hold` and `flip_point` as tools come next (prism-025 §2 step 4).
 - No `structuredContent` and no `outputSchema` yet: the text is the parity surface, and a structured form of it would be a second surface to keep in step.
 - No resources, prompts, logging, sampling or cancellation. A `notifications/cancelled` is ignored like any notification: every call finishes before the next line is read.
 
 ## 9. Questions
 
 - **For Alex:** the crate's name (`prism-mcp` is provisional). And the revision: stay on 2025-06-18's handshake, or move to 2026-07-28 (per-request `_meta` version, `server/discover`)?
+- **For Alex:** the floor now carries prismqueer's proc-macro crates and num-* (§1). Worth it for `check` and `measure`, or should those two live in a second server?
 - **For Mara:**
+  - `check`: is a selection that misses an item a broken ruler (`isError`, as now) or a subject that fails (`out`)? And is a value outside the declared ring the ruler's fault, the subject's, or a protocol error?
+  - `measure`: is naming the window by address enough (`measure_under`), or should the tool take the window ruler's draft and its signer label, so the window is a ruler and not only an address?
   - Is "subject vs ruler" the right line for `isError` (a bad note is `reject`; a bad vkey is no verdict)?
   - Should `heard` for a base64 input name the decoded bytes (as now) or the base64 text received?
   - Should `Decimal` be refused outright (so every number on the wire is an integer), rather than kept as an opaque lexeme?

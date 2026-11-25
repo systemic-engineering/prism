@@ -63,7 +63,9 @@ So the check refuses `cc` reached by any path but blake3's own edge: prismqueer'
 - Still `lapack`: `field`, `field_faces`, `room`, `one_graph`, `hodge`, `steer`, `window`, `instrument`, `music`, `band`, `loss_laws`, `rotation_splinter`, the spectral-compose battery, `autopoietic_loop_integration`, `lapack_faults`, `build_hygiene`. Each uses `spectral`, `band`, `Log2`/`Noise` or a measured reading.
 - `tests/exact.rs` holds the scan (every build) and an end-to-end path under `exact` alone: agreement `In`/`Out`, measured → metrix sealed by its window, a Form's inertia, the triangle's charpoly.
 
-## For prism-mcp (next)
+## For prism-mcp
+
+*Done: prism-mcp takes prismqueer under `exact`, and its guard reads its own resolve (`docs/spec/mcp.md` §6.1). The notes below are the plan as it stood.*
 
 - To offer `check` and `measure`, prism-mcp depends on `prismqueer = { path = "../prismqueer", default-features = false, features = ["exact"] }`.
 - Its independence check refuses `prismqueer` by name today. It would allow prismqueer exactly under that feature set: the walk from prism-mcp stays, and prismqueer's own closure is held by `checks.prismqueer-exact`.
