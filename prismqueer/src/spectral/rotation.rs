@@ -728,6 +728,47 @@ mod tests {
         }
     }
 
+    /// The `FiedlerRise` gate can't fire in Phase 1 (Mara, mirror
+    /// `mara/foerster-gauge-literal` §3.3; docs/spec/checks.md "Can't
+    /// flip"): `fiedler_at_basepoint < previous_fiedler` compares one
+    /// constant with itself, since the topology is fixed during rotation.
+    /// Over three pairs (two paths, two triangles, a triangle and an edge),
+    /// 200 ticks never fail, and every splinter reads the same λ₂ to the
+    /// bit: the join's, read once. What it would do in Phase 2 is the
+    /// docblock's.
+    #[test]
+    fn the_fiedler_gate_cannot_fire_in_phase_1() {
+        let pairs = [
+            (
+                graph_from_edges(&[(0, 1), (1, 2)]),
+                graph_from_edges(&[(3, 4), (4, 5)]),
+            ),
+            (
+                graph_from_edges(&[(0, 1), (1, 2), (0, 2)]),
+                graph_from_edges(&[(3, 4), (4, 5), (3, 5)]),
+            ),
+            (
+                graph_from_edges(&[(0, 1), (1, 2), (0, 2)]),
+                graph_from_edges(&[(3, 4)]),
+            ),
+        ];
+        for (a, b) in pairs {
+            let at = match join(&a, &b) {
+                Imperfect::Success(c) | Imperfect::Partial(c, _) => c.fiedler().value(),
+                Imperfect::Failure(red, _) => panic!("the join refused: {red:?}"),
+            };
+            let rot = match infer_via_rotation(&[a, b], 200, RotationConfig::default()) {
+                Imperfect::Success(r) | Imperfect::Partial(r, _) => r,
+                Imperfect::Failure(red, loss) => panic!("the gate fired: {red:?} {loss:?}"),
+            };
+            assert!(!rot.splinters.is_empty());
+            for s in &rot.splinters {
+                assert_eq!(s.fiedler_lambda_2().value().to_bits(), at.to_bits());
+                assert_eq!(s.transparency, Transparency::Clear);
+            }
+        }
+    }
+
     #[test]
     fn rotation_deterministic_splinter_oids() {
         let a = graph_from_edges(&[(0, 1), (1, 2)]);
