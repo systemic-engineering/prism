@@ -105,23 +105,23 @@ pub mod spectral;
 #[cfg(feature = "lapack")]
 pub mod nl;
 
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod field;
 
 #[cfg(feature = "lapack")]
 pub mod band;
 
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod room;
 
 // The kernel check: a signed selection against the consistent readings of
 // exact relations (prism-019 ask 4).
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod agreement;
 
 // The disco ball: facets on a room, turned by unitaries over ℤ, read as the
 // measurement triple (prism-012 Ask 3).
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod discoball;
 
 // Exact polynomials over ℤ and ℚ: gcds, square-free parts, real roots
@@ -159,27 +159,27 @@ pub mod assertion;
 #[cfg(feature = "lapack")]
 pub mod reality;
 
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod gl;
 
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod hypothesis;
 
 // kleinos: two parties' frames glued along declared spans, a pushout
 // (prism-021 D4; Mara 34f70d6d). The old join lives at `spectral::join`.
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod kleinos;
 
 // metrix: a frame's ruler for length (positive definite, certified by an
 // exact LDLᵀ, signed, no default) and a Form of any signature (prism-021 D5;
 // Mara 54c88f72 §8–§9).
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod metrix;
 
 // measured: a precision matrix estimated exactly over ℚ from integer counts
 // under a declared (chordal) support; a Metrix only once certified and
 // sealed (prism-023 §1, D6). No float on its path.
-#[cfg(feature = "lapack")]
+#[cfg(feature = "exact")]
 pub mod measured;
 
 #[cfg(feature = "lapack")]

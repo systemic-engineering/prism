@@ -58,12 +58,12 @@ use std::collections::BTreeMap;
 use num_bigint::BigInt;
 
 use crate::algedonic::Signer;
+use crate::field::VertexId;
 use crate::field::{Edge, Graph};
 use crate::oid::{Oid, Scope};
 use crate::room::{
     coboundary, solve, Cycle, Exactly, Exactness, QModOne, RingPart, RoomError, ZMod, Z,
 };
-use crate::spectral::join::VertexId;
 
 mod sealed {
     pub trait Sealed {}

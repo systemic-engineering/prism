@@ -94,12 +94,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use terni::Imperfect;
 
 use crate::algedonic::Signer;
+use crate::field::VertexId;
 use crate::field::{check_flat, Edge, Field, FieldError, Flatness, Graph, Loop};
 use crate::gl::{Gl, Scalar};
 use crate::kleinos::SpanId;
 use crate::oid::{Oid, Scope};
 use crate::room::{Coefficient, Z};
-use crate::spectral::join::VertexId;
 
 // --- Frames, relations, faces ---------------------------------------------------
 

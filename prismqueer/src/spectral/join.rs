@@ -80,12 +80,9 @@ use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Trans
 // Types per Mara canonical spec §2.2
 // ---------------------------------------------------------------------------
 
-/// Vertex identifier in a shard-graph. Phase 1: opaque u64.
-pub type VertexId = u64;
-
-/// Oriented edge in a shard-graph. Canonical: lower-VertexId first per
-/// edge_key convention (deterministic content-address).
-pub type EdgeKey = (VertexId, VertexId);
+/// Vertex and edge identifiers: [`field`](crate::field)'s, which the exact
+/// path (`exact`) defines without this module.
+pub use crate::field::{EdgeKey, VertexId};
 
 /// Property discriminator per PAPER §3.6 four properties. Used as substrate-
 /// location type parameter `P` in `Transparency<P>` per Rec #92. Delightfully-

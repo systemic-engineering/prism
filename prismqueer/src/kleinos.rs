@@ -96,7 +96,6 @@ use std::fmt;
 
 use terni::Imperfect;
 
-use crate::band::Measurement;
 use crate::field::Group;
 use crate::gl::{Gl, Scalar};
 use crate::hypothesis::{
@@ -104,7 +103,13 @@ use crate::hypothesis::{
     Relation, RelationDraft,
 };
 use crate::oid::Oid;
-use crate::room::RoomError;
+
+// The measured half (`lapack`): the Fiedler value, a reading beside the
+// address (docs/spec/features.md).
+#[cfg(feature = "lapack")]
+mod reading;
+#[cfg(feature = "lapack")]
+pub use reading::FIEDLER_METHOD;
 
 // --- Errors -----------------------------------------------------------------------
 
@@ -421,10 +426,6 @@ impl<R: Scalar> Added<R> {
     }
 }
 
-/// How [`Pushout::fiedler`] is measured.
-pub const FIEDLER_METHOD: &str =
-    "L₀ = δ*δ on the span multigraph (room), dsyev('N'), second eigenvalue; counts messages";
-
 /// Two parties glued along spans: the glued party, its composite, the event
 /// layer, the readings, and the emergent third.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -484,18 +485,6 @@ impl<R: Scalar> Pushout<R> {
     /// The hypothesis over the glued party: [`hypothesize`]'s.
     pub fn hypothesize(&self) -> Imperfect<Hypothesis, CompositionError, BTreeSet<Obstruction>> {
         hypothesize(&self.party.frames, &self.party.relations, &self.party.faces)
-    }
-
-    /// λ₂ of the room multigraph, measured: a reading beside the address,
-    /// never a law. Between two parties joined by k spans it is 2k.
-    pub fn fiedler(&self) -> Result<Measurement, RoomError> {
-        let spectrum = crate::room::laplacian(self.composite.graph())
-            .measure()
-            .spectrum()?;
-        Ok(Measurement::here(
-            spectrum.get(1).copied().unwrap_or(0.0),
-            FIEDLER_METHOD,
-        ))
     }
 }
 

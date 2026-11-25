@@ -2,8 +2,8 @@
 //! of an integer polynomial, isolated exactly.
 //!
 //! Nothing here is a float until the one place a measurement comes in,
-//! [`Roots::locate`], and even there the float is read as the exact dyadic
-//! rational it is. Coefficients are `num-bigint` integers ([`ZPoly`]) or
+//! `Roots::locate` (under `lapack`), and even there the float is read as the
+//! exact dyadic rational it is. Coefficients are `num-bigint` integers ([`ZPoly`]) or
 //! reduced `BigInt` ratios ([`QPoly`]), so no step rounds or overflows.
 //!
 //! What `poly` keeps from collapsing early:
@@ -11,7 +11,7 @@
 //!   disjoint rational intervals `(lo, hi]`, one root each, in increasing
 //!   order. A root's name is its index there; refining an interval never
 //!   changes it.
-//! - **A measurement is matched, or it refuses.** [`Roots::locate`] says
+//! - **A measurement is matched, or it refuses.** `Roots::locate` says
 //!   which exact root a measured eigenvalue is, only when exactly one root is
 //!   in its window. Two or more is [`Located::Ambiguous`], with the
 //!   candidates: what is known, not a guess.
@@ -30,7 +30,7 @@
 //! For mirror's exact algebraic tag (`0x06`: the minimal polynomial, then
 //! the root's index among its real roots): the minimal polynomial of an
 //! eigenvalue is its *irreducible* factor over ℚ, and the square-free part
-//! is only the product of those factors. [`Factorization::identify`] reads
+//! is only the product of those factors. `Factorization::identify` reads
 //! a measured value against every factor's isolated roots and returns the
 //! tag, [`Algebraic`] (minimal, index), or refuses. [`Roots::index_of`] on
 //! a square-free part that isn't irreducible is an index among *its* roots,
@@ -46,6 +46,11 @@ use num_bigint::{BigInt, Sign};
 use num_integer::Integer;
 use num_rational::BigRational;
 use num_traits::{One, Signed, Zero};
+
+// The measured half (`lapack`): a float read against the exact roots, the one
+// place a measurement comes in (docs/spec/features.md).
+#[cfg(feature = "lapack")]
+mod reading;
 
 // --- Shared coefficient arithmetic -------------------------------------------
 
@@ -607,31 +612,6 @@ impl Roots {
             _ => None,
         }
     }
-
-    /// Which root a measured value is: the roots in the closed window
-    /// [measured − radius, measured + radius], counted exactly (each float
-    /// is the dyadic rational it is). One root: [`Located::Root`] with its
-    /// index. Several: [`Located::Ambiguous`], a refusal naming them. None:
-    /// [`Located::Absent`].
-    pub fn locate(&self, measured: f64, radius: f64) -> Located {
-        let (Some(m), Some(r)) = (
-            BigRational::from_float(measured),
-            BigRational::from_float(radius),
-        ) else {
-            return Located::Unmeasured;
-        };
-        if r.is_negative() {
-            return Located::Unmeasured;
-        }
-        let (lo, hi) = (&m - &r, &m + &r);
-        let (below, on_edge) = self.below(&lo);
-        let count = self.count_in(&lo, &hi) + usize::from(on_edge);
-        match count {
-            0 => Located::Absent,
-            1 => Located::Root(below),
-            _ => Located::Ambiguous(below..below + count),
-        }
-    }
 }
 
 /// The Sturm sequence p, p′, −rem(p, p′), …: each term the negated
@@ -973,29 +953,6 @@ impl Factorization {
         self.factors
             .iter()
             .fold(ZPoly(vec![BigInt::one()]), |acc, f| &acc * f)
-    }
-
-    /// Which exact algebraic number a measured value is: the roots of every
-    /// factor in the closed window [measured − radius, measured + radius],
-    /// counted exactly ([`Roots::locate`] on each). One root: its tag, the
-    /// factor as minimal polynomial and the root's index among that
-    /// factor's real roots. Several: a refusal naming them.
-    pub fn identify(&self, measured: f64, radius: f64) -> Identified {
-        let mut hits = Vec::new();
-        for (f, roots) in self.factors.iter().zip(&self.roots) {
-            let tag = |index| Algebraic::new(f.clone(), index);
-            match roots.locate(measured, radius) {
-                Located::Unmeasured => return Identified::Unmeasured,
-                Located::Absent => {}
-                Located::Root(i) => hits.push(tag(i)),
-                Located::Ambiguous(range) => hits.extend(range.map(tag)),
-            }
-        }
-        match hits.len() {
-            0 => Identified::Absent,
-            1 => Identified::Algebraic(hits.pop().expect("one")),
-            _ => Identified::Ambiguous(hits),
-        }
     }
 }
 

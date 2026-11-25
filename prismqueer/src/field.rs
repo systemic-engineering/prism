@@ -20,8 +20,8 @@
 //!
 //! The algebra is a type distinction: [`Lattice`] values get `meet`, [`Group`]
 //! values get transports, and only [`Exact`] groups get [`check_flat`]. A float
-//! group ([`Log2`]) is a measurement: it can be read only through a declared
-//! [`Noise`] band ([`check_flat_within`]). No silent tolerance.
+//! group (`Log2`, under `lapack`) is a measurement: it can be read only
+//! through a declared `Noise` band (`check_flat_within`). No silent tolerance.
 //!
 //! Geometry only. Rulers, approvals and signatures live in mirror.
 //!
@@ -51,8 +51,22 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 
 use crate::oid::{Oid, Scope};
-use crate::spectral::join::{EdgeKey, Graph as Shape, VertexId};
-use crate::spectral::settle::Noise;
+#[cfg(feature = "lapack")]
+use crate::spectral::join::Graph as Shape;
+
+// The measured half (`lapack`): a float group read through a declared band.
+#[cfg(feature = "lapack")]
+mod reading;
+#[cfg(feature = "lapack")]
+pub use reading::{check_flat_within, Log2, Measured};
+
+/// Vertex identifier in a shard-graph. Phase 1: opaque u64.
+/// ([`spectral::join`](crate::spectral::join) re-exports it.)
+pub type VertexId = u64;
+
+/// Oriented edge in a shard-graph. Canonical: lower-VertexId first per
+/// edge_key convention (deterministic content-address).
+pub type EdgeKey = (VertexId, VertexId);
 
 // --- The value algebra -------------------------------------------------------
 
@@ -75,12 +89,6 @@ pub trait Group: Clone + PartialEq + Debug {
 /// A group whose equality is exact, so a holonomy that isn't the identity
 /// really isn't. Only these get [`check_flat`].
 pub trait Exact: Group {}
-
-/// A group read by measurement: how far a value is from the identity.
-pub trait Measured: Group {
-    /// Distance from the identity, in the group's own units.
-    fn magnitude(&self) -> f64;
-}
 
 /// A meet-semilattice with a top: values that combine by taking the lower.
 pub trait Lattice: Clone + PartialEq + Debug {
@@ -250,29 +258,6 @@ impl Group for Perm {
 }
 
 impl Exact for Perm {}
-
-/// A float group: logarithms (base 2) under addition. A measurement, not
-/// [`Exact`]: read it through [`check_flat_within`] with a declared band.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct Log2(pub f64);
-
-impl Group for Log2 {
-    fn identity() -> Self {
-        Log2(0.0)
-    }
-    fn compose(&self, other: &Self) -> Self {
-        Log2(self.0 + other.0)
-    }
-    fn inverse(&self) -> Self {
-        Log2(-self.0)
-    }
-}
-
-impl Measured for Log2 {
-    fn magnitude(&self) -> f64 {
-        self.0.abs()
-    }
-}
 
 /// The least of some numbers: meet is `min`, top is `u64::MAX`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -617,7 +602,9 @@ impl<V: Group> Field<Graph, V> {
     /// A connection on a simple graph: one transport per edge, given in
     /// either orientation (a transport given on `(v, u)` is stored inverted
     /// on `(u, v)`). Every edge is `nth` 0; a pair given twice keeps the
-    /// last. For parallel edges, use [`Field::multigraph`].
+    /// last. For parallel edges, use [`Field::multigraph`]. Under `lapack`:
+    /// the simple graph is [`spectral::join`](crate::spectral::join)'s.
+    #[cfg(feature = "lapack")]
     pub fn transports(
         graph: &Shape,
         given: impl IntoIterator<Item = (EdgeKey, V)>,
@@ -830,7 +817,7 @@ impl<P, V> ScalarPrism<V> for P where P: FieldPrism<Point, V> {}
 
 // --- Flat or curved ----------------------------------------------------------
 
-/// A flat connection, which only [`check_flat`] or [`check_flat_within`] can
+/// A flat connection, which only [`check_flat`] or `check_flat_within` can
 /// produce. Its gauge class is absorbable: a potential `p` with
 /// `transport(u → v) = p(u)⁻¹ · p(v)` on every edge, the identity at each
 /// component's smallest vertex.
@@ -915,12 +902,6 @@ pub enum Flatness<V> {
 /// Flat or curved, decided exactly.
 pub fn check_flat<V: Exact>(field: &Field<Graph, V>) -> Flatness<V> {
     flatness(field, |h| h.is_identity())
-}
-
-/// Flat or curved, read through a declared band: a loop closes when its
-/// holonomy is within `noise` of the identity.
-pub fn check_flat_within<V: Measured>(field: &Field<Graph, V>, noise: Noise) -> Flatness<V> {
-    flatness(field, |h| h.magnitude() <= noise.0)
 }
 
 fn flatness<V: Group>(field: &Field<Graph, V>, closes: impl Fn(&V) -> bool) -> Flatness<V> {

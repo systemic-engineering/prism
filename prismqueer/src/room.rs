@@ -41,10 +41,11 @@
 //! Composition is checked by kind. The control compiles:
 //!
 //! ```
+//! use prismqueer::field::Graph;
 //! use prismqueer::room::coboundary;
-//! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
+//! let delta = coboundary(&Graph::new([0, 1, 2], [(0, 1), (1, 2), (0, 2)]));
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
+//! # #[cfg(feature = "lapack")] // measured: the `lapack` half
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
 //! ```
@@ -55,10 +56,11 @@
 //! ended in C¹.
 //!
 //! ```compile_fail,E0308
+//! use prismqueer::field::Graph;
 //! use prismqueer::room::coboundary;
-//! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
+//! let delta = coboundary(&Graph::new([0, 1, 2], [(0, 1), (1, 2), (0, 2)]));
 //! let laplacian = delta.then(&delta).unwrap(); // C⁰ → C¹, then out of C⁰
+//! # #[cfg(feature = "lapack")] // measured: the `lapack` half
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
 //! ```
@@ -66,9 +68,9 @@
 //! An exact map then a measured one: the move to `f64` is never implicit.
 //!
 //! ```compile_fail,E0308
+//! use prismqueer::field::Graph;
 //! use prismqueer::room::coboundary;
-//! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
+//! let delta = coboundary(&Graph::new([0, 1, 2], [(0, 1), (1, 2), (0, 2)]));
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
 //! let _ = delta.then(&delta.adjoint().measure());
 //! let _ = laplacian.symmetric();
@@ -77,10 +79,11 @@
 //! A door isn't a room: δ goes from C⁰ to C¹, so it has no resonances.
 //!
 //! ```compile_fail,E0599
+//! use prismqueer::field::Graph;
 //! use prismqueer::room::coboundary;
-//! use prismqueer::spectral::graph_from_edges;
-//! let delta = coboundary(graph_from_edges(&[(0, 1), (1, 2), (0, 2)]).multigraph());
+//! let delta = coboundary(&Graph::new([0, 1, 2], [(0, 1), (1, 2), (0, 2)]));
 //! let laplacian = delta.then(&delta.adjoint()).unwrap(); // C⁰ → C¹ → C⁰
+//! # #[cfg(feature = "lapack")] // measured: the `lapack` half
 //! let _ = delta.measure().then(&delta.adjoint().measure());
 //! let _ = delta.symmetric();
 //! ```
@@ -217,11 +220,18 @@ use std::marker::PhantomData;
 
 use num_bigint::{BigInt, Sign};
 use num_rational::BigRational;
-use num_traits::{One, ToPrimitive, Zero};
+use num_traits::{One, Zero};
 
+use crate::field::VertexId;
 use crate::field::{complex_oid, Edge, Exact, Face, Graph, Group, Spanning, Walk};
 use crate::oid::{Oid, Scope};
-use crate::spectral::join::VertexId;
+
+// The measured half (`lapack`): the one explicit step to `f64`, and the eigen
+// and singular-value readings through LAPACK (docs/spec/features.md).
+#[cfg(feature = "lapack")]
+mod reading;
+#[cfg(feature = "lapack")]
+pub use reading::{Measure, Modes};
 
 // --- Kinds of room -----------------------------------------------------------
 
@@ -337,6 +347,7 @@ pub enum RoomError {
         col: usize,
     },
     /// LAPACK couldn't measure: what it, or prism's check before it, said.
+    #[cfg(feature = "lapack")]
     Unmeasured(crate::ffi::Fault),
     /// A face runs along an edge the graph doesn't have.
     Outside(Edge),
@@ -615,12 +626,6 @@ pub trait Entry: Coefficient {
 /// `f64` isn't one.
 pub trait Exactly: Coefficient {}
 
-/// Exact entries that can be measured: the one explicit step to `f64`.
-pub trait Measure: Entry + Exact {
-    /// This entry as a float.
-    fn measure(&self) -> f64;
-}
-
 /// An integer, exactly and of any size: the entries of exact topology (δ is
 /// ±1 and 0), and of everything composed from them.
 ///
@@ -699,14 +704,6 @@ impl Entry for Z {
 }
 
 impl Exactly for Z {}
-
-impl Measure for Z {
-    /// Exact up to 2⁵³ in magnitude; beyond, the nearest float, and ±∞ past
-    /// `f64`'s range.
-    fn measure(&self) -> f64 {
-        self.0.to_f64().expect("every BigInt has a float reading")
-    }
-}
 
 /// An integer mod n, exactly: a residue in 0..n, with its [`Modulus`].
 ///
@@ -965,34 +962,6 @@ impl Entry for Q {
 
 impl Exactly for Q {}
 
-impl Coefficient for f64 {
-    type Ring = ();
-    fn ring(&self) -> &() {
-        &()
-    }
-    fn zero(_: &()) -> Self {
-        0.0
-    }
-    fn add(&self, other: &Self) -> Self {
-        self + other
-    }
-    fn neg(&self) -> Self {
-        -self
-    }
-    fn times(&self, n: &BigInt) -> Self {
-        n.to_f64().expect("every BigInt has a float reading") * self
-    }
-}
-
-impl Entry for f64 {
-    fn one(_: &()) -> Self {
-        1.0
-    }
-    fn mul(&self, other: &Self) -> Self {
-        self * other
-    }
-}
-
 // --- Maps --------------------------------------------------------------------
 
 /// A linear map from room `A` to room `B` with entries `R`: a door.
@@ -1213,13 +1182,6 @@ impl<A: Kind, B: Kind, R: Entry> Map<A, B, R> {
     }
 }
 
-impl<A: Kind, B: Kind, R: Measure> Map<A, B, R> {
-    /// The one explicit step from exact to measured: every entry as `f64`.
-    pub fn measure(&self) -> Map<A, B, f64> {
-        self.with(self.entries.iter().map(Measure::measure).collect(), ())
-    }
-}
-
 impl<A: Kind, B: Kind> Map<A, B, Z> {
     /// The ring map ℤ → ℤ/n on every entry: this map over ℤ/n.
     pub fn reduce(&self, n: &Modulus) -> Map<A, B, ZMod> {
@@ -1245,19 +1207,6 @@ impl<A: Kind, B: Kind> Map<A, B, Z> {
             }
         }
         Ok(y)
-    }
-}
-
-impl<A: Kind, B: Kind> Map<A, B, f64> {
-    /// The Frobenius norm: the square root of the sum of squared entries.
-    pub(crate) fn frobenius(&self) -> f64 {
-        self.entries.iter().map(|x| x * x).sum::<f64>().sqrt()
-    }
-
-    /// The singular values, descending, by LAPACK's dgesdd. The matrix goes
-    /// over as stored (column-major). `Err` is dgesdd's `info`.
-    pub(crate) fn singular_values(&self) -> Result<Vec<f64>, crate::ffi::Fault> {
-        crate::ffi::singular_values_columns(self.to.dim, self.from.dim, &self.entries)
     }
 }
 
@@ -1366,36 +1315,6 @@ impl<A: Kind, B: Kind, R: Entry<Ring = ()>> Map<Sum<A, B>, Sum<A, B>, R> {
 /// room's resonator. Only [`Map::symmetric`] makes one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Symmetric<A: Kind, R: Entry>(Map<A, A, R>);
-
-impl<A: Kind, R: Measure> Symmetric<A, R> {
-    /// Measured: every entry as `f64`. A mirror stays a mirror.
-    pub fn measure(&self) -> Symmetric<A, f64> {
-        Symmetric(self.0.measure())
-    }
-}
-
-impl<A: Kind> Symmetric<A, f64> {
-    /// The room's resonances: eigenvalues and eigenvectors, by LAPACK's dsyev.
-    /// The matrix goes over as stored (column-major), without a copy.
-    pub fn decompose(&self) -> Result<Modes<A>, RoomError> {
-        let map = &self.0;
-        let (spectrum, vectors) = crate::ffi::eigensystem_columns(map.from.dim, &map.entries)
-            .map_err(RoomError::Unmeasured)?;
-        Ok(Modes {
-            room: map.from.clone(),
-            spectrum,
-            vectors,
-        })
-    }
-
-    /// The room's resonant values alone, ascending: its spectrum without the
-    /// modes, by dsyev('N'). Not [`decompose`](Self::decompose)'s spectrum to
-    /// the bit: dsyev('V') solves the tridiagonal problem another way.
-    pub fn spectrum(&self) -> Result<Vec<f64>, RoomError> {
-        let map = &self.0;
-        crate::ffi::eigenvalues_columns(map.from.dim, &map.entries).map_err(RoomError::Unmeasured)
-    }
-}
 
 impl<A: Kind> Symmetric<A, Z> {
     /// The invariant factors ([`Map::invariant_factors`]). A symmetric
@@ -1715,41 +1634,6 @@ impl<A: Kind> Map<A, A, Z> {
             previous = a[k][k].clone();
         }
         Z(sign * previous)
-    }
-}
-
-/// The modes of a room: how a self-adjoint map on it resonates.
-///
-/// The spectrum is sorted ascending; mode `k` is eigenvalue `k` with
-/// eigenvector `k`. Eigenvectors are read only whole, as columns.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Modes<A: Kind> {
-    room: Room<A>,
-    spectrum: Vec<f64>,
-    /// Column-major: eigenvector `k` is `vectors[k * n..(k + 1) * n]`.
-    vectors: Vec<f64>,
-}
-
-impl<A: Kind> Modes<A> {
-    /// The room that resonates.
-    pub fn room(&self) -> &Room<A> {
-        &self.room
-    }
-
-    /// The eigenvalues, ascending.
-    pub fn spectrum(&self) -> &[f64] {
-        &self.spectrum
-    }
-
-    /// Eigenvector `k`, belonging to `spectrum()[k]`: a vector of the room.
-    pub fn vector(&self, k: usize) -> Option<&[f64]> {
-        let n = self.room.dim;
-        (k < n).then(|| &self.vectors[k * n..(k + 1) * n])
-    }
-
-    /// Every eigenvector, in spectrum order.
-    pub fn vectors(&self) -> impl Iterator<Item = &[f64]> {
-        (0..self.room.dim).filter_map(move |k| self.vector(k))
     }
 }
 
