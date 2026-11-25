@@ -941,6 +941,13 @@ fn census<B: Backend + ?Sized>(
         own(backend, scope, crystal)?;
         covers.insert(crystal.clone());
     }
+    for root in unless_erased(read_list(backend, &slots.chain))? {
+        own(backend, scope, &root)?;
+        covers.insert(root);
+    }
+    if let Some(bytes) = unless_erased(read_slot(backend, &slots.root))? {
+        covers.insert(Oid::hash(scope, &bytes));
+    }
     Ok(covers)
 }
 
@@ -1200,13 +1207,34 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
     /// The scope's root: the address of its root bytes, which name the last
     /// crystal settled and the root before. `None` before the first settle.
     pub fn root(&self) -> Result<Option<Oid>, Recall<B::Error>> {
-        Ok(None)
+        let bytes = read_slot(&*self.backend, self.slots().root())?;
+        Ok(bytes.map(|bytes| Oid::hash(&self.scope, &bytes)))
     }
 
     /// Every root, in order, if the scope was settled chained.
     pub fn chain(&self) -> Result<Vec<Oid>, Recall<B::Error>> {
-        let _ = self.chained;
-        Ok(Vec::new())
+        read_list(&*self.backend, self.slots().chain())
+    }
+
+    /// Advance the root past a newly settled crystal: `root ‖ settled ‖
+    /// previous root`, one line each. Chained, the root also persists as a
+    /// crystal and joins the chain.
+    fn advance(&mut self, settled: &Oid) -> Result<(), Recall<B::Error>> {
+        let slots = self.slots();
+        let mut bytes = format!("root\n{}", settled.as_str());
+        if let Some(previous) = self.root()? {
+            bytes.push('\n');
+            bytes.push_str(previous.as_str());
+        }
+        let bytes = bytes.into_bytes();
+        if self.chained {
+            let root = Crystal::settle(&self.scope, bytes.clone());
+            let mut chain = self.chain()?;
+            self.backend.persist(&root).map_err(Recall::Backend)?;
+            chain.push(root.address().clone());
+            self.write(&slots.chain, &list_bytes(&chain))?;
+        }
+        self.write(&slots.root, &bytes)
     }
 
     /// The scope.
@@ -1255,6 +1283,7 @@ impl<'a, 'k, B: Backend + ?Sized> Held<'a, 'k, B> {
         if new {
             manifest.push(address.clone());
             self.write(&slots.manifest, &list_bytes(&manifest))?;
+            self.advance(&address)?;
         }
         Ok(address)
     }
