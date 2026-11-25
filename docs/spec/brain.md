@@ -197,8 +197,8 @@ makes using the key after the mint unrepresentable (`compile_fail`, E0382).
   doesn't is refused (`Stranger`), and the key is handed back unconsumed. So an Erasure
   can purge only its own scope's crystals, never the public scope's or another
   holder's. Without the census, one holder's erasure could delete anyone's bytes,
-  because an address doesn't say which scope it's in. Item 3's per-scope index will
-  take the census's place.
+  because an address doesn't say which scope it's in. Item 3's per-scope index took
+  the census's place (below, "The census, replaced").
 - **A dangling verdict is never erasure evidence.** It is never final (`compile_fail`).
 
 ### The receipt (item 7)
@@ -265,14 +265,190 @@ scope id. That is what lets Y's edge read `Erased` instead of `Missing`. Whether
 count is itself a leak is Mara's to grade. The alternative is a tombstone per scope,
 with Y's edges carrying the target's scope id.
 
-### Next (not in this run)
+## A keyed scope's own state (prism-026 items 3, 4, 5)
 
-- **Item 3.** The per-scope reference index, persisted beside the crystal in its own
-  scope and purged with it. It replaces the census. It waits on Alex's answer about
-  retiring "the index never shrinks" for keyed scopes.
-- **Item 4.** Lums and deposit ticks per scope, erased with it.
-- **Item 5.** A per-scope root, with an optional root chain.
+*prism-Reed, 2026-11-25. The second run of prism-026. F8 stands: synthetic bytes and
+throwaway keys only. Items 3, 4 and 5 put a keyed scope's index, light and root **in the
+scope itself, through `Backend`**, so the same erasure that purges its crystals purges
+them. prism keeps none of it in memory and holds no key.*
+
+### Slots: a scope's mutable state, under its key
+
+A content address can't hold state that changes (a list that grows, a root that
+advances). So a keyed scope keeps its state in **slots**: named places whose address
+only the key holder can compute.
+
+- **The address:** `Oid::slot(scope, label) = BLAKE3-derive-key("systemic.engineering://slot/v1", K_scope ‖ label)`,
+  64 hex. It's the same shape as `ScopeId`: one-way, and in neither the content
+  domain (a keyed hash) nor the scope-id domain. No crystal's bytes can land on a
+  slot, and a slot doesn't reveal the key. Without the key, a slot address is as
+  unlinkable as the scope's crystal addresses.
+- **The port:** `Backend` gains one required method, `write(&Slot)`: replace the bytes
+  under a slot address. `Slot` has no public constructor; only prism's keyed-scope
+  operations build one. Writing a tombstoned slot stores nothing (a purge is final).
+  A slot reads back through `fetch`, by a checked read that asks `erased` **first**,
+  so an erased slot reads `Lost(Erased(receipt))` even on a backend that kept its
+  bytes.
+- **What a slot read can't check, and what it can.** A slot's bytes are mutable, so
+  they can't be rehashed to their address the way a crystal's can. Their
+  faithfulness is the adapter's obligation, like durability under A2. Malformed
+  bytes read `Forged(slot)`, never believed. And every address a slot *names* is
+  checked when it's used: a listed crystal is read by `recall` (rehash), the mint
+  rehashes each one under the live key, and the root's address is recomputed from
+  the root's bytes on every read.
+
+A scope's slots:
+
+| slot (label) | holds | item |
+|---|---|---|
+| `manifest` | the crystals settled in the scope, in settle order | 3 |
+| `references ‖ c` | the references declared for crystal `c` at `settle_with` (a union) | 3 |
+| `light` | each deposited fact's slot address and its deposit tick | 4 |
+| `root` | the current root's bytes | 5 |
+| `chain` | every root's address, in order (only when chained) | 5 |
+
+### `Held`: a scope, for the duration of a borrow
+
+`Held::open(&mut backend, &key)` borrows the backend and the key. It keeps nothing
+beside the borrow: no cache, no index in memory, and no key (it holds a
+`Scope<'k>`, which borrows the key, so a `Held` can't outlive it). Every operation
+reads and writes the scope's slots through `Backend`. It isn't a `Brain`: it holds
+nothing hot, so `Capacity` doesn't apply, and the capacity proof above is untouched.
+`Brain` still works only in the public scope.
+
+### Item 3: the per-scope reference index
+
+- **The lists live beside the crystal, in its own scope.** `Held::settle_with(bytes,
+  references)` persists the crystal, appends it to `manifest` if it's new, and writes
+  its declared references into its own `references ‖ c` slot. Settling the same
+  bytes again adds the new references to the old ones, as `Brain::settle_with` does.
+- **The index is a projection, rebuilt.** `Held::index()` reads `manifest`, then each
+  crystal's `references` slot, and returns the map. Nothing caches it. Rebuilding it
+  twice gives the same index; rebuilding it after a purge reads `Lost(Erased)`.
+  - A scope never settled into has no `manifest`: its index is **empty**.
+  - A purged scope's index is **`Lost(Erased(receipt))`**, never empty: a purge and
+    a scope never used don't read the same (E1, again).
+- **No global cross-world index.** Every list is in a slot under its own scope's key.
+  No slot is written outside the scope, and no scope's index names another scope's
+  crystal unless its holder declared it as a reference.
+- **The public scope keeps today's behaviour.** `Brain`'s index (`references`) stays
+  in memory, outside `Capacity`, and never shrinks: cooling, a keyed purge on any
+  backend, or settling again never removes an entry. The public scope has no
+  `Erasure`, so nothing could license a shrink.
+- **Flagged for Alex: built pending confirmation.** prism-026 asked Alex to confirm
+  retiring "the index lives outside `Capacity` and never shrinks" for keyed scopes.
+  That isn't confirmed yet. The keyed index is built purgeable (it's in the scope's
+  slots, so the erasure covers it) because erasure is meaningless if the index
+  survives it. If Alex says no, the lists would have to leave the scope's slots, and
+  an erasure would leave them behind: that needs its own design, and Mara's grade.
+
+### The census, replaced
+
+`Erasure::mint(key, epoch, &backend)`: the census is no longer the caller's. Under the
+live key, the mint rebuilds the scope's state and covers:
+
+- every crystal in `manifest`;
+- every root in `chain`, and the current root;
+- every slot: `manifest`, each `references ‖ c`, `light`, `root`, `chain`.
+
+The `Stranger` refusal keeps its meaning: anything not in the scope under the live key
+is refused, and the key comes back unconsumed.
+
+- A listed crystal (or chained root) whose bytes the backend holds must rehash to its
+  address **under the live key**. If it doesn't, it's another scope's:
+  `Stranger(Foreign(address))`.
+- If the backend fails, `Stranger(Backend(error))`: still unconsumed.
+- A listed crystal whose bytes are missing is covered. It's named in the scope's own
+  `manifest`, which only the key holder's process writes, and a person's erasure
+  can't be blocked by a lost disk. (If a faulty adapter listed another scope's
+  address there and also lost its bytes, that address would read `Erased` instead
+  of `Missing`. It already had no bytes.)
+- **It can't be stale.** The mint reads the backend at the moment it consumes the key.
+  Once the key is consumed, nothing more can be settled in the scope in this process.
+  A copy of the key elsewhere could settle more; that's the same unprovable copy the
+  Sealed grade already names.
+- A scope already purged mints again (a copy of the key, say) and covers its slots
+  only. Its crystals are already tombstoned.
+
+### Item 4: lums and deposit ticks, per scope
+
+- `Held::deposit(fact, tick)` records a fact's deposit tick in `light`. It returns
+  `false`, and keeps the first tick, if the fact was already deposited, as
+  `Brain::deposit` does.
+- `Held::tick_of(fact)` is the tick it was deposited at.
+- `Held::lums(as_of)` is the number of distinct facts deposited at or before `as_of`:
+  `Brain::lums`'s count, per scope and persisted.
+- **A fact is named by its slot address,** `Oid::slot(scope, "fact\0" ‖ bytes)`, never by
+  its bytes. The backend holds no fact's plaintext, only one-way names and ticks.
+- **Erased with the scope:** `light` is a slot, so the mint covers it. After a purge,
+  `lums`, `tick_of` and `deposit` read `Lost(Erased(receipt))` on every backend.
+- The public `Brain`'s lums stay as they are: counters in memory, never part of an
+  address.
+
+### Item 5: a per-scope root, with an optional chain
+
+- **Every new crystal settled in the scope advances the root.** The root's bytes are
+  `root ‖ settled ‖ previous root` (one line each; no previous root at the first
+  settle). Its address is `Oid::hash(keyed, bytes)`. So the root commits to the
+  scope's whole settle history, as a hash chain, whether or not the history is
+  kept. Settling the same bytes again doesn't advance it.
+- **The `root` slot holds the root's bytes.** Its address is recomputed on every read,
+  never believed.
+- **The chain is optional.** `Held::open(..).chained()` also persists each root as a
+  crystal in the scope and appends it to `chain`: the person's own history,
+  walkable from the head. Unchained, a root's bytes exist only in the slot, and
+  earlier roots are nowhere.
+- **Purged with the scope.** The mint covers the current root, every chained root and
+  both slots. After a purge, `root()` and `chain()` read `Lost(Erased(receipt))`, and
+  so does any edge into a root: Y reading X's root, or any of X's chained roots,
+  without X's key, reads `Lost(Erased(receipt))`.
+
+### The mutations, each caught
+
+- **A global cross-scope index entry** (the `manifest` slot taken in the public scope,
+  so every scope shares one list): one scope's index names another's crystals.
+- **A purge that leaves lums** (`light` left out of the census): lums still read after
+  the purge.
+- **A purge that leaves the root chain** (the chained roots left out of the census): a
+  chained root still reads back.
+- **A mint from a stale census** (the manifest's last crystal left out, as if the
+  census were taken one settle early): a crystal settled before the mint survives it.
+
+## The line between prism and the adapter (prism-029, "the gap")
+
+prism's keyed scope is **keyed addressing**, not encryption.
+
+- **prism gives unlinkable addresses.** `Oid::hash(Scope::keyed(k), bytes)` and
+  `Oid::slot(Scope::keyed(k), label)` make a scope's addresses unrecomputable and
+  unlinkable without its key. **The content is still plaintext**: a crystal's bytes,
+  a slot's lists of addresses and ticks, a root's bytes.
+- **Encryption at rest is the key holder's adapter's job**: mirror's, per mirror-036,
+  running for X with X's key, through `@io`. **Never prism's.** prism holds no keys and
+  sees one only for the duration of a call. If prism ever seals envelopes, `K_enc` is
+  its own type, never a field of `Scope` (`identity.md`).
+- **Recall's integrity check in a keyed scope needs the key.** A crystal's address is
+  the keyed hash of its *plaintext*. If the backend stores ciphertext, `recall`'s
+  check (fetch, rehash, compare) has to decrypt before it rehashes, so it needs the
+  key at read time. That fits "the key is passed per call", but it means a keyed
+  scope can't be read, or verified, without its holder present.
+- **So after erasure, nobody can read or verify the scope.** That is the point of
+  `Erasure::mint`: once the key is consumed, nothing in the scope can be recomputed,
+  decrypted or checked again, and the tombstones say why.
+- **Deterministic encryption within one scope** would keep dedup inside the scope
+  (equal plaintext, equal ciphertext), leaking only equality within that scope.
+  That's the adapter's choice to make.
+- **prism builds no encryption.** This section states the line; it doesn't move it.
+
+## Next (not in this run)
+
+- **Alex:** confirm (or refuse) the keyed index being purgeable, retiring "never
+  shrinks" for keyed scopes only (item 3, above).
 - **Item 6.** Held until mirror's pin is signed and Alex answers "per scope or per
   (role, scope)".
-- **A keyed `Brain`.** `Brain` still works only in the public scope. A keyed brain would
-  take its `ScopeKey` per call, never at construction.
+- **A keyed `Brain`.** `Brain` still works only in the public scope. `Held` carries a
+  keyed scope's persisted state; a keyed hot tier, if it's ever needed, would take
+  its `ScopeKey` per call, never at construction.
+- **For Mara:** a backend sees which slots are written together, and when. Like the
+  tombstone count, that links a scope's slots to each other (never to the person, and
+  never across scopes). Each write rewrites a whole slot, which is O(n) per settle;
+  fine at this size, named here.
