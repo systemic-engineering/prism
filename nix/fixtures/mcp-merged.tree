@@ -11,7 +11,7 @@ proc-macro2 v1.0.106|default,proc-macro
 unicode-ident v1.0.24|
 quote v1.0.45|default,proc-macro
 proc-macro2 v1.0.106|default,proc-macro (*)
-syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro,visit-mut
+syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro
 proc-macro2 v1.0.106|default,proc-macro (*)
 quote v1.0.45|default,proc-macro (*)
 unicode-ident v1.0.24|
@@ -76,7 +76,7 @@ zerocopy v0.8.48|derive,zerocopy-derive
 zerocopy-derive v0.8.48 (proc-macro)|
 proc-macro2 v1.0.106|default,proc-macro (*)
 quote v1.0.45|default,proc-macro (*)
-syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro,visit-mut (*)
+syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro (*)
 echo v0.1.0 (/w/echo)|
 blake3 v1.8.7|default,pure,std
 arrayvec v0.7.8|
@@ -86,9 +86,8 @@ cpufeatures v0.3.1| (*)
 cc v1.2.60|
 find-msvc-tools v0.1.9|
 shlex v1.3.0|default,std
-prismqueer v0.1.1 (/w/prismqueer)|exact
+prism-laws v0.1.0 (/w/laws)|
 blake3 v1.8.7|default,pure,std (*)
-hex v0.4.3|alloc,default,std
 num-bigint v0.4.6|default,std
 num-integer v0.1.46|default,i128,std
 num-traits v0.2.19|default,i128,std (*)
@@ -99,24 +98,4 @@ num-bigint v0.4.6|default,std (*)
 num-integer v0.1.46|default,i128,std (*)
 num-traits v0.2.19|default,i128,std (*)
 num-traits v0.2.19|default,i128,std (*)
-prismqueer-projections v0.1.0 (proc-macro) (/w/projections)|
-proc-macro2 v1.0.106|default,proc-macro (*)
-quote v1.0.45|default,proc-macro (*)
-syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro,visit-mut (*)
-sha2 v0.10.9|default,std
-cfg-if v1.0.4|
-cpufeatures v0.2.17|
-libc v0.2.184|
-digest v0.10.7|alloc,block-buffer,core-api,default,std
-block-buffer v0.10.4|
-generic-array v0.14.7|more_lengths
-typenum v1.20.1|const-generics
-version_check v0.9.5|
-crypto-common v0.1.7|std
-generic-array v0.14.7|more_lengths (*)
-typenum v1.20.1|const-generics
-terni v0.7.0 (/w/imperfect)|default,fractal,macros
-terni-macros v0.7.0 (proc-macro) (/w/imperfect/macros)|
-proc-macro2 v1.0.106|default,proc-macro (*)
-quote v1.0.45|default,proc-macro (*)
-syn v2.0.117|clone-impls,default,derive,full,parsing,printing,proc-macro,visit-mut (*)
+terni v0.7.0 (/w/imperfect)|fractal

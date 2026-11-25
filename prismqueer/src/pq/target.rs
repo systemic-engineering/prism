@@ -32,6 +32,7 @@ pub enum Target {
     /// `{"oid": "..."}` — focus by content address.
     Oid {
         /// The content address to focus.
+        #[serde(with = "super::oid_wire")]
         oid: Oid,
     },
     /// `{"path": "..."}` — focus by working-tree path.
@@ -113,7 +114,9 @@ impl<'de> Deserialize<'de> for Target {
                 let (key, value) = entries.into_iter().next().unwrap();
                 match key.as_str() {
                     "oid" => Ok(Target::Oid {
-                        oid: serde_json::from_value(value).map_err(de::Error::custom)?,
+                        oid: serde_json::from_value::<String>(value)
+                            .map(crate::Oid::from)
+                            .map_err(de::Error::custom)?,
                     }),
                     "path" => Ok(Target::Path {
                         path: serde_json::from_value(value).map_err(de::Error::custom)?,

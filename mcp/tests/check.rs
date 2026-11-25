@@ -1,10 +1,10 @@
-//! The check tool (docs/spec/mcp.md §5.3): prismqueer's `agreement::check`
+//! The check tool (docs/spec/mcp.md §5.3): prism-laws's `agreement::check`
 //! over the wire, on `prismqueer/tests/agreement.rs`'s known values. The
 //! addresses come from the library itself: the tool reports what it says.
 
+use prism_laws::agreement::{Consistent, Relations, SelectionDraft};
+use prism_laws::room::{Modulus, QModOne, ZMod, Z};
 use prism_mcp::json::Value;
-use prismqueer::agreement::{Consistent, Relations, SelectionDraft};
-use prismqueer::room::{Modulus, QModOne, ZMod, Z};
 
 use crate::common::{call, code, get, is_error, ready, str_of, texts};
 
@@ -68,7 +68,7 @@ fn off_by_one_is_out_with_exactly_its_edges_and_is_a_verdict() {
 }
 
 /// The cycle lines as the library's cycles give them.
-fn cycles<V: prismqueer::agreement::Reading>(
+fn cycles<V: prism_laws::agreement::Reading>(
     relations: &Relations<V>,
     word: fn(&V) -> String,
 ) -> String {

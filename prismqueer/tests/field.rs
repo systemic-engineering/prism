@@ -15,7 +15,7 @@
 
 use prismqueer::field::{
     check_flat, check_flat_within, Discrete, Exact, Field, Flatness, Group, Lattice, Least, Log2,
-    Perm, Point, Ratio, Zn,
+    Perm, Point, Ratio, Transports, Zn,
 };
 use prismqueer::spectral::graph_from_edges;
 use prismqueer::spectral::settle::Noise;

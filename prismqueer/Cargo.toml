@@ -17,9 +17,10 @@ default = []
 optics = []
 bundle = ["optics"]
 lambda = []
-# The certified path, exact over ℤ and ℚ: room's exact half, field, gl, poly,
-# agreement, metrix, measured, hypothesis, kleinos, discoball. No float, no
-# cc, no LAPACK/BLAS/Fortran, no native build step (docs/spec/features.md).
+# The certified path, exact over ℤ and ℚ: prism-laws's room, field, gl,
+# agreement, metrix, measured, hypothesis and kleinos, re-exported at their old
+# paths, and discoball. No float, no cc, no LAPACK/BLAS/Fortran, no native
+# build step (docs/spec/features.md, docs/spec/laws.md).
 exact = []
 # The measured readings on top of it: ffi (LAPACK through Fortran), room's
 # eigen readings, band, spectral and everything built on them.
@@ -35,6 +36,9 @@ fate-metal = ["fate", "dep:metal", "dep:objc"]
 fate-training = ["fate", "dep:serde", "dep:serde_json"]
 
 [dependencies]
+# prism's floor: the exact laws, re-exported at their old paths
+# (docs/spec/laws.md).
+prism-laws = { path = "../laws" }
 # fractal: `Membership { In, Out, Undecided }` for algedonic::cross.
 terni = { version = "0.7", path = "../imperfect", features = ["fractal"] }
 prismqueer-projections = { version = "0.1", path = "../projections" }

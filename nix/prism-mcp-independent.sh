@@ -3,21 +3,23 @@
 # (docs/spec/mcp.md §6; prism-025 §1; Alex: "No serde.").
 #
 # prism-mcp serves prism's verifiers to mirror. It may not share code with
-# what it serves, carry a JSON crate (the wire is hand-written), or carry
-# prismqueer's LAPACK/BLAS/Fortran backend. Forbidden, by package name:
+# what it serves, carry a JSON crate (the wire is hand-written), or carry the
+# lab (prismqueer) or a LAPACK/BLAS/Fortran backend. Its laws come from the
+# floor, prism-laws (docs/spec/laws.md). Forbidden, by package name:
 #   - any mirror crate (`mirror`, `mirror-*`, `mirror_*`);
 #   - anything serde (*serde*: serde, serde_json, serde_core, serde_derive,
 #     miniserde, nanoserde) and any JSON crate (*json*);
 #   - anything LAPACK, BLAS or Fortran (*lapack*, *blas*, *fortran*,
 #     netlib-src, intel-mkl*, accelerate-src), and any package whose `links`
 #     key names lapack, blas or fortran;
-#   - prismqueer with any feature set but exactly `exact` (no `default`, no
-#     `lapack`): its certified path, held by checks.prismqueer-exact.
+#   - prismqueer, by name, with any features: the lab. (Before prism-laws,
+#     prismqueer was allowed under exactly `exact`.)
 #
 # The graph is prism-mcp's own resolve, not the workspace's. `cargo
 # metadata` resolves features once for the whole workspace, dev-dependencies
 # included: prismqueer's dev-dependency on terni turns terni's `serde` on in
-# that union, and the union shows terni → serde under prism-mcp although
+# that union, and the union shows terni → serde under prism-mcp (through
+# prism-laws, which takes terni without it) although
 # `cargo build -p prism-mcp` never builds it. `cargo tree -p prism-mcp`
 # resolves for prism-mcp alone, as cargo build and cargo test -p prism-mcp
 # do: prism-mcp's own dev edges, never its dependencies', and each package
@@ -39,7 +41,7 @@ set -euo pipefail
 
 tree=${1:?usage: prism-mcp-independent.sh <tree> <metadata.json>}
 meta=${2:?usage: prism-mcp-independent.sh <tree> <metadata.json>}
-forbidden='^(mirror|mirror[-_].*|.*serde.*|.*json.*|.*lapack.*|.*blas.*|.*fortran.*|netlib-src|intel-mkl.*|accelerate-src)$'
+forbidden='^(prismqueer|prismqueer[-_].*|mirror|mirror[-_].*|.*serde.*|.*json.*|.*lapack.*|.*blas.*|.*fortran.*|netlib-src|intel-mkl.*|accelerate-src)$'
 
 # One line per package node: `name vVERSION[ (proc-macro)][ (source)]|features`,
 # then ` (*)` when cargo has printed that node already.
@@ -56,7 +58,6 @@ found=$(jq -r -R -s --slurpfile meta "$meta" --arg re "$forbidden" --arg native 
         elif ($links | has($key) | not) then "\($key) (not in the metadata)"
         elif (.name | test($re)) then .name
         elif ($links[$key] | test($native)) then "\(.name) (links \($links[$key]))"
-        elif .name == "prismqueer" and .features != "exact" then "prismqueer (features \(.features))"
         else empty end
     end
 ' "$tree" | sort -u)
@@ -70,4 +71,4 @@ if [ -n "$found" ]; then
   echo "$found" | sed 's/^/    /' >&2
   exit 1
 fi
-echo "✔ prism-mcp-independent: no serde, JSON crate, mirror, LAPACK, BLAS or Fortran in prism-mcp's build; prismqueer only under exact"
+echo "✔ prism-mcp-independent: no serde, JSON crate, mirror, prismqueer, LAPACK, BLAS or Fortran in prism-mcp's build"

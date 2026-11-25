@@ -401,7 +401,7 @@ mod compare {
 #[cfg(feature = "lapack")]
 mod against_room {
     use super::*;
-    use prismqueer::room::laplacian;
+    use prismqueer::room::{laplacian, Measuring, Resonant};
     use prismqueer::spectral::graph_from_edges;
 
     /// The tag of every measured eigenvalue of a graph's L₀.

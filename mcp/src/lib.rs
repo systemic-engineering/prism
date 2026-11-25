@@ -7,12 +7,12 @@
 //!   message per line.
 //! - The [`tools`]: `echo` (the echo library, byte for byte the binary's
 //!   lines) and `chorus` (the AND checkpoint and an inclusion proof); and,
-//!   on prismqueer's `exact` path, `check` (agreement) and `measure` (a
+//!   on prism's floor (prism-laws), `check` (agreement) and `measure` (a
 //!   precision matrix over ℚ).
 //!
 //! No I/O, no clock, no environment: `#![no_std]` with `alloc`, bytes in,
 //! bytes out. Only the binary (`src/bin/prism-mcp.rs`) touches stdin and
-//! stdout. (prismqueer, which `check` and `measure` call, is a std crate, so
+//! stdout. (prism-laws, which `check` and `measure` call, is a std crate, so
 //! the build links std; this crate's own code still names none of it.)
 #![no_std]
 #![forbid(unsafe_code)]

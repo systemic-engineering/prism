@@ -46,7 +46,9 @@ Rust's orphan rule welds a generic type's admissible entries to the crate that d
   - `room::Measure` (an exact entry's reading), `room::Measuring` (`measure` on `Map` and `Symmetric`), `room::Resonant` (`decompose`, `spectrum` by dsyev);
   - `kleinos::Fiedler` (`fiedler`);
   - `field::Transports` (`Field::transports`, on spectral's simple graph).
-- **`RoomError` carries no lab type.** `Unmeasured(ffi::Fault)` left the floor: a LAPACK reading fails with the lab's `room::Unmeasured(ffi::Fault)`.
+- **`RoomError` carries no lab type.** `Unmeasured(ffi::Fault)` left the floor. A LAPACK reading (`decompose`, `spectrum`, `fiedler`) fails only to measure, so it returns the lab's `ffi::Fault` itself: every caller had matched `Unmeasured` and called the other variants unreachable.
+- **What the floor gives the lab to read with, all generic, none float:** `Map::column_major` (the stored entries) and `Map::entrywise` / `Symmetric::entrywise` (the one explicit change of entry type), `Symmetric::map`, `Field::simple` (a connection on a simple `field::Graph`; the lab's `Field::transports` is it on spectral's graph), `check_flat_by` (flatness under a caller's named predicate; `check_flat` and the lab's banded `check_flat_within` are both it), `Crystal::shared_bytes`, and `field::complex_oid` made public. A measured map's entries are copied into LAPACK's `f64` layout at the call (O(n²) beside dsyev's O(n³)); the floor has no `unsafe` to avoid it.
+- **What stays lab beside a law:** `field::FieldPrism` / `ScalarPrism` (over the lab's `Prism`), poly's `From<flux::pillar::Budget>`, and `Oid`'s serde on the pq wire (`pq::oid_wire`, the string as it is, what `#[serde(transparent)]` on `Oid` said).
 - **The newtype is where provenance goes next** (contract rule 7: a measurement names its machine and method). Not built here; `F64` is a bare carrier for now.
 
 ## Judges: a law may read a measurement, beside itself

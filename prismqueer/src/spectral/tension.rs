@@ -52,7 +52,6 @@ use std::collections::BTreeSet;
 
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
-use crate::room::RoomError;
 use crate::spectral::join::laplacian_spectrum;
 use crate::spectral::{Graph, Property, Red, VertexId};
 
@@ -141,11 +140,8 @@ pub fn detect_tensions(sheaf: &Graph) -> Imperfect<Vec<Tension>, Red, Convergenc
     let n = vertex_count;
     let spectrum = match laplacian_spectrum(sheaf) {
         Ok(evals) => evals,
-        Err(e) => {
-            let why = match e {
-                RoomError::Unmeasured(fault) => format!("LAPACK: {fault}"),
-                other => format!("{other:?}"),
-            };
+        Err(fault) => {
+            let why = format!("LAPACK: {fault}");
             return Imperfect::Failure(
                 Transparency::single(
                     Property::FiedlerRise,

@@ -402,6 +402,7 @@ fn a_commit_is_a_full_hash_and_a_span_is_two() {
 #[cfg(feature = "lapack")]
 #[test]
 fn lambda_2_between_two_parties_counts_messages() {
+    use prismqueer::kleinos::Fiedler;
     let (a, b) = (frame("A"), frame("B"));
     let tails = ['1', '2', '3', '4', '5', '6'];
     for k in 1..=5usize {

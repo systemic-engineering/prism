@@ -5,7 +5,7 @@
 
 #![cfg(feature = "lapack")]
 
-use prismqueer::field::{check_flat, Field, Flatness, Ratio};
+use prismqueer::field::{check_flat, Field, Flatness, Ratio, Transports};
 use prismqueer::spectral::graph_from_edges;
 
 fn thirds() -> [((u64, u64), Ratio); 3] {

@@ -553,42 +553,9 @@ where
 // Crystals and the backend
 // ---------------------------------------------------------------------------
 
-/// A settled item: canonical bytes under their address. Immutable.
-///
-/// [`Crystal::settle`] is the only constructor, and it computes the address
-/// from the bytes, so no crystal's address can disagree with its bytes, and
-/// nothing lends its bytes mutably.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Crystal {
-    address: Oid,
-    bytes: Arc<[u8]>,
-}
-
-impl Crystal {
-    /// Settle `bytes` in `scope`: the address is `Oid::hash(scope, bytes)`.
-    pub fn settle(scope: &Scope, bytes: Vec<u8>) -> Self {
-        Crystal {
-            address: Oid::hash(scope, &bytes),
-            bytes: bytes.into(),
-        }
-    }
-
-    /// The crystal's address.
-    pub fn address(&self) -> &Oid {
-        &self.address
-    }
-
-    /// The crystal's canonical bytes.
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-impl std::fmt::Debug for Crystal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Crystal({:?}, {} B)", self.address, self.bytes.len())
-    }
-}
+// The settled item itself is a law (docs/spec/laws.md): `crossing` replays
+// over it. It lives in prism-laws and is re-exported here at its old path.
+pub use prism_laws::crystal::Crystal;
 
 /// Where crystals persist. prism defines it; mirror implements it.
 ///
@@ -655,7 +622,7 @@ impl Backend for Memory {
 
     fn persist(&mut self, crystal: &Crystal) -> Result<(), Infallible> {
         self.crystals
-            .insert(crystal.address.clone(), crystal.bytes.clone());
+            .insert(crystal.address().clone(), crystal.shared_bytes());
         Ok(())
     }
 
@@ -783,7 +750,7 @@ pub fn recall<B: Backend + ?Sized>(
         .map_err(Recall::Backend)?
         .ok_or_else(|| Recall::Lost(address.clone()))?;
     let crystal = Crystal::settle(scope, bytes);
-    if &crystal.address != address {
+    if crystal.address() != address {
         return Err(Recall::Forged(address.clone()));
     }
     Ok(crystal)
@@ -1065,10 +1032,10 @@ impl<B: Backend> Brain<B> {
         references: impl IntoIterator<Item = Oid>,
     ) -> Result<Oid, B::Error> {
         let crystal = Crystal::settle(&self.scope, bytes);
-        let address = crystal.address.clone();
+        let address = crystal.address().clone();
         if !self.crystals.contains_key(&address) {
             self.backend.persist(&crystal)?;
-            let cost = crystal.bytes.len();
+            let cost = crystal.bytes().len();
             self.crystals.insert(address.clone(), crystal);
             self.settled_order.push_back(address.clone());
             self.hold(cost);
@@ -1155,7 +1122,7 @@ impl<B: Backend> Brain<B> {
         let mut cooled = 0;
         for address in &dangling.addresses {
             if let Some(crystal) = self.crystals.remove(address) {
-                self.stats.hot_bytes -= crystal.bytes.len();
+                self.stats.hot_bytes -= crystal.bytes().len();
                 self.stats.evicted_crystals += 1;
                 cooled += 1;
             }
@@ -1209,7 +1176,7 @@ impl<B: Backend> Brain<B> {
                 break;
             };
             let crystal = self.crystals.remove(&address).expect("held in order");
-            self.stats.hot_bytes -= crystal.bytes.len();
+            self.stats.hot_bytes -= crystal.bytes().len();
             self.stats.evicted_crystals += 1;
         }
         if self.capacity.admits(self.stats.hot_bytes) || self.recompute.is_none() {

@@ -1,15 +1,15 @@
-//! The measure tool (docs/spec/mcp.md §5.4): prismqueer's `measured::measure`
+//! The measure tool (docs/spec/mcp.md §5.4): prism-laws's `measured::measure`
 //! over the wire, on `prismqueer/tests/measured.rs`'s known values. The
 //! window is a real ruler's address, and the addresses expected are the
 //! library's own `measure` under that ruler: the tool reports what it says.
 //! It measures and never seals.
 
+use prism_laws::algedonic::{Clock, Draft, Question, Region, Ruler, Wald};
+use prism_laws::hypothesis::Frame;
+use prism_laws::measured::{measure, Estimator, Method, Support};
+use prism_laws::oid::Oid;
+use prism_laws::room::{Q, Z};
 use prism_mcp::json::Value;
-use prismqueer::algedonic::{Clock, Draft, Question, Region, Ruler, Wald};
-use prismqueer::hypothesis::Frame;
-use prismqueer::measured::{measure, Estimator, Method, Support};
-use prismqueer::oid::Oid;
-use prismqueer::room::{Q, Z};
 
 use crate::common::{call, code, get, is_error, ready, str_of, texts};
 

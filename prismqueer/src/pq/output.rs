@@ -14,8 +14,10 @@ use crate::Oid;
 #[serde(deny_unknown_fields)]
 pub struct CasUpdate {
     /// The currently-observed Oid (the CAS guard).
+    #[serde(with = "super::oid_wire")]
     pub old: Oid,
     /// The Oid to write if the guard matches.
+    #[serde(with = "super::oid_wire")]
     pub new: Oid,
 }
 

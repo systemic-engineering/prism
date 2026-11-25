@@ -8,6 +8,8 @@
 
 #![cfg(feature = "exact")]
 
+#[cfg(feature = "lapack")]
+use prismqueer::field::Transports;
 use prismqueer::field::{check_flat, Edge, Field, FieldError, Flatness, Graph, Group, Perm, Ratio};
 #[cfg(feature = "lapack")]
 use prismqueer::spectral::graph_from_edges;

@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 
 use terni::{Imperfect, Loss};
 
-use crate::room::{laplacian, Modes, RoomError, Vertices};
+use crate::room::{laplacian, Measuring, Modes, Resonant, Vertices};
 use crate::spectral::join::{Graph, VertexId};
 
 /// A value per vertex. Keyed by vertex, not by position.
@@ -200,10 +200,7 @@ impl Eigen {
         let modes = laplacian(graph.multigraph())
             .measure()
             .decompose()
-            .map_err(|e| match e {
-                RoomError::Unmeasured(fault) => Wall::Eigensystem(fault),
-                other => unreachable!("decompose fails only unmeasured: {other:?}"),
-            })?;
+            .map_err(Wall::Eigensystem)?;
         let harmonic = kernel(modes.spectrum(), components(graph, &index), n)?;
         Ok(Self {
             vertices,

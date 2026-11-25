@@ -71,9 +71,10 @@
 use std::collections::BTreeSet;
 
 use crate::band::Measurement;
+use crate::ffi::Fault;
 use crate::field::{complex_oid, Graph as Multigraph};
 use crate::oid::{Addressable, Oid, Scope};
-use crate::room::RoomError;
+use crate::room::{Measuring, Resonant};
 use terni::{ConvergenceLoss, Diagnostic, Imperfect, Loss, PropertyVerdict, Transparency};
 
 // ---------------------------------------------------------------------------
@@ -349,10 +350,10 @@ pub fn fiedler_lambda_2_of_graph(sheaf: &Graph) -> f64 {
 
 /// The spectrum of the graph Laplacian L₀ = δ*δ on C⁰, ascending: built
 /// exactly in [`room`](crate::room), measured once, read by dsyev('N')
-/// ([`Symmetric::spectrum`](crate::room::Symmetric::spectrum)). Vertices in
+/// ([`Resonant::spectrum`](crate::room::Resonant::spectrum)). Vertices in
 /// canonical order, as [`Graph::vertices`]. `Err` only when LAPACK refuses
-/// ([`RoomError::Unmeasured`]).
-pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, RoomError> {
+/// (its [`Fault`]).
+pub(crate) fn laplacian_spectrum(graph: &Graph) -> Result<Vec<f64>, Fault> {
     crate::room::laplacian(graph.multigraph())
         .measure()
         .spectrum()

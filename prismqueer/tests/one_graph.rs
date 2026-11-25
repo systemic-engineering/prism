@@ -16,9 +16,11 @@
 
 #![cfg(feature = "lapack")]
 
-use prismqueer::field::{check_flat, Edge, Field, Flatness, Graph, Ratio};
+use prismqueer::field::{check_flat, Edge, Field, Flatness, Graph, Ratio, Transports};
 use prismqueer::music::{Atom, Note, Rule, Tuning};
-use prismqueer::room::{coboundary, dirac, laplacian, Edges, Map, Room, Vertices, Z};
+use prismqueer::room::{
+    coboundary, dirac, laplacian, Edges, Map, Measuring, Resonant, Room, Vertices, Z,
+};
 use prismqueer::spectral::graph_from_edges;
 
 /// dim ker of a symmetric exact map: x's multiplicity as a root of its

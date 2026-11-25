@@ -1,0 +1,28 @@
+[package]
+name = "prism-laws"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "prism's floor (docs/spec/laws.md): the exact laws a verdict rests on. Rooms and maps over ℤ, ℤ/n, ℚ/ℤ, ℚ; agreement, gl, poly, metrix, measured, hypothesis, kleinos, hold, flip, navigation, crossing, the algedonic seals, and the identity law. No float entry, no proc-macro, no serde, no native numerics."
+repository = "https://github.com/systemic-engineering/prism"
+publish = false
+
+[lib]
+name = "prism_laws"
+
+# checks.laws-independent holds this crate's own build graph (nix/laws-
+# independent.sh): no proc-macro, no serde or JSON crate, no mirror crate, no
+# prismqueer, nothing LAPACK, BLAS or Fortran, no cc but blake3's. No
+# dev-dependencies either: the root's dev edges count.
+[dependencies]
+# Membership { In, Out, Undecided } (fractal) and Imperfect. Not terni's
+# default: that is `macros`, a proc-macro crate (terni-macros).
+terni = { version = "0.7", path = "../imperfect", default-features = false, features = ["fractal"] }
+# room::Z: arbitrary-precision integers, so exact topology never overflows.
+num-bigint = "0.4"
+num-traits = "0.2"
+# poly: exact ℚ and ℚ[x] (reduced BigInt ratios), and gcds over ℤ.
+num-rational = "0.4"
+num-integer = "0.1"
+# Scoped identity: Oid::hash is BLAKE3 keyed by the scope (docs/spec/identity.md).
+blake3 = "=1.8.7"

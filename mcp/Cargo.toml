@@ -19,14 +19,13 @@ path = "tests/main.rs"
 name = "prism-mcp"
 path = "src/bin/prism-mcp.rs"
 
-# echo, chorus and prismqueer's exact path (docs/spec/mcp.md §6).
-# checks.prism-mcp-independent holds the rest of prism-mcp's own build graph:
-# no serde, no JSON crate, no mirror crate, nothing LAPACK, BLAS or Fortran,
-# and prismqueer with exactly the feature `exact`. No dev-dependencies
-# either: the root's dev edges count.
+# echo, chorus and prism-laws (docs/spec/mcp.md §6). checks.prism-mcp-
+# independent holds the rest of prism-mcp's own build graph: no serde, no
+# JSON crate, no mirror crate, nothing LAPACK, BLAS or Fortran, and no
+# prismqueer. No dev-dependencies either: the root's dev edges count.
 [dependencies]
 echo = { path = "../echo" }
 chorus = { path = "../chorus" }
-# check and measure: prismqueer's certified path only, no LAPACK (docs/spec/
-# features.md). The guard allows prismqueer under exactly this feature set.
-prismqueer = { path = "../prismqueer", default-features = false, features = ["exact"] }
+# check and measure: prism's floor, the exact laws (docs/spec/laws.md). Not
+# prismqueer, the lab: the guard refuses it by name.
+prism-laws = { path = "../laws" }

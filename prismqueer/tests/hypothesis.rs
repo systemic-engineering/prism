@@ -230,7 +230,8 @@ fn no_metric_is_referenced_on_the_composition_path() {
     let _: Hypothesize = hypothesize::<Q>;
     let _: Compose = compose::<Q>;
 
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    // gl and hypothesis live in prism's floor, prism-laws (docs/spec/laws.md).
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../laws/src");
     for file in ["gl.rs", "hypothesis.rs"] {
         let text = std::fs::read_to_string(root.join(file)).expect("readable");
         for (n, line) in text.lines().enumerate() {

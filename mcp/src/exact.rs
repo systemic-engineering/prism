@@ -1,4 +1,4 @@
-//! The tools on prismqueer's certified path (docs/spec/mcp.md §5.3, §5.4):
+//! The tools on prism's floor, prism-laws (docs/spec/mcp.md §5.3, §5.4):
 //! `check` (`agreement::check`) and `measure` (`measured::measure`), exact
 //! over ℤ, ℤ/n, ℚ/ℤ and ℚ. Integers travel as JSON integers and rationals
 //! as `"p/q"` strings; nothing is ever a decimal.
@@ -17,12 +17,12 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use prismqueer::agreement::{self, Consistent, Reading, Relations, SelectionDraft, Verdict};
-use prismqueer::field::Edge;
-use prismqueer::hypothesis::Frame;
-use prismqueer::measured::{self, Estimator, Method, Shape, Support};
-use prismqueer::oid::Oid;
-use prismqueer::room::{Cycle, Modulus, QModOne, ZMod, Q, Z};
+use prism_laws::agreement::{self, Consistent, Reading, Relations, SelectionDraft, Verdict};
+use prism_laws::field::Edge;
+use prism_laws::hypothesis::Frame;
+use prism_laws::measured::{self, Estimator, Method, Shape, Support};
+use prism_laws::oid::Oid;
+use prism_laws::room::{Cycle, Modulus, QModOne, ZMod, Q, Z};
 
 use crate::json::Value;
 use crate::server::{object, text, Error};
@@ -116,7 +116,7 @@ fn broken(why: String) -> Result<Value, Error> {
 // ---------------------------------------------------------------- check
 
 const CHECK: &str = "Checks a selection against exact relations among items \
-                     (prismqueer::agreement::check). Each relation [from, to, t] says \
+                     (prism_laws::agreement::check). Each relation [from, to, t] says \
                      s(to) \u{2212} s(from) = t in one ring: Z, ZMod (with its modulus) or \
                      QModOne (values as \"p/q\" strings); items are integers \u{2265} 0. The \
                      answer is in (every relation, required and found, and the selection's \
@@ -129,7 +129,7 @@ const CHECK: &str = "Checks a selection against exact relations among items \
                      (algedonic::Signer), never verified; prism holds no keys and never signs.";
 
 const MEASURE: &str = "Estimates a precision matrix exactly over Q from integer counts \
-                       (prismqueer::measured::measure): samples (rows of `streams` integers), \
+                       (prism_laws::measured::measure): samples (rows of `streams` integers), \
                        the estimator mle (divide by n) or unbiased (by n \u{2212} 1), and the \
                        declared support edges [i, j], a zero off them declared conditional \
                        independence. Full support gives the inverse sample covariance, chordal \

@@ -34,7 +34,8 @@ use num_bigint::BigInt;
 use num_traits::{Signed, ToPrimitive};
 use prismqueer::band::{zeros, Verdict};
 use prismqueer::room::{
-    coboundary, coboundary_over, dirac, laplacian, Edges, Map, Room, RoomError, Sum, Vertices, Z,
+    coboundary, coboundary_over, dirac, laplacian, Edges, Map, Measuring, Resonant, Room,
+    RoomError, Sum, Vertices, F64, Z,
 };
 use prismqueer::spectral::instrument::Instrument;
 use prismqueer::spectral::{graph_from_edges, Graph};
@@ -168,7 +169,7 @@ fn dirac_squared_is_l0_plus_the_down_laplacian() {
             for j in 0..n {
                 // Integers in f64 are exact: equality, not a tolerance.
                 assert_eq!(
-                    *measured.entry(i, j).unwrap(),
+                    measured.entry(i, j).unwrap().0,
                     known[i * n + j],
                     "{name}: L₀[{i}, {j}]"
                 );
@@ -181,12 +182,13 @@ fn dirac_squared_is_l0_plus_the_down_laplacian() {
 
 /// ‖A v − λ v‖∞ for one column, read against the declared `settle` band at
 /// the operator's scale (its largest |eigenvalue|).
-fn residual_is_zero(a: &Map<Vertices, Vertices, f64>, scale: f64, value: f64, v: &[f64]) -> bool {
-    let av = a.apply(v).expect("v lives in A's room");
+fn residual_is_zero(a: &Map<Vertices, Vertices, F64>, scale: f64, value: f64, v: &[f64]) -> bool {
+    let x: Vec<F64> = v.iter().copied().map(F64).collect();
+    let av = a.apply(&x).expect("v lives in A's room");
     let r = av
         .iter()
         .zip(v)
-        .map(|(x, y)| (x - value * y).abs())
+        .map(|(x, y)| (x.0 - value * y).abs())
         .fold(0.0, f64::max);
     zeros::settle(v.len()).read(r, scale) == Verdict::Zero
 }
@@ -197,11 +199,12 @@ fn eigenvectors_are_columns() {
     // Distinct eigenvalues and an eigenbasis that isn't symmetric: reading a
     // row as an eigenvector gives a wrong answer (checked below).
     let rows = [
-        vec![2.0, 1.0, 0.0, 0.0],
-        vec![1.0, 3.0, 1.0, 0.0],
-        vec![0.0, 1.0, 4.0, 1.0],
-        vec![0.0, 0.0, 1.0, 7.0],
-    ];
+        [2.0, 1.0, 0.0, 0.0],
+        [1.0, 3.0, 1.0, 0.0],
+        [0.0, 1.0, 4.0, 1.0],
+        [0.0, 0.0, 1.0, 7.0],
+    ]
+    .map(|row| row.map(F64).to_vec());
     let a = Map::from_rows(&room, &room, &rows).expect("4×4 on C⁰");
     let modes = a
         .clone()

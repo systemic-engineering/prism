@@ -20,7 +20,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::room::{self, Edges, Map, Modes, RoomError, Sum, Vertices};
+use crate::room::{self, Edges, Map, Measuring, Modes, Resonant, Sum, Vertices, F64};
 use crate::spectral::commutator::Unmeasured;
 use crate::spectral::join::{EdgeKey, Graph, VertexId};
 use crate::spectral::settle::Time;
@@ -284,7 +284,7 @@ type Chains = Sum<Vertices, Edges>;
 pub struct Instrument {
     vertices: BTreeMap<VertexId, usize>,
     edges: BTreeMap<EdgeKey, usize>,
-    dirac: Map<Chains, Chains, f64>,
+    dirac: Map<Chains, Chains, F64>,
     /// D row-major, for [`Instrument::matrix`] only: nothing inside reads it.
     matrix: Vec<f64>,
     modes: Modes<Chains>,
@@ -310,14 +310,11 @@ impl Instrument {
             .symmetric()
             .expect("D = δ + δ* is self-adjoint")
             .decompose()
-            .map_err(|e| match e {
-                RoomError::Unmeasured(fault) => Unmeasured(fault),
-                other => unreachable!("decompose only fails to measure: {other:?}"),
-            })?;
+            .map_err(Unmeasured)?;
         let n = dirac.to().dim();
         let matrix = (0..n)
             .flat_map(|i| (0..n).map(move |j| (i, j)))
-            .map(|(i, j)| *dirac.entry(i, j).expect("inside D"))
+            .map(|(i, j)| dirac.entry(i, j).expect("inside D").0)
             .collect();
         Ok(Self {
             vertices,
@@ -334,7 +331,7 @@ impl Instrument {
 
     /// Entry `(row, col)` of D.
     fn d(&self, row: usize, col: usize) -> f64 {
-        *self.dirac.entry(row, col).expect("inside D")
+        self.dirac.entry(row, col).expect("inside D").0
     }
 
     /// The modes as (eigenvalue, eigenvector), in spectrum order.
@@ -374,7 +371,14 @@ impl Instrument {
     /// cochain's answer lands on the vertices.
     pub fn question(&self, x: &Cochain) -> Result<Cochain, Outside> {
         let x = self.dense(x)?;
-        let y = self.dirac.apply(&x).expect("dense is D's dimension");
+        let x: Vec<F64> = x.into_iter().map(F64).collect();
+        let y: Vec<f64> = self
+            .dirac
+            .apply(&x)
+            .expect("dense is D's dimension")
+            .into_iter()
+            .map(|y| y.0)
+            .collect();
         Ok(self.sparse(&y))
     }
 

@@ -1,7 +1,10 @@
 //! The measured half of [`field`](super) (`lapack`): a float group, read
-//! only through a declared [`Noise`] band. No silent tolerance.
+//! only through a declared [`Noise`] band, and a field on `spectral::join`'s
+//! simple graph. No silent tolerance.
 
-use super::{flatness, Field, Flatness, Graph, Group};
+use prism_laws::field::{check_flat_by, EdgeKey, Field, FieldError, Flatness, Graph, Group};
+
+use crate::spectral::join::Graph as Shape;
 use crate::spectral::settle::Noise;
 
 /// A group read by measurement: how far a value is from the identity.
@@ -36,5 +39,27 @@ impl Measured for Log2 {
 /// Flat or curved, read through a declared band: a loop closes when its
 /// holonomy is within `noise` of the identity.
 pub fn check_flat_within<V: Measured>(field: &Field<Graph, V>, noise: Noise) -> Flatness<V> {
-    flatness(field, |h| h.magnitude() <= noise.0)
+    check_flat_by(field, |h| h.magnitude() <= noise.0)
+}
+
+/// A connection on [`spectral::join`](crate::spectral::join)'s simple graph:
+/// [`Field::simple`] on its multigraph.
+pub trait Transports<V: Group>: Sized {
+    /// One transport per edge, given in either orientation (a transport
+    /// given on `(v, u)` is stored inverted on `(u, v)`). Every edge is
+    /// `nth` 0; a pair given twice keeps the last. For parallel edges, use
+    /// [`Field::multigraph`].
+    fn transports(
+        graph: &Shape,
+        given: impl IntoIterator<Item = (EdgeKey, V)>,
+    ) -> Result<Self, FieldError>;
+}
+
+impl<V: Group> Transports<V> for Field<Graph, V> {
+    fn transports(
+        graph: &Shape,
+        given: impl IntoIterator<Item = (EdgeKey, V)>,
+    ) -> Result<Self, FieldError> {
+        Field::simple(graph.multigraph(), given)
+    }
 }

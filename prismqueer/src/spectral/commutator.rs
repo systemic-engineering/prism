@@ -41,7 +41,7 @@ use std::collections::BTreeSet;
 
 use terni::Imperfect;
 
-use crate::room::{coboundary_over, Map, Room, RoomError, Vertices, Z};
+use crate::room::{coboundary_over, Map, Measuring, Norms, Room, RoomError, Vertices, Z};
 use crate::spectral::join::{Graph, VertexId};
 
 /// Singular-value spectrum of the sheaf-Laplacian commutator `[L_A, L_B]`.

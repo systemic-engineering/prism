@@ -716,8 +716,9 @@ fn the_fit_meets_dempsters_condition_on_every_chordal_support() {
 /// the pattern of `no_clock.rs`, on one file.
 #[test]
 fn the_measured_module_has_no_float() {
-    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/measured.rs");
-    let text = std::fs::read_to_string(&file).expect("src/measured.rs is readable");
+    // The module lives in prism's floor, prism-laws (docs/spec/laws.md).
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../laws/src/measured.rs");
+    let text = std::fs::read_to_string(&file).expect("laws/src/measured.rs is readable");
     let forbidden = ["f64", "f32", "lapack", "ndarray", "blas", "band::"];
     let hits: Vec<String> = text
         .lines()
@@ -727,7 +728,7 @@ fn the_measured_module_has_no_float() {
             forbidden
                 .iter()
                 .any(|w| code.contains(w))
-                .then(|| format!("src/measured.rs:{}: {}", n + 1, line.trim()))
+                .then(|| format!("laws/src/measured.rs:{}: {}", n + 1, line.trim()))
         })
         .collect();
     assert!(text.lines().count() > 50, "the scan found the module");

@@ -287,7 +287,7 @@ fn a_measurement_near_no_root_is_absent_and_a_non_finite_one_unmeasured() {
 #[cfg(feature = "lapack")]
 mod against_room {
     use super::*;
-    use prismqueer::room::{coboundary, laplacian};
+    use prismqueer::room::{coboundary, laplacian, Measuring, Resonant};
     use prismqueer::spectral::graph_from_edges;
 
     #[test]

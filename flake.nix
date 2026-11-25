@@ -48,6 +48,7 @@
         ./projections
         ./chorus
         ./echo
+        ./laws
         ./mcp
       ];
       sourceExts = [
@@ -273,6 +274,7 @@
           packages = {
             prismqueer = crate "prismqueer" ./prismqueer [
               ./imperfect
+              ./laws
               ./projections
             ] "--features ${features}";
             terni = crate "terni" ./imperfect [ ] "";
@@ -397,20 +399,20 @@
               installPhaseCommand = "touch $out";
             };
 
-            # docs/spec/mcp.md §6: prism-mcp's own build graph holds no serde,
-            # no JSON crate, no mirror crate and nothing LAPACK, BLAS or
-            # Fortran, and prismqueer only with exactly the feature `exact`.
+            # docs/spec/mcp.md §6, docs/spec/laws.md: prism-mcp's own build
+            # graph holds no serde, no JSON crate, no mirror crate, no
+            # prismqueer (its laws come from prism-laws) and nothing LAPACK,
+            # BLAS or Fortran.
             # The graph is `cargo tree -p prism-mcp` (cargo's resolve for
             # prism-mcp alone: its own dev edges, never its dependencies',
             # features as that build turns them on), with `links` from the
             # metadata. The guard runs on the real graph; accepts mcp-merged
-            # (prism-mcp → prismqueer under exact, the real tree), whose
-            # workspace-union metadata the old reading refused for terni →
-            # serde (asserted here); and refuses nine, each for its own
-            # reason: prismqueer with lapack, prismqueer with default, terni's
-            # serde really on, serde_json as a normal edge, a JSON crate, a
-            # mirror crate, `links = "blas"`, a package the metadata doesn't
-            # have, and a line that doesn't parse.
+            # (prism-mcp → prism-laws, the real tree), whose workspace-union
+            # metadata the old reading refused for terni → serde (asserted
+            # here); and refuses eight, each for its own reason: prismqueer,
+            # terni's serde really on, serde_json as a normal edge, a JSON
+            # crate, a mirror crate, `links = "blas"`, a package the metadata
+            # doesn't have, and a line that doesn't parse.
             prism-mcp-independent = craneLib.mkCargoDerivation {
               pname = "prism-mcp-independent";
               inherit version;
@@ -435,8 +437,7 @@
                   if said=$(bash $guard $fixtures/mcp-$f.tree $fixtures/mcp-packages.json 2>&1); then echo "prism-mcp-independent accepted mcp-$f" >&2; exit 1; fi
                   case "$said" in *"$why"*) ;; *) echo "prism-mcp-independent refused mcp-$f, but not for $why: $said" >&2; exit 1 ;; esac
                 done <<'EOF'
-                lapack prismqueer (features exact,lapack)
-                default prismqueer (features default,exact)
+                prismqueer prismqueer
                 terni-serde serde_derive
                 serde-json serde_json
                 json tinyjson

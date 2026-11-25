@@ -12,7 +12,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use prismqueer::field::{Edge, Field, Ratio};
+use prismqueer::field::{Edge, Field, Ratio, Transports};
 use prismqueer::music::{ring_true, Atom, Note, Piece, Ringing, Rule, Tuning, TuningError};
 use prismqueer::spectral::graph_from_edges;
 

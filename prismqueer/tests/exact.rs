@@ -34,7 +34,21 @@ const EXACT: [&str; 10] = [
 ];
 
 fn source(name: &str) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(name);
+    read(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(name))
+}
+
+/// An exact module's own source: in prism's floor, prism-laws, for every
+/// one but discoball (docs/spec/laws.md); prismqueer re-exports them.
+fn law_source(name: &str) -> String {
+    let dir = if name == "discoball.rs" {
+        "src"
+    } else {
+        "../laws/src"
+    };
+    read(Path::new(env!("CARGO_MANIFEST_DIR")).join(dir).join(name))
+}
+
+fn read(path: std::path::PathBuf) -> String {
     fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
 
@@ -81,7 +95,7 @@ fn no_exact_module_holds_a_float() {
         .iter()
         .flat_map(|m| {
             let file = format!("{m}.rs");
-            floats(&source(&file))
+            floats(&law_source(&file))
                 .into_iter()
                 .map(move |(n, l)| format!("src/{file}:{n}: {l}"))
         })
